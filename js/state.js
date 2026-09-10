@@ -171,7 +171,9 @@ GAME.State = {
         // 重置剧情进度，确保筑基期主线从干净状态展开
         p.moEventDone = false;
         p.jiayuanDone = false;
-        p.qixuan = null;
+        // 官方筑基期直接跳过苍梧门开局六幕：把六幕标记为「已完结」(act 7)，
+        // 否则目标横幅会一直挂着「走完苍梧门开局六幕」，与「直接到筑基期」的设定相悖
+        p.qixuan = { act: 7, step: 0 };
         p.tainan = null;
         p.companion = null;
         p.stats = p.stats || { kills:0, mercies:0, breakthroughs:0, explores:0, pillsTaken:0, alchemy:0, maxRealm:13, oddjobs:0, trialsEntered:0, fzones:0 };

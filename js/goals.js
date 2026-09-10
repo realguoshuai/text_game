@@ -95,7 +95,12 @@ GAME.Goals = {
                 var act = (p.qixuan && p.qixuan.act) || 1;
                 return "当前第 " + Math.min(act, 6) + " 幕 / 共 6 幕";
             },
-            where: "苍梧门"
+            where: "苍梧门",
+            goto: function () {                       // 目标横幅「前往：苍梧门」可点击 → 直接跳转开幕
+                if (!GAME.Qixuan) return;
+                if (!GAME.State.p().qixuan) GAME.Qixuan.start();   // 尚未启幕：开演六幕第一幕（炼骨崖考核）
+                else GAME.UI.updateUI();                          // 已进行中：重绘让紧急面板优先显示六幕剧情
+            }
         },
         {
             id: "tainan",

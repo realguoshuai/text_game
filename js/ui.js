@@ -206,7 +206,21 @@ GAME.UI = {
         if (tag) tag.innerText = g.urgent ? "当务之急" : "当前目标";
         var t = this.$("goal-text"); if (t) t.innerText = g.text || "—";
         var h = this.$("goal-hint"); if (h) h.innerText = g.hint || "";
-        var w = this.$("goal-where"); if (w) w.innerText = g.where ? ("前往：" + g.where) : "";
+        var w = this.$("goal-where");
+        if (w) {
+            if (g.where && !GAME.State.p().isDead) {
+                if (typeof g.goto === "function") {
+                    // 可点击跳转：把地点名渲染成链接（如「苍梧门」→ 跳到六幕开幕）
+                    w.innerHTML = '前往：<span class="goal-where-link" id="goal-where-link">' + (g.where || "") + '</span>';
+                    var link = this.$("goal-where-link");
+                    if (link) link.onclick = function () { try { g.goto(); } catch (e) { console.error(e); } };
+                } else {
+                    w.innerText = "前往：" + g.where;
+                }
+            } else {
+                w.innerText = "";   // 死亡态：目标横幅交由 applyDeathLock 显示「道陨」，此处留空
+            }
+        }
     },
 
     updateUI: function () {
