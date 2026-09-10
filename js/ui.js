@@ -138,41 +138,58 @@ GAME.UI = {
     // 原则：死亡后玩家不得再改变今生任何状态；仅可读取轮回石（存档管理）或重开新局（重入轮回）。
     applyDeathLock: function () {
         var p = GAME.State.p();
-        if (!p.isDead) return;
-        // 允许点击的按键白名单：重入轮回 / 存档管理入口 / 存档弹窗关闭 / 档位读写按钮
+        var dead = !!(p && p.isDead);
         var ALLOW = { "btn-restart": 1, "btn-manage": 1, "btn-save-close": 1 };
-        var containers = ["topbar", "main-panel", "goal-banner", "workspace", "save-modal"];
         var self = this;
+        // —— 非死亡态：解除上一轮死亡锁，交回业务渲染决定正常禁用 ——
+        if (!dead) {
+            try {
+                var locked = (typeof document !== "undefined" && document.querySelectorAll)
+                    ? document.querySelectorAll("button.dead-locked") : [];
+                for (var k = 0; k < locked.length; k++) {
+                    locked[k].disabled = false;
+                    if (locked[k].classList) locked[k].classList.remove("dead-locked");
+                }
+            } catch (e) {}
+            // 还原目标横幅（若曾被「道陨」覆盖）
+            var gb = this.$("goal-banner");
+            if (gb && gb.className && gb.className.indexOf("urgent") >= 0) {
+                gb.className = "goal-banner";
+                var gt = this.$("goal-tag"); if (gt) gt.innerText = "";
+                var gx = this.$("goal-text"); if (gx) gx.innerText = "";
+                var gh = this.$("goal-hint"); if (gh) gh.innerText = "";
+            }
+            return;
+        }
+        // —— 死亡态：锁定白名单之外所有按钮（打 dead-locked 标记，便于复活时精准解锁）——
+        function lockBtn(b) {
+            if (!b) return;
+            if (ALLOW[b.id]) return;
+            if (b.hasAttribute && b.hasAttribute("data-slot")) return;
+            b.disabled = true;
+            if (b.classList) b.classList.add("dead-locked");
+        }
+        var containers = ["topbar", "main-panel", "goal-banner", "workspace", "save-modal"];
         containers.forEach(function (cid) {
             var c = self.$(cid);
             if (!c) return;
             var btns = c.getElementsByTagName("button");
-            for (var i = 0; i < btns.length; i++) {
-                var b = btns[i];
-                if (ALLOW[b.id]) continue;                  // 白名单：始终可点
-                if (b.hasAttribute("data-slot")) continue;  // 存档管理：档位读取/覆盖/删除/存入
-                b.disabled = true;                          // 其余全部置灰
-            }
+            for (var i = 0; i < btns.length; i++) lockBtn(btns[i]);
         });
-        // 死亡态：目标横幅改为「道陨」提示，解释为何全部操作被锁
-        var gb = self.$("goal-banner");
-        if (gb) {
-            gb.style.display = "";
-            gb.className = "goal-banner urgent";
-            var gt = self.$("goal-tag"); if (gt) gt.innerText = "道陨";
-            var gx = self.$("goal-text"); if (gx) gx.innerText = (p.deathReason || "未知") + "——今生已止，仅可重入轮回或读取轮回石。";
-            var gh = self.$("goal-hint"); if (gh) gh.innerText = "读回最近一次轮回石，即可从那一刻重来。";
-        }
         // 兜底：全文档扫描（覆盖任何未来新增容器/游离按钮，名单之外绝不漏锁）
         try {
             var allB = (typeof document !== "undefined" && document.querySelectorAll) ? document.querySelectorAll("button") : [];
-            for (var k = 0; k < allB.length; k++) {
-                var b2 = allB[k];
-                if (ALLOW[b2.id]) continue;
-                if (b2.hasAttribute && b2.hasAttribute("data-slot")) continue;
-                b2.disabled = true;
-            }
+            for (var m = 0; m < allB.length; m++) lockBtn(allB[m]);
         } catch (e2) {}
+        // 死亡态：目标横幅改为「道陨」提示，解释为何全部操作被锁
+        var gb2 = self.$("goal-banner");
+        if (gb2) {
+            gb2.style.display = "";
+            gb2.className = "goal-banner urgent";
+            var gt2 = self.$("goal-tag"); if (gt2) gt2.innerText = "道陨";
+            var gx2 = self.$("goal-text"); if (gx2) gx2.innerText = (p.deathReason || "未知") + "——今生已止，仅可重入轮回或读取轮回石。";
+            var gh2 = self.$("goal-hint"); if (gh2) gh2.innerText = "读回最近一次轮回石，即可从那一刻重来。";
+        }
     },
 
     // ---------- 总渲染 ----------
@@ -1910,6 +1927,9 @@ GAME.UI = {
     doRestart: function () {
         if (!window.confirm("重入轮回将删除当前存档与今生进度，确定？")) return;
         GAME.Storage.clear();
+        // 清除死亡态：否则回到出身页时死亡锁仍未解除，按钮全灰、需手动刷新
+        var pp = GAME.State.p();
+        if (pp) { pp.isDead = false; pp.deathReason = ""; }
         this.started = false;
         this.selectedOrigin = GAME.DATA.ORIGINS[0].id;
         this.tab = "map";
@@ -1917,6 +1937,7 @@ GAME.UI = {
         this._lastLocation = undefined;
         document.getElementById("log-box").innerHTML = "";
         this.renderOrigin();
+        this.applyDeathLock();   // 解除死亡锁，解锁出身页按钮（isDead 已清，走解锁分支）
     },
 
     // ---------- 存档管理（多档位） ----------
