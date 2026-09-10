@@ -133,6 +133,38 @@ GAME.UI = {
         this.updateUI();
     },
 
+    // ---------- 死亡锁：除「重入轮回」「存档管理」外，所有操作按键置灰禁用 ----------
+    // 触发点：setDead() / 战斗 end() / 任何 updateUI 都会走到这里（死亡是终局态）。
+    // 原则：死亡后玩家不得再改变今生任何状态；仅可读取轮回石（存档管理）或重开新局（重入轮回）。
+    applyDeathLock: function () {
+        var p = GAME.State.p();
+        if (!p.isDead) return;
+        // 允许点击的按键白名单：重入轮回 / 存档管理入口 / 存档弹窗关闭 / 档位读写按钮
+        var ALLOW = { "btn-restart": 1, "btn-manage": 1, "btn-save-close": 1 };
+        var containers = ["topbar", "main-panel", "goal-banner", "workspace", "save-modal"];
+        var self = this;
+        containers.forEach(function (cid) {
+            var c = self.$(cid);
+            if (!c) return;
+            var btns = c.getElementsByTagName("button");
+            for (var i = 0; i < btns.length; i++) {
+                var b = btns[i];
+                if (ALLOW[b.id]) continue;                  // 白名单：始终可点
+                if (b.hasAttribute("data-slot")) continue;  // 存档管理：档位读取/覆盖/删除/存入
+                b.disabled = true;                          // 其余全部置灰
+            }
+        });
+        // 死亡态：目标横幅改为「道陨」提示，解释为何全部操作被锁
+        var gb = self.$("goal-banner");
+        if (gb) {
+            gb.style.display = "";
+            gb.className = "goal-banner urgent";
+            var gt = self.$("goal-tag"); if (gt) gt.innerText = "道陨";
+            var gx = self.$("goal-text"); if (gx) gx.innerText = (p.deathReason || "未知") + "——今生已止，仅可重入轮回或读取轮回石。";
+            var gh = self.$("goal-hint"); if (gh) gh.innerText = "读回最近一次轮回石，即可从那一刻重来。";
+        }
+    },
+
     // ---------- 总渲染 ----------
     // ---------- 当前目标横幅 ----------
     renderGoal: function () {
@@ -315,6 +347,7 @@ GAME.UI = {
             this.renderPuppet();
             this.renderAchievements();
             this.applyPanels();
+            this.applyDeathLock();   // 死亡态：锁定除「重入轮回」「存档管理」外所有操作
         } catch (e) {
             console.error("渲染异常", e);
             try { this.log("界面渲染出现异常：" + e.message + "（游戏仍在运行，可重入轮回）", "danger"); } catch (e2) {}
