@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="ywCLTY2okBfC3Uv9JiqlT2">
+<head data-page-node-id="FeZd6CQkcWgxmC3XZifR60">
+    <meta charset="UTF-8" data-page-node-id="bov0znnrrQBRh6PGlmqdk1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="4U91psroUmWQWYufHAqoF3">
+    <title>凡人问道录 - ImmortalGame</title>
+    <link rel="stylesheet" href="css/style.css" data-page-node-id="sFDalITgKUcZRZn5XXAhyA">
+</head>
+<body data-page-node-id="dSLKe9X195XC6lC7ojDrav">
+
+<div id="game-container" data-page-node-id="vWuVgJAHCmppfsedO4oFd3">
+
+    <!-- ===== 顶栏：标题 + 存档操作 ===== -->
+    <div id="topbar" data-page-node-id="kKy70nIPSoXZGUZGfAkVde">
+        <h2 data-page-node-id="iSG1WXcoh9IgdzYCmptwgt">凡人问道录</h2>
+        <div id="save-row" data-page-node-id="Vg3t5d4saG1odga9Fa7ZC2">
+            <button id="btn-theme" class="small-btn" data-page-node-id="xDxvJ8vsfwJMtYMj1GWTGp">浅色</button>
+            <button id="btn-save" class="small-btn" data-page-node-id="TKldJsBtfT2PIYlwJD92LV">存档</button>
+            <button id="btn-manage" class="small-btn" data-page-node-id="jWUEknvPpOc9lp8q4wmLxK">存档管理</button>
+            <button id="btn-restart" class="small-btn btn-danger" data-page-node-id="vora45MHzWWkBakGz8Ndrl">重入轮回</button>
+        </div>
+    </div>
+
+    <!-- ===== 开局：封面 + 出身选择 ===== -->
+    <div class="panel" id="origin-panel" data-page-node-id="P0Vc8C8E4DMKfNKo5PnBzQ">
+        <div class="cover-head" data-page-node-id="VdSFAZSIXhGjMLqTPvo8yG">
+            <div class="cover-ornament" data-page-node-id="1OUf419OGqTHteLDcHAt9R">✦ ────────── ❖ ────────── ✦</div>
+            <h1 class="cover-title" data-page-node-id="0ZQz72FCdIziTRS8sWspk0">凡人问道录</h1>
+            <div class="cover-sub" data-page-node-id="fTM05PDm8BMULKKIZUY9Rr">一个山村穷小子的漫漫仙途 · 苍梧门 → 景阳城 → 苍南山 → 筑基之路</div>
+            <div class="cover-ornament" data-page-node-id="uqEfpq715zuStLmGKZOIUT">❖</div>
+        </div>
+        <div class="cover-section-title" data-page-node-id="jbFWEChWMAeBtbGRaA9Lah">── 投胎转世 · 择一身世 ──</div>
+        <div id="origin-list" class="origin-cards" data-page-node-id="EDax0RvgbtA1vkMGT8cCLo"></div>
+        <div id="origin-desc" class="origin-desc" data-page-node-id="IoC7ysfjWuneMwwchaIoED"></div>
+        <button id="btn-start" class="btn-gold cover-start" data-page-node-id="BVdfubIcPbtPjEtb6764e7">就 此 踏 入 修 仙 界</button>
+        <button id="btn-zhuji" class="cover-start" data-page-node-id="zhuji_preset_btn" style="margin-top:14px;font-size:14px;padding:8px 32px;letter-spacing:2px;">⚡ 直接体验筑基期（官方存档）</button>
+    </div>
+
+    <!-- ===== 角色状态 ===== -->
+    <div class="panel" id="main-panel" data-page-node-id="Sgd4asjAPlZuw3vrWFjiPn">
+        <div class="stats-grid" data-page-node-id="TwZsqWAN4sRRRxSYSkXDe3">
+        	<div data-page-node-id="HP3sNFSdKAr3WxYVfec3mZ">道号：<span class="highlight" data-page-node-id="gNXg5gOIp854GvGtF2TpyR">沈小牧</span></div>
+        	<div data-page-node-id="1Mn2wscTDZCJbCdq3OKPAe">出身：<span id="origin-text" class="highlight" data-page-node-id="TWTTNZZx2gG2C3IAb2D62P">-</span></div>
+        	<div data-page-node-id="GABYWdrlik8aeTGPHrLlyA">境界：<span id="realm-text" class="highlight" data-page-node-id="6wj3O33SyaYlmt774lUnBc">练气一层</span></div>
+        	<div data-page-node-id="bqBvTq5eZqv8uIh1OyjGss">修为：<span id="exp-text" data-page-node-id="8CHn1z1k4wtgkbzNJaDzow">0 / 20</span></div>
+        	<div data-page-node-id="g7qrya9bdT5bJtgCRYXOyC">气血：<span id="hp-text" data-page-node-id="JQXTbLmiFrnPJQYBwbRQQ9">100 / 100</span></div>
+        	<div data-page-node-id="VHDPsnz7KsDGNPCbf4A170">灵石：<span id="stone-text" class="gold" data-page-node-id="7V8K8f7KKdtEKHiE7wWAtt">0</span></div>
+        	<div data-page-node-id="8xOlD1GDN4Fd5sg1CF2nFi">绿液：<span id="liquid-text" class="highlight" data-page-node-id="MU9l8dneEBYdgYKnsVKQvP">0</span> 滴</div>
+        	<div data-page-node-id="jT7LVvFhIq9nHBGZkRmFdY">所在：<span id="location-text" class="highlight" data-page-node-id="29khdKCsHP9nCXDrEmQcE9">幽篁谷</span></div>
+        	<div data-page-node-id="BNO3i0ePYIhDZCUXVATF5Y">银两：<span id="silver-text" data-page-node-id="ho1T7krnzF4ITh4Lkyv6T4">0</span> 两</div>
+        	<div style="grid-column:1/-1;" id="status-alerts">
+        		<span class="alert-tag" id="alert-wrap-煞气" style="display:none;"><div data-page-node-id="W04p8fDgasX1F2f1gmoUmN">煞气：<span id="sha-text" data-page-node-id="l9xODSsGWTAVKt58pFBaYb">0</span></div></span>
+        		<span class="alert-tag" id="alert-wrap-阴毒" style="display:none;"><div data-page-node-id="kAErd22dSBm5gAfESdqQTH">阴毒：<span id="yindu-text" data-page-node-id="YiMkTW0vXOQVeU76GRidia">无</span></div></span>
+        		<span class="alert-tag" id="alert-wrap-risk" style="display:none;">觊觎：<span id="risk-text">0</span>/100</span>
+        		<span class="alert-tag" id="alert-wrap-leak" style="display:none;">药香泄露：<span id="leak-text">0</span></span>
+        	</div>
+        		<details class="stats-more" style="grid-column:1/-1;">
+        			<summary>更多属性</summary>
+        			<div data-page-node-id="OeCIbsfK8IIfpSbxPJO4tY">
+        				<div data-page-node-id="rrk3etvmFfPUtinUxTLR9s"><em>资质</em><b>伪灵根</b></div>
+        				<div data-page-node-id="3MMV74EyFhPXlbEgrHhxy6"><em>善恶</em><b id="karma-text">0</b></div>
+        				<div data-page-node-id="tnJbcnqCs9kLDnRuHYWmat"><em>寿元</em><b><span id="age-text">16岁</span> / <span id="max-age-text">100岁</span></b></div>
+        				<div data-page-node-id="gk70asWOYLyCVvzSIycHjP"><em>面板</em><b id="stat-text">攻5 防2 速6 识5</b></div>
+        				<div data-page-node-id="zDkfWZ9DtR1C7RabyjRXP6"><em>法器</em><b id="artifact-text">无</b></div>
+        				<div data-page-node-id="2EsZldE5HXqDtaqdLHxQzy"><em>贡献</em><b id="contrib-text">0</b></div>
+        				<div data-page-node-id="gCNIeRw0pIkAlDKqd4H0AE"><em>敛气</em><b><span id="conceal-text">0</span> 阶</b></div>
+        				<div data-page-node-id="cjCfMPh0Jjq4TIdRE1ows1"><em>青木功</em><b><span id="changchun-text">0</span> 层</b></div>
+        				<div data-page-node-id="aeBKIxFozDem1ZZqf9tChp"><em>玄傀</em><b id="companion-text">无</b></div>
+        				<div data-page-node-id="NNpx9tNsATqagymtXgtnkL"><em>心境</em><b id="mind-text">0</b></div>
+        				<div data-page-node-id="lwOqVTk6n66Bpo9n2tzHsU"><em>门派</em><b id="sect-text">散修</b></div>
+        				<div data-page-node-id="alGs6tEjPTKwDD1oBFvPkb"><em>因果</em><b id="causal-text">无</b></div>
+        			</div>
+        		</details>
+        </div>
+    </div>
+
+    <!-- ===== 工作区：左=操作+面板，右=日志；两栏各自内部滚动 ===== -->
+    <div id="workspace" data-page-node-id="miDdDGGRuA0M4UnwChNkf4">
+
+        <div id="left-col" data-page-node-id="Hw2irYum2Lt7PMHm1NUjzG">
+            <!-- 洞府操作：常驻可见 -->
+            <div class="actions" id="cave-actions" data-page-node-id="WVzQskURDI6MUseBEVxhqv">
+                <button id="btn-meditate" data-page-node-id="C8BlRj3V4Dsr299iTeBxY8">闭关打坐 (半年+1修为)</button>
+                                <details class="dropdown" id="dd-catalyze">
+                    <summary>承露瓶催熟 ▾（绿液 <span id="dd-liquid-text">0</span> 滴）</summary>
+                    <div class="dd-body">
+						<button id="btn-catalyze-bainian" class="small-btn dd-item" style="display:block;width:100%;">催熟百年灵药 (1滴)</button>
+                											<button id="btn-catalyze-qiannian" class="small-btn dd-item" style="display:block;width:100%;">催熟千年灵药 (5滴)</button>
+                											<button id="btn-catalyze-wood" class="small-btn dd-item" style="display:block;width:100%;">催熟灵木幼苗 (1滴 得灵木×3)</button>
+                											<button id="btn-catalyze-xuanbing" class="small-btn dd-item" style="display:block;width:100%;">催熟五百年玄冰花 (5滴)</button>
+                											<button id="btn-catalyze-longlin" class="small-btn dd-item" style="display:block;width:100%;">催熟千年龙鳞果 (10滴)</button>
+                    </div>
+                </details>
+                <button id="btn-alchemy" data-page-node-id="gblIVqM1sB7jc2HqejS797">开炉炼丹</button>
+                <button id="btn-breakthrough" data-page-node-id="XBfz8ISTTIoqE6B4VQ14Ex">尝试突破境界</button>
+                <button id="btn-explore" class="btn-danger" data-page-node-id="6f8qRzfD2Q3GaHXVOqb2at">外出历练 (1~3月)</button>
+                <button id="btn-market" class="btn-gold" data-page-node-id="SWlaGwCVrQTnA5yRgLp9JA">前往坊市 (耗时2月)</button>
+                <button id="btn-sect" data-page-node-id="estJjkB8CNUqoOaXYE4qO5">门派</button>
+            </div>
+
+            <!-- 面板切换：同一时刻只显示一个 -->
+            <div id="tabs" data-page-node-id="rDgBXtHxbobSWbr1ZhCxl1">
+                <button id="tab-map" class="small-btn" data-page-node-id="16t10QAr4zdgwWYb1ubho7">大地图</button>
+                <button id="tab-home" class="small-btn">洞府</button>
+                <button id="tab-bag" class="small-btn" data-page-node-id="uG1WwCtG5JN5JYS8dfWHqy">储物袋<span id="badge-bag" class="tab-badge" style="display:none;"></span></button>
+                <button id="tab-market" class="small-btn" data-page-node-id="xB76RNxneibNOW0kX6GD9t">坊市</button>
+                <button id="tab-fzone" class="small-btn" data-page-node-id="OMeD5O2tfIYEQGQoV06SmL">副本/试炼<span id="badge-fzone" class="tab-badge" style="display:none;"></span></button>
+                <button id="tab-companion" class="small-btn" data-page-node-id="0dHGsHB9VCW7a4zBZbFMTX">灵宠/傀儡<span id="badge-companion" class="tab-badge" style="display:none;"></span></button>
+                <button id="tab-codex" class="small-btn">图志/道碑</button>
+            </div>
+
+            <div id="panel-area" data-page-node-id="0Zg1uwes6QAbF6ly85IZ44">
+                <!-- 岚州大地图：节点流转 + 地点专属行动 -->
+                <div class="panel" id="map-panel" data-page-node-id="TOJ1GgnbEgMlV3V1Twg3hQ">
+                    <h3 data-page-node-id="8CP5AS1Vn5AUzNH4en7PVn">岚州舆图</h3>
+                    <div id="map-info" class="item-desc" data-page-node-id="JvGWIdtm4BgCESyTdgd2Da"></div>
+                    <h3 style="margin-top:10px;" data-page-node-id="AKOJYh5K3DlxbtPNttFllL">四通八达</h3>
+                    <div id="map-routes" data-page-node-id="CFnk2KizydqqFtCOaJIlmJ"></div>
+                    <h3 style="margin-top:10px;" data-page-node-id="Yf8uiadUb0UeXO2RGaUD3E">天下舆图 <span class="item-desc" style="font-weight:normal;" data-page-node-id="FeN2R8Cf6VJAQRbbpJgACJ">（随修为渐进解锁）</span></h3>
+                    <div id="map-atlas" data-page-node-id="wop9bayoCW5dhOzEH3UoMs"></div>
+                    <div class="highlight" style="margin-top:8px;">—— 狩猎之地（按修为开放） ——</div>
+                    <div id="map-hunts"></div>
+                    <h3 style="margin-top:10px;" data-page-node-id="mSo7J5fW2FCUYYBhyASDod">此地可为</h3>
+                    <div id="map-actions" data-page-node-id="ucKs25Hx0oNmblu9YOBPO1"></div>
+                    <div id="map-exchange" style="display:none; margin-top:10px;">
+                        <div class="item-desc" style="margin-bottom:4px;">市口守着一位行商老者，摇着蒲扇替修道人兑世俗银两——1 灵石兑 100 两。</div>
+                        <div class="combat-actions">
+                            <button id="btn-exchange-1" class="small-btn" data-page-node-id="Uz5Opf7EDsaRoeUb8YLtit">兑 1 灵石（100 两）</button>
+                            <button id="btn-exchange-5" class="small-btn" data-page-node-id="Y3HSA8m0gCMFcmwJBHi34p">兑 5 灵石（500 两）</button>
+                        </div>
+                    </div>
+                    <div class="combat-actions" id="map-black-entry" style="margin-top:10px;">
+                        <button id="btn-map-black" class="small-btn btn-gold">坊市旧货摊 · 地下黑市</button>
+                    </div>
+                    <!-- 苍南小会：身抵苍南谷时显现（散修坊市 + 升仙大会） -->
+                    <div id="tainan-block" style="display:none; margin-top:10px; border-top:1px dashed var(--bd); padding-top:8px;" data-page-node-id="sEhqeUP8RUNxgbyBZ0jdnq">
+                        <h3 data-page-node-id="EFBMauGIlMU8dXfvubaGDw">苍南小会</h3>
+                        <div id="tainan-info" class="item-desc" data-page-node-id="v2ElxRUr0xpURWHi3XTbA9">此处需用灵石说话——世俗银两在修仙者眼里与沙土无异。</div>
+                        <h3 style="margin-top:10px;" data-page-node-id="GxEUM4OyKy6b6CuVQ6DuQm">散修坊市</h3>
+                        <div id="tainan-goods" data-page-node-id="EPGDvHyawZB6FxIZnNoPgn"></div>
+                        <h3 style="margin-top:10px;" data-page-node-id="ZMvyLpHCz4gcd7bZI5kTQU">出售杂物</h3>
+                        <div id="tainan-sell" data-page-node-id="13FvDAarxOHyffqFyzfqNI"></div>
+                        <h3 style="margin-top:10px;" data-page-node-id="ipWcUKV9UFLEqBUn3EDRtN">升仙大会</h3>
+                        <div id="tainan-leitai" class="item-desc" data-page-node-id="vpSixXBPFzKGxSbXMgb0Zw"></div>
+                        <div class="combat-actions" data-page-node-id="kYtkSJbxHJ1UWVigurmML8">
+                            <button id="btn-leitai-next" class="btn-danger" data-page-node-id="fZWtgD3GpBBqNtmJynokjb">上台打擂</button>
+                            <button id="btn-shengxian-token" class="btn-gold" data-page-node-id="Y2lNwHo2h2IUStbUUAViSV">出示升仙令（保送拜山）</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel" id="bag-panel" data-page-node-id="vi1qowg4dpyFJ1qQ58S8qJ">
+                    <h3 data-page-node-id="R5lWWF5zEuKSL287p1UiH8">储物袋</h3>
+                    <div id="bag-list" data-page-node-id="0Z1NH2pww6boGiHhv0VuHg"></div>
+                </div>
+
+                <div class="panel" id="alchemy-panel" data-page-node-id="U3l9LyR42NnBCFk8qfGBef">
+                    <h3 style="border-color:#0369a1;" data-page-node-id="H7aQD6Ik4LdOWriWQefAeZ">丹炉</h3>
+                    <div id="recipe-list" data-page-node-id="KUFxZQ7YcbU4HRS8NZvr0A"></div>
+                    <button id="btn-close-alchemy" class="small-btn" style="margin-top:8px;" data-page-node-id="xj6EagsQ7WMaekFu5cCrFk">收炉</button>
+                </div>
+
+                <div class="panel" id="market-panel" data-page-node-id="Kms1iJp0ygbghINHGSytuH">
+                    <h3 data-page-node-id="3XSCDHWoZpevFsOh1EdkZq">坊市</h3>
+                    <div class="item-desc" id="market-tip" data-page-node-id="F4TpZlyvCTK53atp3X2FUR"></div>
+                    <div id="market-goods" data-page-node-id="IhMbl4TGXUoD8KTHPJ72uv"></div>
+                    <h3 style="margin-top:10px;" data-page-node-id="LPvTfiOQx8KutBX6rxKAFi">出售杂物</h3>
+                    <div id="market-sell" data-page-node-id="kj6ayXkwKBq42wUMoPqqOt"></div>
+                    <h3 style="margin-top:10px;">货币兑换商</h3>
+                    <div class="item-desc">积零成整：100 枚低阶灵石可兑 1 枚中阶灵石（筑基期大额支付通行）。</div>
+                    <button id="btn-exchange-stone" class="small-btn btn-gold" style="margin-top:4px;">兑换中阶灵石 (100 低阶)</button>
+                    <button id="btn-leave-market" style="margin-top:8px;" data-page-node-id="hFzFFWfLymLjOWXL1RmnlS">返回洞府</button>
+                </div>
+
+                <div class="panel" id="home-panel">
+                    <h3>洞府</h3>
+                    <div class="item-desc" id="home-intro"></div>
+                    <div id="home-guide" class="guide-box" style="display:none"></div>
+                    <div id="home-facilities"></div>
+                    <div id="cave2-block" style="margin-top:12px;"></div>
+                    <div id="endgame-block" style="margin-top:12px;"></div>
+                    <h3 style="margin-top:14px;">地火丹房</h3>
+                    <div class="combat-actions">
+                        <button id="btn-home-alchemy" class="small-btn">开炉炼丹（地火丹房）</button>
+                    </div>
+                </div>
+
+                <div class="panel" id="codex-panel">
+                    <h3>图鉴 · 见闻录</h3>
+                    <div class="item-desc" id="codex-summary"></div>
+                    <div id="codex-guide" class="guide-box" style="display:none"></div>
+                    <div class="combat-actions">
+                        <button id="btn-codex-items" class="small-btn">器物</button>
+                        <button id="btn-codex-monsters" class="small-btn">妖兽</button>
+                        <button id="btn-codex-spells" class="small-btn">术法</button>
+                        <button id="btn-codex-lore" class="small-btn">秘闻</button>
+                        <button id="btn-codex-skill" class="small-btn">修行录·技能</button>
+                    </div>
+                    <div id="codex-list"></div>
+                    <h3 style="margin-top:14px;">道碑与生平</h3>
+                    <div class="item-desc" id="ach-summary"></div>
+                    <div id="ach-list" class="ach-list"></div>
+                </div>
+
+                <div class="panel" id="sect-panel" data-page-node-id="pLQBsZJKMBGv3HwFEZ3kcj">
+                    <h3 data-page-node-id="3wE7a4spvweCZchWE9lkyG">门派 · 杂役堂</h3>
+                    <div class="item-desc" data-page-node-id="LYFk8KTeCGwDRTdrGPJI63">承接杂役攒宗门贡献，亦可暗行监守自盗——风险与收益并存。</div>
+                    <div id="sect-missions" data-page-node-id="VYQFQMbM3HzTkOvJ9Jab3Y"></div>
+                    <h3 style="margin-top:10px;" data-page-node-id="gy7LvPsQhWcbMChPYSxRNN">贡献兑换</h3>
+                    <div id="sect-exchange" data-page-node-id="yacviOnjPcrXUYwSlNivYS"></div>
+                    <div id="sect2-box" data-page-node-id="ep2TV3ZpJAv4LCO5mzL1Ac"></div>
+                </div>
+
+                <div class="panel" id="black-panel" data-page-node-id="Vtxz99OXICNihvw4xcJlNW">
+                    <h3 data-page-node-id="q31V82dRCrnbM584UmDTbv">坊市旧货摊 · 地下黑市</h3>
+                    <div class="item-desc" data-page-node-id="gG4uaIUhRp0KbAmeE0VH07">旧货摊：以神识鉴定真伪，神识不足只能盲买赌命。地下黑市：高阶灵药高价变现，却易招神识尾随。</div>
+                    <div class="item-desc" id="junk-tip" data-page-node-id="junkTipNode"></div>
+                    <div id="junk-goods" data-page-node-id="9LpPERvtZjQFLhWI7U8yD2"></div>
+                    <h3 style="margin-top:10px;" data-page-node-id="gtdOBPbhmqh6QLxB1IGitS">地下黑市销赃</h3>
+                    <div id="black-sell" data-page-node-id="c8McSG9Mx8tEdBeaQuN0rG"></div>
+                    <h3 style="margin-top:10px;" data-page-node-id="LEbHCqLztYPHDfT6v8cgXR">黑市秘籍 <span class="item-desc" style="font-weight:normal;" data-page-node-id="aYpx1Ml3tmPVdHoVYHzxLd">（魔道功法，修习沾染煞气）</span></h3>
+                    <div id="black-skills" data-page-node-id="gYqaaNaJE4pA96CKAVDdU4"></div>
+                    <h3 style="margin-top:10px;">黑市材料门路 <span class="item-desc" style="font-weight:normal;">（每 3 月轮换，限量售罄不补）</span></h3>
+                    <div id="black-rotation"></div>
+                </div>
+
+                <!-- 紧急面板：与标签页共用面板区，同一时刻只显其一，整页不溢出 -->
+                <div class="panel" id="combat-panel" data-page-node-id="Gel6PDn4NpneeinISQJz6X">
+                    <h3 style="border-color:#7f1d1d;" data-page-node-id="KDJHr0CEozpIaZ1o7rZy1c">斗法之中！</h3>
+                    <div class="combat-enemy" id="combat-enemy-text" data-page-node-id="LxL7OjVGtAfooyb4JlZ7A0"></div>
+                    <div class="item-desc" id="combat-round-text" data-page-node-id="URPUptWSYCjdVvBZ7MyBZh"></div>
+                    <div class="combat-actions" data-page-node-id="AUP8uvvWUk6z9VbxQUlPZY">
+                        <button id="btn-attack" class="btn-danger" data-page-node-id="ttBamfGfIDY0LAjFvfTLrF">斗法</button>
+                        <button id="btn-talisman" class="btn-gold" data-page-node-id="oXFNL8bEXGAaDtoGd3wm0P">使用符箓</button>
+                        <button id="btn-spell" class="btn-gold" data-page-node-id="CtH83vOh600r0ZsW827yqh">施放术法</button>
+                        <button id="btn-coat" class="small-btn" data-page-node-id="T6litLi22uB8fREciBEnDz">涂抹毒囊</button>
+                        <button id="btn-detonate" class="btn-danger" data-page-node-id="4J13KLe6KDSzHD1vuJlB2H">自爆法器</button>
+                        <button id="btn-fubao" class="btn-danger" data-page-node-id="fubaoCastBtn001">祭起符宝</button>
+                        <button id="btn-flee" data-page-node-id="xt1SCNvW6Vq5h2wLcXShlO">遁走</button>
+                        <button id="btn-luoyan" class="small-btn" data-page-node-id="on5lVRdFNYEZ77H9QXQcAx">流烟步(耗30%气血)</button>
+                        <button id="btn-blink" class="small-btn" data-page-node-id="bvjVPwIVebaHnGWM5t0uez">眨眼剑法(反光短剑)</button>
+                        <button id="btn-companion-block" class="small-btn" data-page-node-id="sf5wxLyEA8MdOOmN8eI11A">玄傀·肉身抵挡</button>
+                        <button id="btn-companion-smash" class="small-btn" data-page-node-id="K6zeVSykGTVItRz67LXhvM">玄傀·象甲重击</button>
+                    </div>
+                    <div class="talisman-list" id="talisman-list" data-page-node-id="QfOzJsiKJxiyK8GHMpteBk"></div>
+                    <div class="talisman-list" id="spell-list" data-page-node-id="GjW1dBv18UmZFK0iOZ9SRG"></div>
+                </div>
+
+                <!-- 玄机子与夺舍对决（多阶段紧急面板；阶段二为战斗，由 combat-panel 接管） -->
+                <div class="panel" id="mo-panel" data-page-node-id="4izWqWqQa7LQrR3QTWeRjs">
+                    <h3 style="border-color:#7f1d1d;" data-page-node-id="LkcbC7irPu1RDzkJRvGX8C">玄机子与夺舍对决</h3>
+                    <div id="mo-text" class="event-text" data-page-node-id="YVNLvmCSiHx7ywFkK0qcSI"></div>
+                    <div class="combat-actions" id="mo-stage1-actions" data-page-node-id="GycV3eFxORp5r9LCxQfoMg">
+                        <button id="btn-mo-stage1" class="btn-gold" data-page-node-id="0nRKTLzesQZDMGLEFdTAIq">运功相抗（玄机子点穴暗算）</button>
+                    </div>
+                    <div class="event-choices" id="mo-stage3-actions" data-page-node-id="mcOvBwMqCDg8YGiejrdaF6">
+                        <button id="btn-mo-swallow-hard" class="btn-danger" data-page-node-id="2L5FQfj7rk7hQ9BZJJ0eZU">硬撼元神（赌命一搏）</button>
+                        <button id="btn-mo-swallow-bell" class="btn-gold" data-page-node-id="GRveETwYC442L5oXwoDlhX">摄魂钟镇魂（需摄魂钟）</button>
+                        <button id="btn-mo-retry" class="small-btn" data-page-node-id="yefZT2pLmg7WiGkLGjxzCy">再试一次吞噬</button>
+                    </div>
+                </div>
+
+                <div class="panel" id="event-panel" data-page-node-id="CHqEhvVijeZjJ7c8ghfuRg">
+                    <h3 style="border-color:#a16207;" data-page-node-id="wL3EMGtCaMTqJkkPYZG30I">历练遭际</h3>
+                    <div id="event-text" class="event-text" data-page-node-id="gVPE2f0tvQdghT99iREqSr"></div>
+                    <div id="event-choices" class="event-choices" data-page-node-id="Oc2178gKgimmDdfNCU8pIO"></div>
+                </div>
+
+                <div class="panel" id="mercy-panel" data-page-node-id="jTAB38QxdWkPl2UgFuIHXX">
+                    <h3 style="border-color:#7f1d1d;" data-page-node-id="7Cgz5FMWe5tjaCYbh5biSW">胜负已分</h3>
+                    <div id="mercy-text" class="event-text" data-page-node-id="oVunuvyIqqUdmH2zobWQF1"></div>
+                    <div class="event-choices" data-page-node-id="WFF6Ai4akHguAhlx3dkZ2v">
+                        <button id="btn-mercy-kill" class="btn-danger" data-page-node-id="izHYZq7JJmKMhcFgN3Z9xw">斩草除根（恶名+8，煞气+5，全额财物）</button>
+                        <button id="btn-mercy-burn" class="small-btn" data-page-node-id="3sizRVUdMCMCueLaJJGdMO">火球术毁尸灭迹（无因果缠身，恶名+12）</button>
+                        <button id="btn-mercy-spare" class="btn-gold" data-page-node-id="1Wo9HnxzHxXCizKzZtA4nJ">留其活口（善名+6，六成财物）</button>
+                    </div>
+                </div>
+
+                <div class="panel" id="trial-panel" data-page-node-id="PWDdZ7OBtIFF4ok10br6UW">
+                    <h3 style="border-color:#7f1d1d;" data-page-node-id="MEJKNh3RqbGH22oNFvj9U2">血月试炼</h3>
+                    <div id="trial-text" class="event-text" data-page-node-id="TzcaHa0dqztYxK2CALWPst"></div>
+                    <div class="combat-actions" data-page-node-id="mB1gnmxpdmFZGmxOEZMeho">
+                        <button id="btn-trial-step" class="btn-danger" data-page-node-id="1Fs6VAfWE73K4Iz9FK99tv">前进一步</button>
+                        <button id="btn-trial-abandon" data-page-node-id="Lxe55UsAleVASiWXaQJgmJ">撤离试炼</button>
+                    </div>
+                </div>
+
+                <!-- 苍梧门风云·开局六幕剧情（紧急覆盖） -->
+                <div class="panel" id="qixuan-panel" data-page-node-id="6FXzubQspN2r3RZtX2OElg">
+                    <div id="qixuan-text" class="event-text" data-page-node-id="ypqz3oc8OBdsux9trWVo7L"></div>
+                    <div class="event-choices" id="qixuan-choices" data-page-node-id="pbPr8sPbpWyGzOxXSjpy3H"></div>
+                </div>
+
+                <!-- 副本中枢：血月试炼 / 血色禁地 等系列副本入口 -->
+                <div class="panel" id="dungeon-panel" data-page-node-id="hsblyHumUqUu78cSKqA7d3">
+                    <h3 data-page-node-id="cGNEa9cAv8o6jTpBNaZJMv">副本</h3>
+                    <div class="item-desc" data-page-node-id="cqt3d8Dh16FY1sfZgUrXeU">修仙路上的凶险之地——有造化，也有杀机。境界不到，切莫轻入。</div>
+                    <div id="dungeon-guide" class="guide-box" style="display:none"></div>
+                    <div id="dungeon-list" data-page-node-id="bPDCgPUZG0ZoM0IGE1hjGF"></div>
+                </div>
+
+                <!-- 血色禁地·5×5 网格轻肉鸽（练气中后期核心副本） -->
+                <div class="panel" id="fz-panel" data-page-node-id="lIWvLAN7GY6KFo3B8WYBpv">
+                    <h3 style="border-color:#7f1d1d;" data-page-node-id="cnXkzoI7bSdUkXi0hy2PrG">血色禁地</h3>
+                    <div id="fz-text" class="event-text" data-page-node-id="DZJeoS8HJqLKFOwv8WBsUc"></div>
+                    <div id="fz-fields"></div>
+                    <div class="combat-actions">
+                        <button id="btn-fz-rest" class="btn-gold">调息疗伤</button>
+                        <button id="btn-fz-submit" class="btn-gold">赴出口法阵·上交灵药</button>
+                        <button id="btn-fz-keep">私藏灵药·悄然脱离</button>
+                    </div>
+                    <div class="combat-actions" data-page-node-id="MDFMVv6AsITL1dp2aIHqQJ">
+                        <button id="btn-fz-teleport" class="btn-gold" data-page-node-id="401U6yT8tt5WU1hQzm4qOE">燃烧传送符撤离（连人带货）</button>
+                        <button id="btn-fz-abandon" data-page-node-id="KPOaFfnUl0BRTwbNaGWu5c">寻隙撤离（弃私藏药草）</button>
+                    </div>
+                </div>
+
+                <div class="panel" id="track-panel" data-page-node-id="qCRevUMqvf4I2Idz6uXiSG">
+                    <h3 style="border-color:#7f1d1d;" data-page-node-id="2efJX8W6vkkhFnhwJUD4tY">神识尾随</h3>
+                    <div id="track-text" class="event-text" data-page-node-id="CBCbrj9F0J2UIiZr31ssBf"></div>
+                    <div class="event-choices" data-page-node-id="3sFQtT7VHD4KPjR6AIyi0z">
+                        <button id="btn-track-escape" class="btn-gold" data-page-node-id="hQEN7XegDe7azHoaBQfurz">神行符/御风诀逃离（速度检定）</button>
+                        <button id="btn-track-fight" class="btn-danger" data-page-node-id="7aGgmlxUeY44NXaNz4Xfgg">引至荒野反杀（生死战）</button>
+                        <button id="btn-track-pay" class="small-btn" data-page-node-id="NGSkAWFBofvj2j89Q9sev2">弃一半灵石破财消灾</button>
+                    </div>
+                </div>
+
+                <!-- 墨府探查（景阳城·玄机世家主线子玩法）：4×4 府邸，搜检/盘问/应对巡卫 -->
+                <div class="panel" id="mansion-panel">
+                    <h3 style="border-color:#a16207;">夜探墨府</h3>
+                    <div id="mansion-text" class="event-text"></div>
+                    <div id="mansion-rooms"></div>
+                    <div class="event-choices">
+                        <button id="btn-ms-question" class="small-btn">盘问下人(15两)</button>
+                    </div>
+                    <div class="event-choices" id="ms-patrol-choices" style="border-color:var(--danger-bd);">
+                        <button id="btn-ms-sneak" class="btn-gold">隐匿绕行</button>
+                        <button id="btn-ms-bribe" class="small-btn">行贿打点(25两)</button>
+                        <button id="btn-ms-fight" class="btn-danger">硬闯（斗法）</button>
+                    </div>
+                    <div class="combat-actions">
+                        <button id="btn-ms-finish" class="btn-gold">求见颜氏（结算探查）</button>
+                        <button id="btn-ms-abandon">翻墙退出</button>
+                    </div>
+                </div>
+
+                <!-- 景阳城·玄机世家主线（四阶段连环事件） -->
+                <div class="panel" id="jiayuan-panel" data-page-node-id="3A5pPvFOKoStEx8gXaGCce">
+                    <h3 style="border-color:#a16207;" id="jiayuan-title" data-page-node-id="E2uqYw0C2kS3aIOYVwtR5b">玄机世家</h3>
+                    <div id="jiayuan-text" class="event-text" data-page-node-id="W1mYDerDqKtkn47Kms2yd5"></div>
+                    <div id="jiayuan-choices" class="event-choices" data-page-node-id="ywMoEGRgIShzuHI1fsy9Dp"></div>
+                </div>
+
+                <!-- 技能 · 修行录（替换原苍南页签位） -->
+                <div class="panel" id="skill-panel" data-page-node-id="WmpzIy6cRGbFA8XWAMLAdN">
+                    <h3 data-page-node-id="nhd1W0d4AASYzN2ASMUqNJ">技能 · 修行录</h3>
+                    <div class="item-desc" data-page-node-id="eFGWm3KpBOnvFFQL9GCkus">功法、武学、术法皆录于此。持有对应秘籍可点击研习；未得者注明来路。</div>
+                    <div id="skill-list" data-page-node-id="ri2yy1wGefrTDVfKKOvTVC"></div>
+                </div>
+
+                <!-- 铁奴·玄傀：随从日常（激活 / 药田除草 / 后山采矿） -->
+                <div class="panel" id="companion-panel" data-page-node-id="8whC3BeZN6Lu6aMpW3yoSJ">
+                    <h3 data-page-node-id="sVtjcXiD4xrPBUiJFY5hBY">铁奴·玄傀</h3>
+                    <div id="companion-info" class="item-desc" data-page-node-id="ovUSfHtG6vAHBXVXZ8yvno">你尚未收服随从。玄机子一战之后，或可凭【摄魂钟】唤起铁奴玄傀。</div>
+                    <div class="combat-actions" data-page-node-id="2lhaE6T7gGHQIwWhxXgHkP">
+                        <button id="btn-companion-activate" class="small-btn" data-page-node-id="lzv8AzagewFNCL0D4YvEAu">催动摄魂钟激活</button>
+                        <button id="btn-companion-weed" class="small-btn" data-page-node-id="A4TNGTx8iueWPHZkr5BScm">派遣·药田除草 (耗时6月)</button>
+                        <button id="btn-companion-mine" class="small-btn" data-page-node-id="2iPCST1iy9MGL1eV7zqodI">派遣·后山采矿 (耗时6月)</button>
+                        <button id="btn-companion-chop" class="small-btn">派遣·后山伐木 (2月 得灵木×1)</button>
+                        <button id="btn-companion-mineore" class="small-btn">派遣·下矿开采 (1月 得玄铁×2)</button>
+                    </div>
+                    <h3 style="margin-top:14px;">机关傀儡 · 异虫</h3>
+                    <div id="puppet-block"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右栏：见闻录 -->
+        <div id="right-col" data-page-node-id="EPculnuAHo7s9N6ejqopca">
+            <div id="log-title" class="item-desc" data-page-node-id="WRjMNBmhwhLiZdBFD5q9TN">见闻录</div>
+            <div id="log-box" data-page-node-id="S1P8I40A2T04Cp33Wkur0a"></div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ===== 存档管理模态（多档位 + 官方筑基期体验存档） ===== -->
+<div id="save-modal" class="modal-mask" style="display:none;" data-page-node-id="save_modal">
+    <div class="modal-box" data-page-node-id="save_modal_box">
+        <div class="modal-head" data-page-node-id="save_modal_head">
+            <span>轮回石 · 存档管理</span>
+            <button id="btn-save-close" class="small-btn" data-page-node-id="save_modal_close">✕</button>
+        </div>
+        <div id="save-slots" class="modal-slots" data-page-node-id="save_slots"></div>
+        <div class="modal-preset" data-page-node-id="save_modal_preset">
+            <div class="preset-title">📜 官方体验存档 · 筑基期</div>
+            <div class="preset-desc">跳过百年苦修，直接以「筑基一层」之身开局：神识修至《大衍决》四层圆满、气血法力拉满、灵石充裕，并备齐机关傀儡与魔道终局所需物事。适合快速体验筑基期玩法与终局路线。</div>
+            <button id="btn-zhuji-preset" class="btn-gold" data-page-node-id="save_modal_preset_btn">载入筑基期存档</button>
+        </div>
+    </div>
+</div>
+
+<!-- 脚本按依赖顺序加载：数据层 -> 状态 -> 存档 -> 战斗 -> 核心 -> 坊市 -> 扩展模块 -> 界面 -->
+<script src="data/realms.js"></script>
+<script src="data/realms_foundation.js"></script>
+<script src="data/items.js"></script>
+<script src="data/skills.js"></script>
+<script src="data/events.js"></script>
+<script src="data/world.js"></script>
+<script src="data/worldmap.js"></script>
+<script src="data/content.js"></script>
+<script src="data/qixuan_events.js"></script>
+<script src="data/demon_war_events.js"></script>
+<script src="data/skills_foundation.js"></script>
+<script src="data/items_foundation.js"></script>
+<script src="data/dungeon_heisha.js"></script>
+<script src="data/wild_dungeons.js"></script>
+<script src="js/state.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/core.js"></script>
+<script src="js/moEvent.js"></script>
+<script src="js/market.js"></script>
+<script src="js/map.js"></script>
+<script src="js/jiayuan.js"></script>
+<script src="js/mansion.js"></script>
+<script src="js/tainan.js"></script>
+<script src="js/sect.js"></script>
+<script src="js/garden.js"></script>
+<script src="js/home.js"></script>
+<script src="js/codex.js"></script>
+<script src="js/blackmarket.js"></script>
+<script src="js/trial.js"></script>
+<script src="js/forbidden_zone.js"></script>
+<script src="js/qixuan.js"></script>
+<script src="js/puppet.js"></script>
+<script src="js/insect.js"></script>
+<script src="js/cave2.js"></script>
+<script src="js/cultivation.js"></script>
+<script src="js/alchemy.js"></script>
+<script src="js/bottle.js"></script>
+<script src="js/bonds.js"></script>
+<script src="js/dungeon_heisha.js"></script>
+<script src="js/hunt.js"></script>
+<script src="js/teleport_portal.js"></script>
+<script src="js/endings.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
