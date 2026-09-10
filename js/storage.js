@@ -78,6 +78,11 @@ GAME.Storage = {
     saveToSlot: function (i, name, silent) {
         try {
             var p = GAME.State.p();
+            // 死亡不入档：保住最后一次"活着"的存档，玩家读档即可重来（失败兜底）
+            if (p.isDead) {
+                if (!silent) GAME.UI.log("道陨之身无法铭刻轮回石——但你上一次的存档仍在。", "system");
+                return false;
+            }
             var snapshot = JSON.parse(JSON.stringify(p));
             snapshot.combat = null;
             snapshot.pendingEvent = null;

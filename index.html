@@ -34,6 +34,7 @@
         <div id="origin-desc" class="origin-desc" data-page-node-id="IoC7ysfjWuneMwwchaIoED"></div>
         <button id="btn-start" class="btn-gold cover-start" data-page-node-id="BVdfubIcPbtPjEtb6764e7">就 此 踏 入 修 仙 界</button>
         <button id="btn-zhuji" class="cover-start" data-page-node-id="zhuji_preset_btn" style="margin-top:14px;font-size:14px;padding:8px 32px;letter-spacing:2px;">⚡ 直接体验筑基期（官方存档）</button>
+        <div class="cover-note">修仙界不讲情面，但也不必怕：随时可存档，<b>死亡不会写入存档</b>——读回最近一次轮回石即可重来。</div>
     </div>
 
     <!-- ===== 角色状态 ===== -->
@@ -91,6 +92,14 @@
             <!-- 洞府操作：常驻可见 -->
             <div class="actions" id="cave-actions" data-page-node-id="WVzQskURDI6MUseBEVxhqv">
                 <button id="btn-meditate" data-page-node-id="C8BlRj3V4Dsr299iTeBxY8">闭关打坐 (半年+1修为)</button>
+                <details class="dropdown" id="dd-meditate">
+                    <summary>批量闭关 ▾</summary>
+                    <div class="dd-body">
+                        <button id="btn-meditate-5" class="small-btn dd-item" style="display:block;width:100%;">连修 5 次</button>
+                        <button id="btn-meditate-10" class="small-btn dd-item" style="display:block;width:100%;">连修 10 次</button>
+                        <button id="btn-meditate-full" class="small-btn dd-item" style="display:block;width:100%;">直修至本境圆满</button>
+                    </div>
+                </details>
                                 <details class="dropdown" id="dd-catalyze">
                     <summary>承露瓶催熟 ▾（绿液 <span id="dd-liquid-text">0</span> 滴）</summary>
                     <div class="dd-body">
@@ -241,6 +250,7 @@
                     <div class="item-desc" id="combat-round-text" data-page-node-id="URPUptWSYCjdVvBZ7MyBZh"></div>
                     <div class="combat-actions" data-page-node-id="AUP8uvvWUk6z9VbxQUlPZY">
                         <button id="btn-attack" class="btn-danger" data-page-node-id="ttBamfGfIDY0LAjFvfTLrF">斗法</button>
+                        <button id="btn-auto-combat" class="btn-gold" title="一键打到分出胜负；气血跌破三成自动停下">自动斗法</button>
                         <button id="btn-talisman" class="btn-gold" data-page-node-id="oXFNL8bEXGAaDtoGd3wm0P">使用符箓</button>
                         <button id="btn-spell" class="btn-gold" data-page-node-id="CtH83vOh600r0ZsW827yqh">施放术法</button>
                         <button id="btn-coat" class="small-btn" data-page-node-id="T6litLi22uB8fREciBEnDz">涂抹毒囊</button>
@@ -456,6 +466,8 @@
 <script src="js/endings.js"></script>
 <script src="js/goals.js"></script>
 <script src="js/review.js"></script>
+<script src="js/moments.js"></script>
+<script src="js/tips.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

@@ -25,6 +25,7 @@ GAME.Core = {
             p.liquidCharge -= 12;
             p.liquid += 1;
             GAME.UI.log("月华流转，承露瓶悄然凝聚出一滴绿液。", "success");
+            if (GAME.Moments) GAME.Moments.fire("first_liquid");
         }
 
         // 内门师叔月俸：筑基后按月发放（中阶灵石折算）
@@ -213,6 +214,29 @@ GAME.Core = {
         this.passTime(months);
     },
 
+    // 批量打坐：连修 n 次（n<=0 或 "full" 表示一直修到本境圆满）
+    // 玩家视角：一下一下点"闭关打坐"不是玩法，是体力活。
+    meditateTimes: function (n) {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return 0;
+        var done = 0;
+        var toFull = (n === "full");
+        var limit = toFull ? 300 : Math.max(1, n | 0);
+        while (done < limit) {
+            if (p.isDead || p.combat || p.pendingEvent || p.pendingMercy) break;
+            if (!toFull) { /* 固定次数 */ }
+            else {
+                var realm = GAME.DATA.REALMS[p.realmIndex];
+                if (realm.needExp == null || p.currentExp >= realm.needExp) break;
+            }
+            this.meditate();
+            done += 1;
+        }
+        if (done > 1) GAME.UI.log("你一连闭关苦修 " + done + " 轮，出关时蒲团上落了一层灰。", "system");
+        GAME.UI.updateUI();
+        return done;
+    },
+
     // 绿液催熟：1 滴 -> 百年灵药；5 滴 -> 千年灵药
     // 宗门弟子催熟私药有被神识查获之险；百草园管事借【灵眼之泉】催熟——0% 查获，且两成概率灵泉双收。
     catalyze: function (drops, herbId) {
@@ -226,6 +250,7 @@ GAME.Core = {
         p.liquid -= drops;
         GAME.State.addItem(herbId, 1);
         GAME.UI.log("绿液化作雾气没入药苗，须臾之间，一株【" + GAME.DATA.ITEMS[herbId].name + "】长成！", "success");
+        if (GAME.Moments) GAME.Moments.fire("first_catalyze", GAME.DATA.ITEMS[herbId].name);
 
         var g2 = GAME.DATA.CONTENT.SECT2 ? GAME.DATA.CONTENT.SECT2.garden : null;
         if (GAME.Garden) {
@@ -283,6 +308,7 @@ GAME.Core = {
         p.stats.alchemy += 1;
         GAME.UI.log("炉火青烟腾起——炼成【" + GAME.DATA.ITEMS[r.pill].name + "】×" + made + "！" +
             (made > 1 ? "（丹房火候到家，双丹同炉）" : "") + "（耗灵石 " + cost + "）", "success");
+        if (GAME.Moments) GAME.Moments.fire("first_alchemy", GAME.DATA.ITEMS[r.pill].name);
         this.passTime(2);
     },
 
@@ -416,11 +442,15 @@ GAME.Core = {
         if (p.isDead || p.combat) return;
         var item = GAME.DATA.ITEMS[id];
         if (!item || item.type !== "artifact" || !GAME.State.countItem(id)) return;
+        var before = GAME.State.getStats();
         if (p.artifact) GAME.State.addItem(p.artifact);
         GAME.State.removeItem(id);
         p.artifact = id;
         p.artifactDurability = item.maxDur || 10;   // 装备即满耐久
-        GAME.UI.log("你祭起【" + item.name + "】，法力与器物隐隐相连。（耐久 " + p.artifactDurability + "）", "success");
+        var after = GAME.State.getStats();
+        var feel = (GAME.Tips && GAME.Tips.gearFeel) ? GAME.Tips.gearFeel(before, after) : "";
+        GAME.UI.log("你祭起【" + item.name + "】，法力与器物隐隐相连。（耐久 " + p.artifactDurability + "）" + feel, "success");
+        if (GAME.Moments) GAME.Moments.fire("first_artifact", item.name);
         GAME.UI.autoSave();
         GAME.UI.updateUI();
     },
@@ -473,10 +503,12 @@ GAME.Core = {
         if (p.isDead || p.combat) return;
         var it = GAME.DATA.ITEMS[id];
         if (!it || it.type !== "armor" || !GAME.State.countItem(id)) return;
+        var before = GAME.State.getStats();
         if (p.armor) GAME.State.addItem(p.armor);
         GAME.State.removeItem(id);
         p.armor = id;
-        GAME.UI.log("你戴上了【" + it.name + "】，护住心脉。", "success");
+        var feel = (GAME.Tips && GAME.Tips.gearFeel) ? GAME.Tips.gearFeel(before, GAME.State.getStats()) : "";
+        GAME.UI.log("你戴上了【" + it.name + "】，护住心脉。" + feel, "success");
         GAME.UI.autoSave();
         GAME.UI.updateUI();
     },
@@ -586,6 +618,7 @@ GAME.Core = {
 
         if (zhujiPill) GAME.State.removeItem(zhujiPill);
 
+        var oldMaxHp = p.maxHp;
         if (Math.random() <= successChance) {
             p.currentExp -= realm.needExp;
             p.realmIndex += 1;
@@ -606,6 +639,10 @@ GAME.Core = {
             p.currentHp = p.maxHp;
             p.changchunLevel += 1;   // 《青木功》随破境而深，每层 +5% 命中 / +10% 异常抗性
             GAME.UI.log("【突破成功】破境功成！你已踏入 " + newRealm.name + "！", "success");
+            if (GAME.Moments) {
+                GAME.Moments.fire("first_breakthrough", newRealm.name);
+                if (isZhuji) GAME.Moments.fire("first_zhuji");
+            }
             if (GAME.Codex) {
                 GAME.Codex.unlockLore("lore_changchun");
                 if (isZhuji) GAME.Codex.unlockLore("lore_zhuji");
@@ -614,6 +651,7 @@ GAME.Core = {
             if (p.realmIndex === (GAME.DATA.ALCHEMY.unlockRealm || 2)) {
                 GAME.UI.log("玄机子见你《青木功》已有小成，难得地多说了几句：「火候、药材、心性，缺一不可。」——他传了你《炼丹初步》，丹炉自此可用！", "story");
             }
+            GAME.UI.log("气血上限 " + oldMaxHp + " → " + p.maxHp + "，法力上限 " + p.maxMp + "——肉身与神识俱有长进。", "success");
             if (isZhuji) GAME.UI.log("寿元大限延至 " + newRealm.maxAge + " 岁——你终于在这一界站稳了脚跟！", "success");
             // 突破练气四层：苍梧门篇大关卡——六幕剧情推进至此幕的，先播「墨师翻脸·尸虫丸」
             // 逼命叙事（12 个月倒计时），再接玄机子夺舍对决；未推剧情（老档/测试桩）直接开战，行为不变。

@@ -96,6 +96,7 @@ GAME.State = {
             guide: null,            // 首次进入引导 { home/codex/dungeon：true=已读不再提示 }
             stats: { kills:0, mercies:0, breakthroughs:0, explores:0, pillsTaken:0, alchemy:0, maxRealm:0, oddjobs:0, trialsEntered:0, fzones:0 },
             review: null,           // 十年回顾记账 { lastYear, snap, times }（js/review.js）
+            moments: {},           // 高光时刻 { 首次id: true }（js/moments.js，每条只记一次）
             totalMonths: 0,
             isDead: false,
             deathReason: "",

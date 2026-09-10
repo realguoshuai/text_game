@@ -509,3 +509,41 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
     .goal-banner { flex-wrap: wrap; }
     .goal-where { display: none; }
 }
+
+/* ---------- 高光时刻（首次里程碑） ---------- */
+.log-moment {
+    margin: 6px 0 0;
+    padding: 7px 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--gold);
+    background: rgba(251,191,36,.10);
+    border: 1px solid var(--gold-bd);
+    border-radius: 4px;
+}
+.log-moment-body {
+    margin: 0 0 6px;
+    padding: 0 10px;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-dim);
+    text-align: center;
+}
+.log-moment-gap { height: 4px; }
+
+/* ---------- 事件选项：把赌注写在选项上 ---------- */
+.event-opt { display: flex; flex-direction: column; gap: 2px; line-height: 1.5; }
+.opt-text { font-size: 13px; }
+.opt-tip { font-size: 11px; opacity: .75; font-weight: normal; }
+
+/* ---------- 封面说明 ---------- */
+.cover-note {
+    margin-top: 14px;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-mute);
+    text-align: center;
+}
+.cover-note b { color: var(--gold); }

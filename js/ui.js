@@ -112,6 +112,7 @@ GAME.UI = {
     setDead: function () {
         var p = GAME.State.p();
         this.log("【道陨】死因：" + (p.deathReason || "未知") + "。修仙界如此残酷，唯轮回石尚存你一生记忆。", "danger");
+        this.log("别慌：死亡不会写入存档。读取最近一次轮回石，即可从那一刻重来（也可直接重入轮回开新局）。", "system");
         this.updateUI();
     },
 
@@ -1164,8 +1165,13 @@ GAME.UI = {
         box.innerHTML = "";
         (ev.choices || []).forEach(function (opt, idx) {
             var b = document.createElement("button");
-            b.className = "btn-gold";
-            b.innerText = opt.text;
+            b.className = "btn-gold event-opt";
+            // 选项第一行是选项本身，第二行是自动推导的"赌注"（风险/收益/对手）
+            var tip = (GAME.Tips && GAME.Tips.choiceTip) ? (opt.tip || GAME.Tips.choiceTip(opt)) : "";
+            b.innerHTML = '<span class="opt-text"></span>' +
+                          (tip ? '<span class="opt-tip"></span>' : "");
+            b.firstChild.innerText = opt.text;
+            if (tip) b.lastChild.innerText = tip;
             b.onclick = function () { GAME.Core.chooseEventOption(idx); };
             box.appendChild(b);
         });
@@ -1983,6 +1989,8 @@ GAME.UI = {
         if (bEx) bEx.onclick = function () { GAME.Market.exchangeStone(); };
 
         this.$("btn-attack").onclick = function () { GAME.Combat.attack(); };
+        var bac = this.$("btn-auto-combat");
+        if (bac) bac.onclick = function () { GAME.Combat.auto(); };
         this.$("btn-fubao").onclick = function () {
             var p = GAME.State.p();
             var ids = ["fubao_lvhuang", "fubao_luohun"];
@@ -2095,12 +2103,21 @@ GAME.UI = {
     },
 
     autoSave: function () { GAME.Storage.autoSave(); },
+
+    bindBatch: function () {
+        var bind = function (id, fn) { var el = document.getElementById(id); if (el) el.onclick = fn; };
+        if (!GAME.Core || !GAME.Core.meditateTimes) return;
+        bind("btn-meditate-5", function () { GAME.Core.meditateTimes(5); });
+        bind("btn-meditate-10", function () { GAME.Core.meditateTimes(10); });
+        bind("btn-meditate-full", function () { GAME.Core.meditateTimes("full"); });
+    },
 };
 
 /* ================= 入口 ================= */
 (function () {
     try {
         GAME.UI.bindEvents();
+        GAME.UI.bindBatch();            // 批量闭关（连修 5/10/至圆满）
         GAME.UI.initTheme();            // 先还原配色偏好，避免首屏闪烁
         GAME.State.createNewPlayer();   // 先建默认角色，供日志/合并模板兜底
         if (GAME.Storage.hasSave()) {

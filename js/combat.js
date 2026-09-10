@@ -131,6 +131,26 @@ GAME.Combat = {
     },
 
     // ---------- 玩家行动 1：斗法 ----------
+    // 自动斗法：一键打到分出胜负（气血跌破三成自动停下，把决断权交回玩家）
+    auto: function (limit) {
+        var p = GAME.State.p();
+        if (!p.combat || p.isDead) return 0;
+        limit = limit || 80;
+        var n = 0;
+        while (p.combat && !p.isDead && n < limit) {
+            if (p.pendingEvent || p.pendingMercy) break;
+            if (p.currentHp < p.maxHp * 0.3) {
+                GAME.UI.log("自动斗法中止：气血已不足三成，剩下的交由你自己决断。", "warning");
+                break;
+            }
+            this.attack();
+            n += 1;
+        }
+        if (n > 0) GAME.UI.log("自动斗法结束，共交手 " + n + " 回合。", "system");
+        GAME.UI.updateUI();
+        return n;
+    },
+
     attack: function () {
         var p = GAME.State.p();
         if (!p.combat || p.isDead) return;
@@ -693,6 +713,7 @@ GAME.Combat = {
         var def = p.combat.def;
         var ctx = p.combat.ctx;
         GAME.UI.log("【" + p.combat.name + "】轰然倒地！", "success");
+        if (GAME.Moments) GAME.Moments.fire("first_kill", p.combat.name);
         p.currentExp += def.exp;
         GAME.UI.log("斗法之余灵台清明，修为增加 " + def.exp + " 点。", "success");
         var stones = this.rand(def.stones[0], def.stones[1]);
