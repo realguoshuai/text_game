@@ -163,6 +163,16 @@ GAME.UI = {
             var gx = self.$("goal-text"); if (gx) gx.innerText = (p.deathReason || "未知") + "——今生已止，仅可重入轮回或读取轮回石。";
             var gh = self.$("goal-hint"); if (gh) gh.innerText = "读回最近一次轮回石，即可从那一刻重来。";
         }
+        // 兜底：全文档扫描（覆盖任何未来新增容器/游离按钮，名单之外绝不漏锁）
+        try {
+            var allB = (typeof document !== "undefined" && document.querySelectorAll) ? document.querySelectorAll("button") : [];
+            for (var k = 0; k < allB.length; k++) {
+                var b2 = allB[k];
+                if (ALLOW[b2.id]) continue;
+                if (b2.hasAttribute && b2.hasAttribute("data-slot")) continue;
+                b2.disabled = true;
+            }
+        } catch (e2) {}
     },
 
     // ---------- 总渲染 ----------
@@ -347,11 +357,11 @@ GAME.UI = {
             this.renderPuppet();
             this.renderAchievements();
             this.applyPanels();
-            this.applyDeathLock();   // 死亡态：锁定除「重入轮回」「存档管理」外所有操作
         } catch (e) {
             console.error("渲染异常", e);
             try { this.log("界面渲染出现异常：" + e.message + "（游戏仍在运行，可重入轮回）", "danger"); } catch (e2) {}
         }
+        this.applyDeathLock();   // 死亡锁置于 try 之外：即便渲染中途异常被吞，终局安全锁也必须执行
     },
 
     // ---------- 开局：出身选择 ----------
