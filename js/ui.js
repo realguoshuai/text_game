@@ -2173,7 +2173,7 @@ GAME.UI = {
         this.$("btn-leitai-next").onclick = function () { GAME.Tainan.nextRound(); };
         this.$("btn-shengxian-token").onclick = function () { GAME.Tainan.joinByToken(); };
 
-        this.bindHoverDropdowns();   // 批量闭关 / 承露瓶催熟：hover 展开、移开收起
+        this.bindHoverDropdowns();   // 闭关苦修 / 灵液催熟：hover 展开、移开收起
     },
 
     initLogs: function () {
@@ -2186,7 +2186,7 @@ GAME.UI = {
 
     autoSave: function () { GAME.Storage.autoSave(); },
 
-    // 批量闭关 / 承露瓶催熟：改为 hover 展开、移开收起（替代原生点击切换）
+    // 闭关苦修 / 灵液催熟：改为 hover 展开、移开收起（替代原生点击切换）
     bindHoverDropdowns: function () {
         var dds = document.querySelectorAll("details.dropdown");
         for (var i = 0; i < dds.length; i++) {
