@@ -2151,6 +2151,8 @@ GAME.UI = {
         // 苍南小会：擂台与保送拜山
         this.$("btn-leitai-next").onclick = function () { GAME.Tainan.nextRound(); };
         this.$("btn-shengxian-token").onclick = function () { GAME.Tainan.joinByToken(); };
+
+        this.bindHoverDropdowns();   // 批量闭关 / 承露瓶催熟：hover 展开、移开收起
     },
 
     initLogs: function () {
@@ -2162,6 +2164,35 @@ GAME.UI = {
     },
 
     autoSave: function () { GAME.Storage.autoSave(); },
+
+    // 批量闭关 / 承露瓶催熟：改为 hover 展开、移开收起（替代原生点击切换）
+    bindHoverDropdowns: function () {
+        var dds = document.querySelectorAll("details.dropdown");
+        for (var i = 0; i < dds.length; i++) {
+            (function (dd) {
+                var hideTimer = null;
+                // 阻止点击 summary 触发原生 toggle，避免与 hover 逻辑打架
+                var sum = dd.querySelector("summary");
+                if (sum) sum.addEventListener("click", function (e) { e.preventDefault(); });
+                dd.addEventListener("mouseenter", function () {
+                    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+                    dd.open = true;   // 展开
+                });
+                dd.addEventListener("mouseleave", function () {
+                    if (hideTimer) clearTimeout(hideTimer);
+                    hideTimer = setTimeout(function () { dd.open = false; }, 160);  // 移开略延迟再收起，防间隙闪烁
+                });
+                // 点击菜单内任一操作按钮后，菜单立即收起
+                dd.addEventListener("click", function (e) {
+                    var t = e.target;
+                    if (t && t.classList && t.classList.contains("dd-item")) {
+                        if (hideTimer) clearTimeout(hideTimer);
+                        dd.open = false;
+                    }
+                });
+            })(dds[i]);
+        }
+    },
 
     bindBatch: function () {
         var bind = function (id, fn) { var el = document.getElementById(id); if (el) el.onclick = fn; };
