@@ -113,6 +113,9 @@ GAME.Core = {
         // 百草园管事年底结算：上交 10 株常规草药，逾期褫夺管事之位（逻辑在 js/garden.js）
         if (p.garden && GAME.Garden) GAME.Garden.tick(months);
 
+        // 十年回顾：每满 10 年结算一次小结（js/review.js，纯展示）
+        if (GAME.Review && GAME.Review.tick) GAME.Review.tick();
+
         this.checkLifeSpanWarning();
         this.checkDeath();
         this.checkAchievements();

@@ -95,6 +95,7 @@ GAME.State = {
             cd: null,               // 副本冷却 { trial/fzone：下次可入的总月数 }（副本日常化）
             guide: null,            // 首次进入引导 { home/codex/dungeon：true=已读不再提示 }
             stats: { kills:0, mercies:0, breakthroughs:0, explores:0, pillsTaken:0, alchemy:0, maxRealm:0, oddjobs:0, trialsEntered:0, fzones:0 },
+            review: null,           // 十年回顾记账 { lastYear, snap, times }（js/review.js）
             totalMonths: 0,
             isDead: false,
             deathReason: "",
