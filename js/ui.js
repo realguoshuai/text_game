@@ -116,6 +116,21 @@ GAME.UI = {
     },
 
     // ---------- 总渲染 ----------
+    // ---------- 当前目标横幅 ----------
+    renderGoal: function () {
+        var box = this.$("goal-banner");
+        if (!box) return;
+        var g = (GAME.Goals && GAME.Goals.current) ? GAME.Goals.current() : null;
+        if (!g) { box.style.display = "none"; return; }
+        box.style.display = "";
+        box.className = "goal-banner" + (g.urgent ? " urgent" : "");
+        var tag = this.$("goal-tag");
+        if (tag) tag.innerText = g.urgent ? "当务之急" : "当前目标";
+        var t = this.$("goal-text"); if (t) t.innerText = g.text || "—";
+        var h = this.$("goal-hint"); if (h) h.innerText = g.hint || "";
+        var w = this.$("goal-where"); if (w) w.innerText = g.where ? ("前往：" + g.where) : "";
+    },
+
     updateUI: function () {
         try {
             if (!this.started) { this.renderOrigin(); return; }
@@ -216,6 +231,9 @@ GAME.UI = {
             if (leakV > 0) this.$("leak-text").innerText = leakV;
             var ddl = this.$("dd-liquid-text");
             if (ddl) ddl.innerText = p.liquid;
+
+            // —— 当前目标横幅（随进度自动切换；紧急项红色高亮） ——
+            this.renderGoal();
 
             // —— 页签角标：储物袋（傀儡材料齐）/ 副本（可进试炼）/ 灵宠（有虫卵待孵） ——
             var badge = function (id, on, num) {

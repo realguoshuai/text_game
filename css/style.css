@@ -413,7 +413,7 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
 
 /* ---------- 布局优化：属性分组 / 催熟下拉 / 页签角标 ---------- */
 .stats-more {
-    border-top: 1px dashed var(--bd);
+    border-top: 1px dashed var(--panel-border);
     margin-top: 2px;
     padding-top: 6px;
 }
@@ -445,7 +445,7 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
     grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
     gap: 0;
     background: rgba(128,128,128,.07);
-    border: 1px solid var(--bd);
+    border: 1px solid var(--panel-border);
     border-radius: 5px;
     padding: 6px 10px;
     font-size: 12px;
@@ -467,10 +467,45 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
 #status-alerts { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
 .alert-tag { background: rgba(200,60,40,.12); border: 1px solid rgba(200,60,40,.45); border-radius: 3px; padding: 1px 8px; font-size: 12px; color: #c0392b; }
 details.dropdown { position: relative; display: inline-block; }
-details.dropdown summary { cursor: pointer; list-style: none; border: 1px solid var(--bd); border-radius: 3px; padding: 5px 12px; background: var(--btn-bg); user-select: none; }
+details.dropdown summary { cursor: pointer; list-style: none; border: 1px solid var(--panel-border); border-radius: 3px; padding: 5px 12px; background: var(--btn-bg); user-select: none; }
 details.dropdown summary::-webkit-details-marker { display: none; }
 details.dropdown[open] summary { border-color: var(--text-dim); color: var(--gold); }
-details.dropdown .dd-body { position: absolute; z-index: 30; min-width: 200px; background: var(--panel-bg, #fff); border: 1px solid var(--bd); border-radius: 3px; padding: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+details.dropdown .dd-body { position: absolute; z-index: 30; min-width: 200px; background: var(--panel-bg, #fff); border: 1px solid var(--panel-border); border-radius: 3px; padding: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
 #tabs button { position: relative; }
 .tab-badge { position: absolute; top: -4px; right: -2px; min-width: 8px; height: 8px; padding: 0 3px; border-radius: 6px; background: #c0392b; color: #fff; font-size: 9px; line-height: 8px; font-weight: bold; }
+
+/* ---------- 当前目标横幅 ---------- */
+.goal-banner {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0 0 10px;
+    padding: 7px 12px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.7;
+}
+.goal-banner.urgent { border-left-color: var(--warning); background: rgba(248,113,113,.08); }
+.goal-tag {
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: var(--btn-bg);
+    color: var(--text-dim);
+    border: 1px solid var(--panel-border);
+}
+.goal-banner.urgent .goal-tag { color: var(--warning); border-color: var(--warning); }
+.goal-main { flex: 1; min-width: 0; }
+.goal-main b { color: var(--text-strong); }
+.goal-banner.urgent .goal-main b { color: var(--warning); }
+.goal-hint { display: block; font-size: 12px; color: var(--text-mute); }
+.goal-where { flex-shrink: 0; font-size: 12px; color: var(--text-faint); }
+@media (max-width: 768px) {
+    .goal-banner { flex-wrap: wrap; }
+    .goal-where { display: none; }
+}
