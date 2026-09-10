@@ -18,7 +18,24 @@ GAME.UI = {
     // display 参数：grid 容器若被设成 block 会塌成单列，故可显式指定
     show: function (id, visible, display) {
         var el = this.$(id);
-        if (el) el.style.display = visible ? (display || "block") : "none";
+        // display 传 "" 表示交回 CSS 默认值（如 .goal-banner 的 flex），不能退化成 block
+        if (el) el.style.display = !visible ? "none" : (display === undefined ? "block" : display);
+    },
+
+    // 封面 ↔ 戏内 两套界面的统一开关。
+    // 教训：目标横幅(goal-banner) 曾是 #game-container 的直接子块、又不在这份名单里，
+    // 导致封面阶段它带着上一世的内容残留，在 height:100%/overflow:hidden 的布局里
+    // 挤掉出身面板的高度、把"就 此 踏 入 修 仙 界"按钮顶出可视区。
+    // 今后任何"只在戏内显示"的顶层容器，都必须登记到 PLAY_ONLY。
+    PLAY_ONLY: ["main-panel", "goal-banner", "workspace"],
+    setPlayMode: function (on) {
+        var self = this;
+        this.show("origin-panel", !on);
+        this.PLAY_ONLY.forEach(function (id) {
+            // workspace 是两栏 grid；goal-banner 靠 CSS 的 flex——都不能用 block 覆盖
+            var d = (id === "workspace") ? "grid" : (id === "goal-banner" ? "" : "block");
+            self.show(id, on, d);
+        });
     },
 
     // ---------- 面板页签：同屏只显示一个，避免纵向堆叠 ----------
@@ -121,6 +138,7 @@ GAME.UI = {
     renderGoal: function () {
         var box = this.$("goal-banner");
         if (!box) return;
+        if (!this.started) { box.style.display = "none"; return; }
         var g = (GAME.Goals && GAME.Goals.current) ? GAME.Goals.current() : null;
         if (!g) { box.style.display = "none"; return; }
         box.style.display = "";
@@ -372,8 +390,7 @@ GAME.UI = {
             '<div class="od-line">随身 — ' + invText + '</div>';
 
         // 开局时隐藏主界面：工作区整体收起，出身面板独占一屏
-        this.show("origin-panel", true);
-        ["main-panel","workspace"].forEach(function (id) { self.show(id, false); });
+        this.setPlayMode(false);
     },
 
     startGame: function (originId) {
@@ -382,9 +399,7 @@ GAME.UI = {
         this.tab = "map";
         this._lastAtMarket = undefined;
         this._lastLocation = undefined;   // 首次 updateUI 不触发"跃迁"提示
-        this.show("origin-panel", false);
-        this.show("main-panel", true);
-        this.show("workspace", true, "grid");   // 必须还原为 grid，否则两栏塌陷
+        this.setPlayMode(true);                 // 含 workspace 还原为 grid，否则两栏塌陷
         this.initLogs();
         if (GAME.Qixuan) GAME.Qixuan.start();   // 苍梧门六幕开局：炼骨崖考核
         this.updateUI();
@@ -1835,16 +1850,18 @@ GAME.UI = {
     },
 
     // ---------- 存档动作 ----------
-    doSave: function () { GAME.Storage.save(false); this.updateUI(); },
+    doSave: function () {
+        // 未入世不许写档：否则会把"苍梧门六幕尚未启动"的空角色存成档，刷新后读进残局
+        if (!this.started) { alert("尚未踏入修仙界，无可存之身。"); return; }
+        GAME.Storage.save(false); this.updateUI();
+    },
     doLoad: function () {
         if (!GAME.Storage.load()) return;
         this.started = true;
         this.tab = "map";
         this._lastAtMarket = undefined;
         this._lastLocation = undefined;
-        this.show("origin-panel", false);
-        this.show("main-panel", true);
-        this.show("workspace", true, "grid");
+        this.setPlayMode(true);
         this.updateUI();
     },
     doRestart: function () {
@@ -1921,9 +1938,7 @@ GAME.UI = {
         this.tab = "map";
         this._lastAtMarket = undefined;
         this._lastLocation = undefined;
-        this.show("origin-panel", false);
-        this.show("main-panel", true);
-        this.show("workspace", true, "grid");
+        this.setPlayMode(true);
         this.closeSaveModal();
         this.updateUI();
     },
@@ -1955,9 +1970,7 @@ GAME.UI = {
         this.tab = "map";
         this._lastAtMarket = undefined;
         this._lastLocation = undefined;
-        this.show("origin-panel", false);
-        this.show("main-panel", true);
-        this.show("workspace", true, "grid");
+        this.setPlayMode(true);
         this.closeSaveModal();
         document.getElementById("log-box").innerHTML = "";
         var pp = GAME.State.p();
@@ -2068,7 +2081,10 @@ GAME.UI = {
         this.$("btn-ms-finish").onclick = function () { GAME.Mansion.finish(); };
         this.$("btn-ms-abandon").onclick = function () { GAME.Mansion.abandon(); };
 
-        this.$("btn-save").onclick = function () { self.doSave(); };
+        this.$("btn-save").onclick = function () {
+            if (!self.started) { alert("尚未踏入修仙界，无可存之身。"); return; }
+            self.doSave();
+        };
         this.$("btn-manage").onclick = function () { self.doSaveManage(); };
         this.$("btn-restart").onclick = function () { self.doRestart(); };
         this.$("btn-zhuji").onclick = function () { self.startPresetZhuji(); };

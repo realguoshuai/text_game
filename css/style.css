@@ -254,7 +254,12 @@ button:disabled {
 .origin-list { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 
 /* ---------- 封面（开局出身选择页） ---------- */
-#origin-panel { text-align: center; overflow-y: auto; }
+#origin-panel {
+    text-align: center;
+    overflow-y: auto;
+    flex: 1 1 auto;                /* 封面独占一屏：吃掉剩余高度，内容多时内部滚动 */
+    min-height: 0;                 /* flex 子项可收缩的前提，缺了会被内容顶破 */
+}
 .cover-head { margin: 3vh auto 8px; }
 .cover-ornament { color: var(--gold); opacity: .55; letter-spacing: 4px; font-size: 13px; margin: 6px 0; }
 .cover-title {
@@ -477,6 +482,7 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
 
 /* ---------- 当前目标横幅 ---------- */
 .goal-banner {
+    flex-shrink: 0;                /* 布局挤压时不许横幅把出身面板顶出可视区 */
     display: flex;
     align-items: baseline;
     gap: 10px;
