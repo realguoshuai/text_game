@@ -2,20 +2,20 @@
 /* =========================================================
  * test/smoke_tainan_fold.js —— 苍南小会折叠入口 回归测试
  *
- * 背景：苍南小会（散修坊市 14 件商品 + 出售杂物 + 升仙大会）原以 div 形式
- * 整块展开在大地图页尾。玩家反馈「大地图下直接把物品放出来不太好」：
- *   ① 商品带购买按钮铺满一屏，舆图信息被挤到要往下滚；
- *   ② 与「坊市」页签的商品列表观感重复；
- *   ③ 真正属于此地的升仙大会擂台被压在商品列表最底下。
+ * 背景：苍南小会原以 div 形式整块展开在大地图页尾（含散修坊市 14 件商品 +
+ * 出售杂物 + 升仙大会），商品带购买按钮铺满一屏，舆图信息被挤到要往下滚。
+ * 玩家反馈「大地图下直接把物品放出来不太好」。
  *
- * 改法：整块改为原生 <details> 折叠，默认收起为一行入口（零 JS 依赖），
- *       摘要行右侧显示擂台状态，不展开也知道进度。
+ * 改法其一：整块改为原生 <details> 折叠，默认收起为一行入口（零 JS 依赖），
+ *          摘要行右侧显示擂台状态，不展开也知道进度。
+ * 改法其二（后续市集整合）：散修坊市与出售杂物已迁出，改挂【市集】页签；
+ *          此处只留升仙大会。本文件锁死这两条边界，市集侧见 smoke_market_hub.js。
  *
  * 本测试锁死：
- *   ① 结构：tainan-block 必须是 <details> 且默认不带 open；商品/擂台都在其内部
- *   ② 显隐：仅身抵苍南谷时显示
- *   ③ 状态摘要：未开擂 / 连胜 N 场 / 前三已定 / 已拜宗门 四态正确
- *   ④ 折叠不影响功能：收起状态下商品仍可正常购买
+ *   ① 结构：tainan-block 必须是 <details> 且默认不带 open；擂台在其内部
+ *   ② 迁出：散修坊市商品/出售杂物已不在苍南小会内（改挂市集页签）
+ *   ③ 显隐：仅身抵苍南谷时显示
+ *   ④ 状态摘要：未开擂 / 连胜 N 场 / 前三已定 / 已拜宗门 四态正确
  * 运行： node test/smoke_tainan_fold.js
  * ========================================================= */
 const fs = require('fs');
@@ -129,10 +129,16 @@ const startIdx = html.indexOf('id="tainan-block"');
 const endIdx = html.indexOf('</details>', startIdx);
 const inner = startIdx >= 0 && endIdx > startIdx ? html.slice(startIdx, endIdx) : '';
 ok('折叠容器内含 <summary> 入口行', inner.includes('<summary'));
-ok('散修坊市商品容器在容器内部（收起时不外露）', inner.includes('id="tainan-goods"'));
-ok('出售杂物在容器内部', inner.includes('id="tainan-sell"'));
 ok('升仙大会擂台与按钮在容器内部', inner.includes('id="tainan-leitai"') && inner.includes('id="btn-leitai-next"'));
 ok('摘要行带擂台状态位 tainan-brief', inner.includes('id="tainan-brief"'));
+
+/* 市集整合后：散修坊市与出售杂物已迁出苍南小会 */
+ok('散修坊市商品已迁出苍南小会（改挂【市集】页签）', !inner.includes('id="tainan-goods"'));
+ok('出售杂物已迁出苍南小会', !inner.includes('id="tainan-sell"'));
+const mktStart = html.indexOf('id="tainan-market-block"');
+const mktEnd = html.indexOf('</div>', html.indexOf('id="tainan-sell"'));
+ok('散修坊市区块已落在市集面板内', mktStart > 0 && html.indexOf('id="market-panel"') < mktStart && mktEnd > mktStart);
+ok('苍南小会摘要行改为「升仙大会」（不再号称含坊市）', /苍南小会[\s\S]{0,200}?升仙大会/.test(html) && !/散修坊市 · 出售杂物 · 升仙大会/.test(html));
 
 const css = fs.readFileSync(path.join(BASE, 'css/style.css'), 'utf8');
 ok('已补 .tainan-fold 样式（summary 可点、箭头可转）', /\.tainan-fold\s*>?\s*summary/.test(css) || css.includes('.tainan-fold'));
@@ -171,24 +177,7 @@ p.sectId = 'huangfenggu';
 U.updateUI();
 ok('已拜宗门 → 「已拜宗门」', brief() === '已拜宗门');
 
-/* ================= ④ 折叠不影响功能 ================= */
-section('④ 收起状态下商品仍可正常购买（折叠只改呈现、不改功能）');
-const p2 = G.State.createNewPlayer('wanderer');
-p2.location = 'tainan_gu';
-p2.spiritStones = 1000;
-U.updateUI();
-const goods = els['tainan-goods'];
-const buyBtns = collectButtons(goods, '购买');
-ok('散修坊市商品仍渲染出「购买」按钮', buyBtns.length > 0);
-ok('商品数量与 TAINAN.goods 一致', buyBtns.length === G.DATA.TAINAN.goods.length);
-
-const first = G.DATA.TAINAN.goods[0];
-const stonesBefore = p2.spiritStones;
-let cerr = null;
-try { buyBtns[0].onclick(); } catch (e) { cerr = e.message; }
-ok('点击「购买」不抛错', cerr === null);
-ok('灵石按价扣除', p2.spiritStones === stonesBefore - first.price);
-ok('物品已入储物袋', G.State.countItem(first.id) >= 1);
+/* 散修坊市的买卖功能已随迁出改由 test/smoke_market_hub.js 覆盖 */
 
 /* ================= 汇总 ================= */
 console.log('\n' + '─'.repeat(46));

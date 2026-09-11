@@ -87,6 +87,7 @@ GAME.State = {
             atMarket: false,        // 是否在坊市
             marketGoods: [],        // 坊市在售 [{ id, qty, price }]
             junkGoods: [],          // 旧货摊未鉴定货架 [{ id, price, needSpirit, realId, treasure, appraised }]
+            junkStocked: false,     // 旧货摊是否已铺过货（空数组为 truthy，须另用标记判首次）
             marketNextRefresh: 12,  // 下次换货的总月数
             junkNextRefresh: 12,    // 旧货摊下次换货的总月数（与坊市同节奏，买空不再即补）
             blackGoods: null,       // 地下黑市筑基材料货架 [{ id, qty, price }]（每 3 月轮换）

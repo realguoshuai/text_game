@@ -39,10 +39,12 @@ GAME.UI = {
     },
 
     // ---------- 面板页签：同屏只显示一个，避免纵向堆叠 ----------
+    // market 已升格为「市集」交易中枢（坊市 + 散修坊市 + 地下黑市 + 货币兑换四分区），
+    // 常驻可开、不再要求 atMarket；原独立 black-panel 已并入其中。
     TAB_MAP: {
         map: "map-panel", bag: "bag-panel", alchemy: "alchemy-panel", market: "market-panel", home: "home-panel",
         codex: "codex-panel",
-        sect: "sect-panel", black: "black-panel", companion: "companion-panel",
+        sect: "sect-panel", companion: "companion-panel",
         skill: "skill-panel", dungeon: "dungeon-panel", secret: "secret-panel"
     },
 
@@ -52,11 +54,6 @@ GAME.UI = {
         // 丹炉：练气三层前锁死（玄机子未传手艺）
         if (name === "alchemy" && !GAME.Core.canAlchemy()) {
             this.log("玄机子的炼丹手艺不外传——待你练气三层，他自会开口。", "system");
-            return;
-        }
-        // 坊市仅在坊市处可见；苍南须身在苍南谷；玄机世家须身在景阳城且事件链开启
-        if (name === "market" && !p.atMarket) {
-            this.log("你尚未前往坊市。先点【前往坊市】才可见商贾。", "system");
             return;
         }
         if (name === "skill" && p.isDead) {
@@ -84,27 +81,26 @@ GAME.UI = {
         else if (p.moEvent && !p.combat) urgent = "mo-panel";   // 玄机子阶段一/三（阶段二为战斗，归 combat）
         else if (p.jiayuan && GAME.Jiayuan.at()) urgent = "jiayuan-panel";   // 玄机世家主线对话（已并入大地图，身在此地即显）
 
-        // 坊市页签仅在身处坊市时可看，否则回落储物袋
-        if (this.tab === "market" && !p.atMarket) this.tab = "map";
         // 玄机世家已并入大地图，无独立页签；旧存档残留此页签时回落
         if (this.tab === "jiayuan") this.tab = "map";
+        // 黑市已并入市集页签；旧存档若停在该页签，回落市集
+        if (this.tab === "black") this.tab = "market";
         // 兜底：未知页签回落大地图，避免整页空白
         if (!this.TAB_MAP[this.tab]) this.tab = "map";
         var visible = urgent || this.TAB_MAP[this.tab];
 
         var self = this;
-        ["map-panel", "bag-panel", "alchemy-panel", "market-panel", "home-panel", "sect-panel", "black-panel", "companion-panel",
+        ["map-panel", "bag-panel", "alchemy-panel", "market-panel", "home-panel", "sect-panel", "companion-panel",
          "jiayuan-panel", "skill-panel", "dungeon-panel", "fz-panel", "qixuan-panel",
          "combat-panel", "track-panel", "trial-panel", "event-panel", "mercy-panel", "mo-panel", "mansion-panel", "secret-panel", "codex-panel"]
             .forEach(function (id) { self.show(id, id === visible); });
 
-        // 页签按钮：紧急面板期间禁用切换；坊市未进入时禁用该签
+        // 页签按钮：仅紧急面板期间禁用切换（市集常驻可开，不再按 atMarket 禁用）
         for (var t in this.TAB_MAP) {
             var btn = this.$("tab-" + t);
             if (btn) {
                 btn.className = "small-btn" + (this.tab === t ? " tab-on" : "");
-                btn.disabled = !!urgent
-                    || (t === "market" && !p.atMarket);
+                btn.disabled = !!urgent;
             }
         }
     },
@@ -350,10 +346,11 @@ GAME.UI = {
             this.$("btn-market").innerText = p.atMarket ? "坊市中" : "前往坊市 (耗时1月)";
             this.$("btn-save").disabled = dead;
 
-            // 进出坊市时自动切到对应页签（仅在状态跃迁那一次触发，不强行夺走玩家选择）
+            // 进入坊市时自动切到市集页签（仅在状态跃迁那一次触发）
+            // 离开坊市时不再夺走页签——市集已常驻，玩家可能正在看黑市或兑换
             if (p.atMarket !== this._lastAtMarket) {
                 this._lastAtMarket = p.atMarket;
-                this.tab = p.atMarket ? "market" : "map";
+                if (p.atMarket) this.tab = "market";
             }
             // 踏上新地点时自动落到地图页（苍南小会内容已并入地图面板）
             if (p.location !== this._lastLocation) {
@@ -613,73 +610,107 @@ GAME.UI = {
         this.switchTab(this.tab === "alchemy" ? "home" : "alchemy");
     },
 
-    // ---------- 坊市 ----------
+    // ---------- 市集（交易中枢：本坊市 / 散修坊市 / 地下黑市 / 货币兑换） ----------
     renderMarket: function () {
         var p = GAME.State.p();
-        if (!p.atMarket || p.isDead || p.combat) return;   // 可见性由 applyPanels 统一控制
-        var self = this;
-        var locNames = { shenshou_gu: "山间小集", qingniu_zhen: "青牛镇集", jiayuan_cheng: "岚州大城 · 坊市", tainan_gu: "苍南谷坊市" };
-        this.$("market-tip").innerText = "【" + (locNames[p.location] || "坊市") + "】 每逢 " + GAME.DATA.MARKET.refreshMonths +
-            " 个月换货；" + (p.karma < -20 ? "你恶名在外，商贾坐地起价" : p.karma > 20 ? "你乐善好施，商贾愿予折扣" : "童叟无欺");
+        if (p.isDead || p.combat) return;   // 页签常驻可开，各分区按自身条件显隐
 
-        // 在售
-        var box = this.$("market-goods");
-        box.innerHTML = "";
-        if (!p.marketGoods.length) box.innerHTML = '<div class="empty-tip">货架已被买空。</div>';
-        p.marketGoods.forEach(function (g, i) {
-            var item = GAME.DATA.ITEMS[g.id];
-            var price = GAME.Market.buyPrice(g.price);
-            var locked = g.req && p.realmIndex < g.req;
-            var row = document.createElement("div");
-            row.className = "item-row";
-            var left = document.createElement("div");
-            left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + g.qty +
-                '<div class="item-desc">' + item.desc +
-                (locked ? ' <span class="danger">【修为不足：需练气' + (g.req + 1) + '层】</span>' : '') + '</div>';
-            var right = document.createElement("div");
-            right.className = "item-right";
-            var priceEl = document.createElement("span");
-            priceEl.className = "gold";
-            priceEl.innerText = price + "灵石";
-            var b = document.createElement("button");
-            b.className = "small-btn btn-gold";
-            b.innerText = "购买";
-            b.disabled = p.spiritStones < price || !!locked;
-            b.onclick = function () { GAME.Market.buy(i); };
-            right.appendChild(priceEl);
-            right.appendChild(b);
-            row.appendChild(left);
-            row.appendChild(right);
-            box.appendChild(row);
-        });
+        /* ① 本坊市：须先跑商「前往坊市」；未进时退化为一行入口，不再整区空白 */
+        this.show("market-local", !!p.atMarket);
+        this.show("market-away", !p.atMarket);
+        if (p.atMarket) {
+            var locNames = { shenshou_gu: "山间小集", qingniu_zhen: "青牛镇集", jiayuan_cheng: "岚州大城 · 坊市", tainan_gu: "苍南谷坊市" };
+            this.$("market-tip").innerText = "【" + (locNames[p.location] || "坊市") + "】 每逢 " + GAME.DATA.MARKET.refreshMonths +
+                " 个月换货；" + (p.karma < -20 ? "你恶名在外，商贾坐地起价" : p.karma > 20 ? "你乐善好施，商贾愿予折扣" : "童叟无欺");
 
-        // 出售
-        var sellBox = this.$("market-sell");
-        sellBox.innerHTML = "";
-        var sellable = Object.keys(p.inventory).filter(function (id) { return GAME.Market.canSell(id); });
-        if (!sellable.length) sellBox.innerHTML = '<div class="empty-tip">没有可出售之物。</div>';
-        sellable.forEach(function (id) {
-            var item = GAME.DATA.ITEMS[id];
-            var gain = GAME.Market.sellPrice(item.price);
-            var row = document.createElement("div");
-            row.className = "item-row";
-            var left = document.createElement("div");
-            left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + p.inventory[id];
-            var right = document.createElement("div");
-            right.className = "item-right";
-            var g = document.createElement("span");
-            g.className = "gold";
-            g.innerText = "+" + gain + "灵石";
-            var b = document.createElement("button");
-            b.className = "small-btn";
-            b.innerText = "出售";
-            b.onclick = function () { GAME.Market.sell(id); };
-            right.appendChild(g);
-            right.appendChild(b);
-            row.appendChild(left);
-            row.appendChild(right);
-            sellBox.appendChild(row);
-        });
+            // 在售
+            var box = this.$("market-goods");
+            box.innerHTML = "";
+            if (!p.marketGoods.length) box.innerHTML = '<div class="empty-tip">货架已被买空。</div>';
+            p.marketGoods.forEach(function (g, i) {
+                var item = GAME.DATA.ITEMS[g.id];
+                var price = GAME.Market.buyPrice(g.price);
+                var locked = g.req && p.realmIndex < g.req;
+                var row = document.createElement("div");
+                row.className = "item-row";
+                var left = document.createElement("div");
+                left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + g.qty +
+                    '<div class="item-desc">' + item.desc +
+                    (locked ? ' <span class="danger">【修为不足：需练气' + (g.req + 1) + '层】</span>' : '') + '</div>';
+                var right = document.createElement("div");
+                right.className = "item-right";
+                var priceEl = document.createElement("span");
+                priceEl.className = "gold";
+                priceEl.innerText = price + "灵石";
+                var b = document.createElement("button");
+                b.className = "small-btn btn-gold";
+                b.innerText = "购买";
+                b.disabled = p.spiritStones < price || !!locked;
+                b.onclick = function () { GAME.Market.buy(i); };
+                right.appendChild(priceEl);
+                right.appendChild(b);
+                row.appendChild(left);
+                row.appendChild(right);
+                box.appendChild(row);
+            });
+
+            // 出售
+            var sellBox = this.$("market-sell");
+            sellBox.innerHTML = "";
+            var sellable = Object.keys(p.inventory).filter(function (id) { return GAME.Market.canSell(id); });
+            if (!sellable.length) sellBox.innerHTML = '<div class="empty-tip">没有可出售之物。</div>';
+            sellable.forEach(function (id) {
+                var item = GAME.DATA.ITEMS[id];
+                var gain = GAME.Market.sellPrice(item.price);
+                var row = document.createElement("div");
+                row.className = "item-row";
+                var left = document.createElement("div");
+                left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + p.inventory[id];
+                var right = document.createElement("div");
+                right.className = "item-right";
+                var g = document.createElement("span");
+                g.className = "gold";
+                g.innerText = "+" + gain + "灵石";
+                var b = document.createElement("button");
+                b.className = "small-btn";
+                b.innerText = "出售";
+                b.onclick = function () { GAME.Market.sell(id); };
+                right.appendChild(g);
+                right.appendChild(b);
+                row.appendChild(left);
+                row.appendChild(right);
+                sellBox.appendChild(row);
+            });
+        }
+
+        /* ② 散修坊市：仅苍南谷可见（商品与出售由 renderTainan 填充同一批容器） */
+        this.show("tainan-market-block", !!GAME.Tainan.at());
+
+        /* ④ 货币兑换（低阶↔中阶灵石 + 灵石→银两） */
+        this.renderExchange();
+    },
+
+    // ---------- 货币兑换分区 ----------
+    // 低阶→中阶灵石：随处可兑；灵石→银两：行商只在凡俗城池设摊（世俗银两只在凡俗地界使唤得着）
+    renderExchange: function () {
+        var p = GAME.State.p();
+        var bStone = this.$("btn-exchange-stone");
+        if (bStone) bStone.disabled = p.isDead || p.spiritStones < 100;
+
+        var node = (GAME.Map && GAME.Map.cur) ? (GAME.Map.cur() || {}) : {};
+        var mortal = (node.kind === "mortal");
+        var sa = this.$("silver-actions");
+        if (sa) sa.style.display = mortal ? "" : "none";
+        var tip = this.$("silver-tip");
+        if (tip) {
+            tip.innerText = mortal
+                ? "市口守着一位行商老者，摇着蒲扇替修道人兑世俗银两——1 灵石兑 100 两。"
+                : "行商老者只在凡俗城池设摊；此地修仙者不认世俗银两，兑不出手。";
+        }
+        if (mortal) {
+            if (this.$("btn-exchange-1")) this.$("btn-exchange-1").disabled = p.spiritStones < 1;
+            if (this.$("btn-exchange-5")) this.$("btn-exchange-5").disabled = p.spiritStones < 5;
+        }
     },
 
     // ---------- 洞府建设 ----------
@@ -1160,11 +1191,11 @@ GAME.UI = {
         s2.appendChild(tool);
     },
 
-    // ---------- 坊市旧货摊 + 地下黑市 ----------
+    // ---------- 市集·地下黑市分区（原独立 black-panel 已并入市集页签） ----------
     renderBlack: function () {
         var p = GAME.State.p();
-        if (this.tab !== "black" || p.isDead || p.combat) return;  // 可见性由 applyPanels 统一控制
-        if (!p.junkGoods) GAME.BlackMarket.ensureJunk();
+        if (p.isDead || p.combat) return;  // 常驻渲染，不再依赖独立页签
+        GAME.BlackMarket.ensureJunk();     // 首次进入才铺货（空数组 truthy，判断在 ensureJunk 内）
         var self = this;
         // 换货提示（镜像坊市 market-tip）
         var jtip = this.$("junk-tip");
@@ -1662,13 +1693,8 @@ GAME.UI = {
         });
         if (!(node.actions || []).length) ab.innerHTML = '<div class="empty-tip">此地无事可做。</div>';
 
-        this.$("btn-exchange-1").disabled = p.spiritStones < 1;
-        this.$("btn-exchange-5").disabled = p.spiritStones < 5;
-        // 行商兑换市银：只现身于凡俗城池（修仙之地只认灵石，世俗银两无用）
-        var exBox = this.$("map-exchange");
-        if (exBox) exBox.style.display = (node.kind === "mortal") ? "block" : "none";
-
-        // 苍南小会内容并入地图面板：身抵苍南谷时显现为折叠入口，否则整体隐藏
+        // 苍南小会：身抵苍南谷时显现为折叠入口，否则整体隐藏
+        // （散修坊市与货币兑换已移至【市集】页签，此处只留升仙大会）
         var tb = this.$("tainan-block");
         if (tb) tb.style.display = GAME.Tainan.at() ? "block" : "none";
     },
@@ -2214,6 +2240,8 @@ GAME.UI = {
         this.$("btn-explore").onclick = function () { GAME.Core.explore(); };
         this.$("btn-market").onclick = function () { GAME.Market.toggle(); };
         this.$("btn-leave-market").onclick = function () { GAME.Market.toggle(); };
+        // 市集页签内「本坊市」未开市时的入口，与洞府按钮同走一条跑商动作
+        var bMktGo = this.$("btn-market-go"); if (bMktGo) bMktGo.onclick = function () { GAME.Market.toggle(); };
         var bEx = this.$("btn-exchange-stone");
         if (bEx) bEx.onclick = function () { GAME.Market.exchangeStone(); };
 
@@ -2264,11 +2292,11 @@ GAME.UI = {
         // 下沉页签入口（丹炉→洞府 / 门派 / 黑市→大地图 / 技能→图志）：顶级按钮已移除，绑定时做空值保护
         var bAlch = this.$("tab-alchemy"); if (bAlch) bAlch.onclick = function () { self.switchTab("alchemy"); };
         var bSect = this.$("tab-sect"); if (bSect) bSect.onclick = function () { self.switchTab("sect"); };
-        var bBlack = this.$("tab-black"); if (bBlack) bBlack.onclick = function () { self.switchTab("black"); };
         var bSkill = this.$("tab-skill"); if (bSkill) bSkill.onclick = function () { self.switchTab("skill"); };
         // 新增子入口按钮：功能下沉后的可达路径（确保无死链）
         this.$("btn-home-alchemy").onclick = function () { self.switchTab("alchemy"); };
-        this.$("btn-map-black").onclick = function () { self.switchTab("black"); };
+        // 大地图快捷入口：市集（原独立黑市页已并入其中）
+        var bMapShop = this.$("btn-map-shop"); if (bMapShop) bMapShop.onclick = function () { self.switchTab("market"); };
         this.$("btn-codex-skill").onclick = function () { self.switchTab("skill"); };
 
         // 洞府快捷入口（门派 / 血月试炼 / 神识尾随）——大地图与副本入口已挪至下方页签区

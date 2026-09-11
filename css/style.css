@@ -600,3 +600,25 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
 @media (max-width: 480px) {
     .tainan-fold .tainan-sub { display: none; }
 }
+
+/* ---------- 市集：分区标题与分区间距 ----------
+   四个分区（本坊市 / 散修坊市 / 地下黑市 / 货币兑换）各按自身条件显隐，
+   用细分隔线切开，避免几摊货架糊成一片。 */
+.mkt-sec {
+    margin: 14px 0 8px 0;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    border-left: 3px solid var(--gold);
+    padding-left: 8px;
+}
+.mkt-sec:first-child { margin-top: 4px; }
+#market-away,
+#tainan-market-block,
+#black-section,
+#exchange-section {
+    margin-top: 14px;
+    border-top: 1px dashed var(--panel-border);
+    padding-top: 10px;
+}

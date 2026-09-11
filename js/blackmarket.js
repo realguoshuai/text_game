@@ -22,7 +22,12 @@ GAME.BlackMarket = {
     ensureJunk: function () {
         var p = GAME.State.p();
         // 仅首次进入时铺货；买空后留空，等 passTime 到 junkNextRefresh 才换货（与坊市同节奏）
-        if (!p.junkGoods) this.refreshJunk();
+        // ⚠️ 不能用 `!p.junkGoods` 判断：模板初值是 []，空数组为 truthy，
+        //    会导致首次进入旧货摊永不铺货（玩家须干等到第 12 个月才见货）。
+        if (!p.junkStocked) {
+            p.junkStocked = true;
+            this.refreshJunk();
+        }
     },
 
     /* ================= 地下黑市·筑基材料轮换（每 3 月刷新） =================

@@ -122,7 +122,7 @@
                 <button id="tab-map" class="small-btn" data-page-node-id="16t10QAr4zdgwWYb1ubho7">大地图</button>
                 <button id="tab-home" class="small-btn">洞府</button>
                 <button id="tab-bag" class="small-btn" data-page-node-id="uG1WwCtG5JN5JYS8dfWHqy">储物袋<span id="badge-bag" class="tab-badge" style="display:none;"></span></button>
-                <button id="tab-market" class="small-btn" data-page-node-id="xB76RNxneibNOW0kX6GD9t">坊市</button>
+                <button id="tab-market" class="small-btn" data-page-node-id="xB76RNxneibNOW0kX6GD9t">市集</button>
                 <button id="tab-fzone" class="small-btn" data-page-node-id="OMeD5O2tfIYEQGQoV06SmL">副本/试炼<span id="badge-fzone" class="tab-badge" style="display:none;"></span></button>
                 <button id="tab-secret" class="small-btn">秘境</button>
                 <button id="tab-companion" class="small-btn" data-page-node-id="0dHGsHB9VCW7a4zBZbFMTX">灵宠/傀儡<span id="badge-companion" class="tab-badge" style="display:none;"></span></button>
@@ -142,35 +142,25 @@
                     <div id="map-hunts"></div>
                     <h3 style="margin-top:10px;" data-page-node-id="mSo7J5fW2FCUYYBhyASDod">此地可为</h3>
                     <div id="map-actions" data-page-node-id="ucKs25Hx0oNmblu9YOBPO1"></div>
-                    <div id="map-exchange" style="display:none; margin-top:10px;">
-                        <div class="item-desc" style="margin-bottom:4px;">市口守着一位行商老者，摇着蒲扇替修道人兑世俗银两——1 灵石兑 100 两。</div>
-                        <div class="combat-actions">
-                            <button id="btn-exchange-1" class="small-btn" data-page-node-id="Uz5Opf7EDsaRoeUb8YLtit">兑 1 灵石（100 两）</button>
-                            <button id="btn-exchange-5" class="small-btn" data-page-node-id="Y3HSA8m0gCMFcmwJBHi34p">兑 5 灵石（500 两）</button>
-                        </div>
+                    <div class="combat-actions" id="map-shop-entry" style="margin-top:10px;">
+                        <button id="btn-map-shop" class="small-btn btn-gold">去市集（坊市 · 旧货摊 · 地下黑市）</button>
                     </div>
-                    <div class="combat-actions" id="map-black-entry" style="margin-top:10px;">
-                        <button id="btn-map-black" class="small-btn btn-gold">坊市旧货摊 · 地下黑市</button>
-                    </div>
-                    <!-- 苍南小会：身抵苍南谷时显现。默认收起为一行入口，点开才见坊市商品与升仙大会 -->
+                    <!-- 苍南小会：身抵苍南谷时显现。散修坊市已归入【市集】页签，此处只留升仙大会 -->
                     <details class="tainan-fold" id="tainan-block" style="display:none;" data-page-node-id="sEhqeUP8RUNxgbyBZ0jdnq">
                         <summary data-page-node-id="EFBMauGIlMU8dXfvubaGDw">
                             <span class="gold">苍南小会</span>
-                            <span class="item-desc tainan-sub">散修坊市 · 出售杂物 · 升仙大会</span>
+                            <span class="item-desc tainan-sub">升仙大会 · 擂台三轮</span>
                             <span id="tainan-brief" class="tainan-brief"></span>
                         </summary>
                         <div class="tainan-body">
                             <div id="tainan-info" class="item-desc" data-page-node-id="v2ElxRUr0xpURWHi3XTbA9">此处需用灵石说话——世俗银两在修仙者眼里与沙土无异。</div>
-                            <h3 style="margin-top:10px;" data-page-node-id="GxEUM4OyKy6b6CuVQ6DuQm">散修坊市</h3>
-                            <div id="tainan-goods" data-page-node-id="EPGDvHyawZB6FxIZnNoPgn"></div>
-                            <h3 style="margin-top:10px;" data-page-node-id="ZMvyLpHCz4gcd7bZI5kTQU">出售杂物</h3>
-                            <div id="tainan-sell" data-page-node-id="13FvDAarxOHyffqFyzfqNI"></div>
-                            <h3 style="margin-top:10px;" data-page-node-id="ipWcUKV9UFLEqBUn3EDRtN">升仙大会</h3>
+                            <h4 class="mkt-sec">升仙大会 <span class="item-desc" style="font-weight:normal;" data-page-node-id="ipWcUKV9UFLEqBUn3EDRtN">（擂台三轮，连胜可夺前三）</span></h4>
                             <div id="tainan-leitai" class="item-desc" data-page-node-id="vpSixXBPFzKGxSbXMgb0Zw"></div>
                             <div class="combat-actions" data-page-node-id="kYtkSJbxHJ1UWVigurmML8">
                                 <button id="btn-leitai-next" class="btn-danger" data-page-node-id="fZWtgD3GpBBqNtmJynokjb">上台打擂</button>
                                 <button id="btn-shengxian-token" class="btn-gold" data-page-node-id="Y2lNwHo2h2IUStbUUAViSV">出示升仙令（保送拜山）</button>
                             </div>
+                            <div class="item-desc" style="margin-top:6px;">此地散修坊市已并入【市集】页签，就地即可交易。</div>
                         </div>
                     </details>
                 </div>
@@ -186,16 +176,62 @@
                     <button id="btn-close-alchemy" class="small-btn" style="margin-top:8px;" data-page-node-id="xj6EagsQ7WMaekFu5cCrFk">收炉</button>
                 </div>
 
+                <!-- 市集：统一的交易中枢。页签常驻可开，四个分区各按自身条件显隐：
+                     ① 本坊市（须先跑商前往）② 散修坊市（苍南谷）③ 地下黑市（常开）
+                     ④ 货币兑换（低阶↔中阶灵石常开；灵石→银两仅凡人城池） -->
                 <div class="panel" id="market-panel" data-page-node-id="Kms1iJp0ygbghINHGSytuH">
-                    <h3 data-page-node-id="3XSCDHWoZpevFsOh1EdkZq">坊市</h3>
-                    <div class="item-desc" id="market-tip" data-page-node-id="F4TpZlyvCTK53atp3X2FUR"></div>
-                    <div id="market-goods" data-page-node-id="IhMbl4TGXUoD8KTHPJ72uv"></div>
-                    <h3 style="margin-top:10px;" data-page-node-id="LPvTfiOQx8KutBX6rxKAFi">出售杂物</h3>
-                    <div id="market-sell" data-page-node-id="kj6ayXkwKBq42wUMoPqqOt"></div>
-                    <h3 style="margin-top:10px;">货币兑换商</h3>
-                    <div class="item-desc">积零成整：100 枚低阶灵石可兑 1 枚中阶灵石（筑基期大额支付通行）。</div>
-                    <button id="btn-exchange-stone" class="small-btn btn-gold" style="margin-top:4px;">兑换中阶灵石 (100 低阶)</button>
-                    <button id="btn-leave-market" style="margin-top:8px;" data-page-node-id="hFzFFWfLymLjOWXL1RmnlS">返回洞府</button>
+                    <h3 data-page-node-id="3XSCDHWoZpevFsOh1EdkZq">市集</h3>
+                    <div class="item-desc">四方货殖汇聚于此：本坊市随所在地换货，散修坊市在苍南谷，地下黑市另有门路。</div>
+
+                    <!-- ① 本坊市：未前往时退化为一行「前往坊市」 -->
+                    <div id="market-local">
+                        <h4 class="mkt-sec">本坊市</h4>
+                        <div class="item-desc" id="market-tip" data-page-node-id="F4TpZlyvCTK53atp3X2FUR"></div>
+                        <div id="market-goods" data-page-node-id="IhMbl4TGXUoD8KTHPJ72uv"></div>
+                        <h4 class="mkt-sec">出售杂物</h4>
+                        <div id="market-sell" data-page-node-id="kj6ayXkwKBq42wUMoPqqOt"></div>
+                        <button id="btn-leave-market" style="margin-top:8px;" data-page-node-id="hFzFFWfLymLjOWXL1RmnlS">离开坊市，返回洞府</button>
+                    </div>
+                    <div id="market-away" style="display:none;">
+                        <h4 class="mkt-sec">本坊市</h4>
+                        <div class="empty-tip">你尚未前往坊市。商贾只在当地开市，须先动身前往。</div>
+                        <button id="btn-market-go" class="small-btn btn-gold">前往坊市</button>
+                    </div>
+
+                    <!-- ② 散修坊市（苍南谷专属） -->
+                    <div id="tainan-market-block" style="display:none;">
+                        <h4 class="mkt-sec">散修坊市 <span class="item-desc" style="font-weight:normal;">苍南山 · 苍南谷</span></h4>
+                        <div class="item-desc">散修之地不问出身只问拳头，此处以灵石换取灵药、法器与法术。</div>
+                        <div id="tainan-goods" data-page-node-id="EPGDvHyawZB6FxIZnNoPgn"></div>
+                        <h4 class="mkt-sec">出售杂物</h4>
+                        <div id="tainan-sell" data-page-node-id="13FvDAarxOHyffqFyzfqNI"></div>
+                    </div>
+
+                    <!-- ③ 地下黑市（原独立黑市页整体并入） -->
+                    <div id="black-section">
+                        <h4 class="mkt-sec">坊市旧货摊 · 地下黑市</h4>
+                        <div class="item-desc" data-page-node-id="gG4uaIUhRp0KbAmeE0VH07">旧货摊：以神识鉴定真伪，神识不足只能盲买赌命。地下黑市：高阶灵药高价变现，却易招神识尾随。</div>
+                        <div class="item-desc" id="junk-tip" data-page-node-id="junkTipNode"></div>
+                        <div id="junk-goods" data-page-node-id="9LpPERvtZjQFLhWI7U8yD2"></div>
+                        <h4 class="mkt-sec">地下黑市销赃</h4>
+                        <div id="black-sell" data-page-node-id="c8McSG9Mx8tEdBeaQuN0rG"></div>
+                        <h4 class="mkt-sec">黑市秘籍 <span class="item-desc" style="font-weight:normal;" data-page-node-id="aYpx1Ml3tmPVdHoVYHzxLd">（魔道功法，修习沾染煞气）</span></h4>
+                        <div id="black-skills" data-page-node-id="gYqaaNaJE4pA96CKAVDdU4"></div>
+                        <h4 class="mkt-sec">黑市材料门路 <span class="item-desc" style="font-weight:normal;">（每 3 月轮换，限量售罄不补）</span></h4>
+                        <div id="black-rotation"></div>
+                    </div>
+
+                    <!-- ④ 货币兑换 -->
+                    <div id="exchange-section">
+                        <h4 class="mkt-sec">货币兑换</h4>
+                        <div class="item-desc">积零成整：100 枚低阶灵石可兑 1 枚中阶灵石（筑基期大额支付通行）。</div>
+                        <button id="btn-exchange-stone" class="small-btn btn-gold" style="margin-top:4px;">兑换中阶灵石 (100 低阶)</button>
+                        <div class="item-desc" id="silver-tip" style="margin-top:10px;"></div>
+                        <div class="combat-actions" id="silver-actions">
+                            <button id="btn-exchange-1" class="small-btn" data-page-node-id="Uz5Opf7EDsaRoeUb8YLtit">兑 1 灵石（100 两）</button>
+                            <button id="btn-exchange-5" class="small-btn" data-page-node-id="Y3HSA8m0gCMFcmwJBHi34p">兑 5 灵石（500 两）</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="panel" id="home-panel">
@@ -235,19 +271,6 @@
                     <h3 style="margin-top:10px;" data-page-node-id="gy7LvPsQhWcbMChPYSxRNN">贡献兑换</h3>
                     <div id="sect-exchange" data-page-node-id="yacviOnjPcrXUYwSlNivYS"></div>
                     <div id="sect2-box" data-page-node-id="ep2TV3ZpJAv4LCO5mzL1Ac"></div>
-                </div>
-
-                <div class="panel" id="black-panel" data-page-node-id="Vtxz99OXICNihvw4xcJlNW">
-                    <h3 data-page-node-id="q31V82dRCrnbM584UmDTbv">坊市旧货摊 · 地下黑市</h3>
-                    <div class="item-desc" data-page-node-id="gG4uaIUhRp0KbAmeE0VH07">旧货摊：以神识鉴定真伪，神识不足只能盲买赌命。地下黑市：高阶灵药高价变现，却易招神识尾随。</div>
-                    <div class="item-desc" id="junk-tip" data-page-node-id="junkTipNode"></div>
-                    <div id="junk-goods" data-page-node-id="9LpPERvtZjQFLhWI7U8yD2"></div>
-                    <h3 style="margin-top:10px;" data-page-node-id="gtdOBPbhmqh6QLxB1IGitS">地下黑市销赃</h3>
-                    <div id="black-sell" data-page-node-id="c8McSG9Mx8tEdBeaQuN0rG"></div>
-                    <h3 style="margin-top:10px;" data-page-node-id="LEbHCqLztYPHDfT6v8cgXR">黑市秘籍 <span class="item-desc" style="font-weight:normal;" data-page-node-id="aYpx1Ml3tmPVdHoVYHzxLd">（魔道功法，修习沾染煞气）</span></h3>
-                    <div id="black-skills" data-page-node-id="gYqaaNaJE4pA96CKAVDdU4"></div>
-                    <h3 style="margin-top:10px;">黑市材料门路 <span class="item-desc" style="font-weight:normal;">（每 3 月轮换，限量售罄不补）</span></h3>
-                    <div id="black-rotation"></div>
                 </div>
 
                 <!-- 紧急面板：与标签页共用面板区，同一时刻只显其一，整页不溢出 -->
