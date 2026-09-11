@@ -73,10 +73,16 @@ G.Moments.fire('first_liquid');
 assert('重复触发不再刷屏', !text().includes('第一滴绿液'));
 assert('已解锁清单可查', G.Moments.unlocked().includes('first_liquid'));
 // 突破/筑基挂钩
+// 注意：筑基关（realmIndex >= ZHUJI_GATE_INDEX）后加了「心魔劫」——壁障将破时先弹待决事件，
+// 须定心抉择后才由 core._resumeBreakthrough 正式冲击。测试要跟着走这一步，否则永远停在半途。
+function breachThrough() {
+  G.Core.breakthrough();
+  if (P().pendingEvent && P().pendingEvent.eventId === 'heart_demon') G.Core.chooseEventOption(0);
+}
 P().realmIndex = 12; P().currentExp = 999; P().maxHp = 100;
 _rand = 0.01;   // 必成功
 logs.length = 0;
-G.Core.breakthrough();
+breachThrough();
 assert('突破成功触发破境高光', P().moments.first_breakthrough === true);
 assert('突破成功触发筑基高光', P().moments.first_zhuji === true);
 assert('突破日志含气血上限变化', /气血上限 \d+ → \d+/.test(text()));

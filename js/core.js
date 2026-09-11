@@ -114,8 +114,10 @@ GAME.Core = {
             }
         }
 
-        // 百草园管事年底结算：上交 10 株常规草药，逾期褫夺管事之位（逻辑在 js/garden.js）
-        if (p.garden && GAME.Garden) GAME.Garden.tick(months);
+        // 百草园结算（逻辑在 js/garden.js）：①管事明田半年结；②无职弟子暗田泄露值
+        // 达 80 后的「神识掠园」查获。两者都在 Garden.tick 里，故须按「是否青梧谷门人」
+        // 调用，而不能只看 p.garden——否则无职弟子的掠园预警永不兑现（死代码）。
+        if (GAME.Garden && GAME.Garden.active && GAME.Garden.active()) GAME.Garden.tick(months);
 
         // 十年回顾：每满 10 年结算一次小结（js/review.js，纯展示）
         if (GAME.Review && GAME.Review.tick) GAME.Review.tick();

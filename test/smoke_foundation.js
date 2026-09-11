@@ -186,7 +186,7 @@ console.log('==== 四、终局：修复古传送阵 · 破空而去（强制验�
 console.log('==== 五、页签压缩 11→7：无死链（覆盖） ====');
 {
   const html = fs.readFileSync(path.join(BASE, 'index.html'), 'utf8');
-  assert('顶部页签恰为 7 个', (html.match(/id="tab-/g) || []).length === 7);
+  assert('顶部页签恰为 8 个（7 个基础 + 后加的「秘境」）', (html.match(/id="tab-/g) || []).length === 8);
   assert('丹炉顶级按钮已移除', html.indexOf('id="tab-alchemy"') < 0);
   assert('门派顶级按钮已移除', html.indexOf('id="tab-sect"') < 0);
   assert('黑市顶级按钮已移除', html.indexOf('id="tab-black"') < 0);

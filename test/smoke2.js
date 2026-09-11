@@ -62,6 +62,13 @@ function reset(realmIndex) {
   if (realmIndex != null) p.realmIndex = realmIndex;
   return p;
 }
+// 筑基关（realmIndex >= ZHUJI_GATE_INDEX）后加了「心魔劫」：突破会先弹待决事件，
+// 须定心抉择后才由 core._resumeBreakthrough 正式冲击壁障。测试要走完这一步。
+function breach() {
+  G.Core.breakthrough();
+  const pp = G.State.p();
+  if (pp.pendingEvent && pp.pendingEvent.eventId === 'heart_demon') G.Core.chooseEventOption(0);
+}
 
 console.log('\n【0】数据完整性自检');
 assert('realms 全部含 meditateMonths', G.DATA.REALMS.every(r => typeof r.meditateMonths === 'number'));
@@ -277,7 +284,7 @@ p = reset(12); // 练气13, needExp 920
 p.currentExp = 920;
 G.State.addItem('pill_zhengpin', 1);
 G.State.addItem('fake_zhuji', 1);
-G.Core.breakthrough();
+breach();
 assert('正品筑基丹破关成功(入筑基)', p.realmIndex === 13);
 assert('丹药优先级:正品先消耗,伪丹留', G.State.countItem('pill_zhengpin') === 0 && G.State.countItem('fake_zhuji') === 1);
 
@@ -286,7 +293,7 @@ setRand(0.01);
 p = reset(12);
 p.currentExp = 920;
 G.State.addItem('fake_zhuji', 1);
-G.Core.breakthrough();
+breach();
 assert('伪筑基丹亦可破关', p.realmIndex === 13);
 
 // 修习敛气术

@@ -2,17 +2,18 @@
  * test/smoke_mid_game.js —— 练气中后期四大模块全链路无头测试
  *   主线链路：解阴毒 → 拜入青梧谷 → 百草园种药 → 血色禁地撤出 → 四丹必入筑基
  *   单元点：乌金盾护盾 / 子母刃死角暴击 / 玄傀护主软着陆 / 神识负载槽(双法器)
- *           毁尸灭迹与因果追查 / 天眼术探雾 / 御风诀行程折扣
+ *           毁尸灭迹与因果追查 / 天眼术斗法探查 / 御风诀行程折扣
  * 跑法：cd ImmortalGame && node test/smoke_mid_game.js
  * ========================================================= */
 
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var BASE = path.resolve(".");
 
-// ---- UI 桩：只吞不渲染 ----
+// ---- UI 桩：只吞不渲染（日志留存供断言） ----
+var logs = [];
 var uiStub = {
     started: true, tab: "map",
-    log: function () {}, updateUI: function () {}, autoSave: function () {},
+    log: function (m) { logs.push(String(m)); }, updateUI: function () {}, autoSave: function () {},
     setDead: function () {}, initLogs: function () {},
     renderSect: function () {}, renderBlack: function () {}, renderTrial: function () {},
     renderTrack: function () {}, renderCombat: function () {}, renderMap: function () {},
@@ -42,6 +43,13 @@ var G = sandbox.GAME;
 var pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; console.log("  ✓ " + name); } else { fail++; console.log("  ✗ FAIL: " + name); } }
 function reset() { setRand(0.5); G.State.createNewPlayer("wanderer"); return G.State.p(); }
+// 筑基关（realmIndex >= ZHUJI_GATE_INDEX）后加了「心魔劫」：突破会先弹待决事件，
+// 须定心抉择后才由 core._resumeBreakthrough 正式冲击壁障。测试要走完这一步。
+function breach() {
+  G.Core.breakthrough();
+  var pp = G.State.p();
+  if (pp.pendingEvent && pp.pendingEvent.eventId === "heart_demon") G.Core.chooseEventOption(0);
+}
 function add(id, n) { G.State.addItem(id, n || 1); }
 
 /* ============ ① 主线前段：解阴毒 → 拜入青梧谷 ============ */
@@ -68,7 +76,7 @@ ok("贡献不足谋不了管事", (function () { p.sectContrib = 0; G.Sect.takeG
 p.sectContrib = 60;
 G.Sect.takeGarden("contrib");
 ok("行贿执事长老（贡献 60）谋得管事之位", !!p.garden && p.sectContrib === 0);
-ok("管事年例：年底前须上交 10 株", p.garden.due === 12);
+ok("管事年例：半年内须上交 10 株", p.garden.due === 6);
 
 p.liquid = 10;
 setRand(0.5);   // 0.5 ≥ 灵泉双收概率 0.20 → 不触发双收
@@ -78,17 +86,20 @@ ok("管事暗田催熟泄露值 0%（灵泉掩蔽）", p.leak === 0);
 
 add("herb_bainian", 10);
 G.Garden.submit();
-ok("明田提前上缴 10 株，贡献 +10、管事顺延", p.sectContrib === 10 && p.garden.due === 12 && G.State.countItem("herb_bainian") === 1);
+ok("明田提前上缴 10 株，贡献 +10、管事顺延", p.sectContrib === 10 && p.garden.due === 6 && G.State.countItem("herb_bainian") === 1);
 
-// 无管事之职：暗田催熟累积泄露值
+// 无管事之职：暗田催熟累积泄露值（达 leakWarn 80 后置位，下月 tick 神识掠园）
 p.garden = null;
 p.liquid = 30;
+p.spiritStones = 200;
 setRand(0.5);
+p.leak = 0;
 for (var i = 0; i < 5; i++) G.Garden.catalyze("herb_bainian", false);
-ok("无职暗田催熟 5 次泄露值累计 60（12×5）", p.leak === 60);
-for (i = 0; i < 4; i++) G.Garden.catalyze("herb_bainian", false);
-ok("泄露值满 100 触发查获后回落 40", p.leak === 40);
-ok("查获罚没：灵石遭罚（不高于原值）", p.spiritStones <= 200);
+ok("无职暗田催熟 5 次泄露值累计 50（10×5）", p.leak === 50);
+var stonesBeforeCatch = p.spiritStones;
+for (i = 0; i < 3; i++) G.Garden.catalyze("herb_bainian", false);   // 第 8 次达 80 → 触发掠园
+ok("泄露值达预警线触发神识掠园：查获后回落至 40", p.leak === 40);
+ok("查获罚没：灵石遭罚（低于原值）", p.spiritStones < stonesBeforeCatch);
 
 // 恶臭草掩盖
 p.leak = 0;
@@ -117,10 +128,11 @@ G.Combat.attack();
 ok("守护兽伏诛，夺得天灵草", !p.combat && f.herbs.herb_tianling === 1);
 
 // 传送符随时撤离：连人带货
+var invTi = G.State.countItem("herb_tianling");
 add("talisman_chuansong");
 G.FZone.teleport();
 ok("传送符撤离：禁地状态清空", p.fzone === null);
-ok("撤离后私藏灵药入袋", G.State.countItem("herb_tianling") === 1 && G.State.countItem("talisman_chuansong") === 0);
+ok("撤离后私藏灵药入袋（背包 +1）", G.State.countItem("herb_tianling") === invTi + 1 && G.State.countItem("talisman_chuansong") === 0);
 
 // 出口法阵结算：三药俱全 → 正品筑基丹 + 贡献
 p = reset(); p.realmIndex = 9;
@@ -157,9 +169,9 @@ var r2 = G.Combat.calcDamage(50, 0, 10, 10, 0.20);
 ok("无子母刃加成时 0.10 不暴击（基础 5%）", r1.crit === false);
 ok("子母刃 +20% 后同点数必暴击", r2.crit === true);
 
-// 玄傀护主软着陆
+// 玄傀护主软着陆（气血归零方为致命伤，checkDeath 才会触发护主）
 p.companion = { id: "quhun", name: "铁奴·玄傀", hp: 100, maxHp: 200, atk: 24 };
-p.currentHp = 1;
+p.currentHp = 0;
 G.Core.checkDeath();
 ok("玄傀护主：致命伤不判死亡", p.isDead === false);
 ok("玄傀魂体溃散（可再唤）", p.companion.hp === 0);
@@ -198,25 +210,23 @@ G.Combat.attack();
 G.Core.chooseMercy(2);
 ok("火球符毁尸灭迹 → 无因果缠身", p4.causal === null && G.State.countItem("talisman_huoqiu") === 0);
 
-/* ============ ⑤ 四丹连服保底入筑基 ============ */
+/* ============ ⑤ 四丹连服入筑基（25% → 50% → 75% → 100%） ============ */
 console.log("\n【5】练气大圆满：连服筑基丹破境");
 p = reset();
 p.realmIndex = 12;   // 练气十三层大圆满
-p.currentExp = G.DATA.REALMS[12].needExp;
 add("pill_zhuji", 4);
-setRand(0.86);   // 0.86 > 85% → 四连败全可验证；0.84 则第四枚必成
-G.Core.breakthrough();
+setRand(0.86);   // 0.86 高于前三枚的成功率；第四枚拉满 100% 必成
+// 每次冲击前补满修为：突破失败扣 35% 修为，不补则后续冲击会被门槛（修为尚不圆满）直接挡下。
+// 另：筑基关会先弹「心魔劫」，须定心抉择后才正式冲击——见 breach()。
+function chong() { G.State.p().currentExp = G.DATA.REALMS[12].needExp; breach(); }
+chong();
 ok("首枚 25% 失败不致死（丹药护心免死）", p.isDead === false && p.zhujiStreak === 1);
-G.Core.breakthrough();
-ok("第二枚累积至 45%", p.zhujiStreak === 2 && p.realmIndex === 12);
-G.Core.breakthrough();
-ok("第三枚累积至 65%", p.zhujiStreak === 3);
-G.Core.breakthrough();
-ok("第四枚 85% 仍差一口气（0.86 > 0.85）", p.realmIndex === 12 && p.zhujiStreak === 3);
-setRand(0.84);
-add("pill_zhuji");
-G.Core.breakthrough();
-ok("第五枚（保底 85%）破境成功踏入筑基", p.realmIndex === 13 && p.isDead === false);
+chong();
+ok("第二枚累积至 50%", p.zhujiStreak === 2 && p.realmIndex === 12);
+chong();
+ok("第三枚累积至 75%", p.zhujiStreak === 3 && p.realmIndex === 12);
+chong();
+ok("第四枚拉满 100%：破境成功踏入筑基", p.realmIndex === 13 && p.isDead === false);
 ok("成功后连服计数清零", p.zhujiStreak === 0);
 
 // 裸冲：伪灵根 2%，失败八成经脉俱断——玄傀护主可软着陆一次
@@ -224,14 +234,14 @@ p5 = reset();
 p5.realmIndex = 12;
 p5.currentExp = G.DATA.REALMS[12].needExp;
 setRand(0.5);   // 0.5>2% 失败；0.5<80% 经脉俱断
-G.Core.breakthrough();
+breach();
 ok("无丹裸冲失败且无玄傀 → 当场道消身陨", p5.isDead === true);
 p6 = reset();
 p6.realmIndex = 12;
 p6.currentExp = G.DATA.REALMS[12].needExp;
 p6.companion = { id: "quhun", name: "铁奴·玄傀", hp: 100, maxHp: 200, atk: 24 };
 setRand(0.5);
-G.Core.breakthrough();
+breach();
 ok("裸冲失败有玄傀护主 → 软着陆保命", p6.isDead === false && p6.companion.hp === 0);
 
 /* ============ ⑥ 天眼术探雾 + 御风诀行程折扣 ============ */
@@ -241,11 +251,15 @@ p.realmIndex = 9;
 p.changchunLevel = 7;
 add("skill_tianyan");
 G.Core.takePill("skill_tianyan");
-G.FZone.start();
-f = p.fzone;
-G.FZone.scry();
-ok("天眼术耗 1 步看破周身一圈", f.stepsLeft === 24 && f.seen[0][1] === true && f.seen[1][1] === true);
-ok("未习者无从探雾", (function () { var q = reset(); q.realmIndex = 9; G.FZone.start(); G.FZone.scry(); return q.fzone.stepsLeft === 25; })());
+ok("习得天眼术（术法在册）", !!(p.spells && p.spells.tianyan_shu));
+// 天眼术现为斗法「主动探查」：开战即看破敌方气血底细与随身宝物成色。
+// 血色禁地已改「三处药田」模型，旧「探雾 scry / seen / stepsLeft」机制整体移除，
+// 故此处改验斗法探查日志。
+logs.length = 0;
+G.Combat.start("wolf");
+ok("天眼术开战看破敌方底细", logs.join("\n").indexOf("【天眼术】") >= 0);
+ok("看破内容含气血与攻防数值", /气血约 \d+、攻 \d+ 防 \d+/.test(logs.join("\n")));
+G.Combat.end();
 
 p = reset();
 p.location = "shenshou_gu";

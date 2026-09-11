@@ -30,10 +30,10 @@ sandbox.GAME = { UI: uiStub };
 sandbox.Math = Object.assign(Object.create(Math), { random: function () { return _rand; } });
 vm.createContext(sandbox);
 
-// 加载顺序同 index.html
+// 加载顺序同 index.html（insect.js 定义 jinshi，炼丹配方交叉引用需要它）
 ["data/realms.js", "data/items.js", "data/skills.js", "data/events.js", "data/world.js", "data/worldmap.js", "data/content.js",
  "js/state.js", "js/storage.js", "js/combat.js", "js/core.js", "js/moEvent.js", "js/market.js",
- "js/map.js", "js/jiayuan.js", "js/mansion.js", "js/tainan.js", "js/sect.js", "js/blackmarket.js", "js/trial.js"
+ "js/map.js", "js/jiayuan.js", "js/mansion.js", "js/tainan.js", "js/sect.js", "js/blackmarket.js", "js/trial.js", "js/insect.js"
 ].forEach(function (f) {
     vm.runInContext(fs.readFileSync(path.join(BASE, f), "utf8"), sandbox, { filename: f });
 });
@@ -146,13 +146,16 @@ ok("本派门人不受境界所限", G.Map.nodeUnlocked("huangfeng_gu").ok === t
 
 // —— 天下舆图：未解锁者隐去详情，只留所需境界 ——
 p = reset();
-ok("舆图五节点齐全", G.Map.atlas().length === 5);
+ok("舆图七节点齐全（含后期月京城/乱星海）", G.Map.atlas().length === 7);
 ok("练气一层舆图中多处未解锁", G.Map.atlas().filter(function (n) { return !n.unlocked; }).length >= 3);
 ok("未解锁条目均带所需境界", G.Map.atlas().filter(function (n) { return !n.unlocked; })
-    .every(function (n) { return n.reqRealmName.indexOf("练气") === 0 && n.lockMsg.indexOf("需") >= 0; }));
+    .every(function (n) { return (n.reqRealmName || "").length > 0 && n.lockMsg.indexOf("需") >= 0; }));
 ok("当前所在地在舆图中标出", G.Map.atlas().some(function (n) { return n.here && n.id === "shenshou_gu"; }));
 p.realmIndex = 13;
-ok("筑基后舆图全部解锁", G.Map.atlas().every(function (n) { return n.unlocked; }));
+ok("筑基一层解锁至月京城，乱星海仍锁（需筑基九层）", G.Map.atlas().filter(function (n) { return !n.unlocked; })
+    .map(function (n) { return n.id; }).join(",") === "luanxing_hai");
+p.realmIndex = 21;   // 筑基九层
+ok("筑基九层后舆图全部解锁", G.Map.atlas().every(function (n) { return n.unlocked; }));
 
 /* ================= ② 景阳城玄机世家主线 ================= */
 console.log("\n【2】景阳城·玄机世家主线（解毒副本）");
@@ -278,6 +281,8 @@ function arriveTainan() {
     var q = reset();
     q.location = "tainan_gu";
     q.spiritStones = 5000;
+    // 术法书修习有《青木功》层数门槛（火球术4/御风诀5/控物术6），此处直接给足层数
+    q.changchunLevel = 7;
     return q;
 }
 
@@ -511,15 +516,16 @@ console.log("\n【6】端到端串联：玄机子 → 景阳城 → 苍南谷 �
     // 3) 走完玄机世家四阶段：解毒 + 拿到升仙令
     G.Map.doAction("mo_house");
     ok("登门玄机世家，事件链开启", !!q.jiayuan && q.jiayuan.stage === 1);
-    G.Jiayuan.choose(0);                        // 凭信物面见颜氏
+    G.Jiayuan.choose(1);                        // 出示玄机令，凭信物面见严夫人（index 0 现为「翻墙潜入墨府」支线，不推进阶段）
     add("yinhun_zhong"); G.Core.activateCompanion();
     ok("于随从处以精血唤起玄傀", !!q.companion);
-    G.Jiayuan.choose(0);                        // 遣玄傀立威
-    G.Jiayuan.choose(0);                        // 受暖阳宝玉
+    G.Jiayuan.choose(1);                        // 遣玄傀出手血洗叛党（index 0 需先在墨府探得线索≥2）
+    G.Jiayuan.choose(0);                        // 先助颜氏稳住基业，再取宝玉
     ok("暖阳宝玉驱尽阴毒，解除死亡倒计时", q.yindu === null);
-    G.Jiayuan.choose(0);                        // 搜检遗箧
-    ok("玄机世家主线终结", q.jiayuanDone === true && q.jiayuan === null);
+    G.Jiayuan.choose(0);                        // 细细搜检玄机子遗箧
     ok("获得【升仙令】", G.State.countItem("shengxian_ling") === 1);
+    G.Jiayuan.choose(1);                        // 胡乱摸索，只当敲门砖（参悟路线另需《玄机子手札》）
+    ok("玄机世家主线终结", q.jiayuanDone === true && q.jiayuan === null);
 
     // 其间闭关苦修，晋至练气六层（散修之地不纳弱者）
     q.realmIndex = 5;
