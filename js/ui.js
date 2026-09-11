@@ -366,6 +366,7 @@ GAME.UI = {
             this.renderCodex();
             this.renderSect();
             this.renderBlack();
+            this.renderAuction();
             this.renderMap();
             this.renderDungeon();
             this.renderSecret();
@@ -1195,6 +1196,19 @@ GAME.UI = {
     renderBlack: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;  // 常驻渲染，不再依赖独立页签
+
+        // 筑基门槛：练气期不得涉足地下黑市（旧货摊 / 销赃 / 秘籍 / 材料门路一并锁闭）
+        if (!GAME.DATA.isZhuji(p)) {
+            var blk = this.$("black-lock");
+            if (blk) { blk.style.display = ""; blk.innerHTML = '<span class="danger">地下黑市：须筑基期方可涉足——练气散修莫要探头，免得横死当场。</span>'; }
+            ["junk-goods", "black-sell", "black-skills", "black-rotation"].forEach(function (id) {
+                var e = this.$(id); if (e) e.innerHTML = "";
+            }, this);
+            var jt = this.$("junk-tip"); if (jt) jt.innerHTML = "";
+            return;
+        }
+        var blkHide = this.$("black-lock"); if (blkHide) { blkHide.style.display = "none"; blkHide.innerHTML = ""; }
+
         GAME.BlackMarket.ensureJunk();     // 首次进入才铺货（空数组 truthy，判断在 ensureJunk 内）
         var self = this;
         // 换货提示（镜像坊市 market-tip）
@@ -1312,6 +1326,56 @@ GAME.UI = {
                 skBox.appendChild(row);
             });
         }
+    },
+
+    // ---------- 市集·拍卖会（结丹解锁） ----------
+    renderAuction: function () {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return;   // 常驻渲染（市集常驻），可见性由 applyPanels 统一控制
+        var lock = this.$("auction-lock");
+        var box = this.$("auction-goods");
+        var intro = this.$("auction-intro");
+        // 结丹门槛：未到结丹期不可入内，按钮不渲染（修为不到不能点击）
+        if (!GAME.DATA.isJiedan(p)) {
+            if (lock) { lock.style.display = ""; lock.innerHTML = '<span class="danger">拍卖会：须结丹期方可入内——筑基圆满亦只可门外张望，莫要触了高阶修士霉头。</span>'; }
+            if (box) box.innerHTML = "";
+            if (intro) intro.innerHTML = "";
+            return;
+        }
+        if (lock) { lock.style.display = "none"; lock.innerHTML = ""; }
+        if (intro) intro.innerHTML = (GAME.DATA.CONTENT.AUCTION && GAME.DATA.CONTENT.AUCTION.intro) || "";
+        GAME.Auction.ensureAuction();
+        if (!box) return;
+        box.innerHTML = "";
+        var lots = p.auctionGoods || [];
+        if (!lots.length) {
+            box.innerHTML = '<div class="empty-tip">这一场拍品已尽数落槌，约 ' + Math.max(0, (p.auctionNextRefresh || 0) - p.totalMonths) + ' 个月后另有新拍。</div>';
+            return;
+        }
+        lots.forEach(function (lot, i) {
+            var item = GAME.DATA.ITEMS[lot.id];
+            if (!item) return;
+            var row = document.createElement("div");
+            row.className = "item-row";
+            var left = document.createElement("div");
+            left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + lot.qty +
+                '<div class="item-desc">起拍 ' + lot.startBid + ' 灵石｜一口价 ' + lot.buyout + ' 灵石｜' + item.desc + '</div>';
+            var right = document.createElement("div");
+            right.className = "item-right";
+            var b1 = document.createElement("button");
+            b1.className = "small-btn";
+            b1.innerText = "应价";
+            b1.disabled = p.spiritStones < lot.startBid;
+            b1.onclick = function () { GAME.Auction.bid(i); };
+            var b2 = document.createElement("button");
+            b2.className = "small-btn btn-gold";
+            b2.innerText = "一口价";
+            b2.disabled = p.spiritStones < lot.buyout;
+            b2.onclick = function () { GAME.Auction.buyout(i); };
+            right.appendChild(b1); right.appendChild(b2);
+            row.appendChild(left); row.appendChild(right);
+            box.appendChild(row);
+        });
     },
 
     // ---------- 历练事件面板 ----------

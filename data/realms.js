@@ -53,6 +53,13 @@ GAME.DATA.REALMS = [
  * core.breakthrough 据此判定 isZhuji，故拆层后不依赖 realm 名。 */
 GAME.DATA.ZHUJI_GATE_INDEX = 12;
 
+/* 结丹门槛：筑基九层(index21)之后即结丹一层(index22)。当前 REALMS 仅到筑基九层，
+ * 结丹境界尚未实现；此常量与 isJiedan 仅为后续功能（如拍卖会）提供统一解锁判定，
+ * 待 REALMS 扩展至结丹后自动生效（届时 index22+ 自然落入新境界）。 */
+GAME.DATA.JIEDAN_GATE_INDEX = 22;
+GAME.DATA.isJiedan = function (p) { return !!p && p.realmIndex >= GAME.DATA.JIEDAN_GATE_INDEX; };
+GAME.DATA.isZhuji  = function (p) { return !!p && p.realmIndex > GAME.DATA.ZHUJI_GATE_INDEX; };
+
 /* 大境界（major realm）：0=练气，1=筑基。供战斗「境界绝对压制」计算双方阶层差。
  * 仅含练气/筑基两阶；未来接入结丹时扩展为按 index 区间映射。 */
 GAME.DATA.majorRealm = function (idx) { return idx >= 13 ? 1 : 0; };

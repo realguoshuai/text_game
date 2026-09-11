@@ -92,6 +92,8 @@ GAME.State = {
             junkNextRefresh: 12,    // 旧货摊下次换货的总月数（与坊市同节奏，买空不再即补）
             blackGoods: null,       // 地下黑市筑基材料货架 [{ id, qty, price }]（每 3 月轮换）
             blackNextRefresh: 0,    // 黑市下次轮换的总月数
+            auctionGoods: null,     // 拍卖会拍品 [{ id, qty, startBid, buyout, current }]（结丹解锁，每 4 月一场）
+            auctionNextRefresh: 0,  // 拍卖会下次开拍的总月数
             achievements: [],       // 已解锁成就 ID
             codex: null,            // 图鉴·见闻录 { items/monsters/spells/lore 各 { id:true } }（js/codex.js）
             cd: null,               // 副本冷却 { trial/fzone：下次可入的总月数 }（副本日常化）

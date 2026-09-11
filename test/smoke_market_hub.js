@@ -196,10 +196,11 @@ ok('散修坊市购买：物品已入储物袋', G.State.countItem(first.id) >= 
 
 /* ================= ④ 地下黑市分区（并入市集） ================= */
 section('④ 地下黑市：在市集页签下渲染（原实现硬绑 tab==="black"）');
-const p3 = G.State.createNewPlayer('wanderer');
-p3.location = 'qingniu_zhen';
-p3.spiritStones = 5000;
-U.updateUI();
+    const p3 = G.State.createNewPlayer('wanderer');
+    p3.realmIndex = 13;   // 黑市现已要求筑基期，验黑市须以筑基身进入
+    p3.location = 'qingniu_zhen';
+    p3.spiritStones = 5000;
+    U.updateUI();
 U.tab = 'market';
 U.updateUI();
 ok('市集页签下旧货摊已渲染（不再依赖独立黑市页签）', els['junk-goods'].children.length > 0);

@@ -84,6 +84,22 @@ GAME.DATA.CONTENT = {
         { id:"skill_dusha",  price:340 },
     ],
 
+    /* ============ 二·乙、拍卖会（结丹期解锁的高阶交易） ============ */
+    /* 结丹修士方能入内：稀珍灵物、失传丹方、上古残宝在此以「应价 / 一口价」竞得。
+     * 应价可能招来匿名修士抬价（拍卖氛围，加价约起拍价一成）；一口价直接落槌。 */
+    AUCTION: {
+        refreshMonths: 4,   // 每 4 个月一场新拍
+        intro: "结丹修士方能入内的高阶拍卖会——稀珍灵物、失传丹方、上古残宝在此流转。",
+        lots: [
+            { id:"chong_egg",       qty:1, startBid:900,  buyout:1400 },
+            { id:"tianhuo_crystal", qty:1, startBid:120,  buyout:180  },
+            { id:"beast_soul",      qty:1, startBid:60,   buyout:90   },
+            { id:"recipe_yanghun",  qty:1, startBid:380,  buyout:520  },
+            { id:"artifact_frag",   qty:2, startBid:30,   buyout:50   },
+            { id:"jinshi",          qty:3, startBid:30,   buyout:45   },
+        ],
+    },
+
     /* ============ 四、血月试炼 ============ */
     TRIAL: {
         steps: 20,            // 固定 20 步探索倒计时

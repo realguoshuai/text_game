@@ -210,6 +210,7 @@
                     <!-- ③ 地下黑市（原独立黑市页整体并入） -->
                     <div id="black-section">
                         <h4 class="mkt-sec">坊市旧货摊 · 地下黑市</h4>
+                        <div id="black-lock" class="empty-tip" style="display:none;"></div>
                         <div class="item-desc" data-page-node-id="gG4uaIUhRp0KbAmeE0VH07">旧货摊：以神识鉴定真伪，神识不足只能盲买赌命。地下黑市：高阶灵药高价变现，却易招神识尾随。</div>
                         <div class="item-desc" id="junk-tip" data-page-node-id="junkTipNode"></div>
                         <div id="junk-goods" data-page-node-id="9LpPERvtZjQFLhWI7U8yD2"></div>
@@ -219,6 +220,14 @@
                         <div id="black-skills" data-page-node-id="gYqaaNaJE4pA96CKAVDdU4"></div>
                         <h4 class="mkt-sec">黑市材料门路 <span class="item-desc" style="font-weight:normal;">（每 3 月轮换，限量售罄不补）</span></h4>
                         <div id="black-rotation"></div>
+                    </div>
+
+                    <!-- ③·甲 拍卖会（结丹解锁） -->
+                    <div id="auction-section">
+                        <h4 class="mkt-sec">拍卖会 <span class="item-desc" style="font-weight:normal;">（结丹期解锁）</span></h4>
+                        <div id="auction-lock" class="empty-tip" style="display:none;"></div>
+                        <div class="item-desc" id="auction-intro"></div>
+                        <div id="auction-goods"></div>
                     </div>
 
                     <!-- ④ 货币兑换 -->
@@ -515,6 +524,7 @@
 <script src="js/review.js"></script>
 <script src="js/moments.js"></script>
 <script src="js/tips.js"></script>
+<script src="js/auction.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>
