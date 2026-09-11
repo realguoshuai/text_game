@@ -720,7 +720,7 @@ GAME.Combat = {
 
         // 景阳城玄机世家主线 / 升仙大会擂台 / 血色禁地：直接入袋，交还对应模块继续剧情
         // （不走"杀/放"抉择——此三者由剧情验收，不是随机遭遇）
-        if (ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt")) {
+        if (ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic")) {
             p.spiritStones += stones;
             p.stats.kills += 1;
             this.grantLoot(def.loot, 1, def);
@@ -729,6 +729,7 @@ GAME.Combat = {
             else if (ctx.type === "leitai") GAME.Tainan.afterCombat(true, ctx);
             else if (ctx.type === "mansion") GAME.Mansion.afterCombat(true, ctx);
             else if (ctx.type === "heisha") GAME.Heisha.afterCombat(true, ctx);
+            else if (ctx.type === "relic") GAME.Relic.afterCombat(true, ctx);
             else if (ctx.type === "bonds") GAME.Bonds.nangongwanWin();
             else if (ctx.type === "hunt") GAME.Hunt.afterCombat(true, ctx);
             else GAME.FZone.afterCombat(true, ctx);
@@ -783,7 +784,7 @@ GAME.Combat = {
         }
 
         // 玄机世家主线 / 升仙擂台 / 血色禁地：败北不判当场身陨（剧情尚有转圜），按常规折寿失财处理
-        var routed = !!ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt");
+        var routed = !!ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic");
 
         // 血色禁地：败北由禁地模块全权结算软着陆（玄傀护主背出 / 弃药保命），不走通用折寿失财
         if (routed && ctx.type === "fzone") {
@@ -803,6 +804,13 @@ GAME.Combat = {
         if (routed && ctx.type === "mansion") {
             this.end();
             GAME.Mansion.afterCombat(false, ctx);
+            return;
+        }
+
+        // 古修遗迹：败北由遗迹模块结算（重伤退出、战利品散失，不判当场身陨）
+        if (routed && ctx.type === "relic") {
+            this.end();
+            GAME.Relic.afterCombat(false, ctx);
             return;
         }
 

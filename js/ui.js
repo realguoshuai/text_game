@@ -43,7 +43,7 @@ GAME.UI = {
         map: "map-panel", bag: "bag-panel", alchemy: "alchemy-panel", market: "market-panel", home: "home-panel",
         codex: "codex-panel",
         sect: "sect-panel", black: "black-panel", companion: "companion-panel",
-        skill: "skill-panel", dungeon: "dungeon-panel"
+        skill: "skill-panel", dungeon: "dungeon-panel", secret: "secret-panel"
     },
 
     switchTab: function (name) {
@@ -95,7 +95,7 @@ GAME.UI = {
         var self = this;
         ["map-panel", "bag-panel", "alchemy-panel", "market-panel", "home-panel", "sect-panel", "black-panel", "companion-panel",
          "jiayuan-panel", "skill-panel", "dungeon-panel", "fz-panel", "qixuan-panel",
-         "combat-panel", "track-panel", "trial-panel", "event-panel", "mercy-panel", "mo-panel", "mansion-panel", "codex-panel"]
+         "combat-panel", "track-panel", "trial-panel", "event-panel", "mercy-panel", "mo-panel", "mansion-panel", "secret-panel", "codex-panel"]
             .forEach(function (id) { self.show(id, id === visible); });
 
         // 页签按钮：紧急面板期间禁用切换；坊市未进入时禁用该签
@@ -371,6 +371,7 @@ GAME.UI = {
             this.renderBlack();
             this.renderMap();
             this.renderDungeon();
+            this.renderSecret();
             this.renderJiayuan();
             this.renderMansion();
             this.renderTainan();
@@ -1396,6 +1397,88 @@ GAME.UI = {
         });
     },
 
+    // ---------- 秘境舆图：筑基期可闯秘境集中视图（节点卡片地图） ----------
+    renderSecret: function () {
+        var self = this;
+        var p = GAME.State.p();
+        if (this.tab !== "secret" || p.isDead || p.combat) return;   // 可见性由 applyPanels 统一控制
+        var box = this.$("secret-list");
+        if (!box) return;
+        box.innerHTML = "";
+        // 筑基期可闯秘境：节点卡片地图，点击前往复用现有副本逻辑
+        var REALMS = [
+            {
+                id: "heisha", name: "云京皇宫·幽冥地宫", req: 13, cdKey: null,
+                desc: "云国皇城地底蛰伏的血魔。分破四大血侍、再决战幽冥教主越皇——双阶段死战，筑基修士的成名之战。",
+                enter: function () { GAME.Heisha.start(); },
+                done: function (p) { return !!(p.heisha && p.heisha.bossDone); },
+                ongoing: function (p) { return !!p.heisha && !p.heisha.bossDone; }
+            },
+            {
+                id: "hunt_shashen", name: "魔修弃营", req: 15, cdKey: null,
+                desc: "魔道六宗遗弃的联络营垒，连战三波凶徒与禁制，通关夺重宝——筑基三层方稳妥。",
+                enter: function () { GAME.Hunt.enter("hunt_shashen"); },
+                done: function () { return false; },
+                ongoing: function (p) { return !!p.hunt && p.hunt.id === "hunt_shashen"; }
+            },
+            {
+                id: "fzone", name: "血色禁地", req: null, cdKey: "fzone",
+                desc: "三处药田各有守护妖兽，闯入即战，胜则夺药——筑基三药之源。休整 12 月方可再入。",
+                enter: function () { GAME.FZone.start(); },
+                done: function () { return false; },
+                ongoing: function (p) { return !!p.fzone; }
+            },
+            {
+                id: "trial", name: "血月遗境", req: null, cdKey: "trial",
+                desc: "古修遗境二十步生死，集齐三味主药可炼正品筑基丹。休整 6 月方可再入。",
+                enter: function () { GAME.Trial.start(); },
+                done: function () { return false; },
+                ongoing: function (p) { return !!p.trial; }
+            },
+            {
+                id: "relic", name: "古修遗迹·探宝", req: 13, cdKey: "relic",
+                desc: "沉眠千载的古修洞府，多步探索——灵物、机关、残魂、宝箱随机而至。筑基专属机缘，休整 4 月。",
+                enter: function () { if (GAME.Relic) GAME.Relic.start(); },
+                done: function (p) { return !!p.relicDone; },
+                ongoing: function (p) { return !!p.relic; }
+            }
+        ];
+        REALMS.forEach(function (d) {
+            var realmLocked = d.req != null && p.realmIndex < d.req;
+            var cdLeft = d.cdKey ? GAME.State.cdLeft(d.cdKey) : 0;
+            var done = d.done(p), ongoing = d.ongoing(p);
+            var row = document.createElement("div");
+            row.className = "item-row secret-node";
+            var left = document.createElement("div");
+            var status;
+            if (realmLocked) status = '<span class="danger">【需筑基 ' + (d.req - 12) + ' 层】</span>';
+            else if (done) status = '<span class="warning">【已通】</span>';
+            else if (cdLeft > 0) status = '<span class="warning">【休整中 · 尚需 ' + cdLeft + ' 月】</span>';
+            else if (ongoing) status = '<span class="warning">（探索中——请从紧急面板继续）</span>';
+            else status = '<span class="highlight">可前往</span>';
+            left.innerHTML = '<span class="q-灵品">' + d.name + '</span>' +
+                '<div class="item-desc">' + d.desc + '</div>' +
+                '<div class="item-desc">' + status + '</div>';
+            var right = document.createElement("div");
+            right.className = "item-right";
+            var b = document.createElement("button");
+            b.className = "small-btn btn-gold";
+            b.innerText = "前往";
+            b.disabled = realmLocked || done || cdLeft > 0 || ongoing || !!p.combat;
+            if (realmLocked) b.title = "境界不足";
+            b.onclick = d.enter;
+            right.appendChild(b);
+            row.appendChild(left); row.appendChild(right);
+            box.appendChild(row);
+        });
+        // 秘境游历（随机奇遇）：绑定按钮
+        var roam = this.$("btn-secret-roam");
+        if (roam) {
+            roam.disabled = p.isDead || !!p.combat;
+            roam.onclick = function () { if (GAME.Secret) GAME.Secret.roam(); };
+        }
+    },
+
     renderQixuan: function () {
         var p = GAME.State.p();
         var v = GAME.Qixuan ? GAME.Qixuan.view() : null;
@@ -2144,6 +2227,7 @@ GAME.UI = {
 
         // 副本中枢（tab-fzone）：血月试炼 / 血色禁地 / 玄机世家主线 统一入口
         this.$("tab-fzone").onclick = function () { self.switchTab("dungeon"); };
+        this.$("tab-secret").onclick = function () { self.switchTab("secret"); };
         // 药田挑战按钮 btn-fz-fight0/1/2 由 renderFzone 动态生成并绑定
         this.$("btn-fz-rest").onclick = function () { GAME.FZone.rest(); };
         this.$("btn-fz-submit").onclick = function () { GAME.FZone.finish("submit"); };

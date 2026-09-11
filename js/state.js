@@ -173,6 +173,9 @@ GAME.State = {
         p.jiayuanDone = false;
         // 官方筑基期直接跳过苍梧门开局六幕：把六幕标记为「已完结」(act 7)，
         // 否则目标横幅会一直挂着「走完苍梧门开局六幕」，与「直接到筑基期」的设定相悖
+        p.sectId = "huangfenggu";            // 青梧谷弟子身份：筑基预设已是门人，跳过拜山流程，开局直奔云京皇宫副本
+        p.inventory["array_wuxing"] = 1;     // 颠倒五行阵残阵：黑煞 Boss 战战术道具（引魔入阵封 50% 属性）
+        p.inventory["talisman_chuansong"] = 2; // 传送符×2：副本中随时连人带货撤离
         p.qixuan = { act: 7, step: 0 };
         p.tainan = null;
         p.companion = null;

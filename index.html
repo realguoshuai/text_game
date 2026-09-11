@@ -124,6 +124,7 @@
                 <button id="tab-bag" class="small-btn" data-page-node-id="uG1WwCtG5JN5JYS8dfWHqy">储物袋<span id="badge-bag" class="tab-badge" style="display:none;"></span></button>
                 <button id="tab-market" class="small-btn" data-page-node-id="xB76RNxneibNOW0kX6GD9t">坊市</button>
                 <button id="tab-fzone" class="small-btn" data-page-node-id="OMeD5O2tfIYEQGQoV06SmL">副本/试炼<span id="badge-fzone" class="tab-badge" style="display:none;"></span></button>
+                <button id="tab-secret" class="small-btn">秘境</button>
                 <button id="tab-companion" class="small-btn" data-page-node-id="0dHGsHB9VCW7a4zBZbFMTX">灵宠/傀儡<span id="badge-companion" class="tab-badge" style="display:none;"></span></button>
                 <button id="tab-codex" class="small-btn">图志/道碑</button>
             </div>
@@ -319,6 +320,19 @@
                     <div id="dungeon-list" data-page-node-id="bPDCgPUZG0ZoM0IGE1hjGF"></div>
                 </div>
 
+                <!-- 秘境舆图：筑基期可闯秘境集中视图（节点卡片地图） -->
+                <div class="panel" id="secret-panel">
+                    <h3>秘境舆图</h3>
+                    <div class="item-desc">筑基修士可闯的秘境尽列于此——有造化，也有杀机。点选秘境即可前往，莫要贸然轻入。</div>
+                    <div id="secret-list"></div>
+                    <h3 style="margin-top:12px;">秘境游历</h3>
+                    <div class="item-desc">不入秘境深处，只在 periphery 游走探看——或有奇遇，亦或空手而返。每次探看耗 1 月。</div>
+                    <div class="combat-actions">
+                        <button id="btn-secret-roam" class="btn-gold">秘境游历（随机奇遇）</button>
+                    </div>
+                    <div id="secret-roam-text" class="event-text" style="margin-top:8px;"></div>
+                </div>
+
                 <!-- 血色禁地·5×5 网格轻肉鸽（练气中后期核心副本） -->
                 <div class="panel" id="fz-panel" data-page-node-id="lIWvLAN7GY6KFo3B8WYBpv">
                     <h3 style="border-color:#7f1d1d;" data-page-node-id="cnXkzoI7bSdUkXi0hy2PrG">血色禁地</h3>
@@ -434,6 +448,7 @@
 <script src="data/skills_foundation.js"></script>
 <script src="data/items_foundation.js"></script>
 <script src="data/dungeon_heisha.js"></script>
+<script src="data/secret_relic.js"></script>
 <script src="data/wild_dungeons.js"></script>
 <script src="js/state.js"></script>
 <script src="js/storage.js"></script>
@@ -461,6 +476,8 @@
 <script src="js/bottle.js"></script>
 <script src="js/bonds.js"></script>
 <script src="js/dungeon_heisha.js"></script>
+<script src="js/secret_relic.js"></script>
+<script src="js/secret.js"></script>
 <script src="js/hunt.js"></script>
 <script src="js/teleport_portal.js"></script>
 <script src="js/endings.js"></script>
