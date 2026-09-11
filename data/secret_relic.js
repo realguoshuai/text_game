@@ -52,7 +52,11 @@ GAME.DATA.RELIC = {
         { id: "mid_stone",     w: 3, qty: [5, 10] },
         { id: "pill_jinsui",   w: 2, qty: [1, 2] },
         { id: "skill_yufeng",  w: 2 },
-        { id: "artifact_qingyun", w: 1 }
+        { id: "artifact_qingyun", w: 1 },
+        // 残卷机缘：宝箱有几率藏有丹方（研习后化入识海，不入袋）
+        { id: "recipe_ningyuan", w: 1 },
+        { id: "recipe_huasha",   w: 1 },
+        { id: "recipe_yanghun",  w: 1 }
     ],
     // 机关（trap）：掉血 + 扣灵石
     trap: { hp: [20, 60], stonePct: [0.05, 0.15] },

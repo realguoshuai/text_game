@@ -58,6 +58,13 @@ GAME.DATA.CONTENT = {
         goods: [
             { id:"beast_soul",      qtyRange:[1,3], price:35 },   // 妖兽精魄：限量 1~3 份
             { id:"tianhuo_crystal", qtyRange:[1,1], price:80 },   // 天火晶：常备 1 份
+            // —— 丹方卷轴（每期约半数现身，黑市概率获得） ——
+            { id:"recipe_ningyuan", qtyRange:[1,1], price:150 },
+            { id:"recipe_juling",   qtyRange:[1,1], price:150 },
+            { id:"recipe_qingxin",  qtyRange:[1,1], price:280 },
+            { id:"recipe_xugu",     qtyRange:[1,1], price:320 },
+            { id:"recipe_huasha",   qtyRange:[1,1], price:180 },
+            { id:"recipe_yanghun",  qtyRange:[1,1], price:340 },
         ],
     },
 

@@ -87,6 +87,7 @@ GAME.DATA.HEISHA = {
             { id: "xueyu_zhizhu_luan", qty: 1, must: true },
             { id: "ninghou_canjuuan", qty: 1 },
             { id: "mid_stone", qty: 3 },
+            { id: "recipe_xugu", qty: 1 },   // 黑煞战役掉落一张丹方（研习后化入识海）
         ],
         contrib: 200,
         text: "地宫深处血气翻涌。越皇的尸身倒在王座之下，一枚血玉般晶莹的虫卵自其袖中滚落——此乃稀世异宝，灵宠培育之核心。",

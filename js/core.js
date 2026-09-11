@@ -296,6 +296,14 @@ GAME.Core = {
         }
         var r = GAME.DATA.RECIPES[index];
         if (!r) return;
+        // 丹方激活：须先习得对应丹方方可开炉
+        if (r.recipe && !(p.recipes && p.recipes[r.recipe])) {
+            var rd = GAME.DATA.ITEMS[r.recipe];
+            var pn = (rd && rd.learns && GAME.DATA.ITEMS[rd.learns]) ? GAME.DATA.ITEMS[rd.learns].name : "该";
+            GAME.UI.log("你尚未习得「" + pn + "」丹方，无从开炉——丹方可在黑市、秘境奇遇或副本中寻得。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
         var missing = this.craftCheck(r);
         if (missing) {
             GAME.UI.log("药材不齐，炉火空燃：" + missing + "。", "system");
@@ -376,8 +384,25 @@ GAME.Core = {
             p.currentHp = Math.min(p.maxHp, p.currentHp + use.maxHpBonus);
             GAME.UI.log("你依法修习【" + item.name + "】，皮膜坚厚，气血上限 +" + use.maxHpBonus + "（现上限 " + p.maxHp + "）。", "success");
         }
-        // 魔道功法：修习沾染煞气（正道修士侧目，黑市销赃更易被尾随）
-        if (use.shaQi) {
+        // 丹药专属：疗伤 / 心境 / 化煞（type:"pill" 方生效；修正回春散等 heal 失效旧疾）
+        if (item.type === "pill") {
+            if (use.heal) {
+                var before = p.currentHp;
+                p.currentHp = Math.min(p.maxHp, p.currentHp + use.heal);
+                GAME.UI.log("你服下【" + item.name + "】，药力温养四肢百骸，气血回复 " + (p.currentHp - before) + " 点（现 " + p.currentHp + "/" + p.maxHp + "）。", "success");
+            }
+            if (use.mind) {
+                p.mind = (p.mind || 0) + use.mind;
+                GAME.UI.log("你服下【" + item.name + "】，灵台一片空明，心境 +" + use.mind + "（现 " + p.mind + "）。", "info");
+            }
+            if (use.shaQi) {
+                var d = use.shaQi;
+                p.shaQi = Math.max(0, p.shaQi + d);
+                GAME.UI.log("你服下【" + item.name + "】，地脉煞气随药力涤荡——煞气 " + (d < 0 ? ("-" + (-d)) : ("+" + d)) + "（现 " + p.shaQi + "）。", "info");
+            }
+        }
+        // 魔道功法：修习沾染煞气（正道修士侧目，黑市销赃更易被尾随）；丹药净化煞气改由下方 pill 分支处理
+        if (use.shaQi && item.type !== "pill") {
             p.shaQi += use.shaQi;
             GAME.UI.log("一股阴煞之气缠绕周身——煞气 +" + use.shaQi + "。此术虽利，却也惹人觊觎。", "danger");
         }

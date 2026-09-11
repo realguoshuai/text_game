@@ -578,22 +578,28 @@ GAME.UI = {
 
         GAME.DATA.RECIPES.forEach(function (r, idx) {
             var pill = GAME.DATA.ITEMS[r.pill];
-            var missing = GAME.Core.craftCheck(r);
+            var locked = !!(r.recipe && !(p.recipes && p.recipes[r.recipe]));
+            var missing = locked ? null : GAME.Core.craftCheck(r);
             var row = document.createElement("div");
             row.className = "item-row";
             var herbs = Object.keys(r.herbs).map(function (h) {
                 return GAME.DATA.ITEMS[h].name + "×" + r.herbs[h];
             }).join(" + ");
             var left = document.createElement("div");
-            left.innerHTML = '<span class="q-' + pill.quality + '">' + pill.name + '</span>' +
-                '<div class="item-desc">' + herbs + '，炉火灵石 ' + r.stones + '</div>' +
-                (missing ? '<div class="item-desc warning">无法开炉：' + missing + '</div>' : '');
+            if (locked) {
+                left.innerHTML = '<span class="q-' + pill.quality + '">' + pill.name + '</span>' +
+                    '<div class="item-desc warning">未得丹方：须先习得「' + pill.name + '」丹方（黑市 / 秘境奇遇 / 副本可得）。</div>';
+            } else {
+                left.innerHTML = '<span class="q-' + pill.quality + '">' + pill.name + '</span>' +
+                    '<div class="item-desc">' + herbs + '，炉火灵石 ' + r.stones + '</div>' +
+                    (missing ? '<div class="item-desc warning">无法开炉：' + missing + '</div>' : '');
+            }
             var right = document.createElement("div");
             right.className = "item-right";
             var b = document.createElement("button");
             b.className = "small-btn btn-gold";
-            b.innerText = "开炉";
-            b.disabled = !!missing;
+            b.innerText = locked ? "未得丹方" : "开炉";
+            b.disabled = !!locked || !!missing;
             b.onclick = function () { GAME.Core.alchemy(idx); };
             right.appendChild(b);
             row.appendChild(left);

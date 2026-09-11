@@ -39,6 +39,7 @@ GAME.State = {
             inventory: {},          // { 物品ID: 数量 }
             karma: 0,               // 善恶值：负为恶，正为善（-100 ~ 100）
             sectContrib: 0,         // 宗门贡献度（杂役累积，可兑换）
+            recipes: {},            // 已习得丹方 { recipeId: true }（拾得/购入丹方卷轴自动研习）
             concealLevel: 0,        // 敛气等级（中品敛气术修习层数，影响黑市脱身）
             shaQi: 0,               // 煞气值（杀人夺宝 / 地脉煞气累积，影响黑市被尾随概率）
             artifactDurability: 0,  // 当前装备法器耐久（0 = 无/满耐久）
@@ -195,7 +196,19 @@ GAME.State = {
     addItem: function (id, qty) {
         qty = qty || 1;
         var p = this.p();
-        if (!GAME.DATA.ITEMS[id]) { console.warn("未知物品: " + id); return; }
+        var def = GAME.DATA.ITEMS[id];
+        if (!def) { console.warn("未知物品: " + id); return; }
+        // 丹方卷轴：拾得/购入即研习化入识海，不入储物袋（黑市/奇遇/副本统一走此入口）
+        if (def.type === "recipe") {
+            p.recipes = p.recipes || {};
+            if (!p.recipes[id]) {
+                p.recipes[id] = true;
+                var pill = def.learns, pn = (pill && GAME.DATA.ITEMS[pill]) ? GAME.DATA.ITEMS[pill].name : (pill || "");
+                if (GAME.UI && GAME.UI.log) GAME.UI.log("你参详【" + def.name + "】，习得「" + pn + "」炼制之法，丹方化入识海。", "success");
+            }
+            if (GAME.Codex) GAME.Codex.unlockItem(id);   // 图志仍录此方
+            return;
+        }
         p.inventory[id] = (p.inventory[id] || 0) + qty;
         if (GAME.Codex) GAME.Codex.unlockItem(id);   // 图鉴·器物：首次入袋即录
     },

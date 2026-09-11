@@ -17,6 +17,7 @@ GAME.Secret = {
         { type: "beast", w: 2 },   // 妖兽结缘：兽魂
         { type: "jade",  w: 2 },   // 古修遗泽：金髓丸（修为 +80）
         { type: "trap",  w: 2 },   // 陷阱：掉血失财
+        { type: "recipe", w: 2 },  // 残卷机缘：拾得丹方（研习后化入识海）
         { type: "empty", w: 2 }    // 空手而返
     ],
 

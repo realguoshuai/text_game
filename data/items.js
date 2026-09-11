@@ -118,6 +118,22 @@ GAME.DATA.ITEMS = {
     iron_ore:        { id:"iron_ore",        name:"玄铁矿石", quality:"凡品", type:"material", price:15, desc:"地底玄铁原矿，用于傀儡机括与噬金虫喂养。下矿开采或坊市铁匠铺可得。" },
     tianhuo_crystal: { id:"tianhuo_crystal", name:"天火晶",   quality:"上品", type:"material", price:80, desc:"火系地脉结晶，用于高阶巨猿傀儡与法宝胚胎。魔修尸身或黑市可得。" },
     yin_hun_soul:    { id:"yin_hun_soul",    name:"阴魂精魄", quality:"极品", type:"material", price:0,  desc:"魔修丹田所凝阴魂，傀儡阴煞核心。斩杀魔道筑基修士方有几率到手。" },
+
+    // —— 新增（丹方激活系列）：六色新丹，须先习得对应「丹方」方可开炉 ——
+    pill_ningyuan:   { id:"pill_ningyuan",   name:"凝元丹", quality:"灵品", type:"pill", price:120, desc:"筑基通用精进之丹，药力温和。服之修为 +40。", use:{ exp:40 } },
+    pill_juling:     { id:"pill_juling",     name:"聚灵丹", quality:"灵品", type:"pill", price:120, desc:"凝灵聚气，疗伤圣品。服之气血回复 120 点——禁地之外重伤可恃。", use:{ heal:120 } },
+    pill_qingxin:    { id:"pill_qingxin",    name:"清心丹", quality:"上品", type:"pill", price:260, desc:"清心宁神，稳守灵台。服之心境 +5（突破手感更顺）。", use:{ mind:5 } },
+    pill_xugu:       { id:"pill_xugu",       name:"续骨丹", quality:"上品", type:"pill", price:300, desc:"续筋接骨，根基愈牢。服之气血上限 +25（永久）。", use:{ maxHpBonus:25 } },
+    pill_huasha:     { id:"pill_huasha",     name:"化煞丹", quality:"灵品", type:"pill", price:150, desc:"以清灵药力涤荡地脉煞气。服之煞气 -20（矿役/杀伐后最宜）。", use:{ shaQi:-20 } },
+    pill_yanghun:    { id:"pill_yanghun",    name:"养魂丹", quality:"上品", type:"pill", price:320, desc:"温养神魂，识海渐扩。服之神识 +10（御物搜神更利）。", use:{ spiritBonus:10 } },
+
+    // —— 丹方卷轴（type:recipe）：拾得/购入即研习化入识海，不入储物袋；对应丹药方可开炉 ——
+    recipe_ningyuan: { id:"recipe_ningyuan", name:"凝元丹方", quality:"灵品", type:"recipe", price:150, learns:"pill_ningyuan", desc:"凝元丹炼制之法（灵药×2）。黑市/奇遇/副本可得。" },
+    recipe_juling:   { id:"recipe_juling",   name:"聚灵丹方", quality:"灵品", type:"recipe", price:150, learns:"pill_juling",   desc:"聚灵丹炼制之法（灵药×2＋恶臭草）。黑市/奇遇/副本可得。" },
+    recipe_qingxin: { id:"recipe_qingxin",  name:"清心丹方", quality:"上品", type:"recipe", price:280, learns:"pill_qingxin",  desc:"清心丹炼制之法（千年灵药＋灵药）。黑市/奇遇/副本可得。" },
+    recipe_xugu:     { id:"recipe_xugu",     name:"续骨丹方", quality:"上品", type:"recipe", price:320, learns:"pill_xugu",     desc:"续骨丹炼制之法（千年灵药×2＋金砂）。黑市/奇遇/副本可得。" },
+    recipe_huasha:   { id:"recipe_huasha",   name:"化煞丹方", quality:"灵品", type:"recipe", price:180, learns:"pill_huasha",   desc:"化煞丹炼制之法（天灵草＋玉魔花）。黑市/奇遇/副本可得。" },
+    recipe_yanghun:  { id:"recipe_yanghun",  name:"养魂丹方", quality:"上品", type:"recipe", price:340, learns:"pill_yanghun",  desc:"养魂丹炼制之法（妖兽精魄＋天火晶）。黑市/奇遇/副本可得。" },
 };
 
 /* —— 炼丹配方表：按优先级从高到低排列，炼丹时依次匹配 ——
@@ -128,4 +144,11 @@ GAME.DATA.RECIPES = [
     { pill:"pill_zhuji",     herbs:{ herb_qiannian:1, herb_bainian:2 },         stones:200 },
     { pill:"pill_jinsui",    herbs:{ herb_bainian:3 },                          stones:50  },
     { pill:"pill_huanglong", herbs:{ herb_bainian:1 },                          stones:20  },
+    // —— 丹方激活系列：须先习得对应「丹方」方可开炉（黑市/奇遇/副本概率获得） ——
+    { pill:"pill_ningyuan",  herbs:{ herb_bainian:2 },                 stones:30,  recipe:"recipe_ningyuan" },
+    { pill:"pill_juling",    herbs:{ herb_bainian:2, herb_ecao:1 },    stones:30,  recipe:"recipe_juling" },
+    { pill:"pill_qingxin",   herbs:{ herb_qiannian:1, herb_bainian:1 }, stones:80, recipe:"recipe_qingxin" },
+    { pill:"pill_xugu",      herbs:{ herb_qiannian:2, jinshi:1 },      stones:120, recipe:"recipe_xugu" },
+    { pill:"pill_huasha",    herbs:{ herb_tianling:1, herb_yumo:1 },   stones:60,  recipe:"recipe_huasha" },
+    { pill:"pill_yanghun",   herbs:{ beast_soul:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_yanghun" },
 ];
