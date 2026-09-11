@@ -145,7 +145,9 @@ GAME.State = {
         p.currentHp = p.maxHp;
         p.maxMp = (R.mp != null) ? R.mp : 120;    // 120
         p.mp = p.maxMp;
-        p.clock = { year: 18, month: 0, dailyCircles: 0 };
+        // 年龄：不同修为寿元不同（练气上限100、筑基上限200）。筑基预设即「刚从练气突破」之身，
+        // 练气百年寿元已花尽，故以百岁开局最合常理，而非少年起步。
+        p.clock = { year: 100, month: 0, dailyCircles: 0 };
         p.maxAgeBonus = 0;
         p.spiritStones = 3000;                    // 充足灵石，便于体验洞府/坊市/终局
         p.silver = 2000;
