@@ -1668,7 +1668,7 @@ GAME.UI = {
         var exBox = this.$("map-exchange");
         if (exBox) exBox.style.display = (node.kind === "mortal") ? "block" : "none";
 
-        // 苍南小会内容并入地图面板：身抵苍南谷时显现，否则隐藏
+        // 苍南小会内容并入地图面板：身抵苍南谷时显现为折叠入口，否则整体隐藏
         var tb = this.$("tainan-block");
         if (tb) tb.style.display = GAME.Tainan.at() ? "block" : "none";
     },
@@ -1752,6 +1752,15 @@ GAME.UI = {
         else if (p.tainan && p.tainan.leitai > 0) tips.push("已连胜 " + p.tainan.leitai + " 场，再赢 " + (GAME.DATA.TAINAN.leitai.length - p.tainan.leitai) + " 场可夺前三。");
         else tips.push("擂台三轮连胜可得前三，赐筑基丹一枚。");
         this.$("tainan-info").innerText = tips.join("　");
+
+        // 折叠入口右侧的擂台状态：不展开也一眼可见进度
+        var brief;
+        if (p.sectId) brief = "已拜宗门";
+        else if (p.tainan && p.tainan.leitaiDone) brief = "擂台 · 前三已定";
+        else if (p.tainan && p.tainan.leitai > 0) brief = "擂台 · 连胜 " + p.tainan.leitai + " 场";
+        else brief = "擂台 · 未开擂";
+        var briefEl = this.$("tainan-brief");
+        if (briefEl) briefEl.innerText = brief;
 
         // 散修坊市
         var box = this.$("tainan-goods");

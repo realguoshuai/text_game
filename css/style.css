@@ -555,3 +555,48 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
     text-align: center;
 }
 .cover-note b { color: var(--gold); }
+
+/* ---------- 苍南小会：大地图页尾的折叠入口 ----------
+   默认收起为一行，点开才见坊市商品 / 出售杂物 / 升仙大会；
+   避免商品列表把舆图撑长、抢走地图信息的位置。 */
+.tainan-fold {
+    margin-top: 10px;
+    border-top: 1px dashed var(--panel-border);
+    padding-top: 8px;
+}
+.tainan-fold > summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    background: var(--btn-bg);
+    font-size: 13px;
+    transition: border-color .15s, background .15s;
+}
+.tainan-fold > summary::-webkit-details-marker { display: none; }
+.tainan-fold > summary::before {
+    content: "▸";
+    font-size: 11px;
+    color: var(--text-mute);
+    transition: transform .18s ease;
+}
+.tainan-fold[open] > summary::before { transform: rotate(90deg); }
+.tainan-fold > summary:hover { border-color: var(--btn-border); background: rgba(128,128,128,.14); }
+.tainan-fold[open] > summary { border-color: var(--btn-border); margin-bottom: 9px; }
+.tainan-fold .tainan-sub { font-size: 12px; }
+.tainan-fold .tainan-brief {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-mute);
+}
+.tainan-fold[open] .tainan-brief { color: var(--text-dim); }
+.tainan-fold > .tainan-body { padding-left: 2px; }
+@media (max-width: 480px) {
+    .tainan-fold .tainan-sub { display: none; }
+}

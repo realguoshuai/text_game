@@ -152,21 +152,27 @@
                     <div class="combat-actions" id="map-black-entry" style="margin-top:10px;">
                         <button id="btn-map-black" class="small-btn btn-gold">坊市旧货摊 · 地下黑市</button>
                     </div>
-                    <!-- 苍南小会：身抵苍南谷时显现（散修坊市 + 升仙大会） -->
-                    <div id="tainan-block" style="display:none; margin-top:10px; border-top:1px dashed var(--bd); padding-top:8px;" data-page-node-id="sEhqeUP8RUNxgbyBZ0jdnq">
-                        <h3 data-page-node-id="EFBMauGIlMU8dXfvubaGDw">苍南小会</h3>
-                        <div id="tainan-info" class="item-desc" data-page-node-id="v2ElxRUr0xpURWHi3XTbA9">此处需用灵石说话——世俗银两在修仙者眼里与沙土无异。</div>
-                        <h3 style="margin-top:10px;" data-page-node-id="GxEUM4OyKy6b6CuVQ6DuQm">散修坊市</h3>
-                        <div id="tainan-goods" data-page-node-id="EPGDvHyawZB6FxIZnNoPgn"></div>
-                        <h3 style="margin-top:10px;" data-page-node-id="ZMvyLpHCz4gcd7bZI5kTQU">出售杂物</h3>
-                        <div id="tainan-sell" data-page-node-id="13FvDAarxOHyffqFyzfqNI"></div>
-                        <h3 style="margin-top:10px;" data-page-node-id="ipWcUKV9UFLEqBUn3EDRtN">升仙大会</h3>
-                        <div id="tainan-leitai" class="item-desc" data-page-node-id="vpSixXBPFzKGxSbXMgb0Zw"></div>
-                        <div class="combat-actions" data-page-node-id="kYtkSJbxHJ1UWVigurmML8">
-                            <button id="btn-leitai-next" class="btn-danger" data-page-node-id="fZWtgD3GpBBqNtmJynokjb">上台打擂</button>
-                            <button id="btn-shengxian-token" class="btn-gold" data-page-node-id="Y2lNwHo2h2IUStbUUAViSV">出示升仙令（保送拜山）</button>
+                    <!-- 苍南小会：身抵苍南谷时显现。默认收起为一行入口，点开才见坊市商品与升仙大会 -->
+                    <details class="tainan-fold" id="tainan-block" style="display:none;" data-page-node-id="sEhqeUP8RUNxgbyBZ0jdnq">
+                        <summary data-page-node-id="EFBMauGIlMU8dXfvubaGDw">
+                            <span class="gold">苍南小会</span>
+                            <span class="item-desc tainan-sub">散修坊市 · 出售杂物 · 升仙大会</span>
+                            <span id="tainan-brief" class="tainan-brief"></span>
+                        </summary>
+                        <div class="tainan-body">
+                            <div id="tainan-info" class="item-desc" data-page-node-id="v2ElxRUr0xpURWHi3XTbA9">此处需用灵石说话——世俗银两在修仙者眼里与沙土无异。</div>
+                            <h3 style="margin-top:10px;" data-page-node-id="GxEUM4OyKy6b6CuVQ6DuQm">散修坊市</h3>
+                            <div id="tainan-goods" data-page-node-id="EPGDvHyawZB6FxIZnNoPgn"></div>
+                            <h3 style="margin-top:10px;" data-page-node-id="ZMvyLpHCz4gcd7bZI5kTQU">出售杂物</h3>
+                            <div id="tainan-sell" data-page-node-id="13FvDAarxOHyffqFyzfqNI"></div>
+                            <h3 style="margin-top:10px;" data-page-node-id="ipWcUKV9UFLEqBUn3EDRtN">升仙大会</h3>
+                            <div id="tainan-leitai" class="item-desc" data-page-node-id="vpSixXBPFzKGxSbXMgb0Zw"></div>
+                            <div class="combat-actions" data-page-node-id="kYtkSJbxHJ1UWVigurmML8">
+                                <button id="btn-leitai-next" class="btn-danger" data-page-node-id="fZWtgD3GpBBqNtmJynokjb">上台打擂</button>
+                                <button id="btn-shengxian-token" class="btn-gold" data-page-node-id="Y2lNwHo2h2IUStbUUAViSV">出示升仙令（保送拜山）</button>
+                            </div>
                         </div>
-                    </div>
+                    </details>
                 </div>
 
                 <div class="panel" id="bag-panel" data-page-node-id="vi1qowg4dpyFJ1qQ58S8qJ">
