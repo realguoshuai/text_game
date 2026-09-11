@@ -58,6 +58,8 @@ GAME.DATA.CONTENT = {
         goods: [
             { id:"beast_soul",      qtyRange:[1,3], price:35 },   // 妖兽精魄：限量 1~3 份
             { id:"tianhuo_crystal", qtyRange:[1,1], price:80 },   // 天火晶：常备 1 份
+            { id:"jinshi",          qtyRange:[1,3], price:25 },   // 金石矿料：噬金虫口粮／丹药辅材，稳定可购
+            { id:"chong_egg",       qtyRange:[1,1], price:800 },  // 奇虫卵：噬金虫培育起点，稀有不定期上架
             // —— 丹方卷轴（每期约半数现身，黑市概率获得） ——
             { id:"recipe_ningyuan", qtyRange:[1,1], price:150 },
             { id:"recipe_juling",   qtyRange:[1,1], price:150 },

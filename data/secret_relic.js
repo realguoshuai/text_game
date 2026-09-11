@@ -56,7 +56,10 @@ GAME.DATA.RELIC = {
         // 残卷机缘：宝箱有几率藏有丹方（研习后化入识海，不入袋）
         { id: "recipe_ningyuan", w: 1 },
         { id: "recipe_huasha",   w: 1 },
-        { id: "recipe_yanghun",  w: 1 }
+        { id: "recipe_yanghun",  w: 1 },
+        // 苍南谷虫巢遗卵：噬金虫培育起点（稀有）
+        { id: "chong_egg",  w: 1 },
+        { id: "jinshi",     w: 2, qty: [2, 4] }
     ],
     // 机关（trap）：掉血 + 扣灵石
     trap: { hp: [20, 60], stonePct: [0.05, 0.15] },

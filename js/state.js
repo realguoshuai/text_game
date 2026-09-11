@@ -167,6 +167,12 @@ GAME.State = {
         p.inventory["dawei_zhuzhu"] = 1;          // 紫纹宝竹（终局阵基主材）
         p.inventory["mid_stone"]    = 5;          // 中阶灵石×5（终局面眼供能）
         p.inventory["xiufu_zhenpan"]= 1;          // 修复阵盘（终局道具）
+        // 噬金虫起步套装：足以走通「孵卵→成虫→虫王」整条培育线
+        p.inventory["chong_egg"]       = 1;       // 奇虫卵×1
+        p.inventory["jinshi"]          = 3;       // 金石矿料×3（够幼虫进阶成虫）
+        p.inventory["tianhuo_crystal"] = 1;       // 天火晶×1（成虫王化所需）
+        p.liquid = 2;                             // 承露瓶绿液 2 滴（即刻可孵卵）
+        p.liquidCharge = 0;
         // 装备：一把下品法器，便于直接上手斗法
         p.equipment = p.equipment || { mainWeapon:null, subWeapon:null, armor:null, artifact:null };
         p.equipment.mainWeapon = "artifact_qingyun";  // 青云剑：攻+18、速+3

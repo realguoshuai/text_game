@@ -916,13 +916,25 @@ GAME.UI = {
         html += '<button id="btn-puppet-activate" class="small-btn btn-gold" style="margin-top:4px;"' +
             (owned < 1 ? " disabled" : "") + '>神识驭傀·列阵参战</button>' +
             '<span class="item-desc">　现有 ' + owned + ' 具，斗法时齐射（每具 +' + GAME.Puppet.PUPPET_VOLLEY_PER + '）</span></div>';
-        // 噬金虫进化树
-        html += '<div style="padding:6px 0;"><div><span class="gold">噬金虫群</span></div>' +
-            '<button id="btn-shichong-hatch" class="small-btn btn-gold" style="margin:3px 4px 0 0;">绿液浸卵孵化</button>' +
-            '<span class="item-desc">奇虫卵×1＋绿液2滴（卵 ' + cnt("chong_egg") + '｜幼虫 ' + cnt("shijin_larva") + '）</span><br>' +
-            '<button id="btn-shichong-evolve" class="small-btn btn-gold" style="margin:3px 4px 0 0;">吞金石·进阶成虫</button>' +
-            '<span class="item-desc">金石矿料×3（矿料 ' + cnt("jinshi") + '｜成虫 ' + cnt("shijin_adult") + '）</span>' +
-            '<div class="item-desc">成虫斗法时化作虫云，持续腐蚀敌方法宝与护罩。</div></div>';
+        // 噬金虫进化树（三阶：卵 → 幼虫 → 成虫 → 虫王）
+        var In = GAME.DATA.INSECT || {};
+        var hatchNeed = (In.HATCH && In.HATCH.liquid) || 2;
+        var evoNeed   = (In.EVOLVE && In.EVOLVE.jinshi) || 3;
+        var ascNeed   = (In.ASCEND && In.ASCEND.tianhuo_crystal) || 1;
+        var ascStones = (In.ASCEND && In.ASCEND.stones) || 500;
+        var canHatch = cnt("chong_egg") >= 1 && (p.liquid || 0) >= hatchNeed;
+        var canEvo   = cnt("shijin_larva") >= 1 && cnt("jinshi") >= evoNeed;
+        var canAsc   = cnt("shijin_adult") >= 1 && cnt("tianhuo_crystal") >= ascNeed && (p.spiritStones || 0) >= ascStones;
+        html += '<div style="padding:6px 0;"><div><span class="gold">噬金虫群（三阶）</span>' +
+            '<span class="item-desc">　卵 ' + cnt("chong_egg") + '｜幼虫 ' + cnt("shijin_larva") +
+            '｜成虫 ' + cnt("shijin_adult") + '｜<span class="gold">虫王 ' + cnt("shijin_king") + '</span></span></div>' +
+            '<button id="btn-shichong-hatch" class="' + (canHatch ? "small-btn btn-gold" : "small-btn") + '" style="margin:3px 4px 0 0;"' + (canHatch ? "" : " disabled") + '>① 绿液浸卵·孵化幼虫</button>' +
+            '<span class="item-desc">奇虫卵×1＋绿液' + hatchNeed + '滴（绿液 ' + (p.liquid || 0) + '）</span><br>' +
+            '<button id="btn-shichong-evolve" class="' + (canEvo ? "small-btn btn-gold" : "small-btn") + '" style="margin:3px 4px 0 0;"' + (canEvo ? "" : " disabled") + '>② 吞金石·进阶成虫</button>' +
+            '<span class="item-desc">幼虫×1＋金石矿料' + evoNeed + '（矿料 ' + cnt("jinshi") + '）</span><br>' +
+            '<button id="btn-shichong-ascend" class="' + (canAsc ? "small-btn btn-gold" : "small-btn") + '" style="margin:3px 4px 0 0;"' + (canAsc ? "" : " disabled") + '>③ 天火王化·进阶虫王</button>' +
+            '<span class="item-desc">成虫×1＋天火晶' + ascNeed + '＋灵石' + ascStones + '（现 ' + cnt("tianhuo_crystal") + ' 晶／' + (p.spiritStones || 0) + ' 灵石）</span>' +
+            '<div class="item-desc">斗法时放出虫云，无视护体灵光、持续融毁敌方法宝护罩（虫王效果倍增）。奇虫卵可自黑市、秘境游历、古修遗迹寻得。</div></div>';
         this.$("puppet-block").innerHTML = html;
 
         var bDayan = self.$("btn-puppet-dayan");
@@ -934,9 +946,11 @@ GAME.UI = {
         var bAct = self.$("btn-puppet-activate");
         if (bAct) bAct.onclick = function () { GAME.Puppet.activate(GAME.Puppet.MAX_CONTROL); };
         var bHat = self.$("btn-shichong-hatch");
-        if (bHat) bHat.onclick = function () { GAME.Puppet.hatch(); };
+        if (bHat) bHat.onclick = function () { GAME.Insect.hatch(); };
         var bEvo = self.$("btn-shichong-evolve");
-        if (bEvo) bEvo.onclick = function () { GAME.Puppet.evolve(); };
+        if (bEvo) bEvo.onclick = function () { GAME.Insect.evolve(); };
+        var bAsc = self.$("btn-shichong-ascend");
+        if (bAsc) bAsc.onclick = function () { GAME.Insect.ascend(); };
     },
 
     // ---------- 图鉴·见闻录 ----------
@@ -1978,6 +1992,13 @@ GAME.UI = {
         this.$("btn-spell").disabled = !hasSpell || p.isDead;
         this.$("btn-flee").disabled = !!c.moEvent || p.isDead;   // 玄机子封死退路
         this.$("btn-fubao").disabled = !(GAME.State.countItem("fubao_lvhuang") > 0 || GAME.State.countItem("fubao_luohun") > 0) || c.exhausted || p.isDead;
+        // 噬金虫云：需成虫或虫王；放出后本场持续腐蚀，按一次即可
+        var bInsect = this.$("btn-insect-cloud");
+        if (bInsect) {
+            var hasInsect = GAME.State.countItem("shijin_adult") > 0 || GAME.State.countItem("shijin_king") > 0;
+            bInsect.disabled = !hasInsect || !!c.insectCloud || p.isDead;
+            bInsect.innerText = c.insectCloud ? (c.insectCloud === "king" ? "虫王云已布" : "虫云已布") : "放噬金虫云";
+        }
     },
 
     // ---------- 成就道碑 ----------
@@ -2195,6 +2216,8 @@ GAME.UI = {
         this.$("btn-companion-block").onclick = function () { GAME.Combat.companionBlock(); };
         this.$("btn-companion-smash").onclick = function () { GAME.Combat.companionSmash(); };
         this.$("btn-spell").onclick = function () { GAME.Combat.toggleSpells(); };
+        var bInsectCloud = this.$("btn-insect-cloud");
+        if (bInsectCloud) bInsectCloud.onclick = function () { GAME.Insect.release(); };
         this.$("btn-mercy-kill").onclick = function () { GAME.Core.chooseMercy(0); };
         this.$("btn-mercy-spare").onclick = function () { GAME.Core.chooseMercy(1); };
 

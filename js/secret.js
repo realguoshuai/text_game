@@ -18,6 +18,7 @@ GAME.Secret = {
         { type: "jade",  w: 2 },   // 古修遗泽：金髓丸（修为 +80）
         { type: "trap",  w: 2 },   // 陷阱：掉血失财
         { type: "recipe", w: 2 },  // 残卷机缘：拾得丹方（研习后化入识海）
+        { type: "insect", w: 2 },  // 苍南谷虫巢：拾得奇虫卵（孵噬金虫）＋偶带金石矿料
         { type: "empty", w: 2 }    // 空手而返
     ],
 
@@ -63,6 +64,29 @@ GAME.Secret = {
             kind = "danger";
             GAME.Core.checkDeath();
             if (p.isDead) return;
+        } else if (picked.type === "recipe") {
+            // 残卷机缘：优先掉落尚未习得的丹方；丹方已尽则折算灵石
+            var allRecs = ["recipe_ningyuan", "recipe_juling", "recipe_qingxin", "recipe_xugu", "recipe_huasha", "recipe_yanghun"];
+            var unlearned = allRecs.filter(function (rid) { return !(p.recipes && p.recipes[rid]); });
+            if (unlearned.length) {
+                var rid = unlearned[GAME.Core.rand(0, unlearned.length - 1)];
+                GAME.State.addItem(rid, 1);   // addItem 内自动研习并写入识海
+                txt = "残阵深处半卷丹方被你拾得——参详之下，习得「" +
+                    GAME.DATA.ITEMS[GAME.DATA.ITEMS[rid].learns].name + "」炼制之法，丹方化入识海。";
+            } else {
+                var alt = GAME.Core.rand(80, 160);
+                p.spiritStones += alt;
+                txt = "残阵深处只剩几页无用残卷，倒是前人遗落灵石 " + alt + "，你一并收了。";
+            }
+        } else if (picked.type === "insect") {
+            // 苍南谷虫巢：拾得奇虫卵（噬金虫培育起点），偶带金石矿料
+            GAME.State.addItem("chong_egg", 1);
+            txt = "你循一缕腥甜异香拨开乱石，露出一处苍南谷虫巢——内里蜷着数枚青玉般的【奇虫卵】，其一尚有余温，你小心收起。";
+            if (Math.random() < 0.5) {
+                var jn = GAME.Core.rand(1, 2);
+                GAME.State.addItem("jinshi", jn);
+                txt += "巢底散落金石矿料 ×" + jn + "，一并拾了。";
+            }
         } else {
             txt = "秘境 periphery 空寂无人，唯风过石隙。你空手而返，却也落得一时清静。";
             kind = "system";

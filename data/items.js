@@ -115,7 +115,7 @@ GAME.DATA.ITEMS = {
     mid_stone:       { id:"mid_stone",       name:"中阶灵石", quality:"极品", type:"material", price:100, desc:"中阶灵石蕴含灵气远胜下品。100 枚低阶灵石方可兑换 1 枚，传送阵阵眼供能所需。" },
     beast_soul:      { id:"beast_soul",      name:"妖兽精魄", quality:"灵品", type:"material", price:35, desc:"二阶妖兽神魂残留，机关傀儡的核心枢纽。狩猎二阶妖兽有几率拘得。" },
     spirit_wood:     { id:"spirit_wood",     name:"百年灵木", quality:"灵品", type:"material", price:25, desc:"坚韧灵木枝干，傀儡骨架主材。玄傀伐木或承露瓶催熟可得。" },
-    iron_ore:        { id:"iron_ore",        name:"玄铁矿石", quality:"凡品", type:"material", price:15, desc:"地底玄铁原矿，用于傀儡机括与噬金虫喂养。下矿开采或坊市铁匠铺可得。" },
+    iron_ore:        { id:"iron_ore",        name:"玄铁矿石", quality:"凡品", type:"material", price:15, desc:"地底玄铁原矿，用于傀儡机括锻造。下矿开采或坊市铁匠铺可得。（噬金虫须喂金石矿料，非此矿。）" },
     tianhuo_crystal: { id:"tianhuo_crystal", name:"天火晶",   quality:"上品", type:"material", price:80, desc:"火系地脉结晶，用于高阶巨猿傀儡与法宝胚胎。魔修尸身或黑市可得。" },
     yin_hun_soul:    { id:"yin_hun_soul",    name:"阴魂精魄", quality:"极品", type:"material", price:0,  desc:"魔修丹田所凝阴魂，傀儡阴煞核心。斩杀魔道筑基修士方有几率到手。" },
 
