@@ -141,16 +141,35 @@ GAME.Sect = {
         return !!p.sectId && p.sectId === this._cfg2().sectId;
     },
 
-    _busyGuard: function () {
+    // 此刻能否应差：返回不可行的缘由文案（null = 可行）。
+    // 一律以显式日志回执，避免旧版「点了没反应、也没提示」的静默失败。
+    _blockReason: function () {
         var p = GAME.State.p();
-        return p.isDead || p.combat || p.pendingEvent || p.pendingMercy || p.trial || p.fzone;
+        if (p.isDead) return "你已身死道消，无从应差。";
+        if (p.combat) return "斗法正酣，脱身不得。";
+        if (p.pendingEvent) return "眼前之事尚未决断，容后再应差事。";
+        if (p.pendingMercy) return "战后处置未定，稍后再论。";
+        if (p.trial) return "血月试炼未出，脱身不得。";
+        if (p.fzone) return "身陷血色禁地，脱身不得。";
+        return null;
+    },
+
+    // 统一门槛：可应差则 true；否则回执原因并 false
+    _canAct: function () {
+        var reason = this._blockReason();
+        if (reason) { GAME.UI.log(reason, "system"); GAME.UI.updateUI(); return false; }
+        if (!this.isDisciple()) {
+            GAME.UI.log("你并非" + GAME.DATA.TAINAN.token.sectName + "门人，无从应这份差事。", "system");
+            GAME.UI.updateUI();
+            return false;
+        }
+        return true;
     },
 
     // 灵矿挖矿：地脉煞气蚀骨（气血上限受损），换灵石与贡献
     sectMine: function () {
         var p = GAME.State.p();
-        if (this._busyGuard()) return;
-        if (!this.isDisciple()) return;
+        if (!this._canAct()) return;
         var m = this._cfg2().mine;
         GAME.UI.log("你领了灵矿挖矿的差事——" + m.text, "system");
         GAME.Core.passTime(m.months);
@@ -170,8 +189,7 @@ GAME.Sect = {
     // 传功阁抄书：清贵安稳，贡献优厚
     sectCopy: function () {
         var p = GAME.State.p();
-        if (this._busyGuard()) return;
-        if (!this.isDisciple()) return;
+        if (!this._canAct()) return;
         var m = this._cfg2().copy;
         GAME.UI.log("你入传功阁抄书——" + m.text, "system");
         GAME.Core.passTime(m.months);
@@ -188,8 +206,7 @@ GAME.Sect = {
     // 百草园管事：行贿执事长老（贡献 60 或灵石 200）方可任职
     takeGarden: function (payBy) {
         var p = GAME.State.p();
-        if (this._busyGuard()) return;
-        if (!this.isDisciple()) return;
+        if (!this._canAct()) return;
         var g = this._cfg2().garden;
         if (p.garden) { GAME.UI.log("你已是百草园管事，明年年底前记得上交灵药 " + g.quotaQty + " 株。", "system"); GAME.UI.updateUI(); return; }
         if (payBy === "contrib") {

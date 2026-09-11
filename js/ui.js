@@ -1035,7 +1035,12 @@ GAME.UI = {
         // —— 青梧谷弟子区：杂役分流 + 百草园管事（借鸡生蛋） ——
         var s2 = this.$("sect2-box");
         s2.innerHTML = "";
-        if (!p.sectId) { s2.innerHTML = '<div class="empty-tip">（拜入宗门后开放弟子杂役与百草园。）</div>'; return; }
+        // 显隐口径与 GAME.Sect.isDisciple() 对齐：只有真能应差的青梧谷门人才看得到按钮，
+        // 免得留下「按钮在、点了却没反应」的死入口。
+        if (!GAME.Sect.isDisciple()) {
+            s2.innerHTML = '<div class="empty-tip">（拜入' + GAME.DATA.TAINAN.token.sectName + '后开放弟子杂役与百草园。）</div>';
+            return;
+        }
         var s2g = GAME.DATA.CONTENT.SECT2;
 
         var h2 = document.createElement("h3");
@@ -1052,7 +1057,11 @@ GAME.UI = {
             var b = document.createElement("button");
             b.className = "small-btn";
             b.innerText = "应差";
-            b.onclick = function () { (job === s2g.mine ? GAME.Sect.sectMine : GAME.Sect.sectCopy)(); };
+            // 注意：不能写成 (cond ? GAME.Sect.sectMine : GAME.Sect.sectCopy)()——
+            // 那样取出的是裸函数引用，调用时 this 不再是 GAME.Sect，方法内的 this._canAct() 会直接抛错。
+            b.onclick = function () {
+                if (job === s2g.mine) GAME.Sect.sectMine(); else GAME.Sect.sectCopy();
+            };
             right.appendChild(b);
             row.appendChild(left); row.appendChild(right);
             s2.appendChild(row);
@@ -1141,7 +1150,10 @@ GAME.UI = {
             var stb = document.createElement("button");
             stb.className = "small-btn btn-gold";
             stb.innerText = gs.stash > 0 ? "取回私药(" + gs.stash + ")" : "暂存私药入玄傀";
-            stb.onclick = function () { (gs.stash > 0 ? GAME.Garden.unstash : GAME.Garden.stash)(); };
+            // 同上：三元取裸引用会丢 this，Garden 内部 this.active()/this._stashCount() 会抛错。
+            stb.onclick = function () {
+                if (gs.stash > 0) GAME.Garden.unstash(); else GAME.Garden.stash();
+            };
             tr.appendChild(stb);
         }
         tool.appendChild(tl); tool.appendChild(tr);
