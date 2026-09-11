@@ -761,7 +761,14 @@ GAME.UI = {
                     (cur || p.spiritStones < f.rent ? " disabled" : "") + ' style="margin:3px 4px 0 0;">' +
                     f.name + (f.rent ? "（" + f.rent + " 灵石）" : "") + (cur ? " ✓" : "") + '</button>';
             });
-            html += '<div class="item-desc">灵峰提升打坐修为转化与药田产出（中品 ×1.5 / 上品 ×2.0）。</div></div>';
+            html += '<div class="item-desc">灵峰提升打坐修为转化与药田产出（中品 ×1.5 / 上品 ×2.0）。</div>';
+            if (p.peak && p.peak !== "low") {
+                var vp = p.peak === "mid"
+                    ? "中品灵峰：每月 15 灵石 + 百年灵药 ×1"
+                    : "上品灵峰：每月 30 灵石 + 百年灵药 ×2";
+                html += '<div class="item-desc" style="margin-top:4px;color:var(--success);">灵脉挂机产出：' + vp + '</div>';
+            }
+            html += '</div>';
             // 因果·羁绊（师承与红颜，筑基后开启）
             var B = GAME.Bonds;
             if (B) {

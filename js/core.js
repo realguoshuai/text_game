@@ -33,6 +33,9 @@ GAME.Core = {
             for (var mi = 0; mi < months; mi++) GAME.Cave2.grantStipend();
         }
 
+        // 灵脉产出：筑基后独辟灵峰，灵脉自行吐纳灵石与灵草（挂机收益）
+        if (GAME.Cave2 && p.peak) GAME.Cave2.grantVeinOutput(months);
+
         // 坊市定期换货
         if (p.totalMonths >= p.marketNextRefresh) {
             GAME.Market.refreshGoods();
@@ -563,6 +566,17 @@ GAME.Core = {
     breakthrough: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
+        // 心魔劫续破：上轮已定心，直接用缓存的破境参数正式冲击壁障
+        if (p._btCtx) {
+            var cached = p._btCtx; p._btCtx = null;
+            if (p._hdMods) {
+                cached.successChance = Math.max(0.01, Math.min(1.0, cached.successChance + (p._hdMods.successAdd || 0)));
+                cached.dmgMul *= (p._hdMods.dmgMul || 1);
+                p._hdMods = null;
+            }
+            this._rollBreakthrough(cached);
+            return;
+        }
         var realm = GAME.DATA.REALMS[p.realmIndex];
         var target = GAME.DATA.REALMS[p.realmIndex + 1];
 
@@ -611,6 +625,38 @@ GAME.Core = {
             dmgMul *= Math.max(0.7, 1 - mindSteps * 0.03);
         }
         var pillName = zhujiPill ? GAME.DATA.ITEMS[zhujiPill].name : "";
+
+        // 心魔劫：筑基及以上突破，壁障将破时心魔乘虚而入，先定心再破境
+        if (p.realmIndex >= GAME.DATA.ZHUJI_GATE_INDEX) {
+            p._btCtx = {
+                successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,
+                isZhuji: isZhuji, zhujiPill: zhujiPill, pillName: pillName, bareZhuji: bareZhuji
+            };
+            GAME.UI.log("壁障将破未破——识海深处黑潮翻涌，旧日心魔乘虚而入，欲扰你道心！", "danger");
+            p.pendingEvent = { eventId: "heart_demon", resume: "breakthrough" };
+            GAME.UI.updateUI();
+            return;
+        }
+
+        this._rollBreakthrough({
+            successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,
+            isZhuji: isZhuji, zhujiPill: zhujiPill, pillName: pillName, bareZhuji: bareZhuji
+        });
+    },
+
+    // 心魔劫后由 chooseEventOption 调用：缓存已在 _btCtx，入口即走续破分支
+    _resumeBreakthrough: function () {
+        this.breakthrough();
+    },
+
+    // 真正的破境结算（练气小突破、心魔劫续破共用）
+    _rollBreakthrough: function (ctx) {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return;
+        var realm = GAME.DATA.REALMS[p.realmIndex];
+        var target = GAME.DATA.REALMS[p.realmIndex + 1];
+        if (!target) { GAME.UI.updateUI(); return; }
+        var isZhuji = ctx.isZhuji, zhujiPill = ctx.zhujiPill, successChance = ctx.successChance, dmgMul = ctx.dmgMul, deathMul = ctx.deathMul, bareZhuji = ctx.bareZhuji, pillName = ctx.pillName;
 
         GAME.UI.log("你盘膝而坐，周身灵气开始向壁障冲击……" + (isZhuji ? (bareZhuji ? "" : "【" + pillName + "】化作磅礴药力护住心脉！") : ""), "system");
         this.passTime(3);
@@ -755,12 +801,15 @@ GAME.Core = {
     chooseEventOption: function (optionIndex) {
         var p = GAME.State.p();
         if (!p.pendingEvent || p.isDead) return;
-        var ev = this.findEvent(p.pendingEvent.eventId);
+        var pe = p.pendingEvent;                        // 先捕获 resume 标记，再清 pending
+        var ev = this.findEvent(pe.eventId);
         p.pendingEvent = null;
         if (!ev || !ev.choices[optionIndex]) return;
         var opt = ev.choices[optionIndex];
         GAME.UI.log("你心念一定：" + opt.text + "。", "info");
         this.resolveEventOutcomes(opt.outcomes);
+        // 心魔劫等需要续破的流程：定心抉择生效后再正式冲击壁障
+        if (!p.isDead && pe.resume === "breakthrough") this._resumeBreakthrough();
     },
 
     // 战后处置：0=灭口（全额财物+恶名，修士则落因果） 1=留活口（六成财物+善名）
@@ -821,6 +870,7 @@ GAME.Core = {
         for (var i = 0; i < GAME.DATA.EVENTS.length; i++) {
             if (GAME.DATA.EVENTS[i].id === id) return GAME.DATA.EVENTS[i];
         }
+        if (GAME.DATA.HEART_DEMON && GAME.DATA.HEART_DEMON.id === id) return GAME.DATA.HEART_DEMON;
         return null;
     },
 
@@ -876,6 +926,9 @@ GAME.Core = {
             case "combat":
                 GAME.Combat.start(o.monster); // 战斗自行接管 UI 刷新
                 return;
+            case "hdmod":
+                p._hdMods = { successAdd: o.successAdd || 0, dmgMul: o.dmgMul || 1 };
+                break;
             case "nothing":
             default:
                 break;

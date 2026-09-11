@@ -338,6 +338,29 @@ GAME.DATA.EVENTS = [
     },
 ];
 
+/* —— 心魔劫事件（不入 EVENTS 随机池，仅由突破流程触发，见 js/core.js） —— */
+GAME.DATA.HEART_DEMON = {
+    id: "heart_demon",
+    text: "壁障将破未破，识海深处忽有黑潮翻涌——贪、嗔、痴、畏化作旧日执念扑面而来。破境在即，你如何镇之？",
+    choices: [
+        {
+            text: "镇魔守心·以静制动",
+            tip: "成功率 +5%，但败则反噬 +20% 气血",
+            outcomes: [{ type: "hdmod", successAdd: 0.05, dmgMul: 1.2 }]
+        },
+        {
+            text: "焚念破障·孤注一掷",
+            tip: "成功率 +12%，但败则反噬 +50% 气血（险）",
+            outcomes: [{ type: "hdmod", successAdd: 0.12, dmgMul: 1.5 }]
+        },
+        {
+            text: "观想本我·心境为锚",
+            tip: "成功率 +6%、反噬 -15%，四平八稳",
+            outcomes: [{ type: "hdmod", successAdd: 0.06, dmgMul: 0.85 }]
+        }
+    ]
+};
+
 /* =========================================================
  * 【景阳城·玄机世家主线】四阶段连环事件
  * 由 js/jiayuan.js 按 stage 顺序驱动；p.jiayuan = { stage } 记录进度

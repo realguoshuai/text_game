@@ -84,6 +84,28 @@ GAME.Cave2 = {
         return amount;
     },
 
+    /* ---------- 灵脉产出：灵峰自行吐纳，按月结算灵石与灵草（挂机收益） ----------
+     * 中品灵峰：每月 15 灵石 + 百年灵药 ×1；上品灵峰：每月 30 灵石 + 百年灵药 ×2。
+     * 杂役旧洞（low）无灵脉产出；仅在已租赁灵峰（p.peak 为 mid/high）时生效。
+     */
+    grantVeinOutput: function (months) {
+        var p = GAME.State.p();
+        var peak = null;
+        GAME.DATA.LINGFENG.forEach(function (f) { if (f.id === p.peak) peak = f; });
+        if (!peak || peak.id === "low") return;
+        var stonePer = peak.id === "mid" ? 15 : 30;
+        var herbPer = peak.id === "mid" ? 1 : 2;
+        var totalStone = 0, totalHerb = 0;
+        for (var i = 0; i < months; i++) {
+            p.spiritStones += stonePer;
+            totalStone += stonePer;
+            GAME.State.addItem("herb_bainian", herbPer);
+            totalHerb += herbPer;
+        }
+        GAME.UI.log("灵峰灵脉自行吐纳——本批得灵石 " + totalStone + "、百年灵药 ×" + totalHerb +
+            "（每月 " + stonePer + " 灵石 / 百年灵药 ×" + herbPer + "）。", "success");
+    },
+
     /* ---------- 承露瓶催熟灵木幼苗：耗 1 滴绿液 → 百年灵木 ×3 ----------
      * 与催熟灵药同源，但灵木非药材，走独立入口（不计入药田年结）。
      */
