@@ -8,7 +8,7 @@
  * 【素材约定】图片统一放 assets/，用相对路径加载；缺失或加载失败会自动回退到纯色占位符。
  *   assets/tiles/ground.png        等距地面：横向 2 帧（64×32/帧）—— 0=土地 1=青石板
  *   assets/tiles/buildings.png     等距建筑（按占地比例缩放绘制，透明底）
- *   assets/tiles/decorations.png   等距装饰：横向 2 帧（96×96/帧）—— 0=松树 1=灯笼
+ *   assets/tiles/decorations.png   国风装饰：横排 12 帧（96×96/帧）垂柳/青松/竹/灯笼×2/石狮/水井/火盆/练功桩/石牌坊/玉龙像/武雕像
  *   assets/characters/player.png           玩家立绘（底边居中对齐脚点）
  *   assets/characters/npc_merchant.png     商人 NPC
  *   assets/characters/npc_villager.png     村民/弟子 NPC
@@ -77,17 +77,26 @@
   ];
   buildings.forEach(b => fill(b.x, b.y, b.w, b.h, 1));
 
-  // —— 装饰物（松 / 灯笼）：地图标 2，可通行，仅作视觉与遮挡 ——
+  // —— 装饰物：FreePixel 国风道具（帧表见 DECOR_FRAME）
+  //   实体道具（树/石狮/水井/火盆/木桩/像）所在格标 1 不可穿行；灯笼挂空中、牌坊可穿行
   const props = [
-    { x: 5,  y: 8,  kind: 'tree' }, { x: 5,  y: 13, kind: 'tree' },
-    { x: 16, y: 8,  kind: 'tree' }, { x: 16, y: 13, kind: 'tree' },
-    { x: 7,  y: 18, kind: 'tree' }, { x: 14, y: 18, kind: 'tree' },
-    { x: 6,  y: 5,  kind: 'tree' }, { x: 15, y: 5,  kind: 'tree' },
-    { x: 9,  y: 7,  kind: 'lantern' }, { x: 12, y: 7, kind: 'lantern' },
-    { x: 9,  y: 15, kind: 'lantern' }, { x: 12, y: 15, kind: 'lantern' },
-    { x: 7,  y: 9,  kind: 'lantern' }, { x: 14, y: 9, kind: 'lantern' },
+    { x: 5,  y: 8,  kind: 'willow' }, { x: 16, y: 13, kind: 'willow' },
+    { x: 5,  y: 13, kind: 'pine' },   { x: 16, y: 8,  kind: 'pine' },
+    { x: 7,  y: 18, kind: 'pine' },   { x: 14, y: 18, kind: 'willow' },
+    { x: 6,  y: 5,  kind: 'bamboo' }, { x: 15, y: 5,  kind: 'bamboo' },
+    { x: 9,  y: 7,  kind: 'lantern' },  { x: 12, y: 7,  kind: 'lantern' },
+    { x: 9,  y: 15, kind: 'lantern' },  { x: 12, y: 15, kind: 'lantern' },
+    { x: 7,  y: 9,  kind: 'lanternY' }, { x: 14, y: 9,  kind: 'lanternY' },
+    { x: 9,  y: 6,  kind: 'lion' },   { x: 12, y: 6,  kind: 'lion' },   // 接引台前石狮
+    { x: 8,  y: 14, kind: 'well' },                                     // 丹房旁水井
+    { x: 9,  y: 9,  kind: 'brazier' },  { x: 12, y: 12, kind: 'brazier' },  // 广场火盆
+    { x: 13, y: 14, kind: 'dummy' },    { x: 14, y: 13, kind: 'dummy' },    // 器坊前练功桩
+    { x: 17, y: 11, kind: 'gate' },                                     // 东街石牌坊（可穿行）
+    { x: 8,  y: 12, kind: 'dragon' },                                   // 广场玉龙像
+    { x: 13, y: 12, kind: 'statue' },                                   // 广场武雕像
   ];
-  props.forEach(p => { if (map[p.y][p.x] === 0) map[p.y][p.x] = 2; });
+  const SOLID_PROPS = new Set(['willow', 'pine', 'bamboo', 'lion', 'well', 'brazier', 'dummy', 'dragon', 'statue']);
+  props.forEach(p => { map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2; });
 
   // =====================================================
   // 三、NPC 与玩家
@@ -274,18 +283,20 @@
     ctx.fillText(b.name, cx, bottomY - dh - 6);
   }
 
-  /** 装饰：decorations.png 横向 2 帧（0=松 1=灯笼）；无素材画占位 */
+  /** 装饰：decorations.png 横向 12 帧（FreePixel 国风道具，每帧 96×96）；无素材画占位
+   *  帧表：0垂柳 1青松 2竹 3红灯笼 4黄灯笼 5石狮 6水井 7火盆 8练功桩 9石牌坊 10玉龙像 11武雕像 */
+  const DECOR_FRAME = { willow: 0, pine: 1, bamboo: 2, lantern: 3, lanternY: 4, lion: 5, well: 6, brazier: 7, dummy: 8, gate: 9, dragon: 10, statue: 11 };
+  const DECOR_SCALE = { willow: 1.4, pine: 1.3, bamboo: 1.1, lantern: 0.9, lanternY: 0.9, lion: 1.0, well: 1.05, brazier: 0.85, dummy: 0.95, gate: 1.6, dragon: 1.2, statue: 1.05 };
   function drawProp(p) {
     const s = isoToScreen(p.x + 0.5, p.y + 0.5);
-    if (s.x < -60 || s.x > W + 60 || s.y < -140 || s.y > H + 60) return;
+    if (s.x < -80 || s.x > W + 80 || s.y < -160 || s.y > H + 80) return;
     if (SPR.decorations) {
-      const frame = p.kind === 'lantern' ? 96 : 0;    // 每帧 96×96
-      const dw = TILE_W * (p.kind === 'tree' ? 1.15 : 0.85);
-      const dh = dw;
-      ctx.drawImage(SPR.decorations, frame, 0, 96, 96, s.x - dw / 2, s.y - dh + 6, dw, dh);
+      const f = (DECOR_FRAME[p.kind] || 0) * 96;      // 源帧固定 96×96
+      const dw = TILE_W * (DECOR_SCALE[p.kind] || 1), dh = dw;
+      ctx.drawImage(SPR.decorations, f, 0, 96, 96, s.x - dw / 2, s.y - dh + 6, dw, dh);
       return;
     }
-    if (p.kind === 'tree') {
+    if (p.kind === 'willow' || p.kind === 'pine') {
       ctx.fillStyle = 'rgba(0,0,0,.25)';
       ctx.beginPath(); ctx.ellipse(s.x, s.y, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#4a3520'; ctx.fillRect(s.x - 3, s.y - 26, 6, 14);

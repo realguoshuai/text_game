@@ -26,7 +26,7 @@ legacy/         # 文字版《凡人修仙录》
 |---|---|
 | assets/tiles/ground.png | 地面：横排 2 帧 64×32（土地 / 青石板） |
 | assets/tiles/buildings.png | 等距建筑（青瓦+朱红柱+灯笼，透明底） |
-| assets/tiles/decorations.png | 装饰：横排 2 帧 96×96（迎客松 / 红灯笼） |
+| assets/tiles/decorations.png | 国风装饰：横排 12 帧 96×96（垂柳/青松/竹/红灯笼/黄灯笼/石狮/水井/火盆/练功桩/石牌坊/玉龙像/武雕像），裁自 FreePixel（freepixel.art），授权见 assets/CREDITS.txt |
 | assets/characters/player.png / npc_merchant.png / npc_villager.png | Q版角色立绘 64×96 |
 | assets/ui/panel.png | 水墨 UI 底板（自动铺状态栏/任务栏/对话框） |
 | assets/ui/icons.png | 技能图标：横排 4 格 64×64（剑诀/灵力弹/身法/护体） |
