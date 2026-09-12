@@ -137,6 +137,23 @@
     }
     g.globalAlpha = 1;
 
+    // 2.5) 平铺地纹：64px 方格瓦片 + 暗缝 + 偶发灵纹，做出真正的"地图瓦片"质感（预渲染一次）
+    // 想换成 Kenney/CraftPix 的 tileset PNG：把 TILESET_PNG 指向图片，用 g.createPattern 平铺即可（见下方注释）
+    //   if (TILESET_PNG && TILESET_PNG.width) { const pat = g.createPattern(TILESET_PNG, 'repeat'); g.fillStyle = pat; g.fillRect(0,0,W,H); }
+    const TILE = 64;
+    for (let ty = 0; ty * TILE < H + TILE; ty++) {
+      for (let tx = 0; tx * TILE < W + TILE; tx++) {
+        const ox = tx * TILE, oy = ty * TILE;
+        g.fillStyle = ((tx + ty) & 1) ? 'rgba(255,255,255,0.022)' : 'rgba(0,0,0,0.032)';
+        g.fillRect(ox, oy, TILE, TILE);
+        g.strokeStyle = 'rgba(0,0,0,0.20)'; g.lineWidth = 1;
+        g.strokeRect(ox + 0.5, oy + 0.5, TILE - 1, TILE - 1);
+        const h = hash2(tx, ty);                    // 确定性随机：每次重绘同一张图，不会闪
+        if (h < 0.045) { g.fillStyle = 'rgba(120,200,255,0.10)'; g.fillRect(ox + TILE / 2 - 2, oy + TILE / 2 - 2, 4, 4); }
+        else if (h > 0.955) { g.strokeStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.moveTo(ox + 10, oy + 6); g.lineTo(ox + 22, oy + 32); g.lineTo(ox + 42, oy + 22); g.stroke(); }
+      }
+    }
+
     // 3) 苔痕 / 灵草（成簇细叶，让地面有活气）
     for (let i = 0, n = Math.round(A / 30000); i < n; i++) {
       const x = rd(20, W - 20), y = rd(20, H - 20);
@@ -590,6 +607,7 @@
       sway: Math.random() * 6.283,                    // 冲锋时的侧向摆动相位（免得整队排成一条线）
       rush: rush ? 1.15 : 0,                          // 涌进场的加速冲刺
       wander: 0, wanderA: 0,                          // 离得太远时先游荡（免得全图同时扑过来塞满屏幕）
+      moving: false, frmT: 0, frm: 0,                 // 帧动画：是否在行走 / 帧计时 / 当前帧
       dx: 0, dy: 0, hit: 0, anim: Math.random() * 6
     };
   }
@@ -1048,6 +1066,10 @@
       if (m.rush > 0) m.rush -= dt;
       // 妖兽始终面朝玩家（左右转身），而不只是按水平速度翻转；这样斜向/上下追来时也明显转身
       m.face = (player.x >= m.x) ? 1 : -1;
+      // 帧动画状态：在追击范围内=行走（跨步帧），否则=待机（呼吸）；行走节拍快、待机慢
+      m.moving = l <= chaseR;
+      m.frmT = (m.frmT || 0) + dt;
+      m.frm = Math.floor(m.frmT / (m.moving ? 0.16 : 0.5)) % 2;
       m.x += m.dx * spd * dt;
       m.y += m.dy * spd * dt;
       if (m.hit > 0) m.hit -= dt;
@@ -1641,17 +1663,20 @@
     if (m.face < 0) { ctx.translate(W, 0); ctx.scale(-1, 1); }   // 按移动方向转身
     ctx.lineJoin = 'round';
 
-    // ① 图集精灵（加载成功就用 freepixel 的妖兽立绘；按碰撞盒高度等比贴、脚踩盒底、按移动方向镜像）
+    // ① 图集精灵（freepixel 妖兽立绘）+ 帧动画：追击时播"行走"（2 帧跨步 squash/stretch），否则播"待机"（缓慢呼吸）
     const fkey = foeSpriteKey(m);
     if (foeImg && fkey) {
       const b = FOE_BOXES[fkey];
-      // 伪动作：呼吸缩放 + 冲锋拉伸 + 受击闪白/震动；让单帧素材也能"活"起来
-      const breath = 1 + Math.sin(m.anim * 3.2 + m.sway) * 0.032;
-      const rushS  = m.rush > 0 ? 1.14 : 1;       // 冲刺时身体略拉长
+      const moving = m.moving;
+      const ph = (m.frm % 2) * Math.PI;            // 0 / π 两帧交替（落左腿 / 落右腿）
+      let vy, vx, dy;
+      if (moving) { vy = 1 - 0.05 * Math.abs(Math.sin(ph)); vx = 1 + 0.04 * Math.abs(Math.sin(ph)); dy = Math.sin(ph) * 2.4; }
+      else { const br = Math.sin(m.anim * 2.2 + m.sway); vy = 1 + br * 0.03; vx = 1 - br * 0.015; dy = br * 1.3; }
+      const rushS = m.rush > 0 ? 1.12 : 1;         // 冲锋时身体略拉长
       const hitShake = m.hit > 0 ? Math.sin(m.hit * 35) * 1.6 : 0;
-      const sc = (H / b[3]) * breath;
-      const dw = b[2] * sc * rushS, dh = b[3] * sc;
-      const sx = W / 2 - dw / 2 + hitShake, sy = H - dh;
+      const sc = (H / b[3]) * vy * rushS;
+      const dw = b[2] * sc * vx, dh = b[3] * sc;
+      const sx = W / 2 - dw / 2 + hitShake, sy = H - dh + dy;
       if (m.hit > 0) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -2643,6 +2668,7 @@
       speed: isFinal ? 86 : 98,
       dmg: Math.round((isFinal ? 26 : 16) * dmgScaler()),
       sway: Math.random() * 6.283, rush: 0, wander: 0, wanderA: 0,
+      moving: false, frmT: 0, frm: 0,
       dx: 0, dy: 0, hit: 0, anim: Math.random() * 6, atkT: 2.4
     };
     monsters.push(m);
