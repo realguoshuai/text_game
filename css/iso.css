@@ -118,3 +118,43 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
   #questBox { max-height: 34vh; overflow: hidden; }
   #minimap { width: 84px; height: 84px; }
 }
+
+/* ===== 手机横屏（矮视口）：UI 全面紧凑，画面占比最大化 ===== */
+@media (orientation: landscape) and (max-height: 560px) {
+  #statusBar { top: 6px; left: 6px; gap: 5px; padding: 4px 8px; }
+  #avatar { width: 38px; height: 38px; }
+  #statusRight { min-width: 128px; }
+  #pName { font-size: 12px; }
+  #pPower { font-size: 10px; }
+  .bar { height: 10px; margin-bottom: 2px; }
+  .bar span { font-size: 8px; line-height: 10px; }
+
+  #infoBar { top: 6px; right: 6px; width: 128px; }
+  #minimap { width: 76px; height: 76px; margin-bottom: 3px; }
+  #clock { font-size: 10px; padding: 1px 6px; margin-bottom: 4px; }
+  #questBox { padding: 4px 7px; }
+  .qTitle { font-size: 11px; letter-spacing: 3px; padding-bottom: 2px; margin-bottom: 3px; }
+  .qItem { font-size: 10px; line-height: 1.55; }
+  #questBox { max-height: 42vh; overflow: hidden; }
+
+  #bottomBar { bottom: 6px; gap: 5px; }
+  .skill { width: 42px; height: 42px; border-width: 1px; }
+  .skName { margin-top: 9px; font-size: 10px; }
+  .skKey { display: none; }
+  .func { padding: 4px 8px; font-size: 11px; }
+
+  #dialog { width: 56vw; min-width: 340px; bottom: 64px; padding: 10px 14px; }
+  #dlgText { font-size: 12px; min-height: 48px; line-height: 1.6; }
+  #dlgClose { padding: 5px 18px; font-size: 13px; }
+}
+
+/* ===== 竖屏手机：提示横屏 ===== */
+#rotateHint { display: none; position: absolute; top: 46%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 40; pointer-events: none; text-align: center;
+  background: rgba(10,8,4,.88); border: 1px solid #a8894e; border-radius: 8px;
+  color: #ffe9b3; font-size: 15px; letter-spacing: 2px; padding: 14px 26px; line-height: 2; }
+#rotateHint .rot { font-size: 30px; display: block; animation: rotHint 1.6s ease-in-out infinite; }
+@keyframes rotHint { 0%,100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
+@media (orientation: portrait) and (max-width: 760px) {
+  #rotateHint { display: block; }
+}

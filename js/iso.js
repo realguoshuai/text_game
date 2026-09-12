@@ -75,6 +75,8 @@
     { x: 14, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
     { x: 3,  y: 14, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
     { x: 14, y: 14, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
+    { x: 3,  y: 7,  w: 3, h: 2, h3d: 40, frame: 4, name: '沿街铺', roof: '#5a4a38' },
+    { x: 9,  y: 18, w: 3, h: 2, h3d: 40, frame: 5, name: '临街铺', roof: '#5a4a38' },
   ];
   buildings.forEach(b => fill(b.x, b.y, b.w, b.h, 1));
 
@@ -97,8 +99,15 @@
     { x: 13, y: 12, kind: 'statue' },                                   // 广场武雕像
     { x: 8,  y: 9,  kind: 'stall' },                                    // 布棚货摊（AI）
     { x: 13, y: 9,  kind: 'tea' },                                      // 茶摊伞桌（AI）
+    { x: 6,  y: 12, kind: 'string' },   { x: 15, y: 12, kind: 'string' },   // 灯笼串（AI）
+    { x: 9,  y: 13, kind: 'string' },
+    { x: 8,  y: 4,  kind: 'banner' },   { x: 4,  y: 13, kind: 'banner' },   // 幌子旗（AI）
+    { x: 17, y: 13, kind: 'banner' },
+    { x: 9,  y: 8,  kind: 'crates' },   { x: 12, y: 8,  kind: 'crates' },   // 货箱筐堆（AI）
+    { x: 5,  y: 16, kind: 'pond' },                                     // 荷塘小桥（AI）
+    { x: 12, y: 5,  kind: 'crystal' },  { x: 7,  y: 12, kind: 'crystal' },  // 灵晶簇（FreePixel）
   ];
-  const SOLID_PROPS = new Set(['willow', 'pine', 'bamboo', 'lion', 'well', 'brazier', 'dummy', 'dragon', 'statue', 'stall', 'tea']);
+  const SOLID_PROPS = new Set(['willow', 'pine', 'bamboo', 'lion', 'well', 'brazier', 'dummy', 'dragon', 'statue', 'stall', 'tea', 'string', 'banner', 'crates', 'pond', 'crystal']);
   props.forEach(p => { map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2; });
 
   // =====================================================
@@ -142,6 +151,7 @@
     npcVillager:  'assets/characters/npc_villager.png',
     uiPanel:      'assets/ui/panel.png',
     uiIcons:      'assets/ui/icons.png',
+    uiAvatar:     'assets/ui/avatar.png',
   };
   const SPR = {};                       // 只放「加载成功」的图片
   const missing = [];
@@ -152,7 +162,7 @@
     img.src = ASSETS[key];
   });
 
-  /** UI 底板 / 技能图标存在时铺到对应元素（icons 是 4 格横排，按格取位） */
+  /** UI 底板 / 技能图标 / 头像存在时铺到对应元素（icons 是 4 格横排，按格取位） */
   function applyUiSkins() {
     if (SPR.uiPanel) {
       document.querySelectorAll('.uiPanel').forEach(el => {
@@ -165,6 +175,11 @@
         el.style.backgroundSize = '400% 100%';                // 4 格横排
         el.style.backgroundPosition = (i * 100 / 3) + '% 0%'; // 0% 33.3% 66.7% 100%
       });
+    }
+    if (SPR.uiAvatar) {
+      document.getElementById('avatar').style.backgroundImage = 'url(' + ASSETS.uiAvatar + ')';
+      document.getElementById('avatar').style.backgroundSize = 'cover';
+      document.getElementById('avatar').style.backgroundPosition = 'center top';
     }
   }
 
@@ -209,7 +224,12 @@
   // 六、可行走判定
   // =====================================================
   function tileAt(x, y) {
-    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;
+    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 1;   // 地图外视作障碍，防止走出地图
+    return map[Math.floor(y)][Math.floor(x)];
+  }
+  /** 仅用于渲染：地图外按野外土地显示，保证地面铺满整屏不留黑边 */
+  function tileVisual(x, y) {
+    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return 0;
     return map[Math.floor(y)][Math.floor(x)];
   }
   /** 只有 1（建筑/障碍）不可走；0 地面与 2 装饰均可走 */
@@ -223,7 +243,7 @@
   // =====================================================
   /** 地面：ground.png 横向 2 帧（0=土地 1=石板）；无素材则画纯色菱形 */
   function drawGroundTile(tx, ty) {
-    const v = map[ty][tx];
+    const v = tileVisual(tx, ty);
     const p = isoToScreen(tx, ty);                 // 菱形上顶点
     if (p.x < -TILE_W || p.x > W + TILE_W || p.y < -TILE_H * 4 || p.y > H + TILE_H * 4) return; // 视口裁剪
 
@@ -254,8 +274,8 @@
     const A = isoToScreen(b.x, b.y);
     const C = isoToScreen(b.x + b.w, b.y + b.h);
     const cx = (A.x + C.x) / 2, bottomY = C.y;
-    const dw = (b.w + b.h) * HW * 0.92;
-    const dh = dw * (BLD_FH / BLD_FW);          // 保持素材宽高比
+    let dw = (b.w + b.h) * HW * 0.92;
+    let dh = dw * (BLD_FH / BLD_FW);            // 保持素材宽高比
 
     if (SPR.buildings) {
       ctx.drawImage(SPR.buildings, (b.frame || 0) * BLD_FW, 0, BLD_FW, BLD_FH,
@@ -292,8 +312,8 @@
 
   /** 装饰：decorations.png 横向 12 帧（FreePixel 国风道具，每帧 96×96）；无素材画占位
    *  帧表：0垂柳 1青松 2竹 3红灯笼 4黄灯笼 5石狮 6水井 7火盆 8练功桩 9石牌坊 10玉龙像 11武雕像 */
-  const DECOR_FRAME = { willow: 0, pine: 1, bamboo: 2, lantern: 3, lanternY: 4, lion: 5, well: 6, brazier: 7, dummy: 8, gate: 9, dragon: 10, statue: 11, stall: 12, tea: 13 };
-  const DECOR_SCALE = { willow: 1.4, pine: 1.3, bamboo: 1.1, lantern: 0.9, lanternY: 0.9, lion: 1.0, well: 1.05, brazier: 0.85, dummy: 0.95, gate: 1.6, dragon: 1.2, statue: 1.05, stall: 1.7, tea: 1.55 };
+  const DECOR_FRAME = { willow: 0, pine: 1, bamboo: 2, lantern: 3, lanternY: 4, lion: 5, well: 6, brazier: 7, dummy: 8, gate: 9, dragon: 10, statue: 11, stall: 12, tea: 13, string: 14, banner: 15, crates: 16, pond: 17, crystal: 18 };
+  const DECOR_SCALE = { willow: 1.4, pine: 1.3, bamboo: 1.1, lantern: 0.9, lanternY: 0.9, lion: 1.0, well: 1.05, brazier: 0.85, dummy: 0.95, gate: 1.6, dragon: 1.2, statue: 1.05, stall: 1.7, tea: 1.55, string: 1.5, banner: 1.5, crates: 1.0, pond: 2.4, crystal: 0.9 };
   function drawProp(p) {
     const s = isoToScreen(p.x + 0.5, p.y + 0.5);
     if (s.x < -80 || s.x > W + 80 || s.y < -160 || s.y > H + 80) return;
@@ -379,8 +399,15 @@
     ctx.fillStyle = '#14100b';
     ctx.fillRect(0, 0, W, H);
 
-    for (let y = 0; y < MAP_H; y++)
-      for (let x = 0; x < MAP_W; x++) drawGroundTile(x, y);
+    // 1) 地面：按视口四角反算瓦片范围（含地图外沿），铺满整屏不留黑边
+    const cA = screenToIso(-TILE_W, -TILE_H * 2), cB = screenToIso(W + TILE_W, -TILE_H * 2);
+    const cC = screenToIso(-TILE_W, H + TILE_H * 2), cD = screenToIso(W + TILE_W, H + TILE_H * 2);
+    const gx0 = Math.floor(Math.min(cA.mx, cB.mx, cC.mx, cD.mx)) - 1;
+    const gx1 = Math.ceil(Math.max(cA.mx, cB.mx, cC.mx, cD.mx)) + 1;
+    const gy0 = Math.floor(Math.min(cA.my, cB.my, cC.my, cD.my)) - 1;
+    const gy1 = Math.ceil(Math.max(cA.my, cB.my, cC.my, cD.my)) + 1;
+    for (let y = gy0; y <= gy1; y++)
+      for (let x = gx0; x <= gx1; x++) drawGroundTile(x, y);
 
     const draws = [];
     buildings.forEach(b => draws.push({
@@ -415,7 +442,7 @@
   // 光源表：灯笼/火盆 + 各建筑窗光（一次性构建）
   const lights = [];
   props.forEach(p => {
-    if (p.kind === 'lantern' || p.kind === 'lanternY') lights.push({ mx: p.x + 0.5, my: p.y + 0.3, r: 0.85 });
+    if (p.kind === 'lantern' || p.kind === 'lanternY' || p.kind === 'string') lights.push({ mx: p.x + 0.5, my: p.y + 0.3, r: 0.85 });
     if (p.kind === 'brazier') lights.push({ mx: p.x + 0.5, my: p.y + 0.5, r: 1.0 });
   });
   buildings.forEach(b => {
@@ -628,5 +655,6 @@
     tap: handleTap,          // 模拟一次点按（屏幕坐标）
     step: update,            // 手动推进一帧逻辑
     snap: snapCamera,        // 摄像机立即对准玩家
+    render: render,          // 手动渲染一帧（测试采样画布像素用）
   };
 })();
