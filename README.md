@@ -12,12 +12,28 @@
 
 ```
 index.html      # 等距坊市入口
-css/iso.css     # 等距版样式（UI 层 pointer-events 穿透）
-js/iso.js       # 等距版逻辑：坐标转换/深度排序/点击移动/NPC对话/小地图
+css/iso.css     # 等距版样式（UI 层 pointer-events 穿透 + 手机端适配）
+js/iso.js       # 等距版逻辑：坐标转换/深度排序/点击移动/NPC对话/小地图/素材回退
+assets/         # 素材（当前由 tools/make_assets.py 程序化生成的古风占位图）
+tools/          # 素材生成脚本（Pillow）
 battle/         # 俯视角战斗版（index.html + css/ + js/data.js + js/game.js）
 legacy/         # 文字版《凡人修仙录》
-assets/         # 素材
 ```
+
+## 素材说明（assets/）
+
+| 路径 | 内容 |
+|---|---|
+| assets/tiles/ground.png | 地面：横排 2 帧 64×32（土地 / 青石板） |
+| assets/tiles/buildings.png | 等距建筑（青瓦+朱红柱+灯笼，透明底） |
+| assets/tiles/decorations.png | 装饰：横排 2 帧 96×96（迎客松 / 红灯笼） |
+| assets/characters/player.png / npc_merchant.png / npc_villager.png | Q版角色立绘 64×96 |
+| assets/ui/panel.png | 水墨 UI 底板（自动铺状态栏/任务栏/对话框） |
+| assets/ui/icons.png | 技能图标：横排 4 格 64×64（剑诀/灵力弹/身法/护体） |
+
+- 全部由 `tools/make_assets.py`（Pillow，4 倍超采样）生成；`python tools/make_assets.py` 可重新生成。
+- **换真素材**：用同名 PNG 覆盖即可，代码零改动；素材缺失/加载失败时游戏自动回退纯色占位符，保证可运行。
+- 推荐来源（CC0）：OpenGameArt「Isometric Floor Tiles / Isometric Town Tiles」、Summer Engine「Chinese Cultivation Village House」、2DPIXX Free 2D Isometric Fantasy Pack、爱给网「水墨Q版仙侠UI」。
 
 ## 等距版要点
 
