@@ -51,8 +51,15 @@
         妖兽有妖狼/毒蛛/火蟾/鬼面/灵蛇，灵物有灵草/灵石/丹药。
       </p>
       <button id="start-btn">入灵脉</button>
-      <button class="ghost-btn" id="land-btn">⇄ 横屏游玩</button>
+      <button class="ghost-btn" id="land-btn">⇄ 横屏全屏游玩</button>
       <p style="font-size:12px;opacity:.7"><a href="legacy/" style="color:#9a93d8">→ 也想玩文字版？</a></p>
+    </div>
+
+    <!-- 竖屏旋转引导（触屏竖屏时显示，转横屏自动消失；网页无法强制转屏） -->
+    <div id="rotate-hint">
+      <div class="icon">📱</div>
+      <h2>请横置手机游玩</h2>
+      <p>横屏视野更开阔，左手摇杆、右手出剑更顺手。<br>也可点「横屏全屏游玩」先进入全屏。</p>
     </div>
 
     <!-- 死亡 -->
@@ -66,17 +73,18 @@
   <script>
     (function () {
       var intro = document.getElementById('intro');
-      function dismiss() { intro.style.display = 'none'; }
+      function dismiss() {
+        intro.style.display = 'none';
+        document.body.classList.add('started');   // 进入游戏后才显示竖屏旋转引导
+      }
       document.getElementById('start-btn').addEventListener('click', dismiss);
       document.getElementById('start-btn').addEventListener('touchstart', function (e) { e.preventDefault(); dismiss(); }, { passive: false });
-      // 横屏游玩：尽量请求全屏 + 横屏锁定（不支持则静默降级）
+      // 横屏全屏游玩：尽量进全屏（全屏后视野最大、横屏体验最佳）。
+      // 注意：网页无法强制旋转屏幕，竖屏旋转引导由 CSS media 控制。
       document.getElementById('land-btn').addEventListener('click', function () {
         var el = document.documentElement;
         var req = el.requestFullscreen || el.webkitRequestFullscreen;
         if (req) { try { req.call(el); } catch (e) {} }
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('landscape').catch(function () {});
-        }
       });
     })();
   </script>

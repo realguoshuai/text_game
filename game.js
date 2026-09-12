@@ -360,24 +360,62 @@
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) elToast.style.display = 'none'; }
   }
 
-  // ---------- 绘制：修士 ----------
+  // ---------- 绘制：修士（圆头 + 发髻 + 道袍 + 飘带 + 手持飞剑） ----------
   function drawPlayer() {
     const p = player;
-    const bob = Math.sin(p.anim * 8) * (keys.up || keys.down || keys.left || keys.right || joy.active ? 1.5 : 0);
+    const walk = (keys.up || keys.down || keys.left || keys.right || joy.active);
+    const bob = Math.sin(p.anim * 8) * (walk ? 1.4 : 0.5);
     const x = Math.round(p.x), y = Math.round(p.y + bob);
+    const cx = x + p.w / 2;
+    const flash = p.inv > 0 && (Math.floor(p.anim * 20) % 2);
+    const robe  = flash ? '#b8b8d8' : '#3a5a8c';   // 道袍青蓝
+    const robe2 = flash ? '#c9c9e6' : '#2c4a78';   // 交领深
+    const skin  = flash ? '#e8e8f0' : '#f0cda2';
+    const hair  = '#241c33';
+    // 影子
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(x + 2, y + p.h - 2, p.w - 4, 4);
-    ctx.fillStyle = p.inv > 0 && (Math.floor(p.anim * 20) % 2) ? '#b0b0d0' : '#4a3b8c';
-    ctx.fillRect(x, y + 10, p.w, p.h - 10);
+    // 道袍身体（上窄下宽梯形）
+    ctx.fillStyle = robe;
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, y + 11); ctx.lineTo(cx + 6, y + 11);
+    ctx.lineTo(cx + 10, y + p.h - 3); ctx.lineTo(cx - 10, y + p.h - 3);
+    ctx.closePath(); ctx.fill();
+    // 交领（V）
+    ctx.fillStyle = robe2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, y + 11); ctx.lineTo(cx, y + 16); ctx.lineTo(cx + 6, y + 11);
+    ctx.lineTo(cx + 3, y + 11); ctx.lineTo(cx, y + 14); ctx.lineTo(cx - 3, y + 11);
+    ctx.closePath(); ctx.fill();
+    // 腰带
     ctx.fillStyle = '#caa84a';
-    ctx.fillRect(x, y + 18, p.w, 3);
-    ctx.fillStyle = '#e8c9a0';
-    ctx.fillRect(x + 4, y, p.w - 8, 10);
-    ctx.fillStyle = '#2a2238';
-    ctx.fillRect(x + 5, y - 2, p.w - 10, 4);
-    ctx.fillStyle = '#cfe8ff';
-    if (p.face > 0) ctx.fillRect(x + p.w - 2, y + 8, 12, 3);
-    else ctx.fillRect(x - 10, y + 8, 12, 3);
+    ctx.fillRect(cx - 7, y + 19, 14, 3);
+    // 飘带（移动时向后飘）
+    const tilt = walk ? Math.sin(p.anim * 8) * 3 : 0;
+    ctx.fillStyle = 'rgba(150,180,255,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, y + 20); ctx.lineTo(cx - 12 - tilt, y + 26); ctx.lineTo(cx - 6, y + 24);
+    ctx.closePath(); ctx.fill();
+    // 头（圆润）
+    ctx.fillStyle = skin;
+    ctx.beginPath(); ctx.ellipse(cx, y + 8, 6, 6.4, 0, 0, 6.2832); ctx.fill();
+    // 发髻 + 簪
+    ctx.fillStyle = hair;
+    ctx.beginPath(); ctx.arc(cx, y + 3, 5, Math.PI, 0); ctx.fill();       // 额发
+    ctx.beginPath(); ctx.arc(cx, y + 1.5, 2.6, 0, 6.2832); ctx.fill();   // 发髻
+    ctx.fillStyle = '#d9b24a'; ctx.fillRect(cx - 0.6, y - 1.6, 1.2, 4);  // 簪
+    // 眼（朝向）
+    ctx.fillStyle = '#241c33';
+    if (p.face > 0) ctx.fillRect(cx + 1.5, y + 8, 1.4, 1.4);
+    else ctx.fillRect(cx - 2.9, y + 8, 1.4, 1.4);
+    // 手持飞剑（朝面向伸出）
+    ctx.save();
+    ctx.translate(cx + p.face * 9, y + 15);
+    ctx.rotate(p.face > 0 ? 0 : Math.PI);
+    ctx.fillStyle = '#dff0ff';
+    ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-1, -1.6); ctx.lineTo(-1, 1.6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c9a84a'; ctx.fillRect(-3, -1.2, 2, 2.4);            // 护手
+    ctx.restore();
   }
 
   // ---------- 绘制：妖兽（各有形状） ----------

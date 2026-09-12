@@ -120,6 +120,24 @@ html, body {
 }
 .ghost-btn:active { background: rgba(120,110,200,0.22); }
 
+/* ---------- 竖屏旋转引导（触屏竖屏时盖一层，转横屏自动消失） ---------- */
+#rotate-hint {
+  position: absolute; inset: 0; z-index: 8;
+  display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding: 28px;
+  background: rgba(7,6,15,0.92);
+  color: #e8e6f5;
+}
+#rotate-hint .icon { font-size: 58px; animation: rotphone 2.2s ease-in-out infinite; }
+#rotate-hint h2 { font-size: 22px; letter-spacing: 2px; color: #ffd24a; }
+#rotate-hint p { font-size: 13px; line-height: 1.9; color: #cfcbe8; max-width: 300px; }
+@keyframes rotphone { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
+/* 仅在「已开始游戏」且「触屏 + 竖屏」时显示 */
+@media (orientation: portrait) and (pointer: coarse) {
+  body.started #rotate-hint { display: flex; }
+}
+
 /* ---------- 开场 / 死亡 浮层 ---------- */
 .overlay {
   position: absolute; inset: 0;
