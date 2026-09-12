@@ -350,19 +350,69 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
 .log-story { color: var(--gold-tx); border-left: 3px solid var(--gold); padding-left: 8px; }
 .log-loot { color: var(--gold); }
 
-/* ---------- 窄屏 / 手机：主区在上，日志固定高度置底 ---------- */
+/* ---------- 窄屏 / 手机：放弃"锁一屏"，改为整页自然滚动，确保都能点到 ---------- */
 @media (max-width: 900px) {
-    body { padding: 6px; }
-    #game-container { padding: 8px 10px; gap: 6px; }
-    #topbar h2 { font-size: 15px; }
+    html, body {
+        height: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+    body { padding: 0; align-items: stretch; }
+    #game-container {
+        height: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
+        max-width: 100%;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        padding: 8px 10px;
+    }
+    /* 顶栏换行，存档按钮不再挤一行 */
+    #topbar { flex-wrap: wrap; gap: 6px; }
+    #topbar h2 { font-size: 15px; flex: 1 1 100%; }
+    #save-row { flex-wrap: wrap; width: 100%; }
+    #save-row .small-btn { flex: 1 1 auto; min-height: 38px; }
+
+    /* 场景横幅缩小，给内容让空间 */
+    #scene-canvas { height: 110px; }
+
+    /* 工作区单列，左右自然堆叠，整页滚动 */
     #workspace {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, 1fr) 132px;
+        grid-template-rows: none;
+        gap: 10px;
     }
-    .stats-grid { grid-template-columns: repeat(auto-fit, minmax(98px, 1fr)); font-size: 12px; }
+    #left-col { min-height: 0; }
+    #panel-area { overflow-y: visible; max-height: none; padding: 8px; }
+    #right-col { min-height: 0; }
+    #log-box { height: 200px; flex: none; }
+
+    .stats-grid { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); font-size: 12px; }
     .actions { grid-template-columns: repeat(2, 1fr); }
     .event-choices { grid-template-columns: 1fr; }
     .combat-actions { grid-template-columns: repeat(3, 1fr); }
+
+    /* 按钮加大点按区，手机好戳 */
+    button { min-height: 42px; font-size: 14px; padding: 11px 8px; }
+    .small-btn { min-height: 34px; }
+
+    /* 封面标题：防止超大字号撑爆首屏 */
+    .cover-head { margin: 2vh auto 6px; }
+    .cover-title {
+        font-size: clamp(30px, 11vw, 54px);
+        letter-spacing: clamp(4px, 3vw, 16px);
+        text-indent: clamp(4px, 3vw, 16px);
+    }
+    .cover-sub { font-size: 12px; letter-spacing: 1px; padding: 0 8px; }
+    .origin-card { width: 44%; min-width: 140px; padding: 12px 8px; }
+    .origin-desc { font-size: 12px; padding: 0 8px; }
+    .cover-start { font-size: 15px; padding: 12px 28px; }
+}
+@media (max-width: 380px) {
+    .actions { grid-template-columns: 1fr; }
 }
 
 /* 极矮窗口兜底：日志仍保留最小可视高度 */
