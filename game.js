@@ -274,7 +274,6 @@
     thunder: ['雷符', '双雷符', '雷网', '奔雷诀', '紫霄神雷'],
     blade:   ['斩', '烈斩', '回风斩', '裂地斩', '炎武斩']
   };
-  function tierIdx() { if (kills < 3) return 0; if (kills < 7) return 1; if (kills < 12) return 2; if (kills < 20) return 3; return 4; }
   function realmInfo() { const t = tierIdx(); return { name: TIER_NAMES[t], skill: SKILL_NAMES[player.char.id][t] }; }
 
   // ---------- 玩家 ----------
