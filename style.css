@@ -9,7 +9,36 @@ html, body {
   position: fixed;
   width: 100%;
   -webkit-tap-highlight-color: transparent;
+  /* 手机缩放防线：manipulation 干掉双击缩放，同时不破坏浮层内部滑动；
+     捏合缩放由 Safari 专有 gesture 事件 + #game 的 touch-action:none 拦掉 */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
 }
+
+/* 被浏览器放大时的兜底还原按钮（正常情况一直隐藏） */
+.viewfix {
+  position: fixed;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  z-index: 90;
+  padding: 9px 16px;
+  border: 1px solid rgba(120, 220, 255, .55);
+  border-radius: 999px;
+  background: rgba(10, 22, 36, .9);
+  color: #bfe9ff;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.viewfix[hidden] { display: none; }
+
+/* 浮层里必须能上下滑动（选人/结算/设置/洞府面板），显式放行纵向平移 */
+.overlay, #meta-panel { touch-action: pan-y; }
 
 #wrap { position: relative; width: 100vw; height: 100dvh; }
 

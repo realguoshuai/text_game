@@ -4,12 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>凡人修仙录 · 实时版</title>
+  <meta name="theme-color" content="#07060f">
+  <!-- 从主屏图标启动=无 Safari 工具栏，视口不会被地址栏反复撑动（状态栏保持不透明，避免刘海压住 HUD） -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="凡人修仙录">
   <meta name="description" content="修仙题材实时网页小游戏：操控修士在大地图上斩妖、采灵物、突破境界。每位修士各有武器与技能，突破可三选一构筑流派。">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="wrap">
     <canvas id="game"></canvas>
+
+    <!-- 缩放兜底：万一还是被浏览器放大了，给一个能点回来的出口 -->
+    <button id="viewfix" class="viewfix" hidden>视图被放大 · 点此还原</button>
 
     <!-- HUD -->
     <div id="hud">
@@ -171,6 +180,67 @@
     </div>
   </div>
 
+  <!-- 手机缩放防线：iOS Safari 从 iOS10 起忽略 user-scalable=no，
+       而「左手摇杆 + 右手出招」的两根手指会被它当成捏合缩放 —— 页面一放大就回不去。
+       这里在最早时机拦掉全部缩放手势（Safari 专有 gesture 事件 + 多指 touchmove + 双击缩放）。 -->
+  <script>
+    (function () {
+      var NONPASSIVE = { passive: false };
+
+      // 1) Safari 专有手势事件：捏合缩放的真正驱动，必须全部 preventDefault
+      ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
+        document.addEventListener(t, function (e) { e.preventDefault(); }, NONPASSIVE);
+      });
+
+      // 2) 多指触摸：游戏内本来就是多指操作，一律吃掉默认手势
+      document.addEventListener('touchstart', function (e) {
+        if (e.touches.length > 1) e.preventDefault();
+      }, NONPASSIVE);
+      document.addEventListener('touchmove', function (e) {
+        if (e.touches.length > 1 || (e.scale !== undefined && e.scale !== 1)) e.preventDefault();
+      }, NONPASSIVE);
+
+      // 3) 双击缩放 / 长按放大镜 / 长按菜单
+      //    （只吃掉第二次落指的点击，出招钮走 pointerdown，不受影响）
+      var lastTap = 0;
+      document.addEventListener('touchend', function (e) {
+        if (e.touches.length !== 0) return;
+        var now = Date.now();
+        if (now - lastTap < 320) e.preventDefault();
+        lastTap = now;
+      }, NONPASSIVE);
+      document.addEventListener('dblclick', function (e) { e.preventDefault(); }, NONPASSIVE);
+      document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+      // 4) 兜底：万一仍被放大（老系统行为不一致），给个能点回来的按钮，绝不让人卡死
+      var vv = window.visualViewport;
+      var fixEl = document.getElementById('viewfix');
+      if (!vv || !fixEl) return;
+      var meta = document.querySelector('meta[name="viewport"]');
+      var metaBase = meta ? meta.getAttribute('content') : '';
+      var hardTried = false;
+      function zoomed() { return vv.scale > 1.02; }
+      function sync() { fixEl.hidden = !zoomed(); }
+      vv.addEventListener('resize', sync);
+      vv.addEventListener('scroll', sync);
+      window.addEventListener('resize', sync);
+      fixEl.addEventListener('click', function () {
+        if (hardTried) { location.reload(); return; }
+        // 先试不丢进度的还原：重写 viewport meta，逼 Safari 重算缩放
+        try {
+          if (meta) {
+            meta.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');
+            setTimeout(function () { try { meta.setAttribute('content', metaBase); } catch (_) {} }, 150);
+          }
+          window.scrollTo(0, 0);
+        } catch (_) {}
+        setTimeout(function () {
+          sync();
+          if (zoomed()) { hardTried = true; fixEl.textContent = '还原失败 · 点此重新载入'; }
+        }, 400);
+      });
+    })();
+  </script>
   <script src="game.js"></script>
   <script>
     (function () {
