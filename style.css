@@ -93,21 +93,32 @@ html, body {
   will-change: transform;
 }
 
-/* ---------- 飞剑钮（半透明、可拖动、不固定） ---------- */
+/* ---------- 飞剑钮（半隐藏、可拖动、不固定） ---------- */
 .btn {
   position: fixed;
-  right: 22px; bottom: 28px;
-  width: 92px; height: 92px; border-radius: 50%;
-  font-size: 16px;
+  right: 20px; bottom: 26px;
+  width: 60px; height: 60px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  color: #fff;
-  background: rgba(224,70,79,0.26);
-  border: 1px solid rgba(255,140,140,0.45);
+  color: #dfeaff;
+  background: rgba(120,140,220,0.12);
+  border: 1px solid rgba(180,200,255,0.25);
+  opacity: 0.34;                 /* 半隐藏：平时淡显，按下才亮 */
   user-select: none; touch-action: none;
   z-index: 5;
   backdrop-filter: blur(2px);
+  transition: opacity .15s ease, background .15s ease;
 }
-.btn:active { background: rgba(224,70,79,0.5); }
+.btn svg { pointer-events: none; }
+.btn:active { opacity: 1; background: rgba(140,170,255,0.3); }
+
+/* ---------- 横屏游玩按钮（开场浮层） ---------- */
+.ghost-btn {
+  margin-top: 4px;
+  background: transparent; color: #cfcbe8;
+  border: 1px solid rgba(180,170,255,0.4); border-radius: 10px;
+  padding: 9px 20px; font-size: 14px; cursor: pointer;
+}
+.ghost-btn:active { background: rgba(120,110,200,0.22); }
 
 /* ---------- 开场 / 死亡 浮层 ---------- */
 .overlay {
@@ -136,7 +147,7 @@ html, body {
 @media (max-width: 900px) {
   #hud .hp-box { width: 120px; }
   #hud { font-size: 12px; gap: 8px; padding: 8px 10px; }
-  .btn { width: 80px; height: 80px; font-size: 15px; right: 16px; bottom: 22px; }
+  .btn { width: 54px; height: 54px; right: 14px; bottom: 20px; }
   #joystick { width: 110px; height: 110px; }
   #joy-knob { width: 50px; height: 50px; margin: -25px 0 0 -25px; }
   .overlay h1 { font-size: 26px; }

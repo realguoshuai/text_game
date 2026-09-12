@@ -30,8 +30,15 @@
       <div id="joy-knob"></div>
     </div>
 
-    <!-- 飞剑钮（半透明、可拖动摆放） -->
-    <div class="btn" id="btn-atk">飞剑 ⚔</div>
+    <!-- 飞剑钮（半隐藏、可拖动摆放；SVG 剑图标） -->
+    <div class="btn" id="btn-atk" aria-label="飞剑">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path d="M12 2 L14 4 L13 14 L11 14 L10 4 Z" fill="#e3eeff"/>
+        <rect x="8" y="14" width="8" height="2" fill="#d9b24a"/>
+        <rect x="11" y="16" width="2" height="5" fill="#6b4a2f"/>
+        <circle cx="12" cy="21.4" r="1.6" fill="#d9b24a"/>
+      </svg>
+    </div>
 
     <!-- 开场 -->
     <div class="overlay" id="intro">
@@ -44,6 +51,7 @@
         妖兽有妖狼/毒蛛/火蟾/鬼面/灵蛇，灵物有灵草/灵石/丹药。
       </p>
       <button id="start-btn">入灵脉</button>
+      <button class="ghost-btn" id="land-btn">⇄ 横屏游玩</button>
       <p style="font-size:12px;opacity:.7"><a href="legacy/" style="color:#9a93d8">→ 也想玩文字版？</a></p>
     </div>
 
@@ -61,6 +69,15 @@
       function dismiss() { intro.style.display = 'none'; }
       document.getElementById('start-btn').addEventListener('click', dismiss);
       document.getElementById('start-btn').addEventListener('touchstart', function (e) { e.preventDefault(); dismiss(); }, { passive: false });
+      // 横屏游玩：尽量请求全屏 + 横屏锁定（不支持则静默降级）
+      document.getElementById('land-btn').addEventListener('click', function () {
+        var el = document.documentElement;
+        var req = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (req) { try { req.call(el); } catch (e) {} }
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(function () {});
+        }
+      });
     })();
   </script>
 </body>

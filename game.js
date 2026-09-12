@@ -131,6 +131,12 @@
     ghost:   { name: '鬼面', hp: 18, speed: 82, dmg: 8,  w: 26, h: 30, color: '#bfe3ff' },
     serpent: { name: '灵蛇', hp: 30, speed: 96, dmg: 11, w: 34, h: 20, color: '#3fae5a' }
   };
+  // 妖兽强度随玩家境界递增（每突破一档，血量/伤害提升）
+  function diffScaler() {
+    let t = 0;
+    if (kills >= 20) t = 4; else if (kills >= 12) t = 3; else if (kills >= 7) t = 2; else if (kills >= 3) t = 1;
+    return 1 + t * 0.45;
+  }
   let uid = 0;
   function spawnMonster() {
     const edge = Math.random() * 4 | 0;
@@ -142,13 +148,16 @@
     // 后期出现更强种类
     let type;
     const r = Math.random();
-    if (kills < 5) type = r < 0.5 ? 'wolf' : 'spider';
+    if (kills < 3) type = 'wolf';
+    else if (kills < 7) type = r < 0.5 ? 'wolf' : 'spider';
     else if (kills < 12) type = r < 0.4 ? 'wolf' : r < 0.7 ? 'spider' : 'toad';
     else type = ['wolf', 'spider', 'toad', 'ghost', 'serpent'][Math.floor(Math.random() * 5)];
     const d = MTYPE[type];
+    const mul = diffScaler();
     return {
       id: ++uid, type, x, y, w: d.w, h: d.h, color: d.color,
-      hp: d.hp, maxhp: d.hp, speed: d.speed, dmg: d.dmg,
+      hp: Math.round(d.hp * mul), maxhp: Math.round(d.hp * mul),
+      speed: d.speed, dmg: Math.round(d.dmg * mul),
       wander: 0, dx: 0, dy: 0, hit: 0, anim: Math.random() * 6
     };
   }
@@ -491,20 +500,44 @@
     }
   }
 
-  // ---------- 绘制：飞剑 ----------
+  // ---------- 绘制：飞剑（真实剑形，按速度方向旋转） ----------
   function drawSword(s) {
     const sz = s.size;
     const ang = Math.atan2(s.vy, s.vx);
     ctx.save();
     ctx.translate(Math.round(s.x), Math.round(s.y));
     ctx.rotate(ang);
-    const glow = s.homing ? 'rgba(140,255,200,0.35)' : 'rgba(140,210,255,0.35)';
-    ctx.fillStyle = glow;
-    ctx.fillRect(-18 * sz, -6 * sz, 36 * sz, 12 * sz);
-    ctx.fillStyle = s.homing ? '#bfffe0' : '#cfe8ff';
-    ctx.fillRect(-13 * sz, -3 * sz, 26 * sz, 6 * sz);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(8 * sz, -3 * sz, 5 * sz, 6 * sz);
+    // 配色：追魂=翠青，其余=冰蓝
+    const bladeCol = s.homing ? '#c9ffe6' : '#dff0ff';
+    const edgeCol  = s.homing ? '#7dffc0' : '#9fd4ff';
+    const guardCol = s.homing ? '#e8c95a' : '#c9a84a';
+    const glowCol  = s.homing ? 'rgba(120,255,190,0.30)' : 'rgba(120,200,255,0.30)';
+    // 拖影光晕
+    ctx.fillStyle = glowCol;
+    ctx.beginPath();
+    ctx.moveTo(20 * sz, 0); ctx.lineTo(-11 * sz, -7 * sz); ctx.lineTo(-11 * sz, 7 * sz);
+    ctx.closePath(); ctx.fill();
+    // 剑身（尖头菱形双刃）
+    ctx.fillStyle = bladeCol;
+    ctx.beginPath();
+    ctx.moveTo(17 * sz, 0);          // 剑尖
+    ctx.lineTo(-5 * sz, -2.6 * sz);  // 上刃根
+    ctx.lineTo(-9 * sz, -2.6 * sz);  // 护手处上
+    ctx.lineTo(-9 * sz, 2.6 * sz);   // 护手处下
+    ctx.lineTo(-5 * sz, 2.6 * sz);   // 下刃根
+    ctx.closePath(); ctx.fill();
+    // 剑脊高光
+    ctx.strokeStyle = edgeCol; ctx.lineWidth = Math.max(1, 1 * sz);
+    ctx.beginPath(); ctx.moveTo(15 * sz, 0); ctx.lineTo(-6 * sz, 0); ctx.stroke();
+    // 护手（横）
+    ctx.fillStyle = guardCol;
+    ctx.fillRect(-11 * sz, -5 * sz, 3 * sz, 10 * sz);
+    // 剑柄
+    ctx.fillStyle = '#5a3b2a';
+    ctx.fillRect(-18 * sz, -2 * sz, 7 * sz, 4 * sz);
+    // 剑首
+    ctx.fillStyle = guardCol;
+    ctx.beginPath(); ctx.arc(-18 * sz, 0, 2.6 * sz, 0, 6.2832); ctx.fill();
     ctx.restore();
   }
 
