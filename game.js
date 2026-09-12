@@ -137,20 +137,56 @@
     }
     g.globalAlpha = 1;
 
-    // 2.5) 平铺地纹：64px 方格瓦片 + 暗缝 + 偶发灵纹，做出真正的"地图瓦片"质感（预渲染一次）
+    // 2.5) 地面图层（重做）：不再是空荡的方格，而是带纹理的灵土石板 + 苔藓 / 碎石 / 地裂细节（预渲染一次）
     // 想换成 Kenney/CraftPix 的 tileset PNG：把 TILESET_PNG 指向图片，用 g.createPattern 平铺即可（见下方注释）
     //   if (TILESET_PNG && TILESET_PNG.width) { const pat = g.createPattern(TILESET_PNG, 'repeat'); g.fillStyle = pat; g.fillRect(0,0,W,H); }
     const TILE = 64;
     for (let ty = 0; ty * TILE < H + TILE; ty++) {
       for (let tx = 0; tx * TILE < W + TILE; tx++) {
         const ox = tx * TILE, oy = ty * TILE;
-        g.fillStyle = ((tx + ty) & 1) ? 'rgba(255,255,255,0.022)' : 'rgba(0,0,0,0.032)';
+        g.fillStyle = ((tx + ty) & 1) ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.028)';
         g.fillRect(ox, oy, TILE, TILE);
-        g.strokeStyle = 'rgba(0,0,0,0.20)'; g.lineWidth = 1;
+        g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 1;
         g.strokeRect(ox + 0.5, oy + 0.5, TILE - 1, TILE - 1);
         const h = hash2(tx, ty);                    // 确定性随机：每次重绘同一张图，不会闪
-        if (h < 0.045) { g.fillStyle = 'rgba(120,200,255,0.10)'; g.fillRect(ox + TILE / 2 - 2, oy + TILE / 2 - 2, 4, 4); }
-        else if (h > 0.955) { g.strokeStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.moveTo(ox + 10, oy + 6); g.lineTo(ox + 22, oy + 32); g.lineTo(ox + 42, oy + 22); g.stroke(); }
+        if (h < 0.18) {                             // 苔藓斑（成片低对比绿，地面"长东西"的感觉）
+          g.fillStyle = 'rgba(74,150,110,' + (0.05 + h * 0.5).toFixed(3) + ')';
+          g.beginPath(); g.ellipse(ox + TILE / 2, oy + TILE / 2, 12 + h * 26, (12 + h * 26) * 0.7, h * 6.2832, 0, 6.2832); g.fill();
+        } else if (h > 0.80 && h < 0.86) {         // 碎石（两三颗小卵石）
+          g.fillStyle = 'rgba(150,162,190,0.16)';
+          for (let s = 0; s < 3; s++) {
+            const hx = hash2(tx * 3 + s + 1, ty * 7 + s * 2 + 3);
+            g.beginPath(); g.ellipse(ox + 8 + hx * 48, oy + 10 + hash2(tx + s, ty * 2 + s) * 44, 2 + hx * 4, (2 + hx * 4) * 0.8, hx * 6.2832, 0, 6.2832); g.fill();
+          }
+        } else if (h > 0.66 && h < 0.70) {         // 地裂
+          g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 1.4;
+          g.beginPath(); g.moveTo(ox + 8, oy + (ty & 1 ? 12 : 52)); g.lineTo(ox + 30, oy + 32); g.lineTo(ox + 54, oy + (ty & 1 ? 52 : 12)); g.stroke();
+        } else if (h >= 0.86) {                    // 灵纹（原有偶发亮点）
+          g.fillStyle = 'rgba(120,200,255,0.10)'; g.fillRect(ox + TILE / 2 - 2, oy + TILE / 2 - 2, 4, 4);
+        }
+      }
+    }
+
+    // 2.6) 地面细碎景物：高密度散布细草 / 碎石 / 落瓣，让脚下不再是空荡的网格（确定性随机，重绘不闪）
+    const GD = Math.max(80, Math.round(A / 6000));
+    for (let i = 0; i < GD; i++) {
+      const x = rd(10, W - 10), y = rd(10, H - 10);
+      const hh = hash2(i * 131 + 7, i * 977 + 13);
+      if (hh < 0.50) {                              // 细草
+        g.strokeStyle = 'rgba(96,190,150,' + (0.06 + hh * 0.12).toFixed(3) + ')';
+        g.lineWidth = 1; g.beginPath();
+        const blades = 2 + ((hh * 5) | 0);
+        for (let k = 0; k < blades; k++) {
+          const a = -1.5708 + hh * 6.2832 + k * 0.5, L = 4 + hh * 9;
+          g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L);
+        }
+        g.stroke();
+      } else if (hh < 0.80) {                       // 碎石
+        g.fillStyle = 'rgba(150,162,190,' + (0.10 + (hh - 0.5) * 0.3).toFixed(3) + ')';
+        const pr = 1.5 + hh * 3.5; g.beginPath(); g.ellipse(x, y, pr, pr * 0.8, hh * 6.2832, 0, 6.2832); g.fill();
+      } else {                                       // 落瓣 / 灵屑（暖色小点）
+        g.fillStyle = 'rgba(255,210,150,' + (0.08 + (hh - 0.8) * 0.4).toFixed(3) + ')';
+        g.fillRect(x, y, 1.6, 1.6);
       }
     }
 
@@ -608,10 +644,12 @@
       rush: rush ? 1.15 : 0,                          // 涌进场的加速冲刺
       wander: 0, wanderA: 0,                          // 离得太远时先游荡（免得全图同时扑过来塞满屏幕）
       moving: false, frmT: 0, frm: 0,                 // 帧动画：是否在行走 / 帧计时 / 当前帧
-      dx: 0, dy: 0, hit: 0, anim: Math.random() * 6
+      dx: 0, dy: 0, hit: 0, anim: Math.random() * 6,
+      atkAnim: 0, atkCd: 0.3 + Math.random() * 1.4   // 攻击动作：动画进度 / 冷却（仅普通妖兽；妖王用 atkT 做蓄力）
     };
   }
   let monsters = [];
+  const ATTACK_DUR = 0.42, ATTACK_CD = 1.1;   // 妖兽近身攻击：动画时长 / 冷却（纯表现，不影响碰撞）
   let herbs = 0, kills = 0;
 
   // ---------- 兽潮：成波涌来，波与波之间留出喘息与拾取的空档 ----------
@@ -1073,6 +1111,11 @@
       m.x += m.dx * spd * dt;
       m.y += m.dy * spd * dt;
       if (m.hit > 0) m.hit -= dt;
+      // 近身攻击动作：进入攻击距离后周期性"蓄力→扑击→收招"，让妖兽看起来在主动出击，而不是只贴脸磨血（只改外观）
+      if (m.atkCd > 0) m.atkCd -= dt;
+      if (m.atkAnim > 0) m.atkAnim -= dt;
+      const ATK_REACH = m.w * 0.5 + player.w * 0.5 + 28;
+      if (l <= ATK_REACH && m.atkCd <= 0 && m.atkAnim <= 0) { m.atkAnim = ATTACK_DUR; m.atkCd = ATTACK_CD; }
     }
 
     // 兽群互斥：挤成一坨"兽潮"，而不是全部叠在同一像素上（n≤34，开销可忽略）
@@ -1664,6 +1707,14 @@
     ctx.lineJoin = 'round';
 
     // ① 图集精灵（freepixel 妖兽立绘）+ 帧动画：追击时播"行走"（2 帧跨步 squash/stretch），否则播"待机"（缓慢呼吸）
+    // 攻击动作：近身时周期性"蓄力→扑击→收招"，只改外观（不影响碰撞），让妖兽不再只会贴脸磨血
+    let lungeX = 0, aSX = 1, aSY = 1, atkP = -1;
+    if (m.atkAnim > 0) {
+      atkP = 1 - m.atkAnim / ATTACK_DUR;            // 0→1 攻击进度
+      if (atkP < 0.32) { const k = atkP / 0.32; lungeX = -7 * k; aSX = 1 - 0.12 * k; aSY = 1 + 0.07 * k; }                    // 蓄力：后撤压身
+      else if (atkP < 0.66) { const k = (atkP - 0.32) / 0.34; const e = Math.sin(k * Math.PI * 0.5); lungeX = 16 * e; aSX = 1 + 0.24 * e; aSY = 1 - 0.12 * e; }  // 扑击：前冲拉伸
+      else { const k = (atkP - 0.66) / 0.34; lungeX = 16 * (1 - k); aSX = 1 + 0.24 * (1 - k); aSY = 1 - 0.12 * (1 - k); }   // 收招：回弹
+    }
     const fkey = foeSpriteKey(m);
     if (foeImg && fkey) {
       const b = FOE_BOXES[fkey];
@@ -1672,11 +1723,12 @@
       let vy, vx, dy;
       if (moving) { vy = 1 - 0.05 * Math.abs(Math.sin(ph)); vx = 1 + 0.04 * Math.abs(Math.sin(ph)); dy = Math.sin(ph) * 2.4; }
       else { const br = Math.sin(m.anim * 2.2 + m.sway); vy = 1 + br * 0.03; vx = 1 - br * 0.015; dy = br * 1.3; }
+      vx *= aSX; vy *= aSY;                         // 攻击扑击叠加在行走 / 呼吸之上
       const rushS = m.rush > 0 ? 1.12 : 1;         // 冲锋时身体略拉长
       const hitShake = m.hit > 0 ? Math.sin(m.hit * 35) * 1.6 : 0;
       const sc = (H / b[3]) * vy * rushS;
       const dw = b[2] * sc * vx, dh = b[3] * sc;
-      const sx = W / 2 - dw / 2 + hitShake, sy = H - dh + dy;
+      const sx = W / 2 - dw / 2 + hitShake + lungeX, sy = H - dh + dy;
       if (m.hit > 0) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1689,12 +1741,34 @@
       ctx.drawImage(foeImg, b[0], b[1], b[2], b[3], sx, sy, dw, dh);
       if (m.hit > 0) { ctx.filter = 'none'; ctx.restore(); }
     }
-    // ② 退回程序化立绘（图集未加载 / 加载失败 / 无浏览器桩环境）
-    else if (m.type === 'wolf')         drawWolf(W, H, m, body, dark, glow, ink);
-    else if (m.type === 'spider')  drawSpider(W, H, m, body, dark, glow, ink);
-    else if (m.type === 'toad')    drawToad(W, H, m, body, dark, glow, ink);
-    else if (m.type === 'ghost')   drawGhost(W, H, m, body, dark, glow, ink);
-    else                           drawSerpent(W, H, m, body, dark, glow, ink);
+    // ② 退回程序化立绘（图集未加载 / 加载失败 / 无浏览器桩环境）；攻击扑击同样用变换叠加
+    else {
+      ctx.save();
+      if (atkP >= 0) { ctx.translate(lungeX, 0); ctx.scale(aSX, aSY); }
+      if (m.type === 'wolf')         drawWolf(W, H, m, body, dark, glow, ink);
+      else if (m.type === 'spider')  drawSpider(W, H, m, body, dark, glow, ink);
+      else if (m.type === 'toad')    drawToad(W, H, m, body, dark, glow, ink);
+      else if (m.type === 'ghost')   drawGhost(W, H, m, body, dark, glow, ink);
+      else                           drawSerpent(W, H, m, body, dark, glow, ink);
+      ctx.restore();
+    }
+
+    // 攻击挥击弧光（仅"扑击"阶段显示）：一道朝玩家的月牙，让"攻击动作"一眼可见
+    if (atkP >= 0) {
+      const sw = (atkP - 0.26) / 0.42;     // 挥击进度 0→1
+      if (sw > 0 && sw < 1) {
+        ctx.save();
+        ctx.globalAlpha = Math.sin(sw * Math.PI) * 0.82;
+        ctx.strokeStyle = m.glow; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.shadowColor = m.glow; ctx.shadowBlur = 8;
+        const fx = W * 0.84, fy = H * 0.40, R = W * 0.66;
+        const a0 = -1.2, a1 = 1.2, span = a1 - a0;
+        ctx.beginPath();
+        ctx.arc(fx, fy, R, a0 + span * (sw * 0.12), a0 + span * (sw * 0.12 + sw * 0.9), false);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     ctx.restore();
 
