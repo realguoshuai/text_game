@@ -622,3 +622,15 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
     border-top: 1px dashed var(--panel-border);
     padding-top: 10px;
 }
+
+/* ---------- 像素场景横幅（js/scene.js 渲染） ---------- */
+#scene-canvas {
+    display: block;
+    width: 100%;
+    height: 180px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #0a1426;
+    border-bottom: 2px solid var(--panel-border);
+    flex: 0 0 auto;
+}

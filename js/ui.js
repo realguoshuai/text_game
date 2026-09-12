@@ -221,6 +221,7 @@ GAME.UI = {
 
     updateUI: function () {
         try {
+            if (GAME.scene) GAME.scene.render();   // 重绘像素场景横幅（新增）
             if (!this.started) { this.renderOrigin(); return; }
             var p = GAME.State.p();
             var realm = GAME.DATA.REALMS[p.realmIndex];
