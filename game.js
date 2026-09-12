@@ -88,6 +88,9 @@
   // 地图是静态的。与其每帧重画几百笔格线，不如把灵脉、符阵、山石、云海一次性画进离屏 canvas，
   // 主循环里只 drawImage 一块"视口大小"的图 —— 画面厚了，开销反而更低（弱机也能开满）。
   let bgCv = null;
+  // 妖兽/道具图集（freepixel.art）：就绪前为 null，drawMonster/buildWorldBg 自动退回程序化立绘 / 无地图道具。
+  // 必须在此处（buildWorldBg 首次被 resize 调用之前）声明，否则顶层执行到 buildWorldBg 时 propImg 处于暂时性死区会抛 ReferenceError。
+  let foeImg = null, propImg = null;
   // 视野内灵气光点用的确定性噪声（同一个格子永远落在同一处，不用存数组）
   function hash2(i, j) {
     const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
@@ -677,7 +680,6 @@
     bones:[813,1236,174,162], skulls:[1021,1249,158,149], web_sac:[52,1408,96,190],
     wisp:[254,1451,92,147], wisp_gold:[429,1444,142,154], obelisk:[673,1453,54,145], vine:[849,1495,101,103]
   };
-  let foeImg = null, propImg = null;
   (function loadAtlases() {
     if (typeof Image === 'undefined') return;          // 桩环境：退回程序化妖兽 / 无地图道具
     const fl = new Image();
