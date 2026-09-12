@@ -28,6 +28,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
   pointer-events: none;
   text-shadow: 0 1px 3px #000;
   font-size: 13px;
@@ -47,59 +48,66 @@ html, body {
 #hud .stat { white-space: nowrap; }
 #hud .stat b { color: #ffd24a; }
 
-/* ---------- 摇杆 / 触屏操控 ---------- */
-#touch {
-  display: flex;
+/* ---------- 突破提示 ---------- */
+#toast {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding: 0 18px 26px;
+  top: 64px; left: 50%; transform: translateX(-50%);
+  display: none;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: rgba(74,59,140,0.85);
+  border: 1px solid rgba(180,170,255,0.6);
+  color: #ffe27a; font-size: 15px; letter-spacing: 1px;
   pointer-events: none;
-  z-index: 4;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+  z-index: 6;
+  animation: toastpop .3s ease;
 }
+@keyframes toastpop { from { transform: translateX(-50%) scale(0.8); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+
+/* ---------- 浮动摇杆（左半屏触点出现，半透明） ---------- */
 #joystick {
-  position: relative;
-  width: 132px; height: 132px;
+  position: fixed;
+  display: none;
+  width: 120px; height: 120px;
   border-radius: 50%;
-  background: rgba(120,110,200,0.18);
-  border: 2px solid rgba(180,170,255,0.45);
-  pointer-events: auto;
+  background: rgba(120,110,200,0.16);
+  border: 2px solid rgba(180,170,255,0.4);
+  pointer-events: none;
   touch-action: none;
-  flex: 0 0 auto;
+  z-index: 4;
 }
 #joy-base {
   position: absolute; left: 50%; top: 50%;
   width: 52px; height: 52px; margin: -26px 0 0 -26px;
   border-radius: 50%;
-  background: rgba(180,170,255,0.18);
+  background: rgba(180,170,255,0.16);
   border: 1px solid rgba(180,170,255,0.4);
 }
 #joy-knob {
   position: absolute; left: 50%; top: 50%;
   width: 56px; height: 56px; margin: -28px 0 0 -28px;
   border-radius: 50%;
-  background: rgba(150,140,240,0.7);
-  border: 1px solid rgba(220,215,255,0.8);
+  background: rgba(150,140,240,0.55);
+  border: 1px solid rgba(220,215,255,0.7);
   will-change: transform;
 }
+
+/* ---------- 飞剑钮（半透明、可拖动、不固定） ---------- */
 .btn {
-  background: rgba(120,110,200,0.28);
-  border: 1px solid rgba(180,170,255,0.5);
-  border-radius: 12px;
-  color: #fff; font-size: 22px;
+  position: fixed;
+  right: 22px; bottom: 28px;
+  width: 92px; height: 92px; border-radius: 50%;
+  font-size: 16px;
   display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  background: rgba(224,70,79,0.26);
+  border: 1px solid rgba(255,140,140,0.45);
   user-select: none; touch-action: none;
+  z-index: 5;
+  backdrop-filter: blur(2px);
 }
-.btn:active { background: rgba(150,140,240,0.55); }
-#btn-atk {
-  width: 96px; height: 96px; border-radius: 50%;
-  font-size: 17px; flex: 0 0 auto;
-  background: rgba(224,70,79,0.34);
-  border-color: rgba(255,140,140,0.6);
-  pointer-events: auto;
-}
-#btn-atk:active { background: rgba(224,70,79,0.6); }
+.btn:active { background: rgba(224,70,79,0.5); }
 
 /* ---------- 开场 / 死亡 浮层 ---------- */
 .overlay {
@@ -110,7 +118,7 @@ html, body {
   background: rgba(7,6,15,0.82);
   backdrop-filter: blur(2px);
   padding: 24px;
-  z-index: 5;
+  z-index: 7;
 }
 .overlay h1 { font-size: 30px; letter-spacing: 4px; color: #ffd24a; }
 .overlay p { font-size: 14px; line-height: 1.9; color: #cfcbe8; max-width: 340px; }
@@ -123,3 +131,14 @@ html, body {
 }
 .overlay button:active { background: #5d4ca8; }
 #death { display: none; }
+
+/* ---------- 窄屏适配 ---------- */
+@media (max-width: 900px) {
+  #hud .hp-box { width: 120px; }
+  #hud { font-size: 12px; gap: 8px; padding: 8px 10px; }
+  .btn { width: 80px; height: 80px; font-size: 15px; right: 16px; bottom: 22px; }
+  #joystick { width: 110px; height: 110px; }
+  #joy-knob { width: 50px; height: 50px; margin: -25px 0 0 -25px; }
+  .overlay h1 { font-size: 26px; }
+  .overlay p { font-size: 13px; }
+}

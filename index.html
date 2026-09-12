@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>凡人修仙录 · 实时版</title>
-  <meta name="description" content="修仙题材实时网页小游戏：操控修士探索灵脉、施飞剑斩妖兽、采灵草。">
+  <meta name="description" content="修仙题材实时网页小游戏：操控修士探索灵脉、施飞剑斩妖兽、采灵草。飞剑随境界进化，妖兽与灵物各有其形。">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,14 +21,17 @@
       <div class="stat">境界 <b id="realm-val">炼气期</b></div>
     </div>
 
-    <!-- 触屏操控 -->
-    <div id="touch">
-      <div id="joystick">
-        <div id="joy-base"></div>
-        <div id="joy-knob"></div>
-      </div>
-      <div class="btn" id="btn-atk">飞剑 ⚔</div>
+    <!-- 突破提示 -->
+    <div id="toast"></div>
+
+    <!-- 浮动摇杆（左半屏触摸出现） -->
+    <div id="joystick">
+      <div id="joy-base"></div>
+      <div id="joy-knob"></div>
     </div>
+
+    <!-- 飞剑钮（半透明、可拖动摆放） -->
+    <div class="btn" id="btn-atk">飞剑 ⚔</div>
 
     <!-- 开场 -->
     <div class="overlay" id="intro">
@@ -36,9 +39,9 @@
       <p>
         你是一名初入灵脉的修士。<br>
         电脑：<span class="key">W A S D</span> 移动，<span class="key">J / 空格</span> 发飞剑<br>
-        手机：用屏幕按钮移动与出剑<br>
-        斩妖兽、采灵草，修为渐长。<br>
-        妖兽会追你，血空了回洞府重生。
+        手机：<b>左半屏按住拖动</b>移动，<b>右半屏点按</b>（或飞剑钮）出剑<br>
+        斩妖越多，飞剑越厉害——单锋→双锋→追魂三剑→巨剑→五雷<br>
+        妖兽有妖狼/毒蛛/火蟾/鬼面/灵蛇，灵物有灵草/灵石/丹药。
       </p>
       <button id="start-btn">入灵脉</button>
       <p style="font-size:12px;opacity:.7"><a href="legacy/" style="color:#9a93d8">→ 也想玩文字版？</a></p>
@@ -53,7 +56,6 @@
 
   <script src="game.js"></script>
   <script>
-    // 开场浮层：点开始即玩（同时清掉浮层，避免挡触摸）
     (function () {
       var intro = document.getElementById('intro');
       function dismiss() { intro.style.display = 'none'; }
