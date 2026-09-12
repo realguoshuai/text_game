@@ -3,84 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>凡人修仙录 · 坊市行（2D版）</title>
-<link rel="stylesheet" href="css/style.css">
+<title>凡人修仙录 · 坊市（等距视角）</title>
+<link rel="stylesheet" href="css/iso.css">
 </head>
 <body>
+
+<!-- ===== 游戏画布（最底层，接收点击） ===== -->
 <canvas id="game"></canvas>
 
-<!-- ===== 左上：角色状态 ===== -->
-<div id="hud-status" class="hud">
-  <div id="portrait"></div>
-  <div id="status-bars">
-    <div class="name-row"><span id="p-name">同道长生</span><span id="p-realm">练气一层</span></div>
-    <div class="bar hp"><div id="bar-hp"></div><span id="txt-hp"></span></div>
-    <div class="bar mp"><div id="bar-mp"></div><span id="txt-mp"></span></div>
-    <div class="bar exp"><div id="bar-exp"></div><span id="txt-exp"></span></div>
-    <div class="stone-row"><span class="stone-icon"></span><span id="p-stones">0</span> 灵石</div>
+<!-- ===== UI 覆盖层：整体 pointer-events:none，鼠标穿透到 canvas ===== -->
+<div id="uiLayer">
+
+  <!-- 左上：角色状态栏 -->
+  <div id="statusBar">
+    <div id="avatar"></div>
+    <div id="statusRight">
+      <div class="row1"><span id="pName">逍遥长生</span><span id="pPower">战 1268</span></div>
+      <div class="bar hp"><div id="barHp"></div><span id="txtHp">860 / 860</span></div>
+      <div class="bar mp"><div id="barMp"></div><span id="txtMp">420 / 420</span></div>
+    </div>
   </div>
-</div>
 
-<!-- ===== 右上：小地图 + 时辰 ===== -->
-<div id="hud-minimap" class="hud">
-  <canvas id="minimap" width="150" height="112"></canvas>
-  <div id="clock">未时三刻 · 晴</div>
-</div>
-
-<!-- ===== 右侧：任务追踪 ===== -->
-<div id="hud-quests" class="hud">
-  <div class="quest-title">任 务</div>
-  <div id="quest-list"></div>
-</div>
-
-<!-- ===== 底部中央：技能栏 ===== -->
-<div id="hud-skills" class="hud">
-  <div class="skill" data-skill="attack"><div class="skill-name">御剑</div><div class="skill-key">LMB</div><div class="skill-cd"></div></div>
-  <div class="skill" data-skill="flying" id="sk-flying"><div class="skill-name">剑力潮</div><div class="skill-key">Q</div><div class="skill-cd"></div></div>
-  <div class="skill" data-skill="dash" id="sk-dash"><div class="skill-name">血遁</div><div class="skill-key">Shift</div><div class="skill-cd"></div></div>
-  <div class="skill" data-skill="guard" id="sk-guard"><div class="skill-name">护体罡气</div><div class="skill-key">R</div><div class="skill-cd"></div></div>
-</div>
-
-<!-- ===== 底部右侧：功能按钮 ===== -->
-<div id="hud-menu" class="hud">
-  <div class="menu-btn" data-panel="char">角色<span class="kbd">C</span></div>
-  <div class="menu-btn" data-panel="bag">背包<span class="kbd">B</span></div>
-  <div class="menu-btn" data-panel="help">设置<span class="kbd">Esc</span></div>
-</div>
-
-<!-- ===== 对话框 ===== -->
-<div id="dialog" class="panel hidden">
-  <div id="dialog-name"></div>
-  <div id="dialog-text"></div>
-  <div id="dialog-options"></div>
-  <div class="dialog-hint">数字键选择 · Esc 告辞</div>
-</div>
-
-<!-- ===== 角色 / 背包 / 商店 / 帮助 面板 ===== -->
-<div id="panel" class="panel hidden">
-  <div id="panel-title"></div>
-  <div id="panel-body"></div>
-  <div class="dialog-hint">Esc 关闭</div>
-</div>
-
-<!-- ===== 浮动提示 ===== -->
-<div id="toast"></div>
-
-<!-- ===== 标题画面 ===== -->
-<div id="title" class="overlay">
-  <h1>凡人修仙录 · 坊市行</h1>
-  <p class="sub">—— 2D 俯视角版 · 数据承自文字版《凡人修仙录》 ——</p>
-  <div class="title-btns">
-    <button id="btn-new">初入江湖（新游戏）</button>
-    <button id="btn-continue">继续修行（读取存档）</button>
+  <!-- 右上：小地图 + 时辰 + 任务列表 -->
+  <div id="infoBar">
+    <canvas id="minimap" width="132" height="132"></canvas>
+    <div id="clock">未时二刻</div>
+    <div id="questBox">
+      <div class="qTitle">任 务</div>
+      <div class="qItem"><span class="qName">拜入青玄宗</span></div>
+      <div class="qItem"><span class="qName">与接引弟子对话</span><span id="qTalk" class="qProg">0/1</span></div>
+      <div class="qItem"><span class="qName">采集灵药</span><span id="qHerb" class="qProg">2/3</span></div>
+    </div>
   </div>
-  <div class="help-box">
-    <b>操作</b>：WASD / 方向键 移动 · 鼠标左键 / J 挥剑 · Q 飞剑 · Shift 血遁 · R 护体罡气<br>
-    <b>交互</b>：E 对话 / 采集 · C 角色（修为圆满可突破） · B 背包 · Esc 关闭面板
+
+  <!-- 底部：技能栏 + 功能按钮 -->
+  <div id="bottomBar">
+    <div id="skillBar">
+      <div class="skill interactive"><span class="skName">剑诀</span><span class="skKey">1</span></div>
+      <div class="skill interactive"><span class="skName">灵力弹</span><span class="skKey">2</span></div>
+      <div class="skill interactive"><span class="skName">身法</span><span class="skKey">3</span></div>
+      <div class="skill interactive"><span class="skName">护体</span><span class="skKey">4</span></div>
+    </div>
+    <div id="funcBar">
+      <div class="func interactive">境界</div>
+      <div class="func interactive">角色</div>
+      <div class="func interactive">功法</div>
+      <div class="func interactive">背包</div>
+      <div class="func interactive">炼器</div>
+      <div class="func interactive">设置</div>
+    </div>
   </div>
+
+  <!-- 对话面板（交互元素，单独开启 pointer-events） -->
+  <div id="dialog" class="hidden interactive">
+    <div id="dlgName">NPC</div>
+    <div id="dlgText">……</div>
+    <div id="dlgBtns">
+      <button id="dlgClose">继续</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
 </div>
 
-<script src="js/data.js"></script>
-<script src="js/game.js"></script>
+<script src="js/iso.js"></script>
 </body>
 </html>

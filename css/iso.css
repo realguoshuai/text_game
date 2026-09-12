@@ -1,0 +1,77 @@
+/* 凡人修仙录 · 坊市（等距视角）样式
+ * 核心：#uiLayer 整体 pointer-events:none，让鼠标穿透到 canvas；
+ *      需要点按的元素（技能/按钮/对话面板）单独加 .interactive 开启 pointer-events:auto。
+ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #14100b; }
+body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0; user-select: none; }
+#game { display: block; width: 100vw; height: 100vh; }
+.hidden { display: none !important; }
+
+/* ===== UI 覆盖层：鼠标穿透 ===== */
+#uiLayer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+.interactive { pointer-events: auto; }
+
+/* ===== 左上状态栏 ===== */
+#statusBar { position: absolute; top: 14px; left: 14px; display: flex; gap: 10px; align-items: flex-start; }
+#avatar { width: 62px; height: 62px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 30%, #6b5233, #3a2c18 70%);
+  border: 2px solid #a8894e; box-shadow: 0 0 8px rgba(0,0,0,.6); }
+#statusRight { min-width: 230px; }
+.row1 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+#pName { font-size: 16px; font-weight: bold; color: #ffe9b3; text-shadow: 0 1px 2px #000; }
+#pPower { font-size: 12px; color: #ff9a5e; text-shadow: 0 1px 2px #000; }
+.bar { position: relative; height: 14px; background: #241c10; border: 1px solid #5a4826;
+  border-radius: 3px; margin-bottom: 3px; overflow: hidden; }
+.bar > div { height: 100%; }
+.bar.hp > div { background: linear-gradient(#c0392b, #7e1e14); }
+.bar.mp > div { background: linear-gradient(#2e86c1, #1b4f72); }
+.bar span { position: absolute; inset: 0; text-align: center; font-size: 10px;
+  line-height: 14px; color: #fff; text-shadow: 0 1px 1px #000; }
+
+/* ===== 右上信息栏 ===== */
+#infoBar { position: absolute; top: 14px; right: 14px; width: 210px; text-align: center; }
+#minimap { border: 2px solid #a8894e; border-radius: 4px; background: #0d0a06; display: block;
+  margin: 0 auto 6px; }
+#clock { display: inline-block; font-size: 12px; color: #d8c68f; background: rgba(0,0,0,.45);
+  padding: 2px 8px; border-radius: 3px; margin-bottom: 8px; text-shadow: 0 1px 2px #000; }
+#questBox { background: rgba(20,14,6,.72); border: 1px solid #6b5629; border-radius: 6px; padding: 8px 10px; }
+.qTitle { color: #ffe9b3; letter-spacing: 6px; font-size: 14px; border-bottom: 1px solid #6b5629;
+  padding-bottom: 4px; margin-bottom: 6px; }
+.qItem { display: flex; justify-content: space-between; font-size: 12px; color: #cfc3a0; line-height: 1.9; }
+.qName::before { content: "☐ "; color: #ffd75e; }
+.qItem.done .qName::before { content: "☑ "; color: #9fd48a; }
+.qProg { color: #ffd75e; font-size: 11px; }
+.qItem.done .qProg { color: #9fd48a; }
+
+/* ===== 底部技能栏 + 功能按钮 ===== */
+#bottomBar { position: absolute; bottom: 16px; left: 0; right: 0; display: flex;
+  flex-direction: column; align-items: center; gap: 10px; }
+#skillBar { display: flex; gap: 8px; }
+.skill { position: relative; width: 56px; height: 56px; cursor: pointer;
+  background: linear-gradient(#3a2e1a, #1f1810); border: 2px solid #8a6f3a; border-radius: 8px; }
+.skill:hover { border-color: #d4ac2b; }
+.skName { display: block; text-align: center; margin-top: 14px; font-size: 12px; color: #ffe9b3;
+  text-shadow: 0 1px 2px #000; }
+.skKey { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 10px; color: #a99767; }
+#funcBar { display: flex; gap: 8px; }
+.func { padding: 7px 14px; font-size: 13px; color: #ffe9b3; cursor: pointer;
+  background: rgba(30,22,10,.85); border: 1px solid #8a6f3a; border-radius: 6px; }
+.func:hover { background: rgba(60,45,20,.9); }
+
+/* ===== 对话面板 ===== */
+#dialog { position: absolute; left: 50%; bottom: 100px; transform: translateX(-50%);
+  width: 520px; background: rgba(18,13,6,.95); border: 2px solid #a8894e; border-radius: 8px;
+  padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,.7); }
+#dlgName { color: #ffd75e; font-size: 16px; font-weight: bold; margin-bottom: 8px; }
+#dlgText { font-size: 14px; line-height: 1.8; color: #e8dcc0; white-space: pre-wrap; min-height: 72px; }
+#dlgBtns { text-align: right; margin-top: 8px; }
+#dlgClose { padding: 6px 22px; font-size: 14px; cursor: pointer; color: #ffe9b3;
+  background: linear-gradient(#4a3a1e, #2c2210); border: 1px solid #a8894e; border-radius: 4px; }
+#dlgClose:hover { background: linear-gradient(#6a5326, #3c2e14); }
+
+/* ===== Toast ===== */
+#toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; }
+.toastMsg { background: rgba(10,8,4,.85); border: 1px solid #a8894e; color: #ffe9b3; font-size: 14px;
+  padding: 8px 20px; border-radius: 6px; margin-top: 6px; animation: fade 2.2s forwards; }
+@keyframes fade { 0%{opacity:0;transform:translateY(-8px)} 10%{opacity:1;transform:none} 80%{opacity:1} 100%{opacity:0} }
