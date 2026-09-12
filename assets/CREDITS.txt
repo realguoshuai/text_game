@@ -1,7 +1,10 @@
-素材来源与授权
+﻿素材来源与授权
 ================
-1) assets/tiles/decorations.png 各帧裁自 FreePixel（freepixel.art）环境道具包，
-   本地库：text_game/AssetLibrary/FreePixel（地图-中式地标 / 地图-夜景器械 / 地图-晶石矿物）。
-   midnight 系列做了提亮处理（Brightness 1.9 / Color 1.25）。
-2) 其余素材（ground/buildings/characters/ui）由 tools/make_assets.py 程序化生成，无第三方版权。
-3) 替换更精细素材：同名 PNG 覆盖 assets/ 下文件即可，游戏零改动。
+1) assets/tiles/buildings.png —— WorkBuddy ImageGen AI 生成（4 帧：接引台/聚宝阁/丹房/器坊，夜景商铺），
+   经 tools/post_ai.py / tools/fix_buildings.py 抠底、去水印、拼帧。原始 1024px 底图保留在 2d_game/_gen/。
+2) assets/tiles/decorations.png —— 14 帧：
+   帧 0-11 裁自 FreePixel（freepixel.art，本地库 text_game/AssetLibrary/FreePixel，midnight 系已提亮）；
+   帧 12-13（布棚货摊/茶摊）为 AI 生成。
+3) assets/tiles/ground.png —— 程序化生成（tools/make_assets.py）+ 夜景色调（tools/post_ai.py）。
+4) assets/characters/*.png、assets/ui/*.png —— 程序化生成。
+5) 替换更精细素材：同名 PNG 覆盖 assets/ 下文件即可，游戏零改动。

@@ -68,12 +68,13 @@
   fill(1, 10, 20, 2, 2);    // 横向主街
   fill(10, 1, 2, 20, 2);    // 纵向主街
 
-  // —— 建筑：占地图标 1（不可走），登记用于绘制与深度排序 ——
+  // —— 建筑：占地图标 1（不可走），登记用于绘制与深度排序
+  //   frame 对应 buildings.png 横排 4 帧（AI 生成夜景商铺，256×224/帧）：0接引台 1聚宝阁 2丹房 3器坊
   const buildings = [
-    { x: 3,  y: 3,  w: 5, h: 4, h3d: 46, name: '接引台', roof: '#4a5a7a' },
-    { x: 14, y: 3,  w: 5, h: 4, h3d: 46, name: '聚宝阁', roof: '#7a6a2e' },
-    { x: 3,  y: 14, w: 5, h: 4, h3d: 46, name: '丹  房', roof: '#8a3b2e' },
-    { x: 14, y: 14, w: 5, h: 4, h3d: 46, name: '器  坊', roof: '#4a6a4a' },
+    { x: 3,  y: 3,  w: 5, h: 4, h3d: 46, frame: 0, name: '接引台', roof: '#4a5a7a' },
+    { x: 14, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
+    { x: 3,  y: 14, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
+    { x: 14, y: 14, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
   ];
   buildings.forEach(b => fill(b.x, b.y, b.w, b.h, 1));
 
@@ -94,8 +95,10 @@
     { x: 17, y: 11, kind: 'gate' },                                     // 东街石牌坊（可穿行）
     { x: 8,  y: 12, kind: 'dragon' },                                   // 广场玉龙像
     { x: 13, y: 12, kind: 'statue' },                                   // 广场武雕像
+    { x: 8,  y: 9,  kind: 'stall' },                                    // 布棚货摊（AI）
+    { x: 13, y: 9,  kind: 'tea' },                                      // 茶摊伞桌（AI）
   ];
-  const SOLID_PROPS = new Set(['willow', 'pine', 'bamboo', 'lion', 'well', 'brazier', 'dummy', 'dragon', 'statue']);
+  const SOLID_PROPS = new Set(['willow', 'pine', 'bamboo', 'lion', 'well', 'brazier', 'dummy', 'dragon', 'statue', 'stall', 'tea']);
   props.forEach(p => { map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2; });
 
   // =====================================================
@@ -245,20 +248,24 @@
     ctx.stroke();
   }
 
-  /** 建筑：有素材按比例贴图，否则画「顶面+左右侧面」等距立体盒子 */
+  /** 建筑：buildings.png 横排 4 帧（256×224/帧，AI 夜景商铺）；无素材画等距立体盒子 */
+  const BLD_FW = 256, BLD_FH = 224;
   function drawBuilding(b) {
     const A = isoToScreen(b.x, b.y);
     const C = isoToScreen(b.x + b.w, b.y + b.h);
     const cx = (A.x + C.x) / 2, bottomY = C.y;
     const dw = (b.w + b.h) * HW * 0.92;
-    const dh = (b.w + b.h) * HH * 0.92 + b.h3d;
+    const dh = dw * (BLD_FH / BLD_FW);          // 保持素材宽高比
 
     if (SPR.buildings) {
-      ctx.drawImage(SPR.buildings, cx - dw / 2, bottomY - dh, dw, dh);
+      ctx.drawImage(SPR.buildings, (b.frame || 0) * BLD_FW, 0, BLD_FW, BLD_FH,
+        cx - dw / 2, bottomY - dh, dw, dh);
     } else {
       const B = isoToScreen(b.x + b.w, b.y);
       const D = isoToScreen(b.x, b.y + b.h);
       const hgt = b.h3d;
+      dw = (b.w + b.h) * HW * 0.92;             // 占位盒仍按占地比例
+      dh = (b.w + b.h) * HH * 0.92 + hgt;
       ctx.fillStyle = '#4a3c2c';
       ctx.beginPath();
       ctx.moveTo(D.x, D.y); ctx.lineTo(C.x, C.y);
@@ -285,8 +292,8 @@
 
   /** 装饰：decorations.png 横向 12 帧（FreePixel 国风道具，每帧 96×96）；无素材画占位
    *  帧表：0垂柳 1青松 2竹 3红灯笼 4黄灯笼 5石狮 6水井 7火盆 8练功桩 9石牌坊 10玉龙像 11武雕像 */
-  const DECOR_FRAME = { willow: 0, pine: 1, bamboo: 2, lantern: 3, lanternY: 4, lion: 5, well: 6, brazier: 7, dummy: 8, gate: 9, dragon: 10, statue: 11 };
-  const DECOR_SCALE = { willow: 1.4, pine: 1.3, bamboo: 1.1, lantern: 0.9, lanternY: 0.9, lion: 1.0, well: 1.05, brazier: 0.85, dummy: 0.95, gate: 1.6, dragon: 1.2, statue: 1.05 };
+  const DECOR_FRAME = { willow: 0, pine: 1, bamboo: 2, lantern: 3, lanternY: 4, lion: 5, well: 6, brazier: 7, dummy: 8, gate: 9, dragon: 10, statue: 11, stall: 12, tea: 13 };
+  const DECOR_SCALE = { willow: 1.4, pine: 1.3, bamboo: 1.1, lantern: 0.9, lanternY: 0.9, lion: 1.0, well: 1.05, brazier: 0.85, dummy: 0.95, gate: 1.6, dragon: 1.2, statue: 1.05, stall: 1.7, tea: 1.55 };
   function drawProp(p) {
     const s = isoToScreen(p.x + 0.5, p.y + 0.5);
     if (s.x < -80 || s.x > W + 80 || s.y < -160 || s.y > H + 80) return;
@@ -385,8 +392,49 @@
     draws.push({ key: player.mx + player.my, fn: () => drawCharacter(player, true, time) });
 
     draws.sort((a, b) => a.key - b.key).forEach(d => d.fn());
+
+    // —— 夜景氛围：先整体压暗（蓝夜幕），再在光源处叠加暖光晕（加色混合，预渲染光斑，弱机友好） ——
+    ctx.fillStyle = 'rgba(14,20,48,0.34)';
+    ctx.fillRect(0, 0, W, H);
+    if (glowCv) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const L of lights) {
+        const s = isoToScreen(L.mx, L.my);
+        if (s.x < -160 || s.x > W + 160 || s.y < -160 || s.y > H + 160) continue;
+        const R = 80 * L.r;
+        ctx.globalAlpha = 0.62 + 0.14 * Math.sin(time * 6 + L.mx * 3.1);   // 烛光轻微闪烁
+        ctx.drawImage(glowCv, s.x - R, s.y - R - 10, R * 2, R * 2);
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
     drawMinimap();
   }
+
+  // 光源表：灯笼/火盆 + 各建筑窗光（一次性构建）
+  const lights = [];
+  props.forEach(p => {
+    if (p.kind === 'lantern' || p.kind === 'lanternY') lights.push({ mx: p.x + 0.5, my: p.y + 0.3, r: 0.85 });
+    if (p.kind === 'brazier') lights.push({ mx: p.x + 0.5, my: p.y + 0.5, r: 1.0 });
+  });
+  buildings.forEach(b => {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    lights.push({ mx: cx, my: cy + 0.4, r: 1.7 });
+    lights.push({ mx: cx - b.w * 0.22, my: cy + b.h * 0.42, r: 1.1 });
+  });
+  // 预渲染暖光斑（径向渐变，一次生成）
+  const glowCv = document.createElement('canvas');
+  glowCv.width = glowCv.height = 160;
+  (() => {
+    const g = glowCv.getContext('2d');
+    const grad = g.createRadialGradient(80, 80, 4, 80, 80, 78);
+    grad.addColorStop(0, 'rgba(255,190,110,0.50)');
+    grad.addColorStop(0.4, 'rgba(255,160,70,0.20)');
+    grad.addColorStop(1, 'rgba(255,140,40,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 160, 160);
+  })();
 
   // =====================================================
   // 九、小地图（俯视占位；有真实小地图贴图时可换 drawImage）
