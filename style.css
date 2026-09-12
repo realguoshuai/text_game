@@ -1,0 +1,101 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #07060f;
+  color: #e8e6f5;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#wrap { position: relative; width: 100vw; height: 100dvh; }
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+  font-size: 13px;
+}
+#hud .hp-box { width: 150px; }
+#hud .hp-bar {
+  height: 12px; border-radius: 6px;
+  background: rgba(255,255,255,0.12);
+  overflow: hidden; border: 1px solid rgba(255,255,255,0.18);
+}
+#hp-fill {
+  display: block; height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #e0464f, #ff8a5b);
+  transition: width .12s linear;
+}
+#hud .stat { white-space: nowrap; }
+#hud .stat b { color: #ffd24a; }
+
+/* ---------- 触屏按钮 ---------- */
+#touch { display: none; }
+body.touch #touch {
+  display: flex;
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 18px 22px;
+  pointer-events: none;
+}
+.pad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 6px; pointer-events: auto; }
+.pad .spacer { visibility: hidden; }
+.btn {
+  background: rgba(120,110,200,0.28);
+  border: 1px solid rgba(180,170,255,0.5);
+  border-radius: 12px;
+  color: #fff; font-size: 22px;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none; touch-action: none;
+}
+.btn:active { background: rgba(150,140,240,0.55); }
+#btn-atk {
+  width: 84px; height: 84px; border-radius: 50%;
+  font-size: 16px; align-self: center;
+  background: rgba(224,70,79,0.32);
+  border-color: rgba(255,140,140,0.6);
+}
+#btn-atk:active { background: rgba(224,70,79,0.6); }
+
+/* ---------- 开场 / 死亡 浮层 ---------- */
+.overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; text-align: center;
+  background: rgba(7,6,15,0.82);
+  backdrop-filter: blur(2px);
+  padding: 24px;
+  z-index: 5;
+}
+.overlay h1 { font-size: 30px; letter-spacing: 4px; color: #ffd24a; }
+.overlay p { font-size: 14px; line-height: 1.9; color: #cfcbe8; max-width: 340px; }
+.overlay .key { color: #fff; background: rgba(255,255,255,0.12); border-radius: 5px; padding: 1px 7px; margin: 0 2px; }
+.overlay button {
+  margin-top: 6px;
+  background: #4a3b8c; color: #fff;
+  border: 1px solid #7a6bd0; border-radius: 10px;
+  padding: 12px 28px; font-size: 16px; cursor: pointer;
+}
+.overlay button:active { background: #5d4ca8; }
+#death { display: none; }
