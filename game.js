@@ -84,21 +84,202 @@
     return true;
   }
 
-  // 洞窟装饰（晶簇）：随地图尺寸重建
-  const deco = [];
-  function rebuildDeco() {
-    deco.length = 0;
-    const n = Math.max(24, Math.round(WORLD.w * WORLD.h / 26000));
-    for (let i = 0; i < n; i++) {
-      deco.push({
-        x: 24 + Math.random() * (WORLD.w - 48),
-        y: 24 + Math.random() * (WORLD.h - 48),
-        c: Math.random() < 0.5 ? '#3a2f6b' : '#236b5d',
-        r: 5 + Math.random() * 12,
-        glow: Math.random() < 0.4
-      });
-    }
+  // ---------- 世界背景：一次性预渲染到离屏画布 ----------
+  // 地图是静态的。与其每帧重画几百笔格线，不如把灵脉、符阵、山石、云海一次性画进离屏 canvas，
+  // 主循环里只 drawImage 一块"视口大小"的图 —— 画面厚了，开销反而更低（弱机也能开满）。
+  let bgCv = null;
+  // 视野内灵气光点用的确定性噪声（同一个格子永远落在同一处，不用存数组）
+  function hash2(i, j) {
+    const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+    return n - Math.floor(n);
   }
+  function buildWorldBg() {
+    bgCv = null;
+    let c = null, g = null;
+    try {
+      c = document.createElement('canvas');
+      if (!c || typeof c.getContext !== 'function') return;
+      c.width = WORLD.w; c.height = WORLD.h;
+      g = c.getContext('2d');
+    } catch (_) { return; }
+    if (!g) return;
+
+    const W = WORLD.w, H = WORLD.h;
+    const A = W * H;
+    const rd = function (a, b) { return a + Math.random() * (b - a); };
+    // 离屏上下文自己的绘制辅助（不能借用主 ctx 的 poly/limb）
+    function blob(pts, col) {
+      if (col) g.fillStyle = col;
+      g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+      g.closePath(); g.fill();
+    }
+    function oval(cx, cy, rx, ry, col) {
+      g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 6.2832);
+      if (col) { g.fillStyle = col; g.fill(); }
+    }
+
+    // 1) 底：深色灵壤
+    const lg = g.createLinearGradient(0, 0, W, H);
+    lg.addColorStop(0, '#0d1126');
+    lg.addColorStop(0.5, '#0a0d1c');
+    lg.addColorStop(1, '#100e22');
+    g.fillStyle = lg; g.fillRect(0, 0, W, H);
+
+    // 2) 灵土色斑（大块低对比，做出地面起伏）
+    const SOIL = ['#131a33', '#0f1a2c', '#161430', '#0d1a26', '#151b2e'];
+    g.globalAlpha = 0.55;
+    for (let i = 0, n = Math.round(A / 9500); i < n; i++) {
+      oval(rd(0, W), rd(0, H), rd(46, 170), rd(30, 110), SOIL[(Math.random() * SOIL.length) | 0]);
+    }
+    g.globalAlpha = 1;
+
+    // 3) 苔痕 / 灵草（成簇细叶，让地面有活气）
+    for (let i = 0, n = Math.round(A / 30000); i < n; i++) {
+      const x = rd(20, W - 20), y = rd(20, H - 20);
+      g.strokeStyle = 'rgba(96,190,150,' + rd(0.05, 0.13).toFixed(3) + ')';
+      g.lineWidth = 1;
+      g.beginPath();
+      for (let k = 0, m = 4 + ((Math.random() * 6) | 0); k < m; k++) {
+        const a = -1.5708 + rd(-0.9, 0.9), L = rd(5, 13);
+        g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L);
+      }
+      g.stroke();
+    }
+
+    // 4) 灵脉：三条蜿蜒光河（多层描边 + 一次性光晕）
+    g.save();
+    for (let v = 0; v < 3; v++) {
+      const pts = [];
+      let x = rd(0, W), y = rd(0, H), ang = rd(0, 6.2832);
+      pts.push([x, y]);
+      for (let k = 0; k < 9; k++) {
+        ang += rd(-0.75, 0.75);
+        const L = rd(160, 340);
+        x = Math.max(-60, Math.min(W + 60, x + Math.cos(ang) * L));
+        y = Math.max(-60, Math.min(H + 60, y + Math.sin(ang) * L));
+        pts.push([x, y]);
+      }
+      g.shadowColor = 'rgba(110,225,255,0.45)';
+      g.shadowBlur = 16;
+      g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+      for (let k = 1; k < pts.length - 1; k++) {
+        const mx = (pts[k][0] + pts[k + 1][0]) / 2, my = (pts[k][1] + pts[k + 1][1]) / 2;
+        g.quadraticCurveTo(pts[k][0], pts[k][1], mx, my);
+      }
+      g.strokeStyle = 'rgba(70,200,255,0.055)'; g.lineWidth = 15; g.stroke();
+      g.strokeStyle = 'rgba(120,230,255,0.09)'; g.lineWidth = 6.5; g.stroke();
+      g.shadowBlur = 0;
+      g.strokeStyle = 'rgba(205,248,255,0.20)'; g.lineWidth = 2.1; g.stroke();
+    }
+    g.restore();
+
+    // 5) 上古符阵：同心圆 + 内接八边 + 环带刻符
+    for (let i = 0, n = 4 + ((Math.random() * 3) | 0); i < n; i++) {
+      const cx = rd(170, W - 170), cy = rd(170, H - 170);
+      const R = rd(78, 165), rot = rd(0, 6.2832);
+      const hue = Math.random() < 0.5 ? '140,205,255' : '190,150,255';
+      g.strokeStyle = 'rgba(' + hue + ',0.14)'; g.lineWidth = 1.6;
+      g.beginPath(); g.arc(cx, cy, R, 0, 6.2832); g.stroke();
+      g.beginPath(); g.arc(cx, cy, R * 0.66, 0, 6.2832); g.stroke();
+      g.strokeStyle = 'rgba(' + hue + ',0.10)';
+      g.beginPath(); g.arc(cx, cy, R * 0.30, 0, 6.2832); g.stroke();
+      g.strokeStyle = 'rgba(' + hue + ',0.12)';
+      g.beginPath();
+      for (let k = 0; k <= 8; k++) {
+        const a = rot + k * 0.7854;
+        const px = cx + Math.cos(a) * R * 0.82, py = cy + Math.sin(a) * R * 0.82;
+        if (k === 0) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.stroke();
+      g.strokeStyle = 'rgba(' + hue + ',0.16)'; g.lineWidth = 2;
+      g.beginPath();
+      for (let k = 0; k < 16; k++) {
+        const a = rot + k * 0.3927;
+        g.moveTo(cx + Math.cos(a) * R * 0.66, cy + Math.sin(a) * R * 0.66);
+        g.lineTo(cx + Math.cos(a) * R * 0.74, cy + Math.sin(a) * R * 0.74);
+      }
+      g.stroke();
+      g.fillStyle = 'rgba(' + hue + ',0.13)';
+      g.beginPath(); g.arc(cx - R * 0.15, cy, R * 0.075, 0, 6.2832); g.fill();
+      g.beginPath(); g.arc(cx + R * 0.15, cy, R * 0.075, 0, 6.2832); g.fill();
+    }
+
+    // 6) 山石：不规则多边形（影 + 体 + 顶面受光）
+    for (let i = 0, n = Math.round(A / 34000); i < n; i++) {
+      const x = rd(30, W - 30), y = rd(30, H - 30);
+      const R = rd(11, 30), vert = 6 + ((Math.random() * 4) | 0);
+      const pts = [];
+      for (let k = 0; k < vert; k++) {
+        const a = (k / vert) * 6.2832;
+        const rr = R * rd(0.68, 1.18);
+        pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.72]);
+      }
+      g.globalAlpha = 0.5; oval(x, y + R * 0.34, R * 1.05, R * 0.34, '#05060d'); g.globalAlpha = 1;
+      blob(pts, '#1b2138');
+      blob(pts.map(function (p) { return [x + (p[0] - x) * 0.68, y + (p[1] - y) * 0.68 - R * 0.22]; }), '#3a466b');
+    }
+
+    // 7) 灵晶簇：成束尖晶（带自身微光）
+    for (let i = 0, n = Math.round(A / 56000); i < n; i++) {
+      const x = rd(24, W - 24), y = rd(24, H - 24);
+      const purple = Math.random() < 0.5;
+      const col = purple ? '#6a58c8' : '#3fa98e';
+      const lit = purple ? '#b9aaff' : '#8ff0d4';
+      g.globalAlpha = 0.28; oval(x, y + 3, 16, 7, col); g.globalAlpha = 1;
+      for (let k = 0, m = 3 + ((Math.random() * 3) | 0); k < m; k++) {
+        const bx = x + rd(-8, 8), by = y + rd(-2, 3);
+        const hh = rd(10, 26), ww = rd(3, 6.5), lean = rd(-0.35, 0.35);
+        blob([[bx - ww, by], [bx + ww, by], [bx + lean * hh, by - hh]], col);
+        blob([[bx - ww * 0.35, by], [bx + ww * 0.35, by], [bx + lean * hh, by - hh]], lit);
+      }
+    }
+
+    // 8) 云海：大块柔和雾团（预渲染成静态，便宜）
+    for (let i = 0, n = Math.round(A / 160000); i < n; i++) {
+      const x = rd(0, W), y = rd(0, H), R = rd(190, 430);
+      const rg = g.createRadialGradient(x, y, 0, x, y, R);
+      rg.addColorStop(0, 'rgba(150,190,235,' + rd(0.03, 0.062).toFixed(3) + ')');
+      rg.addColorStop(1, 'rgba(150,190,235,0)');
+      g.fillStyle = rg;
+      g.beginPath(); g.arc(x, y, R, 0, 6.2832); g.fill();
+    }
+
+    // 9) 星点灵气
+    for (let i = 0, n = Math.round(A / 13000); i < n; i++) {
+      const x = rd(6, W - 6), y = rd(6, H - 6);
+      const s = Math.random() < 0.85 ? 1 : 2;
+      g.fillStyle = Math.random() < 0.7 ? 'rgba(180,220,255,0.30)' : 'rgba(255,226,160,0.26)';
+      g.fillRect(Math.round(x), Math.round(y), s, s);
+    }
+
+    // 10) 地图边界：雾崖 + 远山剪影（走到尽头能"看见"边界）
+    g.fillStyle = 'rgba(7,9,20,0.85)';
+    for (let i = 0; i < 34; i++) {
+      const bw = W / 34, x = i * bw + rd(-bw * 0.3, bw * 0.3);
+      blob([[x - bw * 0.9, 0], [x, rd(20, 56)], [x + bw * 0.9, 0]]);
+      blob([[x - bw * 0.9, H], [x, H - rd(16, 46)], [x + bw * 0.9, H]]);
+    }
+    for (let i = 0; i < 22; i++) {
+      const bw = H / 22, y = i * bw + rd(-bw * 0.3, bw * 0.3);
+      blob([[0, y - bw * 0.9], [rd(18, 52), y], [0, y + bw * 0.9]]);
+      blob([[W, y - bw * 0.9], [W - rd(18, 52), y], [W, y + bw * 0.9]]);
+    }
+    const EDGE = 78;
+    const eg = [
+      [0, 0, EDGE, 0], [W, 0, W - EDGE, 0],
+      [0, 0, 0, EDGE], [0, H, 0, H - EDGE]
+    ];
+    for (const q of eg) {
+      const gr = g.createLinearGradient(q[0], q[1], q[2], q[3]);
+      gr.addColorStop(0, 'rgba(3,4,10,0.92)');
+      gr.addColorStop(1, 'rgba(3,4,10,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    }
+
+    bgCv = c;
+  }
+  function rebuildDeco() { buildWorldBg(); }
 
   function resize() {
     VW = cv.clientWidth || window.innerWidth;
@@ -106,7 +287,7 @@
     cv.width = VW; cv.height = VH;
     const nw = Math.round(Math.max(1400, Math.min(2600, VW * 2.0)));
     const nh = Math.round(Math.max(900, Math.min(1900, VH * 2.0)));
-    if (nw !== WORLD.w || nh !== WORLD.h) { WORLD.w = nw; WORLD.h = nh; rebuildDeco(); }
+    if (nw !== WORLD.w || nh !== WORLD.h || !bgCv) { WORLD.w = nw; WORLD.h = nh; rebuildDeco(); }
   }
   function centerCam() {
     cam.x = Math.max(0, (WORLD.w - VW) / 2);
@@ -219,11 +400,11 @@
 
   // ---------- 妖兽种类（各有形状，非方块） ----------
   const MTYPE = {
-    wolf:    { name: '妖狼', hp: 26, speed: 60, dmg: 9,  w: 38, h: 30, color: '#6b6f7a', dark: '#4a4e59', glow: '#ff5a3a' },
-    spider:  { name: '毒蛛', hp: 20, speed: 52, dmg: 7,  w: 36, h: 30, color: '#7a4f9e', dark: '#553471', glow: '#ffd24a' },
-    toad:    { name: '火蟾', hp: 48, speed: 40, dmg: 14, w: 44, h: 34, color: '#c8623a', dark: '#8c3d22', glow: '#ffb03a' },
-    ghost:   { name: '鬼面', hp: 18, speed: 82, dmg: 8,  w: 32, h: 36, color: '#bfe3ff', dark: '#8fb6df', glow: '#7fe8ff' },
-    serpent: { name: '灵蛇', hp: 30, speed: 96, dmg: 11, w: 40, h: 26, color: '#3fae5a', dark: '#27803e', glow: '#ff6a5a' }
+    wolf:    { name: '青狼妖', hp: 26, speed: 60, dmg: 9,  w: 38, h: 30, color: '#5f6f63', dark: '#3d4a42', glow: '#ff5a3a' },
+    spider:  { name: '玄纹蛛', hp: 20, speed: 52, dmg: 7,  w: 36, h: 30, color: '#6a4a92', dark: '#452e63', glow: '#ffd24a' },
+    toad:    { name: '焚天蟾', hp: 48, speed: 40, dmg: 14, w: 44, h: 34, color: '#a8552f', dark: '#6e3418', glow: '#ffb03a' },
+    ghost:   { name: '阴煞',   hp: 18, speed: 82, dmg: 8,  w: 32, h: 36, color: '#c3daf0', dark: '#8aa8c8', glow: '#7fe8ff' },
+    serpent: { name: '玄蛟',   hp: 30, speed: 96, dmg: 11, w: 40, h: 26, color: '#2f9e6a', dark: '#1c6b47', glow: '#ff6a5a' }
   };
   // 境界阈值（斩妖数）。同屏妖兽变多后杀怪速度大涨，阈值随之上调，突破才有分量。
   const TIER_KILLS = [8, 20, 40, 70];
@@ -1184,16 +1365,30 @@
     const glow = hit ? '#ffffff' : m.glow;
     const ink = '#15111f';
 
+    // 妖气：周身一层随呼吸涨落的暗焰雾（用半透明椭圆代替 shadowBlur，弱机也扛得住）
+    const pu = 0.5 + 0.5 * Math.sin(m.anim * 3.2);
+    ctx.globalAlpha = 0.11 + 0.07 * pu;
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(cx, y + H * 0.58, W * 0.62, H * 0.55, 0, 0, 6.2832);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
     // 地面投影
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(cx, y + H - 1, W * 0.40, 3.8, 0, 0, 6.2832); ctx.fill();
 
-    // 精英光环
+    // 精英光环（双层，带符纹感）
     if (m.elite) {
-      const pu = 0.5 + 0.5 * Math.sin(m.anim * 4);
-      ctx.strokeStyle = 'rgba(255,190,90,' + (0.28 + 0.34 * pu).toFixed(2) + ')';
+      const eq = 0.5 + 0.5 * Math.sin(m.anim * 4);
+      ctx.strokeStyle = 'rgba(255,190,90,' + (0.26 + 0.34 * eq).toFixed(2) + ')';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.ellipse(cx, y + H - 2, W * 0.52, 6.5, 0, 0, 6.2832); ctx.stroke();
+      if (qLevel >= 1) {
+        ctx.strokeStyle = 'rgba(255,214,140,' + (0.10 + 0.20 * eq).toFixed(2) + ')';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(cx, y + H - 2, W * 0.66, 9.5, 0, 0, 6.2832); ctx.stroke();
+      }
     }
 
     // 妖王蓄力预警：脚下扩散的红圈，看到就躲（否则会被冲击波掀飞）
@@ -1230,236 +1425,394 @@
     }
   }
 
-  // 妖狼：侧身四足 + 背脊鬃刺 + 血口獠牙
+  // 青面狼妖：额生妖角 + 背脊骨刺 + 四爪 + 口中赤息
   function drawWolf(W, H, m, body, dark, glow, ink) {
-    const lp = Math.sin(m.anim * 10) * 2.2;
-    ctx.strokeStyle = dark; ctx.lineWidth = 2.8; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(W * 0.30, H * 0.62); ctx.lineTo(W * 0.28 - lp, H * 0.96); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W * 0.42, H * 0.62); ctx.lineTo(W * 0.44 + lp, H * 0.96); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W * 0.70, H * 0.62); ctx.lineTo(W * 0.72 + lp, H * 0.96); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W * 0.82, H * 0.62); ctx.lineTo(W * 0.80 - lp, H * 0.96); ctx.stroke();
+    const lp = Math.sin(m.anim * 10) * 2.2;        // 步态
+    const br = 1 + Math.sin(m.anim * 3.4) * 0.03;  // 呼吸
 
-    // 尾
-    ctx.strokeStyle = body; ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.moveTo(W * 0.18, H * 0.50);
-    ctx.quadraticCurveTo(W * 0.02, H * 0.36, W * 0.06, H * 0.14);
-    ctx.stroke();
-
-    // 躯干
-    ellipse(W * 0.46, H * 0.50, W * 0.30, H * 0.28, body);
-
-    // 背脊鬃刺
-    ctx.fillStyle = dark;
-    for (let k = 0; k < 4; k++) {
-      const bx = W * (0.30 + k * 0.10);
-      poly([[bx - W * 0.05, H * 0.30], [bx, H * 0.09], [bx + W * 0.05, H * 0.30]]);
-    }
-
-    // 头 + 吻
-    ellipse(W * 0.72, H * 0.34, W * 0.18, H * 0.21, body);
-    poly([[W * 0.78, H * 0.28], [W * 1.02, H * 0.40], [W * 0.78, H * 0.50]], dark);
-    ctx.fillStyle = ink;
-    ctx.beginPath(); ctx.arc(W * 0.99, H * 0.40, 1.5, 0, 6.2832); ctx.fill();
-
-    // 耳
-    ctx.fillStyle = dark;
-    poly([[W * 0.62, H * 0.20], [W * 0.60, H * 0.01], [W * 0.72, H * 0.16]]);
-    poly([[W * 0.78, H * 0.18], [W * 0.82, H * 0.00], [W * 0.88, H * 0.20]]);
-
-    // 獠牙
-    ctx.fillStyle = '#ffffff';
-    poly([[W * 0.86, H * 0.45], [W * 0.90, H * 0.57], [W * 0.92, H * 0.44]]);
-    poly([[W * 0.79, H * 0.45], [W * 0.82, H * 0.55], [W * 0.85, H * 0.44]]);
-
-    // 发光的眼
-    ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(W * 0.76, H * 0.30, 2.2, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(W * 0.90, H * 0.33, 1.8, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = ink;
-    ctx.fillRect(W * 0.745, H * 0.27, 1.4, 2.6);
-  }
-
-  // 毒蛛：八条分节步足 + 腹部斑纹 + 八眼
-  function drawSpider(W, H, m, body, dark, glow, ink) {
-    const cx = W * 0.50, cy = H * 0.52;
-    ctx.strokeStyle = dark; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
-    for (let s = -1; s <= 1; s += 2) {
-      for (let k = 0; k < 4; k++) {
-        const ph = Math.sin(m.anim * 8 + k * 1.3 + (s > 0 ? 0 : 1.6)) * 2;
-        const kx = cx + s * (W * 0.16 + k * 0.05 * W);
-        const ky = cy - H * 0.12 + k * H * 0.10;
-        const ex = cx + s * W * 0.50;
-        const ey = cy - H * 0.34 + k * H * 0.24 + ph;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(kx, ky - H * 0.16);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
+    // 四足（末端三枚利爪）
+    ctx.strokeStyle = dark; ctx.lineWidth = 3.0; ctx.lineCap = 'round';
+    const legs = [[0.30, -1], [0.42, 1], [0.70, 1], [0.82, -1]];
+    for (const L of legs) {
+      const lx = W * L[0], ly = H * 0.94 + lp * L[1] * 0.7;
+      ctx.beginPath(); ctx.moveTo(lx, H * 0.58); ctx.lineTo(lx + lp * L[1], ly); ctx.stroke();
+      for (let k = -1; k <= 1; k++) {
+        poly([[lx + lp * L[1] - 1.8, ly - 1.2], [lx + lp * L[1] + k * 1.9, ly + 3.4], [lx + lp * L[1] + 1.8, ly - 1.2]], '#d9dbe6');
       }
     }
 
-    // 蛛腹 + 斑纹
+    // 妖尾（末端骨刺）
+    ctx.strokeStyle = body; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.20, H * 0.52);
+    ctx.quadraticCurveTo(W * 0.02, H * 0.34, W * 0.06, H * 0.12);
+    ctx.stroke();
+    poly([[W * 0.03, H * 0.16], [W * 0.13, H * 0.00], [W * 0.14, H * 0.18]], dark);
+
+    // 躯干 + 腹暗面
     ctx.fillStyle = body;
-    ctx.beginPath(); ctx.ellipse(cx - W * 0.05, cy + H * 0.06, W * 0.24, H * 0.28, 0, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = glow;
-    for (let k = 0; k < 3; k++) {
-      ctx.beginPath();
-      ctx.ellipse(cx - W * 0.05, cy - H * 0.06 + k * H * 0.12, W * 0.05, H * 0.035, 0, 0, 6.2832);
-      ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.46, H * 0.50, W * 0.30 * br, H * 0.27 * br, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.ellipse(W * 0.44, H * 0.62, W * 0.24, H * 0.12, 0, 0, 6.2832); ctx.fill();
+
+    // 背脊骨刺（七枚，尖端泛白）
+    for (let k = 0; k < 7; k++) {
+      const bx = W * (0.26 + k * 0.075);
+      const hh = H * (0.24 - Math.abs(k - 3) * 0.024);
+      poly([[bx - W * 0.032, H * 0.36], [bx, H * 0.36 - hh], [bx + W * 0.032, H * 0.36]], dark);
+      poly([[bx, H * 0.36 - hh], [bx - W * 0.013, H * 0.36 - hh * 0.58], [bx + W * 0.013, H * 0.36 - hh * 0.58]], '#ded8c6');
     }
+
+    // 颈鬃（三片逆鳞）
+    for (let k = 0; k < 3; k++) {
+      const bx = W * (0.58 + k * 0.03), by = H * (0.30 + k * 0.05);
+      poly([[bx, by], [bx - W * 0.11, by - H * 0.10], [bx + W * 0.02, by + H * 0.06]], dark);
+    }
+
+    // 头 + 楔形吻
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(W * 0.72, H * 0.34, W * 0.17 * br, H * 0.19 * br, 0, 0, 6.2832); ctx.fill();
+    poly([[W * 0.80, H * 0.26], [W * 1.00, H * 0.38], [W * 0.80, H * 0.48]], dark);
+    poly([[W * 0.94, H * 0.345], [W * 1.035, H * 0.385], [W * 0.94, H * 0.425]], glow);
+
+    // 妖角（向后弯的独角）
+    ctx.strokeStyle = '#e6e0cc'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.68, H * 0.20);
+    ctx.quadraticCurveTo(W * 0.58, H * -0.08, W * 0.78, H * -0.12);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(60,50,40,0.50)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(W * 0.665, H * 0.11); ctx.lineTo(W * 0.645, H * 0.04); ctx.stroke();
+
+    // 耳
+    poly([[W * 0.62, H * 0.20], [W * 0.58, H * 0.02], [W * 0.70, H * 0.15]], dark);
+
+    // 獠牙
+    poly([[W * 0.87, H * 0.43], [W * 0.90, H * 0.56], [W * 0.93, H * 0.42]], '#f4f2ea');
+    poly([[W * 0.80, H * 0.44], [W * 0.83, H * 0.54], [W * 0.86, H * 0.43]], '#f4f2ea');
+
+    // 赤瞳（竖瞳）
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(W * 0.76, H * 0.30, 2.4, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = ink; ctx.fillRect(W * 0.752, H * 0.25, 1.3, 5.2);
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(W * 0.90, H * 0.33, 1.9, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = ink; ctx.fillRect(W * 0.895, H * 0.29, 1.0, 4.0);
+
+    // 口中赤息
+    const br2 = 0.5 + 0.5 * Math.sin(m.anim * 5);
+    ctx.globalAlpha = 0.26 + 0.24 * br2;
+    ctx.strokeStyle = glow; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(W * 1.01, H * 0.40);
+    ctx.quadraticCurveTo(W * 1.12, H * (0.33 - 0.06 * br2), W * 1.24, H * (0.40 + 0.05 * br2));
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // 玄纹蛛：八节步足 + 背甲卦纹 + 噬魂螯肢
+  function drawSpider(W, H, m, body, dark, glow, ink) {
+    const cx = W * 0.48, cy = H * 0.54;
+
+    // 八足：两段关节 + 足刺 + 足尖钩
+    ctx.lineCap = 'round';
+    for (let s = -1; s <= 1; s += 2) {
+      for (let k = 0; k < 4; k++) {
+        const ph = Math.sin(m.anim * 8 + k * 1.35 + (s > 0 ? 0 : 1.6)) * H * 0.09;
+        const sx = cx + s * W * 0.12;
+        const sy = cy - H * 0.10 + k * H * 0.09;
+        const mx = cx + s * W * 0.42;
+        const my = cy - H * 0.34 + k * H * 0.22 + ph;
+        const ex = cx + s * W * 0.58;
+        const ey = cy - H * 0.10 + k * H * 0.28 + ph * 0.6;
+        ctx.strokeStyle = dark; ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(mx, my); ctx.stroke();
+        ctx.strokeStyle = body; ctx.lineWidth = 2.0;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.strokeStyle = dark; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + s * W * 0.045, my - H * 0.06); ctx.stroke();
+        ctx.strokeStyle = ink; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + s * W * 0.03, ey + H * 0.055); ctx.stroke();
+      }
+    }
+
+    // 蛛腹 + 背甲
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(cx - W * 0.06, cy + H * 0.06, W * 0.25, H * 0.29, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.ellipse(cx - W * 0.06, cy - H * 0.02, W * 0.20, H * 0.19, 0, 0, 6.2832); ctx.fill();
+
+    // 背甲卦纹（圆 + 三爻刻线）
+    ctx.strokeStyle = glow; ctx.lineWidth = 1.4; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(cx - W * 0.06, cy + H * 0.01, W * 0.115, 0, 6.2832); ctx.stroke();
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(cx - W * 0.16, cy - H * 0.05); ctx.lineTo(cx + W * 0.04, cy - H * 0.05);
+    ctx.moveTo(cx - W * 0.18, cy + H * 0.01); ctx.lineTo(cx - W * 0.10, cy + H * 0.01);
+    ctx.moveTo(cx - W * 0.03, cy + H * 0.01); ctx.lineTo(cx + W * 0.06, cy + H * 0.01);
+    ctx.moveTo(cx - W * 0.16, cy + H * 0.07); ctx.lineTo(cx + W * 0.04, cy + H * 0.07);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
 
     // 头胸
     ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.ellipse(cx + W * 0.10, cy - H * 0.24, W * 0.17, H * 0.17, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + W * 0.14, cy - H * 0.26, W * 0.17, H * 0.17, 0, 0, 6.2832); ctx.fill();
 
-    // 螯肢
-    ctx.strokeStyle = ink; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cx + W * 0.20, cy - H * 0.16); ctx.lineTo(cx + W * 0.31, cy - H * 0.06); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx + W * 0.22, cy - H * 0.22); ctx.lineTo(cx + W * 0.33, cy - H * 0.14); ctx.stroke();
+    // 螯肢（一对毒钩）
+    ctx.strokeStyle = ink; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(cx + W * 0.24, cy - H * 0.20); ctx.lineTo(cx + W * 0.34, cy - H * 0.04); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + W * 0.26, cy - H * 0.28); ctx.lineTo(cx + W * 0.36, cy - H * 0.14); ctx.stroke();
 
-    // 八眼
+    // 八眼（两排）
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(cx + W * 0.12, cy - H * 0.30, 2.4, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + W * 0.21, cy - H * 0.28, 1.8, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + W * 0.15, cy - H * 0.33, 2.6, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + W * 0.24, cy - H * 0.30, 2.0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + W * 0.08, cy - H * 0.26, 1.5, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + W * 0.22, cy - H * 0.21, 1.3, 0, 6.2832); ctx.fill();
     ctx.fillStyle = ink;
-    ctx.beginPath(); ctx.arc(cx + W * 0.13, cy - H * 0.30, 1.0, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + W * 0.21, cy - H * 0.28, 0.8, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + W * 0.155, cy - H * 0.33, 1.1, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + W * 0.245, cy - H * 0.30, 0.9, 0, 6.2832); ctx.fill();
   }
 
-  // 火蟾：宽扁身躯 + 背焰脊 + 竖瞳鼓眼
+  // 焚天蟾：宽扁妖躯 + 背脊三道妖火 + 竖瞳鼓眼 + 口鼻火星
   function drawToad(W, H, m, body, dark, glow, ink) {
-    const breathe = 1 + Math.sin(m.anim * 3) * 0.04;
+    const br = 1 + Math.sin(m.anim * 3) * 0.045;
 
-    // 后腿 + 前足
+    // 后肢 + 前足
     ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.ellipse(W * 0.14, H * 0.82, W * 0.13, H * 0.12, -0.3, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(W * 0.86, H * 0.82, W * 0.13, H * 0.12, 0.3, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(W * 0.26, H * 0.94, W * 0.10, H * 0.05, 0, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(W * 0.74, H * 0.94, W * 0.10, H * 0.05, 0, 0, 6.2832); ctx.fill();
-
-    // 宽身
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.ellipse(W * 0.50, H * 0.62, W * 0.44 * breathe, H * 0.36 * breathe, 0, 0, 6.2832);
-    ctx.fill();
-
-    // 背部火焰脊
-    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.ellipse(W * 0.13, H * 0.80, W * 0.14, H * 0.13, -0.32, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.87, H * 0.80, W * 0.14, H * 0.13, 0.32, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.25, H * 0.95, W * 0.11, H * 0.05, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.75, H * 0.95, W * 0.11, H * 0.05, 0, 0, 6.2832); ctx.fill();
+    // 蹼爪尖
     for (let k = 0; k < 3; k++) {
-      const bx = W * (0.30 + k * 0.20);
-      ctx.beginPath();
-      ctx.moveTo(bx - W * 0.07, H * 0.34);
-      ctx.quadraticCurveTo(bx, H * 0.13, bx + W * 0.07, H * 0.34);
-      ctx.closePath(); ctx.fill();
+      poly([[W * (0.19 + k * 0.045), H * 0.96], [W * (0.21 + k * 0.045), H * 1.03], [W * (0.24 + k * 0.045), H * 0.96]], '#d8d2bd');
+      poly([[W * (0.70 + k * 0.045), H * 0.96], [W * (0.72 + k * 0.045), H * 1.03], [W * (0.75 + k * 0.045), H * 0.96]], '#d8d2bd');
     }
 
-    // 疣斑
+    // 宽身 + 腹暗面
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(W * 0.50, H * 0.62, W * 0.44 * br, H * 0.35 * br, 0, 0, 6.2832); ctx.fill();
     ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.arc(W * 0.34, H * 0.66, W * 0.060, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(W * 0.62, H * 0.74, W * 0.050, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(W * 0.72, H * 0.56, W * 0.040, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.50, H * 0.74, W * 0.36, H * 0.19, 0, 0, 6.2832); ctx.fill();
 
-    // 大嘴线
-    ctx.strokeStyle = ink; ctx.lineWidth = 1.4;
+    // 疣粒
+    const warts = [[0.28, 0.66, 0.055], [0.66, 0.72, 0.048], [0.78, 0.56, 0.040], [0.38, 0.50, 0.034], [0.60, 0.46, 0.030]];
+    ctx.fillStyle = dark;
+    for (const w of warts) { ctx.beginPath(); ctx.arc(W * w[0], H * w[1], W * w[2], 0, 6.2832); ctx.fill(); }
+
+    // 背脊三道妖火（外焰 + 内焰）
+    for (let k = 0; k < 3; k++) {
+      const bx = W * (0.28 + k * 0.21);
+      const hh = H * (0.30 + 0.07 * Math.sin(m.anim * 6 + k * 2.1));
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.moveTo(bx - W * 0.085, H * 0.36);
+      ctx.quadraticCurveTo(bx - W * 0.02, H * (0.36 - hh * 0.55), bx, H * (0.36 - hh));
+      ctx.quadraticCurveTo(bx + W * 0.02, H * (0.36 - hh * 0.55), bx + W * 0.085, H * 0.36);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#fff3c4';
+      ctx.beginPath();
+      ctx.moveTo(bx - W * 0.032, H * 0.37);
+      ctx.quadraticCurveTo(bx, H * (0.37 - hh * 0.72), bx + W * 0.032, H * 0.37);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // 大嘴 + 牙
+    ctx.strokeStyle = ink; ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(W * 0.22, H * 0.56);
-    ctx.quadraticCurveTo(W * 0.50, H * 0.44, W * 0.78, H * 0.56);
+    ctx.moveTo(W * 0.20, H * 0.56);
+    ctx.quadraticCurveTo(W * 0.50, H * 0.42, W * 0.80, H * 0.56);
     ctx.stroke();
+    for (let k = 0; k < 6; k++) {
+      const tx = W * (0.28 + k * 0.09);
+      poly([[tx, H * 0.52], [tx + W * 0.022, H * 0.61], [tx + W * 0.044, H * 0.52]], '#f2ede0');
+    }
 
     // 鼓眼 + 竖瞳
     ctx.fillStyle = body;
-    ctx.beginPath(); ctx.arc(W * 0.32, H * 0.26, W * 0.14, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(W * 0.68, H * 0.26, W * 0.14, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(W * 0.31, H * 0.25, W * 0.145, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(W * 0.69, H * 0.25, W * 0.145, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.arc(W * 0.31, H * 0.25, W * 0.125, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(W * 0.69, H * 0.25, W * 0.125, 0, 6.2832); ctx.fill();
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(W * 0.32, H * 0.26, W * 0.09, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(W * 0.68, H * 0.26, W * 0.09, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(W * 0.31, H * 0.25, W * 0.095, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(W * 0.69, H * 0.25, W * 0.095, 0, 6.2832); ctx.fill();
     ctx.fillStyle = ink;
-    ctx.fillRect(W * 0.305, H * 0.16, W * 0.032, H * 0.20);
-    ctx.fillRect(W * 0.665, H * 0.16, W * 0.032, H * 0.20);
+    ctx.fillRect(W * 0.295, H * 0.14, W * 0.030, H * 0.22);
+    ctx.fillRect(W * 0.675, H * 0.14, W * 0.030, H * 0.22);
+
+    // 口鼻火星
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = glow;
+    for (let k = 0; k < 3; k++) {
+      const a = m.anim * 1.6 + k * 2.1;
+      ctx.fillRect(W * (0.50 + Math.sin(a) * 0.05), H * (0.50 + Math.cos(a) * 0.04), 1.5, 1.5);
+    }
+    ctx.globalAlpha = 1;
   }
 
-  // 鬼面：飘浮幽体 + 破烂下摆 + 空洞眼窝
+  // 阴煞：飘浮幽体 + 哭丧幡 + 朱砂符箓飘带 + 磷火
   function drawGhost(W, H, m, body, dark, glow, ink) {
     const float = Math.sin(m.anim * 3) * 2.6;
     ctx.save();
     ctx.translate(0, float);
-    ctx.globalAlpha = 0.88;
+
+    // 灵幡（画在幽体之后，像举在身侧）
+    ctx.save();
+    ctx.translate(W * 0.16, H * 0.90);
+    ctx.rotate(-0.06 + Math.sin(m.anim * 2.4) * 0.07);
+    ctx.strokeStyle = '#6b5a44'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -H * 0.92); ctx.stroke();
+    ctx.fillStyle = 'rgba(230,228,216,0.88)';
+    ctx.beginPath();
+    ctx.moveTo(0, -H * 0.90);
+    ctx.lineTo(W * 0.30, -H * 0.84);
+    ctx.lineTo(W * 0.30, -H * 0.46);
+    ctx.lineTo(0, -H * 0.54);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(190,50,50,0.85)'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.14, -H * 0.80); ctx.lineTo(W * 0.14, -H * 0.54);
+    ctx.moveTo(W * 0.07, -H * 0.73); ctx.lineTo(W * 0.21, -H * 0.73);
+    ctx.moveTo(W * 0.08, -H * 0.62); ctx.lineTo(W * 0.20, -H * 0.60);
+    ctx.stroke();
+    ctx.restore();
+
+    // 幽体（兜帽 + 破烂下摆）
+    ctx.globalAlpha = 0.90;
     ctx.fillStyle = body;
     ctx.beginPath();
-    ctx.moveTo(W * 0.10, H * 0.86);
-    ctx.quadraticCurveTo(W * 0.06, H * 0.30, W * 0.50, H * 0.08);
-    ctx.quadraticCurveTo(W * 0.94, H * 0.30, W * 0.90, H * 0.86);
+    ctx.moveTo(W * 0.10, H * 0.88);
+    ctx.quadraticCurveTo(W * 0.06, H * 0.28, W * 0.50, H * 0.06);
+    ctx.quadraticCurveTo(W * 0.94, H * 0.28, W * 0.90, H * 0.88);
     for (let k = 0; k < 3; k++) {
       const sx = W * 0.90 - k * W * 0.27;
-      ctx.quadraticCurveTo(sx - W * 0.13, H * (1.06 + (k % 2) * 0.06), sx - W * 0.27, H * 0.86);
+      ctx.quadraticCurveTo(sx - W * 0.13, H * (1.10 + (k % 2) * 0.08), sx - W * 0.27, H * 0.88);
     }
     ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 1;
 
     // 兜帽内暗面
-    ctx.fillStyle = 'rgba(30,20,60,0.55)';
-    ctx.beginPath(); ctx.ellipse(W * 0.50, H * 0.42, W * 0.26, H * 0.26, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = 'rgba(24,16,48,0.62)';
+    ctx.beginPath(); ctx.ellipse(W * 0.50, H * 0.42, W * 0.27, H * 0.27, 0, 0, 6.2832); ctx.fill();
 
     // 幽光眼窝
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.ellipse(W * 0.38, H * 0.40, W * 0.08, H * 0.07, 0.2, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(W * 0.62, H * 0.40, W * 0.08, H * 0.07, -0.2, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.38, H * 0.40, W * 0.085, H * 0.075, 0.2, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.62, H * 0.40, W * 0.085, H * 0.075, -0.2, 0, 6.2832); ctx.fill();
     ctx.fillStyle = ink;
     ctx.beginPath(); ctx.arc(W * 0.38, H * 0.40, W * 0.035, 0, 6.2832); ctx.fill();
     ctx.beginPath(); ctx.arc(W * 0.62, H * 0.40, W * 0.035, 0, 6.2832); ctx.fill();
 
-    // 黑洞嘴
-    ctx.fillStyle = 'rgba(10,6,20,0.75)';
+    // 黑洞嘴（随吐息开合）
+    const mo = 0.5 + 0.5 * Math.sin(m.anim * 4);
+    ctx.fillStyle = 'rgba(8,4,18,0.80)';
     ctx.beginPath();
     ctx.moveTo(W * 0.42, H * 0.60);
-    ctx.quadraticCurveTo(W * 0.50, H * 0.75, W * 0.58, H * 0.60);
-    ctx.quadraticCurveTo(W * 0.50, H * 0.64, W * 0.42, H * 0.60);
+    ctx.quadraticCurveTo(W * 0.50, H * (0.76 + 0.06 * mo), W * 0.58, H * 0.60);
+    ctx.quadraticCurveTo(W * 0.50, H * 0.65, W * 0.42, H * 0.60);
     ctx.closePath(); ctx.fill();
 
-    // 头侧幽火
-    ctx.fillStyle = 'rgba(127,232,255,0.55)';
-    ctx.beginPath(); ctx.arc(W * 0.14, H * 0.20, 2.6, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(W * 0.86, H * 0.20, 2.2, 0, 6.2832); ctx.fill();
+    // 符箓飘带（三条，带朱砂短刻）
+    for (let k = 0; k < 3; k++) {
+      const p = m.anim * 2.2 + k * 1.7;
+      const ox = W * (0.22 + k * 0.29);
+      const oy = H * (0.76 + 0.05 * Math.sin(p));
+      ctx.globalAlpha = 0.70;
+      ctx.strokeStyle = '#e6e2d0'; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.quadraticCurveTo(ox + Math.sin(p) * 5, oy + H * 0.15, ox + Math.sin(p + 1) * 7, oy + H * 0.28);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(190,50,50,0.9)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ox + Math.sin(p) * 3, oy + H * 0.09);
+      ctx.lineTo(ox + Math.sin(p + 1) * 4, oy + H * 0.11);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // 磷火
+    const pf = 0.6 + 0.4 * Math.sin(m.anim * 6);
+    ctx.globalAlpha = 0.35 + 0.45 * pf;
+    ctx.fillStyle = '#9ff0ff';
+    ctx.beginPath(); ctx.arc(W * 0.11, H * 0.16, 3.0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(W * 0.89, H * 0.14, 2.4, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
-  // 灵蛇：盘绕蛇身 + 兜帽颈 + 分叉信子
+  // 玄蛟：盘绕蛟身 + 头生双角 + 颌下长须 + 缠身云雾
   function drawSerpent(W, H, m, body, dark, glow, ink) {
+    // 盘绕身躯（六段，交替明暗 + 鳞纹）
     for (let k = 5; k >= 0; k--) {
-      const bx = W * (0.30 - k * 0.11);
-      const by = H * 0.62 + Math.sin(m.anim * 5 + k * 0.9) * H * 0.16;
-      ellipse(bx, by, W * 0.10, H * 0.22, k % 2 ? body : dark);
+      const bx = W * (0.30 - k * 0.105);
+      const by = H * 0.66 + Math.sin(m.anim * 5 + k * 0.9) * H * 0.15;
+      ctx.fillStyle = (k % 2) ? body : dark;
+      ctx.beginPath(); ctx.ellipse(bx, by, W * 0.105, H * 0.23, 0, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = 'rgba(8,38,28,0.45)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(bx, by, W * 0.072, H * 0.17, 0, 0.6, 2.5); ctx.stroke();
     }
 
-    // 颈 + 兜帽
+    // 颈（立起）
     ctx.fillStyle = dark;
     ctx.beginPath();
-    ctx.moveTo(W * 0.34, H * 0.72);
-    ctx.quadraticCurveTo(W * 0.52, H * 0.34, W * 0.72, H * 0.44);
-    ctx.quadraticCurveTo(W * 0.56, H * 0.52, W * 0.46, H * 0.84);
+    ctx.moveTo(W * 0.36, H * 0.76);
+    ctx.quadraticCurveTo(W * 0.50, H * 0.30, W * 0.74, H * 0.40);
+    ctx.quadraticCurveTo(W * 0.56, H * 0.50, W * 0.48, H * 0.86);
     ctx.closePath(); ctx.fill();
 
-    // 蛇头 + 头鳞
+    // 缠身云雾
+    const cl = 0.5 + 0.5 * Math.sin(m.anim * 2.2);
+    ctx.globalAlpha = 0.13 + 0.10 * cl;
+    ctx.fillStyle = '#bfe6ff';
+    ctx.beginPath(); ctx.ellipse(W * 0.34, H * 0.80, W * 0.34, H * 0.20, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.58, H * 0.58, W * 0.24, H * 0.14, 0, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // 蛟首 + 头鳞
     ctx.fillStyle = body;
-    ctx.beginPath(); ctx.ellipse(W * 0.72, H * 0.42, W * 0.20, H * 0.17, -0.25, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.74, H * 0.40, W * 0.20, H * 0.16, -0.22, 0, 6.2832); ctx.fill();
     ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.ellipse(W * 0.66, H * 0.36, W * 0.10, H * 0.06, -0.25, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W * 0.68, H * 0.34, W * 0.10, H * 0.055, -0.22, 0, 6.2832); ctx.fill();
+
+    // 双角（向后弯）
+    ctx.strokeStyle = '#e8e2cc'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    for (const dx of [-0.02, 0.07]) {
+      ctx.beginPath();
+      ctx.moveTo(W * (0.70 + dx), H * 0.30);
+      ctx.quadraticCurveTo(W * (0.62 + dx), H * 0.10, W * (0.53 + dx), H * 0.05);
+      ctx.stroke();
+    }
+
+    // 颌下长须
+    const sg = Math.sin(m.anim * 7);
+    ctx.strokeStyle = '#f0ecd8'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.86, H * 0.46);
+    ctx.quadraticCurveTo(W * 0.98, H * (0.52 + 0.05 * sg), W * 1.10, H * (0.42 + 0.08 * sg));
+    ctx.moveTo(W * 0.84, H * 0.48);
+    ctx.quadraticCurveTo(W * 0.94, H * (0.58 + 0.05 * sg), W * 1.05, H * (0.54 + 0.08 * sg));
+    ctx.stroke();
 
     // 竖瞳
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(W * 0.76, H * 0.36, 2.2, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = ink;
-    ctx.fillRect(W * 0.752, H * 0.30, 1.2, 4.2);
+    ctx.beginPath(); ctx.arc(W * 0.78, H * 0.35, 2.4, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = ink; ctx.fillRect(W * 0.775, H * 0.28, 1.2, 5.0);
 
     // 信子
     const tg = Math.sin(m.anim * 9) * 2;
     ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(W * 0.90, H * 0.48);
-    ctx.lineTo(W * 1.02, H * 0.50 + tg);
-    ctx.moveTo(W * 0.99, H * 0.50 + tg); ctx.lineTo(W * 1.05, H * 0.44 + tg);
-    ctx.moveTo(W * 0.99, H * 0.50 + tg); ctx.lineTo(W * 1.06, H * 0.56 + tg);
+    ctx.moveTo(W * 0.91, H * 0.46);
+    ctx.lineTo(W * 1.02, H * 0.48 + tg);
+    ctx.moveTo(W * 0.99, H * 0.48 + tg); ctx.lineTo(W * 1.05, H * 0.42 + tg);
+    ctx.moveTo(W * 0.99, H * 0.48 + tg); ctx.lineTo(W * 1.06, H * 0.54 + tg);
     ctx.stroke();
   }
 
@@ -1600,28 +1953,29 @@
     // 视野范围（世界坐标）：所有绘制都按它裁剪，地图再大也不多画一笔
     const vx0 = cam.x - 40, vx1 = cam.x + VW + 40, vy0 = cam.y - 40, vy1 = cam.y + VH + 40;
 
-    // 场地地面
-    ctx.fillStyle = '#0d0b1a';
-    ctx.fillRect(0, 0, WORLD.w, WORLD.h);
-
-    // 灵脉纹路（只画视野内的格线；低画质省掉）
-    if (qLevel >= 2) {
-      ctx.strokeStyle = 'rgba(120,110,180,0.07)';
-      ctx.lineWidth = 1;
-      const step = 64;
-      ctx.beginPath();
-      for (let gx = Math.floor(vx0 / step) * step; gx <= vx1; gx += step) { ctx.moveTo(gx, vy0); ctx.lineTo(gx, vy1); }
-      for (let gy = Math.floor(vy0 / step) * step; gy <= vy1; gy += step) { ctx.moveTo(vx0, gy); ctx.lineTo(vx1, gy); }
-      ctx.stroke();
+    // 世界背景：贴回预渲染图（只贴视野那一块，开销≈一次屏幕大小的拷贝）
+    const bx0 = Math.max(0, Math.floor(vx0)), by0 = Math.max(0, Math.floor(vy0));
+    const bx1 = Math.min(WORLD.w, Math.ceil(vx1)), by1 = Math.min(WORLD.h, Math.ceil(vy1));
+    if (bgCv && bx1 > bx0 && by1 > by0) {
+      ctx.drawImage(bgCv, bx0, by0, bx1 - bx0, by1 - by0, bx0, by0, bx1 - bx0, by1 - by0);
+    } else {
+      ctx.fillStyle = '#0d0b1a';
+      ctx.fillRect(0, 0, WORLD.w, WORLD.h);
     }
 
-    // 洞窟晶簇（视野裁剪；低画质不画）
+    // 灵气上浮光点：世界坐标按格采样（同一格永远同一处，不用存数组），视野内才画
     if (qLevel >= 1) {
-      for (const d of deco) {
-        if (d.x < vx0 || d.x > vx1 || d.y < vy0 || d.y > vy1) continue;
-        if (d.glow && qLevel >= 2) { ctx.globalAlpha = 0.16; ctx.fillStyle = d.c; ctx.fillRect(d.x - d.r - 4, d.y - d.r - 4, (d.r + 4) * 2, (d.r + 4) * 2); ctx.globalAlpha = 1; }
-        ctx.fillStyle = d.c;
-        ctx.fillRect(Math.round(d.x - d.r / 2), Math.round(d.y - d.r), d.r, d.r * 2);
+      const TK = performance.now() / 1000;
+      const CELL = 250;
+      for (let i = Math.floor(vx0 / CELL); i <= Math.floor(vx1 / CELL); i++) {
+        for (let j = Math.floor(vy0 / CELL); j <= Math.floor(vy1 / CELL); j++) {
+          const h1 = hash2(i, j), h2b = hash2(i + 37, j - 11);
+          const px = i * CELL + h1 * CELL;
+          const py = j * CELL + h2b * CELL - ((TK * 11 + h1 * 200) % 56);
+          const al = 0.14 + 0.28 * (0.5 + 0.5 * Math.sin(TK * 1.7 + h1 * 9.1));
+          ctx.fillStyle = h1 > 0.72 ? 'rgba(255,226,160,' + al.toFixed(2) + ')' : 'rgba(150,225,255,' + al.toFixed(2) + ')';
+          ctx.fillRect(Math.round(px), Math.round(py), h1 > 0.9 ? 2 : 1, h1 > 0.9 ? 2 : 1);
+        }
       }
     }
 
