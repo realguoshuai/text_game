@@ -311,17 +311,22 @@
     if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) { tryDash(); e.preventDefault(); }
   });
 
+  // ---------- 缩放坐标换算（页面被浏览器放大时，指针坐标要换回「未放大」坐标系） ----------
+  // ZoomFix 由 index.html 的缩放防线提供；未放大时 ptX/ptY 是恒等函数。
+  // 桩测试/异常情况下拿不到 ZoomFix，这里退化恒等，保证不崩。
+  const ZF = window.ZoomFix || { on: false, s: 1, ox: 0, oy: 0, ptX: x => x, ptY: y => y };
+
   // ---------- 浮动摇杆（左半屏触点出现，不固定位置） ----------
   const joy = { active: false, x: 0, y: 0, id: null };
   const joyEl = document.getElementById('joystick');
   const joyKnob = document.getElementById('joy-knob');
   const JOY_R = 48;
   function joyStart(e) {
-    if (e.clientX > cv.clientWidth / 2) return; // 右半屏留给出剑
+    if (ZF.ptX(e.clientX) > cv.clientWidth / 2) return; // 右半屏留给出剑
     joy.active = true; joy.id = e.pointerId;
     const size = joyEl.offsetWidth || 120;
-    joyEl.style.left = (e.clientX - size / 2) + 'px';
-    joyEl.style.top = (e.clientY - size / 2) + 'px';
+    joyEl.style.left = (ZF.ptX(e.clientX) - size / 2) + 'px';
+    joyEl.style.top = (ZF.ptY(e.clientY) - size / 2) + 'px';
     joyEl.style.right = 'auto'; joyEl.style.bottom = 'auto';
     joyEl.style.display = 'block';
     joyKnob.style.transform = 'translate(0px,0px)';
@@ -330,8 +335,8 @@
   function joyMove(e) {
     if (!joy.active || e.pointerId !== joy.id) return;
     const rect = joyEl.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
-    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const cx = ZF.ptX(rect.left + rect.width / 2), cy = ZF.ptY(rect.top + rect.height / 2);
+    let dx = ZF.ptX(e.clientX) - cx, dy = ZF.ptY(e.clientY) - cy;
     const d = Math.hypot(dx, dy);
     if (d > JOY_R) { dx = dx / d * JOY_R; dy = dy / d * JOY_R; }
     joy.x = dx / JOY_R; joy.y = dy / JOY_R;
@@ -344,10 +349,10 @@
     joyEl.style.display = 'none';
   }
   cv.addEventListener('pointerdown', e => {
-    if (e.clientX > cv.clientWidth / 2) { keys.attack = true; }
+    if (ZF.ptX(e.clientX) > cv.clientWidth / 2) { keys.attack = true; }
     else { joyStart(e); }
   });
-  cv.addEventListener('pointerup', e => { if (e.clientX > cv.clientWidth / 2) keys.attack = false; });
+  cv.addEventListener('pointerup', e => { if (ZF.ptX(e.clientX) > cv.clientWidth / 2) keys.attack = false; });
   window.addEventListener('pointermove', joyMove);
   window.addEventListener('pointerup', joyEnd);
   window.addEventListener('pointercancel', joyEnd);
@@ -371,14 +376,14 @@
 
   btnAtk.addEventListener('pointerdown', e => {
     keys.attack = true; atkDrag = true; atkMoved = false;
-    atkSX = e.clientX; atkSY = e.clientY;
-    const r = btnAtk.getBoundingClientRect(); atkOX = r.left; atkOY = r.top;
+    atkSX = ZF.ptX(e.clientX); atkSY = ZF.ptY(e.clientY);
+    const r = btnAtk.getBoundingClientRect(); atkOX = ZF.ptX(r.left); atkOY = ZF.ptY(r.top);
     if (btnAtk.setPointerCapture) { try { btnAtk.setPointerCapture(e.pointerId); } catch (_) {} }
     e.preventDefault(); e.stopPropagation();
   });
   btnAtk.addEventListener('pointermove', e => {
     if (!atkDrag) return;
-    const dx = e.clientX - atkSX, dy = e.clientY - atkSY;
+    const dx = ZF.ptX(e.clientX) - atkSX, dy = ZF.ptY(e.clientY) - atkSY;
     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) atkMoved = true;
     if (atkMoved) {
       keys.attack = false;

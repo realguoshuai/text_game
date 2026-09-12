@@ -19,21 +19,22 @@ html, body {
   -webkit-text-size-adjust: 100%;
 }
 
-/* 被浏览器放大时的兜底还原按钮（正常情况一直隐藏） */
+/* 被浏览器放大时的兜底还原按钮（正常情况一直隐藏；已在用缩放补偿时 4 秒后自动收起） */
 .viewfix {
   position: fixed;
   left: 50%;
-  top: 10px;
+  top: 46px;
   transform: translateX(-50%);
   z-index: 90;
-  padding: 9px 16px;
+  padding: 7px 13px;
   border: 1px solid rgba(120, 220, 255, .55);
   border-radius: 999px;
   background: rgba(10, 22, 36, .9);
   color: #bfe9ff;
-  font-size: 13px;
+  font-size: 12px;
   font-family: inherit;
   cursor: pointer;
+  white-space: nowrap;
 }
 .viewfix[hidden] { display: none; }
 

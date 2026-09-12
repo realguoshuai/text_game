@@ -180,28 +180,27 @@
     </div>
   </div>
 
-  <!-- 手机缩放防线：iOS Safari 从 iOS10 起忽略 user-scalable=no，
-       而「左手摇杆 + 右手出招」的两根手指会被它当成捏合缩放 —— 页面一放大就回不去。
-       这里在最早时机拦掉全部缩放手势（Safari 专有 gesture 事件 + 多指 touchmove + 双击缩放）。 -->
+  <!-- 手机缩放防线（两段式）
+       ① 拦截：iOS Safari 从 iOS10 起忽略 user-scalable=no，而「左手摇杆 + 右手出招」的两根手指
+          会被它当成捏合缩放 —— 页面一放大就回不去。这里在最早时机拦掉全部缩放手势。
+       ② 补偿：万一还是被放大了（各浏览器行为不一致，光拦不可靠），把 #wrap 反向缩放，
+          让画面始终 1:1 铺满可视区；并通过 window.ZoomFix 把指针坐标换算回「未放大」坐标系，
+          供 game.js 的左右半屏判定与摇杆偏移使用。
+       未放大时 V.s = 1 / V.ox = V.oy = 0，ptX/ptY 是恒等函数 —— 正常情况行为与以前完全一致。 -->
   <script>
     (function () {
       var NONPASSIVE = { passive: false };
 
-      // 1) Safari 专有手势事件：捏合缩放的真正驱动，必须全部 preventDefault
+      /* ---------- ① 拦截缩放手势（Safari 专有事件 + 多指 + 双击） ---------- */
       ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
         document.addEventListener(t, function (e) { e.preventDefault(); }, NONPASSIVE);
       });
-
-      // 2) 多指触摸：游戏内本来就是多指操作，一律吃掉默认手势
       document.addEventListener('touchstart', function (e) {
         if (e.touches.length > 1) e.preventDefault();
       }, NONPASSIVE);
       document.addEventListener('touchmove', function (e) {
         if (e.touches.length > 1 || (e.scale !== undefined && e.scale !== 1)) e.preventDefault();
       }, NONPASSIVE);
-
-      // 3) 双击缩放 / 长按放大镜 / 长按菜单
-      //    （只吃掉第二次落指的点击，出招钮走 pointerdown，不受影响）
       var lastTap = 0;
       document.addEventListener('touchend', function (e) {
         if (e.touches.length !== 0) return;
@@ -212,21 +211,56 @@
       document.addEventListener('dblclick', function (e) { e.preventDefault(); }, NONPASSIVE);
       document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-      // 4) 兜底：万一仍被放大（老系统行为不一致），给个能点回来的按钮，绝不让人卡死
-      var vv = window.visualViewport;
+      /* ---------- ② 缩放补偿（对外暴露 window.ZoomFix） ---------- */
+      var V = { on: false, s: 1, ox: 0, oy: 0 };
+      V.ptX = function (x) { return (x - V.ox) * V.s; };
+      V.ptY = function (y) { return (y - V.oy) * V.s; };
+      window.ZoomFix = V;
+
+      var wrapEl = document.getElementById('wrap');
       var fixEl = document.getElementById('viewfix');
-      if (!vv || !fixEl) return;
+      var vv = window.visualViewport;
       var meta = document.querySelector('meta[name="viewport"]');
       var metaBase = meta ? meta.getAttribute('content') : '';
       var hardTried = false;
-      function zoomed() { return vv.scale > 1.02; }
-      function sync() { fixEl.hidden = !zoomed(); }
-      vv.addEventListener('resize', sync);
-      vv.addEventListener('scroll', sync);
-      window.addEventListener('resize', sync);
-      fixEl.addEventListener('click', function () {
+
+      function sync() {
+        if (!vv) return;
+        var z = vv.scale || 1;
+        var on = z > 1.02;
+        V.on = on;
+        V.s = on ? z : 1;
+        V.ox = on ? (vv.offsetLeft || 0) : 0;
+        V.oy = on ? (vv.offsetTop || 0) : 0;
+        if (wrapEl) {
+          wrapEl.style.transformOrigin = '0 0';
+          wrapEl.style.transform = on
+            ? 'translate(' + V.ox + 'px,' + V.oy + 'px) scale(' + (1 / V.s) + ')'
+            : '';
+        }
+        document.body.classList.toggle('zoom-comp', on);
+        if (!fixEl) return;
+        if (!on) { fixEl.hidden = true; fixEl.dataset.auto = ''; return; }
+        fixEl.hidden = false;
+        fixEl.textContent = '已自动校正视图 ×' + z.toFixed(1) + ' · 点此彻底复位';
+        if (!fixEl.dataset.auto) {
+          // 画面已被自动校正，提示 4 秒后自动收起，不挡视线
+          fixEl.dataset.auto = '1';
+          setTimeout(function () { if (vv.scale > 1.02) fixEl.hidden = true; }, 4000);
+        }
+      }
+
+      if (vv) {
+        vv.addEventListener('resize', sync);
+        vv.addEventListener('scroll', sync);
+        window.addEventListener('resize', sync);
+        window.addEventListener('orientationchange', function () { setTimeout(sync, 260); });
+        sync();
+      }
+
+      // 提示按钮：先试不丢进度的复位（重写 viewport meta 逼浏览器重算缩放），失败才降级重载
+      if (fixEl) fixEl.addEventListener('click', function () {
         if (hardTried) { location.reload(); return; }
-        // 先试不丢进度的还原：重写 viewport meta，逼 Safari 重算缩放
         try {
           if (meta) {
             meta.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');
@@ -235,8 +269,7 @@
           window.scrollTo(0, 0);
         } catch (_) {}
         setTimeout(function () {
-          sync();
-          if (zoomed()) { hardTried = true; fixEl.textContent = '还原失败 · 点此重新载入'; }
+          if (vv && vv.scale > 1.02) { hardTried = true; fixEl.textContent = '浏览器缩放未复位 · 点此重新载入'; }
         }, 400);
       });
     })();
