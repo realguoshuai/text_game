@@ -21,6 +21,7 @@
       <div class="stat">构筑 <b id="build-val">未悟</b></div>
       <div class="stat">兽潮 <b id="foe-val">5/8</b></div>
       <div class="stat">灵石 <b id="stone-val">0</b></div>
+      <button id="btn-set" class="hud-btn push" aria-label="设置">⚙</button>
       <button id="btn-mute" class="hud-btn" aria-label="音效开关">🔊</button>
     </div>
 
@@ -31,6 +32,15 @@
     <div id="joystick">
       <div id="joy-base"></div>
       <div id="joy-knob"></div>
+    </div>
+
+    <!-- 冲遁钮（半透明；冷却中更淡） -->
+    <div class="btn dash" id="btn-dash" aria-label="冲遁">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path d="M2.5 8h10.5a2.8 2.8 0 1 0-2.8-2.8" fill="none" stroke="#cfe4ff" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M2.5 13h14.5a2.8 2.8 0 1 1-2.8 2.8" fill="none" stroke="#cfe4ff" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M2.5 18h7" fill="none" stroke="#cfe4ff" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
     </div>
 
     <!-- 出招钮（半隐藏、可拖动摆放；SVG 剑图标） -->
@@ -58,6 +68,56 @@
         <button id="again-btn">再来一局</button>
         <button id="home-btn" class="ghost-btn">回洞府</button>
       </div>
+    </div>
+
+    <!-- 设置 -->
+    <div class="overlay" id="settings">
+      <h1 class="set-title">设置</h1>
+      <div class="set-list">
+        <div class="set-row">
+          <div class="set-text">
+            <span class="set-label">辅助瞄准</span>
+            <span class="set-hint">出招自动转向最近妖兽，手机上更好打</span>
+          </div>
+          <div class="chips" data-key="aim">
+            <button class="chip" data-val="on">开</button>
+            <button class="chip" data-val="off">关</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-text">
+            <span class="set-label">画质</span>
+            <span class="set-hint">卡顿就调低，自动模式会按帧率自降</span>
+          </div>
+          <div class="chips" data-key="q">
+            <button class="chip" data-val="auto">自动</button>
+            <button class="chip" data-val="high">高</button>
+            <button class="chip" data-val="mid">中</button>
+            <button class="chip" data-val="low">低</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-text">
+            <span class="set-label">显示帧率</span>
+            <span class="set-hint">右上角显示 FPS</span>
+          </div>
+          <div class="chips" data-key="fps">
+            <button class="chip" data-val="on">开</button>
+            <button class="chip" data-val="off">关</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-text">
+            <span class="set-label">音效与震动</span>
+            <span class="set-hint">斩击、突破钟鸣与手机震动</span>
+          </div>
+          <div class="chips" data-key="sound">
+            <button class="chip" data-val="on">开</button>
+            <button class="chip" data-val="off">关</button>
+          </div>
+        </div>
+      </div>
+      <button id="set-close">返回</button>
     </div>
 
     <!-- 开场 + 角色选择 + 洞府 -->
@@ -92,12 +152,13 @@
       </div>
 
       <p class="ctrl-hint">
-        电脑：<span class="key">W A S D</span> 移动，<span class="key">J / 空格</span> 出招<br>
-        手机：左半屏拖动移动，右半屏点按（或出招钮）出招<br>
+        电脑：<span class="key">W A S D</span> 移动，<span class="key">J / 空格</span> 出招，<span class="key">Shift</span> 冲遁<br>
+        手机：左半屏拖动移动，右半屏点按（或出招钮）出招，左下「冲遁」闪避<br>
         地图很大，妖兽从视野外成波涌来；突破时三选一，本局越打越强<br>
         被围死即结束，成绩会记下来——破纪录只是差几只的事
       </p>
       <button id="start-btn">开始游戏</button>
+      <button class="ghost-btn" id="intro-set">⚙ 设置</button>
       <p style="font-size:12px;opacity:.7"><a href="legacy/" style="color:#9a93d8">→ 也想玩文字版？</a></p>
     </div>
 
@@ -117,8 +178,16 @@
       var result = document.getElementById('result');
       var rotateHint = document.getElementById('rotate-hint');
       var metaPanel = document.getElementById('meta-panel');
+      var setPanel = document.getElementById('settings');
       var isTouch = window.matchMedia('(pointer: coarse)').matches;
       var selChar = 'sword';
+
+      // 点击 / 触屏双绑（移动端 touchstart 先吃掉，避免合成 click 延迟）
+      function bind(el, fn) {
+        if (!el) return;
+        el.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
+        el.addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false });
+      }
 
       // 用真实视口尺寸判定横竖屏，比 CSS orientation 媒体查询可靠（iOS/全屏场景下后者会卡住）
       function updateOrientation() {
@@ -132,13 +201,13 @@
 
       function dismiss() {
         if (result) result.style.display = 'none';
+        if (setPanel) setPanel.style.display = 'none';
         if (window.GameAPI) { window.GameAPI.selectChar(selChar); window.GameAPI.start(); }
         intro.style.display = 'none';
         document.body.classList.add('started');
         updateOrientation();
       }
-      document.getElementById('start-btn').addEventListener('click', dismiss);
-      document.getElementById('start-btn').addEventListener('touchstart', function (e) { e.preventDefault(); dismiss(); }, { passive: false });
+      bind(document.getElementById('start-btn'), dismiss);
 
       // 角色选择
       var cards = document.querySelectorAll('.char-card');
@@ -154,13 +223,11 @@
       });
 
       // 结算面板按钮
-      var againBtn = document.getElementById('again-btn');
-      if (againBtn) againBtn.addEventListener('click', function () {
+      bind(document.getElementById('again-btn'), function () {
         if (result) result.style.display = 'none';
         if (window.GameAPI) window.GameAPI.again();
       });
-      var homeBtn = document.getElementById('home-btn');
-      if (homeBtn) homeBtn.addEventListener('click', function () {
+      bind(document.getElementById('home-btn'), function () {
         if (result) result.style.display = 'none';
         if (window.GameAPI) { window.GameAPI.openMeta(true); window.GameAPI.toHome(); }
         intro.style.display = 'flex';
@@ -169,17 +236,50 @@
       });
 
       // 洞府面板展开/收起
-      var metaToggle = document.getElementById('meta-toggle');
-      if (metaToggle) metaToggle.addEventListener('click', function () {
+      bind(document.getElementById('meta-toggle'), function () {
         if (window.GameAPI) window.GameAPI.openMeta();
       });
+
+      // ---------- 设置面板 ----------
+      function syncChips() {
+        if (!window.GameAPI || !window.GameAPI.opts) return;
+        var o = window.GameAPI.opts();
+        document.querySelectorAll('.chips').forEach(function (grp) {
+          var v = o[grp.getAttribute('data-key')];
+          if (typeof v === 'boolean') v = v ? 'on' : 'off';
+          grp.querySelectorAll('.chip').forEach(function (c) {
+            c.classList.toggle('sel', c.getAttribute('data-val') === String(v));
+          });
+        });
+      }
+      function setPanelOpen(on) {
+        if (!setPanel) return;
+        setPanel.style.display = on ? 'flex' : 'none';
+        // 菜单暂停与"选卡暂停"分开：关掉设置后该暂停的还暂停着
+        if (window.GameAPI && window.GameAPI.menuPause) window.GameAPI.menuPause(on);
+        if (on) syncChips();
+      }
+      bind(document.getElementById('btn-set'), function () { setPanelOpen(true); });
+      bind(document.getElementById('intro-set'), function () { setPanelOpen(true); });
+      bind(document.getElementById('set-close'), function () { setPanelOpen(false); });
+
+      document.querySelectorAll('.chips').forEach(function (grp) {
+        var key = grp.getAttribute('data-key');
+        grp.querySelectorAll('.chip').forEach(function (chip) {
+          bind(chip, function () {
+            if (window.GameAPI && window.GameAPI.setOpt) window.GameAPI.setOpt(key, chip.getAttribute('data-val'));
+            syncChips();
+          });
+        });
+      });
+      syncChips();
 
       // 旋转 / 尺寸变化都重新判定（iOS 旋转后需延迟读取真实尺寸）
       window.addEventListener('resize', updateOrientation);
       window.addEventListener('orientationchange', function () { setTimeout(updateOrientation, 300); });
 
       // 用户可手动忽略竖屏提示，绝不把人卡死
-      document.getElementById('rotate-ok').addEventListener('click', function () {
+      bind(document.getElementById('rotate-ok'), function () {
         rotateHint.dataset.dismissed = '1';
         document.body.classList.remove('show-rotate');
       });

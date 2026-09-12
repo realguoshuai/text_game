@@ -19,6 +19,71 @@
   function viewMin() { return Math.min(VW, VH); }
   function viewMax() { return Math.max(VW, VH); }
 
+  // ---------- 设置（持久化；画质档位决定特效开销） ----------
+  const SET_KEY = 'im_set_v1';
+  const Settings = (function () {
+    const o = loadJSON(SET_KEY, null);
+    const s = (o && typeof o === 'object') ? o : {};
+    return {
+      aim: s.aim !== false,                                              // 辅助瞄准：默认开（"打不到身后的怪"是手机上最大的痛点）
+      q: (s.q === 'high' || s.q === 'mid' || s.q === 'low') ? s.q : 'auto',
+      fps: !!s.fps,
+      // 首次加载（还没有 im_set_v1）时继承旧版的静音开关，之后以设置面板为准
+      sound: (s.sound !== undefined) ? !!s.sound : (function () { try { return localStorage.getItem('im_mute') !== '1'; } catch (_) { return true; } })()
+    };
+  })();
+  function saveSettings() { saveJSON(SET_KEY, Settings); }
+
+  // 实际生效的画质：0=低 1=中 2=高。auto 档从高起步，实测掉帧再自动降（只降不升，免得来回跳）
+  let qLevel = 2, autoCap = 2, menuPaused = false, fpsShown = 60;
+  function applyQuality() {
+    if (Settings.q === 'high') qLevel = 2;
+    else if (Settings.q === 'mid') qLevel = 1;
+    else if (Settings.q === 'low') qLevel = 0;
+    else qLevel = autoCap;
+  }
+
+  // ---------- 辅助瞄准：出招时转向"最近的威胁"（面朝方向仍有偏好，不是无脑转头） ----------
+  function aimAngle() {
+    const baseA = player.face > 0 ? 0 : Math.PI;
+    if (!Settings.aim) return baseA;
+    const px = player.x + player.w / 2, py = player.y + player.h / 2;
+    const range = viewMax() * 1.05;
+    let bestA = baseA, bestScore = 1e9, found = false;
+    for (let i = 0; i < monsters.length; i++) {
+      const m = monsters[i];
+      if (!m) continue;
+      const mx = m.x + m.w / 2, my = m.y + m.h / 2;
+      if (mx < cam.x - 40 || mx > cam.x + VW + 40 || my < cam.y - 40 || my > cam.y + VH + 40) continue;
+      const dx = mx - px, dy = my - py;
+      const d = Math.hypot(dx, dy);
+      if (d > range) continue;
+      const a = Math.atan2(dy, dx);
+      let diff = a - baseA;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      const score = d - Math.cos(diff) * 110;    // 面朝方向的怪优先（最多可抵 110px 距离）
+      if (score < bestScore) { bestScore = score; bestA = a; found = true; }
+    }
+    return found ? bestA : baseA;
+  }
+
+  // ---------- 冲遁（闪避）：短距位移 + 无敌，被围住时的活路，也是躲妖王冲击波的手段 ----------
+  const DASH_SPEED = 660, DASH_TIME = 0.2, DASH_CD = 2.0;
+  let dashT = 0, dashCd = 0, dashDX = 1, dashDY = 0;
+  function tryDash() {
+    if (dashT > 0 || dashCd > 0 || player.dead || paused || runOver || menuPaused) return false;
+    let dx = 0, dy = 0;
+    if (joy.active) { dx = joy.x; dy = joy.y; }
+    else { dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0); dy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0); }
+    const l = Math.hypot(dx, dy);
+    if (l > 0.15) { dx /= l; dy /= l; } else { dx = player.face > 0 ? 1 : -1; dy = 0; }
+    dashDX = dx; dashDY = dy; dashT = DASH_TIME; dashCd = DASH_CD;
+    Sfx.dash();
+    buzz(14);
+    return true;
+  }
+
   // 洞窟装饰（晶簇）：随地图尺寸重建
   const deco = [];
   function rebuildDeco() {
@@ -60,6 +125,10 @@
   };
   addEventListener('keydown', e => { if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); } });
   addEventListener('keyup', e => { if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = false; e.preventDefault(); } });
+  // Shift：冲遁（一次性触发，按住不连发）
+  addEventListener('keydown', e => {
+    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) { tryDash(); e.preventDefault(); }
+  });
 
   // ---------- 浮动摇杆（左半屏触点出现，不固定位置） ----------
   const joy = { active: false, x: 0, y: 0, id: null };
@@ -112,6 +181,13 @@
     } catch (_) {}
   }
   restoreAtkPos();
+
+  // ---------- 冲遁钮（半透明，冷却时更淡） ----------
+  const btnDash = document.getElementById('btn-dash');
+  if (btnDash) {
+    btnDash.addEventListener('pointerdown', e => { tryDash(); e.preventDefault(); e.stopPropagation(); });
+  }
+
   btnAtk.addEventListener('pointerdown', e => {
     keys.attack = true; atkDrag = true; atkMoved = false;
     atkSX = e.clientX; atkSY = e.clientY;
@@ -266,7 +342,10 @@
   const COMBO_WIN = 1.2;
   const killTimes = [];
   function burst(x, y, col, n, big) {
-    if (parts.length < 210) {
+    if (qLevel <= 0) return;                                    // 低画质：碎屑与冲击环全免
+    if (qLevel === 1) n = Math.max(1, Math.ceil(n * 0.5));      // 中画质：粒子减半
+    const pCap = qLevel === 1 ? 90 : 210, rCap = qLevel === 1 ? 8 : 22;
+    if (parts.length < pCap) {
       for (let i = 0; i < n; i++) {
         const a = Math.random() * 6.2832, sp = 40 + Math.random() * (big ? 260 : 165);
         parts.push({
@@ -275,14 +354,14 @@
         });
       }
     }
-    if (rings.length < 22) rings.push({ x, y, r: big ? 10 : 7, grow: big ? 190 : 118, life: 0.26, max: 0.26, col });
+    if (rings.length < rCap) rings.push({ x, y, r: big ? 10 : 7, grow: big ? 190 : 118, life: 0.26, max: 0.26, col });
   }
   function trimFx() {
     for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
     for (let i = rings.length - 1; i >= 0; i--) if (rings[i].life <= 0) rings.splice(i, 1);
   }
   // 场上越乱，单次击杀的抖动越小，避免持续晃眼
-  function addShake(v) { shake = Math.min(9, shake + v); }
+  function addShake(v) { shake = Math.min(9, shake + v * (qLevel >= 1 ? 1 : 0.5)); }
 
   // ---------- 可选修士（三种外形 / 武器 / 技能） ----------
   // hpBase：近战要贴脸挨打，血厚；雷修脆皮但清群快
@@ -317,7 +396,11 @@
         // 屏幕内/外妖兽数（用来核对"密度"到底降没降）
         inView: monsters.filter(m => m.x + m.w > cam.x && m.x < cam.x + VW && m.y + m.h > cam.y && m.y < cam.y + VH).length,
         bosses: runBossKills, scrolls: scrollCount, cards: taken.length,
-        paused: paused, runOver: runOver, tierTimes: tierTimes.slice(), waveTimer: +waveTimer.toFixed(2)
+        paused: paused, runOver: runOver, tierTimes: tierTimes.slice(), waveTimer: +waveTimer.toFixed(2),
+        // 手机手感 / 画质（桩测试核对用）
+        dash: dashT > 0, dashCd: +dashCd.toFixed(2), aim: Settings.aim,
+        q: Settings.q, qLevel: qLevel, fps: fpsShown,
+        px: Math.round(player.x), py: Math.round(player.y), aimA: +aimAngle().toFixed(3)
       };
     }
   };
@@ -433,8 +516,8 @@
   // ---------- 更新 ----------
   let last = performance.now();
   function update(dt) {
-    // 暂停（突破选卡 / 结算）时冻结整局：dt 不推进，避免"看完卡回来就已经被围死"
-    if (paused || runOver) return;
+    // 暂停（突破选卡 / 结算 / 设置菜单）时冻结整局：dt 不推进，避免"看完卡回来就已经被围死"
+    if (paused || runOver || menuPaused) return;
     player.anim += dt;
 
     // 移动（键盘 + 浮动摇杆）
@@ -446,19 +529,29 @@
       if (l > 1) { mx /= l; my /= l; }
       if (mx) player.face = mx > 0 ? 1 : -1;
     }
-    player.x = Math.max(0, Math.min(WORLD.w - player.w, player.x + mx * player.speed * dt));
-    player.y = Math.max(0, Math.min(WORLD.h - player.h, player.y + my * player.speed * dt));
+    // 冲遁：期间接管方向与速度，并拖出灵气残影
+    let spd = player.speed;
+    if (dashT > 0) {
+      dashT -= dt;
+      mx = dashDX; my = dashDY; spd = DASH_SPEED;
+      if (qLevel >= 1 && Math.random() < 0.7) burst(player.x + player.w / 2, player.y + player.h / 2, '#9fd4ff', 2, false);
+    }
+    if (dashCd > 0) dashCd -= dt;
+    player.x = Math.max(0, Math.min(WORLD.w - player.w, player.x + mx * spd * dt));
+    player.y = Math.max(0, Math.min(WORLD.h - player.h, player.y + my * spd * dt));
 
     // 攻击（按所选修士的武器 / 技能）
     player.atkCd -= dt;
     if (keys.attack && player.atkCd <= 0) {
       const cfg = applyMods(weaponCfg());
       player.atkCd = cfg.cd;
+      const aimA = aimAngle();                                      // 辅助瞄准：出招瞬间转向最近的威胁
+      if (!(mx || my)) player.face = Math.cos(aimA) >= 0 ? 1 : -1;  // 站桩时人跟着转，视觉更顺
       if (cfg.kind === 'blade') {
-        // 近战刀芒：面朝方向扇形重创 + 击退（扇形内全中，人堆里越砍越爽）
+        // 近战刀芒：瞄准方向的扇形重创 + 击退（扇形内全中，人堆里越砍越爽）
         const px = player.x + player.w / 2, py = player.y + player.h / 2;
-        const fwd = player.face > 0 ? 0 : Math.PI;
-        slashes.push({ x: px, y: py, dir: player.face, range: cfg.range, arc: cfg.arc, life: 0.2, max: 0.2 });
+        const fwd = aimA;
+        slashes.push({ x: px, y: py, ang: aimA, range: cfg.range, arc: cfg.arc, life: 0.2, max: 0.2 });
         let hits = 0;
         for (let j = monsters.length - 1; j >= 0; j--) {
           const m = monsters[j];
@@ -480,7 +573,7 @@
         }
         if (hits) addShake(1.6 + Math.min(4, hits * 0.7));
       } else {
-        const base = player.face > 0 ? 0 : Math.PI;
+        const base = aimA;
         for (let i = 0; i < cfg.count; i++) {
           const off = (i - (cfg.count - 1) / 2) * cfg.spread;
           const a = base + off;
@@ -583,9 +676,9 @@
       a.y = Math.max(0, Math.min(WORLD.h - a.h, a.y));
     }
 
-    // 妖兽贴身伤害
+    // 妖兽贴身伤害（冲遁期间无敌——这是被围住时的活路，也是躲妖王冲击波的手段）
     for (const m of monsters) {
-      if (aabb(player, m) && player.inv <= 0) {
+      if (aabb(player, m) && player.inv <= 0 && dashT <= 0) {
         player.hp -= m.dmg; player.inv = 0.85;
         burst(player.x + player.w / 2, player.y + player.h / 2, '#ff5a5a', 7, false);
         addShake(6);
@@ -1423,7 +1516,7 @@
   // ---------- 绘制：刀芒（近战扇形） ----------
   function drawSlash(s) {
     const a = Math.max(0, s.life / s.max);
-    const fwd = s.dir > 0 ? 0 : Math.PI;
+    const fwd = (typeof s.ang === 'number') ? s.ang : (s.dir > 0 ? 0 : Math.PI);
     ctx.save();
     ctx.translate(Math.round(s.x), Math.round(s.y));
     ctx.globalAlpha = a;
@@ -1511,29 +1604,35 @@
     ctx.fillStyle = '#0d0b1a';
     ctx.fillRect(0, 0, WORLD.w, WORLD.h);
 
-    // 灵脉纹路（只画视野内的格线）
-    ctx.strokeStyle = 'rgba(120,110,180,0.07)';
-    ctx.lineWidth = 1;
-    const step = 64;
-    ctx.beginPath();
-    for (let gx = Math.floor(vx0 / step) * step; gx <= vx1; gx += step) { ctx.moveTo(gx, vy0); ctx.lineTo(gx, vy1); }
-    for (let gy = Math.floor(vy0 / step) * step; gy <= vy1; gy += step) { ctx.moveTo(vx0, gy); ctx.lineTo(vx1, gy); }
-    ctx.stroke();
+    // 灵脉纹路（只画视野内的格线；低画质省掉）
+    if (qLevel >= 2) {
+      ctx.strokeStyle = 'rgba(120,110,180,0.07)';
+      ctx.lineWidth = 1;
+      const step = 64;
+      ctx.beginPath();
+      for (let gx = Math.floor(vx0 / step) * step; gx <= vx1; gx += step) { ctx.moveTo(gx, vy0); ctx.lineTo(gx, vy1); }
+      for (let gy = Math.floor(vy0 / step) * step; gy <= vy1; gy += step) { ctx.moveTo(vx0, gy); ctx.lineTo(vx1, gy); }
+      ctx.stroke();
+    }
 
-    // 洞窟晶簇（视野裁剪）
-    for (const d of deco) {
-      if (d.x < vx0 || d.x > vx1 || d.y < vy0 || d.y > vy1) continue;
-      if (d.glow) { ctx.globalAlpha = 0.16; ctx.fillStyle = d.c; ctx.fillRect(d.x - d.r - 4, d.y - d.r - 4, (d.r + 4) * 2, (d.r + 4) * 2); ctx.globalAlpha = 1; }
-      ctx.fillStyle = d.c;
-      ctx.fillRect(Math.round(d.x - d.r / 2), Math.round(d.y - d.r), d.r, d.r * 2);
+    // 洞窟晶簇（视野裁剪；低画质不画）
+    if (qLevel >= 1) {
+      for (const d of deco) {
+        if (d.x < vx0 || d.x > vx1 || d.y < vy0 || d.y > vy1) continue;
+        if (d.glow && qLevel >= 2) { ctx.globalAlpha = 0.16; ctx.fillStyle = d.c; ctx.fillRect(d.x - d.r - 4, d.y - d.r - 4, (d.r + 4) * 2, (d.r + 4) * 2); ctx.globalAlpha = 1; }
+        ctx.fillStyle = d.c;
+        ctx.fillRect(Math.round(d.x - d.r / 2), Math.round(d.y - d.r), d.r, d.r * 2);
+      }
     }
 
     // 冲击环
-    for (const g of rings) {
-      if (g.x < vx0 || g.x > vx1 || g.y < vy0 || g.y > vy1) continue;
-      ctx.globalAlpha = Math.max(0, g.life / g.max) * 0.7;
-      ctx.strokeStyle = g.col; ctx.lineWidth = 2.4;
-      ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, 6.2832); ctx.stroke();
+    if (qLevel >= 1) {
+      for (const g of rings) {
+        if (g.x < vx0 || g.x > vx1 || g.y < vy0 || g.y > vy1) continue;
+        ctx.globalAlpha = Math.max(0, g.life / g.max) * 0.7;
+        ctx.strokeStyle = g.col; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, 6.2832); ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
 
@@ -1543,11 +1642,13 @@
     for (const s of swords) if (s.x > vx0 && s.x < vx1 && s.y > vy0 && s.y < vy1) drawProj(s);
     if (!player.dead) drawPlayer();
 
-    // 妖兽碎屑（画在最上层，割草才有飞溅感）
-    for (const p of parts) {
-      ctx.globalAlpha = Math.max(0, p.life / p.max);
-      ctx.fillStyle = p.col;
-      ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+    // 妖兽碎屑（画在最上层，割草才有飞溅感；低画质不画）
+    if (qLevel >= 1) {
+      for (const p of parts) {
+        ctx.globalAlpha = Math.max(0, p.life / p.max);
+        ctx.fillStyle = p.col;
+        ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+      }
     }
     ctx.globalAlpha = 1;
 
@@ -1584,6 +1685,15 @@
 
     if (typeof drawBossBar === 'function') drawBossBar();
 
+    // 帧率（可选）：卡不卡一眼看得出来
+    if (Settings.fps) {
+      const qn = Settings.q === 'auto' ? ('自动·' + ['低', '中', '高'][qLevel]) : ({ high: '高', mid: '中', low: '低' })[Settings.q];
+      ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillStyle = fpsShown >= 50 ? '#7de08a' : fpsShown >= 30 ? '#ffd24a' : '#ff8071';
+      ctx.fillText(fpsShown + ' FPS　画质' + qn, VW - 10, 46);
+    }
+
     const info = realmInfo();
     elHp.style.width = (player.hp / player.maxhp * 100) + '%';
     if (elHerb) elHerb.textContent = herbs;
@@ -1591,6 +1701,8 @@
     elFoe.textContent = monsters.length + '/' + targetFoeCount();
     elRealm.textContent = info.name + ' · ' + info.skill;
     if (elStone) elStone.textContent = meta.stones;
+    // 冲遁钮：冷却中渐亮，就绪时最亮（不用 classList，桩环境更省事）
+    if (btnDash) btnDash.style.opacity = dashCd <= 0 ? '0.42' : (0.14 + 0.26 * (1 - dashCd / DASH_CD)).toFixed(2);
   }
 
   // 兽潮来袭提示：贴在屏幕对应边，箭头指向场内
@@ -1680,11 +1792,13 @@
     return {
       unlock() { const a = acInit(); if (a && a.state === 'suspended') { try { a.resume(); } catch (_) {} } },
       isOn() { return enabled; },
+      setOn(v) { enabled = !!v; try { localStorage.setItem('im_mute', enabled ? '0' : '1'); } catch (_) {} return enabled; },
       toggle() { enabled = !enabled; try { localStorage.setItem('im_mute', enabled ? '0' : '1'); } catch (_) {} return enabled; },
       hit() { const n = performance.now(); if (n - lastHit < 60) return; lastHit = n; tone(330, 150, 0.05, 'square', 0.045); },
       kill() { tone(190, 80, 0.09, 'triangle', 0.06); },
       elite() { tone(270, 95, 0.15, 'sawtooth', 0.07); },
       hurt() { noise(0.12, 0.14); tone(150, 70, 0.14, 'sawtooth', 0.06); },
+      dash() { tone(760, 280, 0.13, 'triangle', 0.055); },
       tier() { tone(523, 784, 0.16, 'sine', 0.09); setTimeout(function () { tone(784, 1046, 0.22, 'sine', 0.08); }, 120); },
       pick() { tone(880, 1320, 0.10, 'sine', 0.07); },
       boss() { tone(95, 62, 0.7, 'sawtooth', 0.09); },
@@ -1692,26 +1806,38 @@
       win() { [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tone(f, f, 0.26, 'sine', 0.09); }, i * 140); }); }
     };
   })();
-  function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (_) {} }
+  function buzz(p) { if (!Settings.sound) return; try { if (navigator.vibrate) navigator.vibrate(p); } catch (_) {} }
 
-  // ---------- 持久化：纪录 / 洞府资源 ----------
+  // ---------- 持久化：纪录 / 洞府资源（带版本号与字段校验，坏档 / 旧档不会崩） ----------
   const REC_KEY = 'im_records_v2', MET_KEY = 'im_meta_v2';
+  const SAVE_VER = 2;
   function loadJSON(k, d) { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; } catch (_) { return d; } }
   function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  // 数值兜底：非数字 / NaN / Infinity 一律回落默认值；计数类还要非负取整
+  function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
+  function int0(v, d) { return Math.max(0, Math.floor(num(v, d))); }
+
   let rec = loadJSON(REC_KEY, null);
   if (!rec || typeof rec !== 'object') rec = {};
-  if (typeof rec.bestKills !== 'number') rec.bestKills = 0;
-  if (typeof rec.bestTier !== 'number') rec.bestTier = 0;
-  if (typeof rec.bestCombo !== 'number') rec.bestCombo = 0;
-  if (typeof rec.bestWave !== 'number') rec.bestWave = 0;
-  if (typeof rec.bestTime !== 'number') rec.bestTime = 0;
-  if (typeof rec.bosses !== 'number') rec.bosses = 0;
-  if (typeof rec.clears !== 'number') rec.clears = 0;
+  rec.ver       = SAVE_VER;
+  rec.bestKills = int0(rec.bestKills, 0);
+  rec.bestTier  = int0(rec.bestTier, 0);
+  rec.bestCombo = int0(rec.bestCombo, 0);
+  rec.bestWave  = int0(rec.bestWave, 0);
+  rec.bestTime  = int0(rec.bestTime, 0);
+  rec.bosses    = int0(rec.bosses, 0);
+  rec.clears    = int0(rec.clears, 0);
   if (!Array.isArray(rec.fastest) || rec.fastest.length !== 5) rec.fastest = [null, null, null, null, null];
+  rec.fastest = rec.fastest.map(function (v) { return (typeof v === 'number' && isFinite(v) && v > 0) ? v : null; });
+
   let meta = loadJSON(MET_KEY, null);
   if (!meta || typeof meta !== 'object') meta = {};
-  if (typeof meta.stones !== 'number') meta.stones = 0;
-  if (!meta.up || typeof meta.up !== 'object') meta.up = { atk: 0, spd: 0, hp: 0, mag: 0, crit: 0 };
+  meta.ver    = SAVE_VER;
+  meta.stones = int0(meta.stones, 0);
+  // 经脉等级：缺键补 0，超出上限压回上限（旧档 / 手改档都不会绕过限制）
+  const UP_MAX = { atk: 5, spd: 5, hp: 5, mag: 3, crit: 5 };
+  if (!meta.up || typeof meta.up !== 'object') meta.up = {};
+  Object.keys(UP_MAX).forEach(function (id) { meta.up[id] = Math.min(UP_MAX[id], int0(meta.up[id], 0)); });
   if (!meta.ach || typeof meta.ach !== 'object') meta.ach = {};
   if (!Array.isArray(meta.quests)) meta.quests = null;
 
@@ -1742,7 +1868,18 @@
   function todayKey() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
   function ensureQuests() {
     const k = todayKey();
-    if (meta.qdate !== k || !meta.quests) {
+    // 结构校验：id 必须在任务库里、done 必须是布尔——旧档 / 手改档也不会让渲染崩
+    const valid = {};
+    QUEST_POOL.forEach(function (q) { valid[q.id] = true; });
+    let ok = Array.isArray(meta.quests) && meta.quests.length > 0;
+    if (ok) {
+      for (let i = 0; i < meta.quests.length; i++) {
+        const q = meta.quests[i];
+        if (!q || typeof q.id !== 'string' || !valid[q.id]) { ok = false; break; }
+        if (typeof q.done !== 'boolean') q.done = false;
+      }
+    }
+    if (meta.qdate !== k || !ok) {
       meta.qdate = k;
       const pool = QUEST_POOL.slice(), picks = [];
       for (let i = 0; i < 3 && pool.length; i++) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
@@ -2036,6 +2173,7 @@
     tierTimes = [null, null, null, null, null]; pendingCards = null; cardQueue = [];
     player.dead = false; player.respawn = 0; player.inv = 0; player.anim = 0;
     player.x = WORLD.w / 2; player.y = WORLD.h / 2;
+    dashT = 0; dashCd = 0; menuPaused = false;             // 冲遁冷却与菜单暂停一并归零
     applyBaseMods();
     centerCam(); updateCam();
     for (let i = 0; i < 8; i++) spawnItem();
@@ -2132,18 +2270,64 @@
   // 回洞府：冻结当前局，回到开场界面看成长与任务
   window.GameAPI.toHome = function () { resetRun(); paused = true; renderMeta(); renderMetaStone(); };
 
+  // ---------- 设置接口 ----------
+  window.GameAPI.opts = function () {
+    return { aim: Settings.aim, q: Settings.q, fps: Settings.fps, sound: Settings.sound };
+  };
+  window.GameAPI.setOpt = function (k, v) {
+    if (k === 'aim') Settings.aim = (v === 'on' || v === true);
+    else if (k === 'fps') Settings.fps = (v === 'on' || v === true);
+    else if (k === 'sound') {
+      Settings.sound = (v === 'on' || v === true);
+      Sfx.setOn(Settings.sound);
+      if (elMute) elMute.textContent = Settings.sound ? '🔊' : '🔇';
+    } else if (k === 'q' && (v === 'auto' || v === 'high' || v === 'mid' || v === 'low')) {
+      Settings.q = v; autoCap = 2;                     // 手动改档位时重置自动上限
+    }
+    applyQuality();
+    saveSettings();
+    return window.GameAPI.opts();
+  };
+  // 设置菜单打开时冻结整局（与"选卡暂停"分开：关掉菜单不会误放行选卡）
+  window.GameAPI.menuPause = function (on) { menuPaused = !!on; if (!menuPaused) last = performance.now(); };
+  window.GameAPI.tryDash = function () { return tryDash(); };
+  window.GameAPI.quality = function () { return { q: Settings.q, level: qLevel, fps: fpsShown, dash: dashT > 0, dashCd: dashCd }; };
+
   if (elMute) {
     elMute.textContent = Sfx.isOn() ? '🔊' : '🔇';
     elMute.addEventListener('click', function (e) { e.stopPropagation(); window.GameAPI.toggleMute(); });
   }
+  // 设置里的"音效"是权威（旧版只存 im_mute，首次加载已在 Settings 里继承过）
+  Sfx.setOn(Settings.sound);
+
+  // 帧率统计 + 自动降画质（auto 档：连续约 1.5 秒低于 45 帧就降一档，只降不升免得来回跳）
+  let fpsAcc = 0, fpsFrames = 0, slowCnt = 0;
+  function tickFps(raw) {
+    fpsAcc += raw; fpsFrames++;
+    if (fpsAcc < 0.5) return;
+    fpsShown = Math.round(fpsFrames / fpsAcc);
+    fpsAcc = 0; fpsFrames = 0;
+    if (Settings.q !== 'auto') { slowCnt = 0; return; }
+    if (fpsShown < 45 && autoCap > 0) {
+      slowCnt++;
+      if (slowCnt >= 3) {
+        autoCap--; slowCnt = 0; applyQuality();
+        elToast.textContent = '帧率偏低 · 已自动降到' + ['低', '中', '高'][qLevel] + '画质';
+        elToast.style.display = 'block'; toastT = 2.2;
+      }
+    } else slowCnt = 0;
+  }
 
   function loop(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const raw = Math.max(0.001, (now - last) / 1000);   // 未钳制的真实间隔，用来测帧率
+    const dt = Math.min(0.05, raw);
     last = now;
     update(dt);
     render();
+    tickFps(raw);
     requestAnimationFrame(loop);
   }
 
+  applyQuality();
   requestAnimationFrame(loop);
 })();

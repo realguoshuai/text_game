@@ -181,11 +181,49 @@ body.show-rotate #rotate-hint { display: flex; }
   #hud .hp-box { width: 120px; }
   #hud { font-size: 12px; gap: 8px; padding: 8px 10px; }
   .btn { width: 54px; height: 54px; right: 14px; bottom: 20px; }
+  .btn.dash { right: 76px; bottom: 20px; }
   #joystick { width: 110px; height: 110px; }
   #joy-knob { width: 50px; height: 50px; margin: -25px 0 0 -25px; }
   .overlay h1 { font-size: 26px; }
   .overlay p { font-size: 13px; }
+  #settings .set-row { padding: 9px 10px; gap: 10px; }
+  #settings .chips { flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
 }
+
+/* ================= 新增：冲遁钮 / 设置面板 ================= */
+
+/* ---------- 冲遁（闪避）钮：与出招钮同款半透明；冷却中更淡，就绪时稍亮 ---------- */
+.btn.dash { right: 92px; bottom: 26px; opacity: 0.22; }
+.btn.dash.ready { opacity: 0.42; }
+
+/* ---------- 设置 ---------- */
+#settings { display: none; z-index: 10; }
+#settings .set-title { color: #b9c8ff; font-size: 24px; letter-spacing: 6px; }
+#settings .set-list { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 8px; }
+#settings .set-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 380px; max-width: 88vw;
+  padding: 10px 12px; border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(180,170,255,0.24);
+  text-align: left;
+}
+#settings .set-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#settings .set-label { font-size: 14px; color: #e8e6f5; }
+#settings .set-hint { font-size: 11px; color: #9c98bb; line-height: 1.5; }
+#settings .chips { display: flex; gap: 5px; flex: 0 0 auto; }
+#settings .chip {
+  margin-top: 0;
+  min-width: 38px; padding: 6px 9px; border-radius: 8px;
+  font-family: inherit; font-size: 12px; line-height: 1.2;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(180,170,255,0.3);
+  color: #cfcbe8; cursor: pointer;
+  transition: all .12s ease;
+}
+#settings .chip.sel { background: rgba(255,210,74,0.16); border-color: #ffd24a; color: #ffe27a; }
+#settings .chip:active { transform: scale(0.96); }
+#settings #set-close { margin-top: 6px; }
 
 /* ================= 新增：音效钮 / 突破选卡 / 结算 / 洞府 ================= */
 
@@ -195,7 +233,6 @@ body.show-rotate #rotate-hint { display: flex; }
 /* ---------- HUD 音效开关（HUD 整体 pointer-events:none，这里单独放开） ---------- */
 .hud-btn {
   pointer-events: auto;
-  margin-left: auto;
   width: 30px; height: 30px; padding: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 15px; line-height: 1;
@@ -205,6 +242,7 @@ body.show-rotate #rotate-hint { display: flex; }
   color: #e8e6f5;
   cursor: pointer;
 }
+.hud-btn.push { margin-left: auto; }
 .hud-btn:active { background: rgba(140,170,255,0.3); }
 
 /* ---------- 突破三选一 ---------- */
