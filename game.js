@@ -253,6 +253,52 @@
       g.fillRect(Math.round(x), Math.round(y), s, s);
     }
 
+    // 9.5) 地图道具：freepixel 图集装饰（树/塔/雕像/晶簇/灯笼/骨骸…，融入背景预渲染，各画质档位都显示）
+    // 图集未加载时（初始化 / 桩环境）跳过本段；propImg 加载完成会重建背景把道具铺进来。
+    if (propImg && propImg.width) {
+      const DECOR = [
+        ['tree_giant',1,120,160],['tree_maple',1,110,150],['tree_pine',1,100,140],['tree_willow',1,90,130],
+        ['tree_dead',1,100,140],['tree_crystal',1,100,140],['tower_ruin',1,100,140],['tower_stone',1,90,130],
+        ['tower_wizard',1,110,150],['mausoleum',1,90,120],['hut',1,90,130],['altar',1,70,100],['fountain',1,80,120],
+        ['statue_dragon',2,70,100],['statue_lion',2,60,90],['statue_demon',1,80,110],['gate_stone',1,90,130],
+        ['gate_bamboo',1,90,120],['arch_stone',1,80,120],['arch_dark',1,80,120],['well',2,60,90],
+        ['crystal_stand',2,60,90],['geode',2,60,90],['obelisk',2,50,80],['bamboo',2,80,120],['vine',2,50,90],
+        ['rock_moss',5,18,34],['rock_gray',5,16,30],['rock_pile',5,14,28],['rock_moss_lit',5,18,34],['cairn',4,20,36],
+        ['grass_tuft',6,10,22],['mush_blue',5,16,30],['mush_red',5,16,30],['crystal_purple',4,30,50],
+        ['crystal_blue',4,30,50],['crystal_green',4,24,42],['lantern_red',4,30,50],['lantern_yellow',4,20,36],
+        ['brazier',3,28,46],['torch',3,20,40],['campfire',3,22,40],['bones',3,24,44],['skulls',3,24,44],
+        ['web_sac',3,26,48],['wisp',3,24,44],['wisp_gold',3,30,52]
+      ];
+      let cw = 0; const cum = DECOR.map(function (d) { cw += d[1]; return cw; });
+      const M = 90;                                   // 距地图边界留白，避免道具压在雾崖上
+      const N = Math.max(40, Math.round(A / 30000));
+      const placed = [];
+      for (let i = 0; i < N; i++) {
+        const r = Math.random() * cw;
+        let di = 0; while (di < cum.length - 1 && r > cum[di]) di++;
+        const d = DECOR[di];
+        const th = rd(d[2], d[3]);
+        const bx = PROP_BOXES[d[0]];
+        if (!bx) continue;
+        const wx = rd(M, W - M), wy = rd(M, H - M);
+        placed.push([wy, d[0], wx, wy, th, bx, (d[2] <= 36 ? rd(-0.12, 0.12) : 0)]);
+      }
+      placed.sort(function (a, b) { return a[0] - b[0]; });   // 画家算法：下排后画，自然遮挡
+      for (const p of placed) {
+        const key = p[1], wx = p[2], wy = p[3], th = p[4], bx = p[5], rot = p[6];
+        const sc = th / bx[3];
+        const dw = bx[2] * sc, dh = bx[3] * sc;
+        g.globalAlpha = 0.22; g.fillStyle = '#000';
+        g.beginPath(); g.ellipse(wx, wy + 2, dw * 0.42, dh * 0.10, 0, 0, 6.2832); g.fill();
+        g.globalAlpha = 1;
+        g.save();
+        g.translate(wx, wy);
+        if (rot) g.rotate(rot);
+        g.drawImage(propImg, bx[0], bx[1], bx[2], bx[3], -dw / 2, -dh, dw, dh);
+        g.restore();
+      }
+    }
+
     // 10) 地图边界：雾崖 + 远山剪影（走到尽头能"看见"边界）
     g.fillStyle = 'rgba(7,9,20,0.85)';
     for (let i = 0; i < 34; i++) {
@@ -601,6 +647,60 @@
       im.src = 'assets/char_' + id + '.png';
     }
   })();
+
+  // ---------- 妖兽 / 地图道具图集（freepixel.art 免费商用素材，见 assets/CREDITS.txt） ----------
+  // foes.png：6 列 × 2 行，每格 200px，内容底边居中。坐标来自 build_free_assets.py 产出的 foes.json。
+  // props.png：6 列 × 8 行，每格 200px，内容底边居中。坐标来自 props.json。
+  // 直接用 build 脚本裁掉透明边后的「绝对包围盒」：游戏端免坐标表、免网格换算，零同步风险。
+  const FOE_BOXES = {
+    wolf:        [16, 29, 167, 169],     wolf_elite:   [214, 39, 172, 159],
+    spider:      [410, 10, 179, 188],    spider_elite: [624, 30, 152, 168],
+    toad:        [826, 45, 148, 153],    toad_elite:   [1021, 81, 158, 117],
+    ghost:       [29, 245, 142, 153],    ghost_elite:  [230, 235, 139, 163],
+    serpent:     [411, 237, 178, 161],   serpent_elite: [614, 217, 171, 181],
+    boss1:       [812, 210, 176, 188],   boss2:        [1019, 230, 161, 168]
+  };
+  const PROP_BOXES = {
+    tree_giant:[0,13,200,185], tree_maple:[216,19,168,179], tree_pine:[445,33,109,165],
+    tree_willow:[658,38,83,160], tree_dead:[841,31,118,167], tree_crystal:[1040,49,120,149],
+    bamboo:[48,246,103,152], tower_ruin:[253,238,94,160], tower_stone:[426,269,148,129],
+    tower_wizard:[626,219,148,179], mausoleum:[826,246,148,152], arch_dark:[1030,235,140,163],
+    arch_stone:[20,432,160,166], gate_stone:[238,431,123,167], gate_bamboo:[422,433,156,165],
+    statue_dragon:[634,421,132,177], statue_lion:[849,433,102,165], statue_demon:[1020,421,160,177],
+    well:[46,643,108,155], hut:[205,616,190,182], altar:[461,657,78,141], fountain:[646,635,108,163],
+    crystal_stand:[850,657,100,141], geode:[1043,648,114,150], rock_moss:[22,889,155,109],
+    rock_gray:[270,934,60,64], rock_pile:[429,878,141,120], rock_moss_lit:[625,841,150,157],
+    cairn:[827,872,145,126], grass_tuft:[1055,887,89,111], mush_blue:[21,1032,158,166],
+    mush_red:[226,1030,148,168], crystal_purple:[432,1039,135,159], crystal_blue:[622,1028,155,170],
+    crystal_green:[844,1074,112,124], lantern_red:[1015,1016,170,182], lantern_yellow:[70,1288,60,110],
+    brazier:[261,1262,78,136], torch:[487,1230,26,168], campfire:[648,1275,103,123],
+    bones:[813,1236,174,162], skulls:[1021,1249,158,149], web_sac:[52,1408,96,190],
+    wisp:[254,1451,92,147], wisp_gold:[429,1444,142,154], obelisk:[673,1453,54,145], vine:[849,1495,101,103]
+  };
+  let foeImg = null, propImg = null;
+  (function loadAtlases() {
+    if (typeof Image === 'undefined') return;          // 桩环境：退回程序化妖兽 / 无地图道具
+    const fl = new Image();
+    fl.onload = function () { if (fl.width) foeImg = fl; };
+    fl.onerror = function () { foeImg = null; };
+    fl.src = 'assets/foes.png';
+    const pl = new Image();
+    pl.onload = function () {
+      if (!pl.width) return;
+      propImg = pl;
+      try { rebuildDeco(); } catch (_) {}              // 图集就绪后重绘背景，把道具铺进去
+    };
+    pl.onerror = function () { propImg = null; };
+    pl.src = 'assets/props.png';
+  })();
+  // 妖兽 → 图集格：妖王/妖皇按 boss 取，精英取 _elite，普通取本体
+  function foeSpriteKey(m) {
+    if (m.boss === 2 && FOE_BOXES.boss2) return 'boss2';
+    if (m.boss === 1 && FOE_BOXES.boss1) return 'boss1';
+    if (m.elite && FOE_BOXES[m.type + '_elite']) return m.type + '_elite';
+    if (FOE_BOXES[m.type]) return m.type;
+    return null;
+  }
   window.GameAPI = {
     selectChar(id) { const c = CHARS.find(x => x.id === id); if (c) { player.char = c; player.speed = c.speed; } },
     // 供自动化/桩测试读取运行态（不改游戏行为）
@@ -618,6 +718,8 @@
         dash: dashT > 0, dashCd: +dashCd.toFixed(2), aim: Settings.aim,
         q: Settings.q, qLevel: qLevel, fps: fpsShown,
         px: Math.round(player.x), py: Math.round(player.y), aimA: +aimAngle().toFixed(3),
+        // 妖兽/道具图集：是否就绪（桩测试核对用）
+        foeSprite: !!foeImg, propSprite: !!propImg,
         // 像素立绘：图集是否就绪 / 当前朝向（桩测试核对用）
         sprite: !!sprites[player.char.id], dir: player.dir, walkT: +player.walkT.toFixed(3)
       };
@@ -1474,7 +1576,16 @@
     if (m.face < 0) { ctx.translate(W, 0); ctx.scale(-1, 1); }   // 按移动方向转身
     ctx.lineJoin = 'round';
 
-    if (m.type === 'wolf')         drawWolf(W, H, m, body, dark, glow, ink);
+    // ① 图集精灵（加载成功就用 freepixel 的妖兽立绘；按碰撞盒高度等比贴、脚踩盒底、按移动方向镜像）
+    const fkey = foeSpriteKey(m);
+    if (foeImg && fkey) {
+      const b = FOE_BOXES[fkey];
+      const sc = H / b[3];                          // 内容高度对齐到碰撞盒高度
+      const dw = b[2] * sc, dh = b[3] * sc;
+      ctx.drawImage(foeImg, b[0], b[1], b[2], b[3], W / 2 - dw / 2, H - dh, dw, dh);
+    }
+    // ② 退回程序化立绘（图集未加载 / 加载失败 / 无浏览器桩环境）
+    else if (m.type === 'wolf')         drawWolf(W, H, m, body, dark, glow, ink);
     else if (m.type === 'spider')  drawSpider(W, H, m, body, dark, glow, ink);
     else if (m.type === 'toad')    drawToad(W, H, m, body, dark, glow, ink);
     else if (m.type === 'ghost')   drawGhost(W, H, m, body, dark, glow, ink);
