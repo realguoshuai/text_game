@@ -9,29 +9,40 @@
   const ctx = cv.getContext('2d');
   ctx.imageSmoothingEnabled = false;
 
-  // ---------- 视口 ----------
-  let VW = 0, VH = 0;
+  // ---------- 视口 / 斗法场 ----------
+  // 斗法场＝屏幕：所有实体恒在可视范围内。武器打不到屏幕外，也不会出现"没看见怪就死了"。
+  let VW = 0, VH = 0, zoom = 1;
+  const WORLD = { w: 900, h: 560 };
+  const ARENA_MIN = { w: 640, h: 400 };   // 太小则保底，免得手机竖屏挤成一团
+  const ARENA_MAX = { w: 1180, h: 780 };  // 太大则封顶，免得大屏上妖兽走半天才到
+
+  // 洞窟装饰（晶簇）：随斗法场尺寸重建
+  const deco = [];
+  function rebuildDeco() {
+    deco.length = 0;
+    const n = Math.max(16, Math.round(WORLD.w * WORLD.h / 26000));
+    for (let i = 0; i < n; i++) {
+      deco.push({
+        x: 24 + Math.random() * (WORLD.w - 48),
+        y: 24 + Math.random() * (WORLD.h - 48),
+        c: Math.random() < 0.5 ? '#3a2f6b' : '#236b5d',
+        r: 5 + Math.random() * 12,
+        glow: Math.random() < 0.4
+      });
+    }
+  }
+
   function resize() {
     VW = cv.clientWidth || window.innerWidth;
     VH = cv.clientHeight || window.innerHeight;
     cv.width = VW; cv.height = VH;
+    const nw = Math.round(Math.max(ARENA_MIN.w, Math.min(ARENA_MAX.w, VW)));
+    const nh = Math.round(Math.max(ARENA_MIN.h, Math.min(ARENA_MAX.h, VH)));
+    if (nw !== WORLD.w || nh !== WORLD.h) { WORLD.w = nw; WORLD.h = nh; rebuildDeco(); }
+    zoom = Math.min(VW / WORLD.w, VH / WORLD.h);   // 整块斗法场铺进屏幕
   }
-  window.addEventListener('resize', resize);
-
-  // ---------- 世界 ----------
-  const WORLD = { w: 1760, h: 1280 };
-
-  // 预生成洞窟装饰（晶簇），一次性，绘制时只读取
-  const deco = [];
-  for (let i = 0; i < 46; i++) {
-    deco.push({
-      x: Math.random() * WORLD.w,
-      y: Math.random() * WORLD.h,
-      c: Math.random() < 0.5 ? '#3a2f6b' : '#236b5d',
-      r: 5 + Math.random() * 12,
-      glow: Math.random() < 0.4
-    });
-  }
+  resize();
+  window.addEventListener('resize', function () { resize(); if (typeof fitWorld === 'function') fitWorld(); });
 
   // ---------- 输入 ----------
   const keys = { up: false, down: false, left: false, right: false, attack: false };
@@ -131,29 +142,43 @@
     ghost:   { name: '鬼面', hp: 18, speed: 82, dmg: 8,  w: 32, h: 36, color: '#bfe3ff', dark: '#8fb6df', glow: '#7fe8ff' },
     serpent: { name: '灵蛇', hp: 30, speed: 96, dmg: 11, w: 40, h: 26, color: '#3fae5a', dark: '#27803e', glow: '#ff6a5a' }
   };
-  // 妖兽强度随玩家境界递增（血量/伤害提升，身形也随之长大）
-  function diffScaler() {
-    let t = 0;
-    if (kills >= 20) t = 4; else if (kills >= 12) t = 3; else if (kills >= 7) t = 2; else if (kills >= 3) t = 1;
-    return 1 + t * 0.32;
+  // 境界阈值（斩妖数）。同屏妖兽变多后杀怪速度大涨，阈值随之上调，突破才有分量。
+  const TIER_KILLS = [8, 20, 40, 70];
+  function tierIdx() {
+    const k = kills;
+    if (k < TIER_KILLS[0]) return 0;
+    if (k < TIER_KILLS[1]) return 1;
+    if (k < TIER_KILLS[2]) return 2;
+    if (k < TIER_KILLS[3]) return 3;
+    return 4;
   }
-  // 妖兽数量随境界递增（在原基础上翻倍）：炼气 10 → 筑基 16 → 金丹 22 → 元婴 28 → 化神 34
+  // 妖兽血量随境界递增（身形也随之长大）
+  function diffScaler() { return 1 + tierIdx() * 0.32; }
+  // 伤害单独走更缓的曲线：同屏兽潮是原来的两倍，按原倍率会被围死，爽感变挫败感
+  function dmgScaler() { return 1 + tierIdx() * 0.17; }
+  // 兽潮规模随境界递增：炼气 10 → 筑基 16 → 金丹 22 → 元婴 28 → 化神 34
   const FOE_BY_TIER = [10, 16, 22, 28, 34];
   function targetFoeCount() { return FOE_BY_TIER[tierIdx()]; }
+  // 每波间隔（秒），境界越高来得越急
+  const WAVE_GAP_BY_TIER = [6.6, 6.0, 5.4, 4.8, 4.2];
 
   let uid = 0;
-  function spawnMonster() {
-    const edge = Math.random() * 4 | 0;
-    let x, y;
-    if (edge === 0) { x = Math.random() * WORLD.w; y = 24; }
-    else if (edge === 1) { x = Math.random() * WORLD.w; y = WORLD.h - 24; }
-    else if (edge === 2) { x = 24; y = Math.random() * WORLD.h; }
-    else { x = WORLD.w - 24; y = Math.random() * WORLD.h; }
+  // 贴边落点：妖兽从斗法场四边涌入
+  function edgePos(edge) {
+    const M = 26;
+    if (edge === 0) return { x: 40 + Math.random() * (WORLD.w - 80), y: M * 0.6 };
+    if (edge === 1) return { x: 40 + Math.random() * (WORLD.w - 80), y: WORLD.h - M * 0.6 };
+    if (edge === 2) return { x: M * 0.6, y: 40 + Math.random() * (WORLD.h - 80) };
+    return { x: WORLD.w - M * 0.6, y: 40 + Math.random() * (WORLD.h - 80) };
+  }
+  function spawnMonster(edge, rush) {
+    const e = (edge == null) ? (Math.random() * 4 | 0) : edge;
+    const pos = edgePos(e);
     // 后期出现更强种类
     const t = tierIdx();
     const r = Math.random();
     let type;
-    // 数量翻倍后同屏妖兽更多，种类也提前铺开，免得开局一片全是妖狼
+    // 同屏妖兽多，种类提前铺开，免得开局一片全是妖狼
     if (t === 0) type = r < 0.72 ? 'wolf' : 'spider';
     else if (t === 1) type = r < 0.46 ? 'wolf' : r < 0.78 ? 'spider' : 'toad';
     else if (t === 2) type = r < 0.30 ? 'wolf' : r < 0.55 ? 'spider' : r < 0.80 ? 'toad' : 'ghost';
@@ -164,18 +189,35 @@
     const elite = t >= 2 && Math.random() < 0.14;     // 金丹之后出现精英（血厚、带光环）
     const hpMul = mul * (elite ? 1.9 : 1);
     return {
-      id: ++uid, type, x, y, face: 1, elite,
+      id: ++uid, type, x: pos.x, y: pos.y, face: 1, elite,
       w: Math.round(d.w * grow), h: Math.round(d.h * grow),
       color: d.color, dark: d.dark, glow: d.glow,
       hp: Math.round(d.hp * hpMul), maxhp: Math.round(d.hp * hpMul),
-      speed: d.speed * (elite ? 1.06 : 1), dmg: Math.round(d.dmg * mul * (elite ? 1.3 : 1)),
-      wander: 0, dx: 0, dy: 0, hit: 0, anim: Math.random() * 6
+      speed: d.speed * (elite ? 1.06 : 1) * (1 + t * 0.06),   // 场地小，速度随境界微增，保证压上来
+      dmg: Math.round(d.dmg * dmgScaler() * (elite ? 1.3 : 1)),
+      sway: Math.random() * 6.283,                    // 冲锋时的侧向摆动相位（免得整队排成一条线）
+      rush: rush ? 1.15 : 0,                          // 涌进场的加速冲刺
+      dx: 0, dy: 0, hit: 0, anim: Math.random() * 6
     };
   }
   let monsters = [];
   let herbs = 0, kills = 0;
-  let spawnTimer = 0;                                 // 妖兽补员计时（缓慢补足，不瞬间涌入）
-  for (let i = 0; i < targetFoeCount(); i++) monsters.push(spawnMonster());
+
+  // ---------- 兽潮：成波涌来，波与波之间留出喘息与拾取的空档 ----------
+  let waveTimer = 2.6, waveNo = 0, waveEdge = 2, dripTimer = 0, waveCall = null;
+  function launchWave(silent) {
+    const target = targetFoeCount();
+    if (monsters.length >= target) return 0;
+    waveNo++;
+    waveEdge = Math.floor(Math.random() * 4);
+    const n = Math.max(3, Math.round(target * 0.42));
+    let spawned = 0;
+    for (let i = 0; i < n && monsters.length < target; i++) { monsters.push(spawnMonster(waveEdge, true)); spawned++; }
+    // 不用 toast（每几秒弹一次太吵）：在场边画方向提示，顺带告诉你该朝哪边打
+    if (spawned && !silent) waveCall = { edge: waveEdge, no: waveNo, t: 1.5 };
+    return spawned;
+  }
+  for (let i = 0; i < Math.ceil(targetFoeCount() * 0.6); i++) monsters.push(spawnMonster(null, true));
 
   // ---------- 物品（灵草 / 灵石 / 丹药，各有形状） ----------
   let items = [];
@@ -193,6 +235,32 @@
   // ---------- 飞剑 / 刀芒 ----------
   let swords = [];
   let slashes = [];
+
+  // ---------- 割草反馈：碎屑 / 冲击环 / 震屏 / 连斩 ----------
+  const parts = [];
+  const rings = [];
+  let shake = 0, combo = 0, comboT = 0, comboPop = 0, comboBest = 0, clock = 0;
+  // 连斩＝最近 1.2 秒内的击杀数（衡量"割草速度"），不是累计击杀数，否则会涨到几百毫无意义
+  const COMBO_WIN = 1.2;
+  const killTimes = [];
+  function burst(x, y, col, n, big) {
+    if (parts.length < 210) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * 6.2832, sp = 40 + Math.random() * (big ? 260 : 165);
+        parts.push({
+          x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          life: 0.3 + Math.random() * 0.32, max: 0.62, col, sz: 2 + Math.random() * 3.2
+        });
+      }
+    }
+    if (rings.length < 22) rings.push({ x, y, r: big ? 10 : 7, grow: big ? 190 : 118, life: 0.26, max: 0.26, col });
+  }
+  function trimFx() {
+    for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
+    for (let i = rings.length - 1; i >= 0; i--) if (rings[i].life <= 0) rings.splice(i, 1);
+  }
+  // 场上越乱，单次击杀的抖动越小，避免持续晃眼
+  function addShake(v) { shake = Math.min(9, shake + v); }
 
   // ---------- 可选修士（三种外形 / 武器 / 技能） ----------
   const CHARS = [
@@ -216,50 +284,59 @@
     dead: false, respawn: 0, anim: 0
   };
   window.GameAPI = {
-    selectChar(id) { const c = CHARS.find(x => x.id === id); if (c) { player.char = c; player.speed = c.speed; } }
+    selectChar(id) { const c = CHARS.find(x => x.id === id); if (c) { player.char = c; player.speed = c.speed; } },
+    // 供自动化/桩测试读取运行态（不改游戏行为）
+    stats() {
+      return {
+        kills, wave: waveNo, foes: monsters.length, target: targetFoeCount(),
+        hp: Math.round(player.hp), dead: player.dead, combo, comboBest,
+        parts: parts.length, rings: rings.length, swords: swords.length, slashes: slashes.length,
+        world: [WORLD.w, WORLD.h], zoom, waveTimer: +waveTimer.toFixed(2)
+      };
+    }
   };
-  // ---------- 相机 ----------
-  const cam = { x: 0, y: 0 };
-
   // ---------- 碰撞 ----------
   function aabb(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
 
   // ---------- 武器 / 技能（按境界进化，三种修士各异） ----------
+  // 射程一律按屏幕短边折算（frac × 短边），所以永远不会飞到屏幕外去打"看不见的怪"。
+  function arenaMin() { return Math.min(WORLD.w, WORLD.h); }
   function weaponCfg() {
-    const w = player.char.id, t = tierIdx();
+    const w = player.char.id, t = tierIdx(), R = arenaMin();
     if (w === 'thunder') {
-      const T = [
-        { count: 1, spread: 0,    speed: 560, dmg: 11, life: 1.0, pierce: true, cd: 0.26 },
-        { count: 2, spread: 0.18, speed: 600, dmg: 12, life: 1.1, pierce: true, cd: 0.24 },
-        { count: 3, spread: 0.24, speed: 640, dmg: 13, life: 1.3, pierce: true, cd: 0.22 },
-        { count: 4, spread: 0.30, speed: 700, dmg: 15, life: 1.5, pierce: true, cd: 0.20 },
-        { count: 5, spread: 0.36, speed: 760, dmg: 18, life: 1.7, pierce: true, cd: 0.18 }
+      const B = [
+        { count: 1, spread: 0,    speed: 560, dmg: 11, frac: 0.70, pierce: true, cd: 0.26 },
+        { count: 2, spread: 0.18, speed: 600, dmg: 12, frac: 0.80, pierce: true, cd: 0.24 },
+        { count: 3, spread: 0.24, speed: 640, dmg: 13, frac: 0.90, pierce: true, cd: 0.22 },
+        { count: 4, spread: 0.30, speed: 700, dmg: 15, frac: 1.00, pierce: true, cd: 0.20 },
+        { count: 5, spread: 0.36, speed: 760, dmg: 18, frac: 1.15, pierce: true, cd: 0.18 }
       ][t];
-      return Object.assign({ kind: 'thunder' }, T);
+      return Object.assign({ kind: 'thunder' }, B, { life: R * B.frac / B.speed });
     }
     if (w === 'blade') {
-      const T = [
-        { range: 46, arc: 1.1, dmg: 22, knock: 130, cd: 0.42 },
-        { range: 50, arc: 1.2, dmg: 26, knock: 150, cd: 0.40 },
-        { range: 56, arc: 1.3, dmg: 30, knock: 170, cd: 0.38 },
-        { range: 62, arc: 1.4, dmg: 36, knock: 200, cd: 0.36 },
-        { range: 70, arc: 1.5, dmg: 44, knock: 230, cd: 0.34 }
+      const B = [
+        { range: 46, arc: 1.3, dmg: 24, knock: 150, cd: 0.40 },
+        { range: 50, arc: 1.5, dmg: 28, knock: 170, cd: 0.38 },
+        { range: 56, arc: 1.7, dmg: 33, knock: 195, cd: 0.36 },
+        { range: 62, arc: 1.9, dmg: 39, knock: 225, cd: 0.34 },
+        { range: 70, arc: 2.1, dmg: 48, knock: 260, cd: 0.32 }
       ][t];
-      return Object.assign({ kind: 'blade' }, T);
+      // 刀芒是近身技，按屏幕短边等比放大一点点（大屏上不至于够不着）
+      const k = Math.max(1, Math.min(1.35, R / 420));
+      return Object.assign({ kind: 'blade' }, B, { range: B.range * k, knock: B.knock * k });
     }
-    // 御剑仙：飞剑追踪
-    const T = [
-      { count: 1, spread: 0,    homing: false, speed: 440, dmg: 13, life: 1.1, size: 1.0,  pierce: false, cd: 0.34 },
-      { count: 2, spread: 0.20, homing: false, speed: 480, dmg: 14, life: 1.2, size: 1.1,  pierce: false, cd: 0.32 },
-      { count: 3, spread: 0.26, homing: true,  speed: 520, dmg: 15, life: 1.5, size: 1.1,  pierce: false, cd: 0.30 },
-      { count: 3, spread: 0.30, homing: true,  speed: 620, dmg: 18, life: 1.7, size: 1.3,  pierce: false, cd: 0.28 },
-      { count: 5, spread: 0.36, homing: true,  speed: 700, dmg: 21, life: 1.9, size: 1.45, pierce: true,  cd: 0.26 }
+    // 御剑仙：飞剑追踪（金丹起带穿透，割草才够爽）
+    const B = [
+      { count: 1, spread: 0,    homing: false, speed: 520, dmg: 14, frac: 0.75, size: 1.0,  pierce: false, cd: 0.30 },
+      { count: 2, spread: 0.20, homing: false, speed: 560, dmg: 15, frac: 0.85, size: 1.1,  pierce: false, cd: 0.28 },
+      { count: 3, spread: 0.26, homing: true,  speed: 600, dmg: 16, frac: 0.95, size: 1.1,  pierce: true,  cd: 0.26 },
+      { count: 3, spread: 0.32, homing: true,  speed: 660, dmg: 19, frac: 1.05, size: 1.3,  pierce: true,  cd: 0.24 },
+      { count: 5, spread: 0.40, homing: true,  speed: 720, dmg: 22, frac: 1.20, size: 1.45, pierce: true,  cd: 0.22 }
     ][t];
-    return Object.assign({ kind: 'sword' }, T);
+    return Object.assign({ kind: 'sword' }, B, { life: R * B.frac / B.speed });
   }
-  const TIER_KILLS = [3, 7, 12, 20];
   let lastTierIdx = 0;
 
   // ---------- HUD 缓存 ----------
@@ -281,18 +358,25 @@
     return best;
   }
 
-  // 击杀结算（掉落灵物 + 补一只 + 突破提示）。剑/刀共用
+  // 击杀结算（碎屑 + 连斩 + 掉落 + 突破提示）。剑/刀共用
   function onKill(j) {
     const m = monsters[j];
+    const mx = m.x + m.w / 2, my = m.y + m.h / 2;
     monsters.splice(j, 1);
     kills++;
-    items.push({ x: m.x, y: m.y, kind: ['herb', 'herb', 'stone', 'pill'][Math.floor(Math.random() * 4)], t: 0 });
-    monsters.push(spawnMonster());
+    // 割草反馈：不补位（减员是看得见的），补员交给兽潮波次
+    burst(mx, my, m.glow || '#ffffff', m.elite ? 18 : 9, !!m.elite);
+    addShake(m.elite ? 5 : 2);
+    combo++; comboT = COMBO_WIN; comboPop = 1;
+    killTimes.push(clock);
+    if (killTimes.length > 90) killTimes.shift();
+    if (items.length < 16) items.push({ x: mx, y: my, kind: ['herb', 'herb', 'stone', 'pill'][Math.floor(Math.random() * 4)], t: 0 });
     while (lastTierIdx < TIER_KILLS.length && kills >= TIER_KILLS[lastTierIdx]) {
       const info = realmInfo();
-      elToast.textContent = '突破！' + info.name + ' · ' + info.skill + '　妖潮增至 ' + targetFoeCount() + ' 只';
+      elToast.textContent = '突破！' + info.name + ' · ' + info.skill + '　兽潮将至 ' + targetFoeCount() + ' 只';
       elToast.style.display = 'block'; toastT = 2.4;
       lastTierIdx++;
+      waveTimer = Math.min(waveTimer, 1.2);   // 突破后立刻起一波，规模立刻见长
     }
   }
 
@@ -327,10 +411,11 @@
       const cfg = weaponCfg();
       player.atkCd = cfg.cd;
       if (cfg.kind === 'blade') {
-        // 近战刀芒：面朝方向扇形重创 + 击退
+        // 近战刀芒：面朝方向扇形重创 + 击退（扇形内全中，人堆里越砍越爽）
         const px = player.x + player.w / 2, py = player.y + player.h / 2;
         const fwd = player.face > 0 ? 0 : Math.PI;
-        slashes.push({ x: px, y: py, dir: player.face, range: cfg.range, arc: cfg.arc, life: 0.18, max: 0.18 });
+        slashes.push({ x: px, y: py, dir: player.face, range: cfg.range, arc: cfg.arc, life: 0.2, max: 0.2 });
+        let hits = 0;
         for (let j = monsters.length - 1; j >= 0; j--) {
           const m = monsters[j];
           const dx = m.x + m.w / 2 - px, dy = m.y + m.h / 2 - py;
@@ -340,12 +425,14 @@
           while (diff > Math.PI) diff -= 2 * Math.PI;
           while (diff < -Math.PI) diff += 2 * Math.PI;
           if (Math.abs(diff) > cfg.arc / 2) continue;
-          m.hp -= cfg.dmg; m.hit = 0.12;
+          m.hp -= cfg.dmg; m.hit = 0.14;
+          hits++;
           const kl = Math.max(1, d);
           m.x = Math.max(0, Math.min(WORLD.w - m.w, m.x + dx / kl * cfg.knock * 0.14));
           m.y = Math.max(0, Math.min(WORLD.h - m.h, m.y + dy / kl * cfg.knock * 0.14));
-          if (m.hp <= 0) onKill(j);
+          if (m.hp <= 0) { burst(m.x + m.w / 2, m.y + m.h / 2, m.glow || '#fff', 5, false); onKill(j); }
         }
+        if (hits) addShake(1.6 + Math.min(4, hits * 0.7));
       } else {
         const base = player.face > 0 ? 0 : Math.PI;
         for (let i = 0; i < cfg.count; i++) {
@@ -379,12 +466,14 @@
         }
       }
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
-      if (s.life <= 0 || s.x < -20 || s.x > WORLD.w + 20 || s.y < -20 || s.y > WORLD.h + 20) { swords.splice(i, 1); continue; }
+      // 射程到边即止：撞在斗法场边界上就散掉，不会飞到屏幕外去打看不见的怪
+      if (s.life <= 0 || s.x < 4 || s.x > WORLD.w - 4 || s.y < 4 || s.y > WORLD.h - 4) { swords.splice(i, 1); continue; }
       for (let j = monsters.length - 1; j >= 0; j--) {
         const m = monsters[j];
         if (s.hit.has(m.id)) continue;
         if (aabb({ x: s.x - 9, y: s.y - 9, w: 18, h: 18 }, m)) {
-          m.hp -= s.dmg; m.hit = 0.12;
+          m.hp -= s.dmg; m.hit = 0.14;
+          burst(m.x + m.w / 2, m.y + m.h / 2, m.glow || '#fff', 3, false);
           if (!s.pierce) { swords.splice(i, 1); }
           else s.hit.add(m.id);
           if (m.hp <= 0) { onKill(j); }
@@ -399,51 +488,97 @@
       if (slashes[i].life <= 0) slashes.splice(i, 1);
     }
 
-    // 妖兽 AI
+    // 妖兽 AI：不再远处乱逛，全部朝玩家压上来（这才是"兽潮"），带轻微侧向摆动免成一条线
     for (const m of monsters) {
       m.anim += dt;
-      const dx = player.x - m.x, dy = player.y - m.y, d = Math.hypot(dx, dy);
-      const chase = m.type === 'ghost' ? 230 : 300;
-      if (d < chase) {
-        const l = Math.max(1, d); m.dx = dx / l; m.dy = dy / l;
-      } else {
-        m.wander -= dt;
-        if (m.wander <= 0) {
-          m.wander = (m.type === 'ghost' ? 0.3 : 0.6) + Math.random() * (m.type === 'ghost' ? 0.6 : 1.4);
-          const a = Math.random() * 6.283; m.dx = Math.cos(a); m.dy = Math.sin(a);
-        }
-      }
+      const dx = player.x + player.w / 2 - (m.x + m.w / 2);
+      const dy = player.y + player.h / 2 - (m.y + m.h / 2);
+      const l = Math.max(1, Math.hypot(dx, dy));
+      const ux = dx / l, uy = dy / l;
+      const wob = Math.sin(m.anim * 2.1 + m.sway) * 0.26;
+      m.dx = ux - uy * wob; m.dy = uy + ux * wob;
+      const ul = Math.hypot(m.dx, m.dy) || 1; m.dx /= ul; m.dy /= ul;
+      const spd = m.speed * (m.rush > 0 ? 1.65 : 1);   // 涌进场的一瞬冲得更快
+      if (m.rush > 0) m.rush -= dt;
       if (m.dx > 0.15) m.face = 1; else if (m.dx < -0.15) m.face = -1;
-      m.x = Math.max(0, Math.min(WORLD.w - m.w, m.x + m.dx * m.speed * dt));
-      m.y = Math.max(0, Math.min(WORLD.h - m.h, m.y + m.dy * m.speed * dt));
+      m.x += m.dx * spd * dt;
+      m.y += m.dy * spd * dt;
       if (m.hit > 0) m.hit -= dt;
+    }
+
+    // 兽群互斥：挤成一坨"兽潮"，而不是全部叠在同一像素上（n≤34，开销可忽略）
+    for (let i = 0; i < monsters.length; i++) {
+      const a = monsters[i];
+      for (let j = i + 1; j < monsters.length; j++) {
+        const b = monsters[j];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const minD = (a.w + b.w) * 0.46;
+        if (dx > minD || dx < -minD || dy > minD || dy < -minD) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= minD * minD || d2 < 1e-6) continue;
+        const d = Math.sqrt(d2), push = (minD - d) * 0.5;
+        const ux = dx / d, uy = dy / d;
+        a.x -= ux * push; a.y -= uy * push;
+        b.x += ux * push; b.y += uy * push;
+      }
+      a.x = Math.max(0, Math.min(WORLD.w - a.w, a.x));
+      a.y = Math.max(0, Math.min(WORLD.h - a.h, a.y));
+    }
+
+    // 妖兽贴身伤害
+    for (const m of monsters) {
       if (aabb(player, m) && player.inv <= 0) {
-        player.hp -= m.dmg; player.inv = 0.8;
+        player.hp -= m.dmg; player.inv = 0.85;
+        burst(player.x + player.w / 2, player.y + player.h / 2, '#ff5a5a', 7, false);
+        addShake(6);
         if (player.hp <= 0) { player.hp = 0; player.dead = true; player.respawn = 1.6; }
       }
     }
 
-    // 妖兽补员：数量随境界提升（每 1.1s 补一只，避免瞬间涌入卡顿）
-    spawnTimer -= dt;
-    if (spawnTimer <= 0) {
-      spawnTimer = 1.1;
-      if (monsters.length < targetFoeCount()) monsters.push(spawnMonster());
+    // 兽潮波次：成波涌来，波与波之间留空档，让"割完一波"有实感
+    waveTimer -= dt;
+    if (waveTimer <= 0) { waveTimer = WAVE_GAP_BY_TIER[tierIdx()]; launchWave(false); }
+    // 细水补员：只补到目标的一半，剩下的靠下一波涌进来
+    dripTimer -= dt;
+    if (dripTimer <= 0) {
+      dripTimer = 0.9;
+      if (monsters.length < Math.ceil(targetFoeCount() * 0.5)) monsters.push(spawnMonster(null, false));
     }
 
-    // 物品拾取
+    // 割草反馈推进
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vx *= (1 - 3.2 * dt); p.vy *= (1 - 3.2 * dt);
+      p.life -= dt;
+    }
+    for (let i = rings.length - 1; i >= 0; i--) { const g = rings[i]; g.r += g.grow * dt; g.life -= dt; }
+    trimFx();
+    if (shake > 0) shake = Math.max(0, shake - dt * 26);
+    clock += dt;
+    while (killTimes.length && clock - killTimes[0] > COMBO_WIN) killTimes.shift();
+    combo = killTimes.length;
+    if (combo > comboBest) comboBest = combo;
+    if (comboT > 0) comboT -= dt;
+    if (comboPop > 0) comboPop = Math.max(0, comboPop - dt * 3.4);
+    if (waveCall) { waveCall.t -= dt; if (waveCall.t <= 0) waveCall = null; }
+
+    // 物品：轻微磁吸（割完一波自动往身上收）+ 拾取治疗
     for (let i = items.length - 1; i >= 0; i--) {
       const h = items[i];
+      h.t += dt;
+      const dx = player.x + player.w / 2 - h.x, dy = player.y + player.h / 2 - h.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 96 && d > 1) { h.x += dx / d * 132 * dt; h.y += dy / d * 132 * dt; }
       if (aabb(player, { x: h.x - 12, y: h.y - 12, w: 24, h: 24 })) {
         items.splice(i, 1); herbs++;
-        const heal = h.kind === 'pill' ? 18 : h.kind === 'stone' ? 6 : 0;
-        if (heal) player.hp = Math.min(player.maxhp, player.hp + heal);
+        const heal = h.kind === 'pill' ? 24 : h.kind === 'stone' ? 9 : 3;
+        player.hp = Math.min(player.maxhp, player.hp + heal);
         if (items.length < 7) spawnItem();
       }
     }
 
-    // 相机
-    cam.x = WORLD.w <= VW ? (WORLD.w - VW) / 2 : Math.max(0, Math.min(WORLD.w - VW, player.x + player.w / 2 - VW / 2));
-    cam.y = WORLD.h <= VH ? (WORLD.h - VH) / 2 : Math.max(0, Math.min(WORLD.h - VH, player.y + player.h / 2 - VH / 2));
+    // 斗法场即屏幕，无相机滚动：所有实体恒在可视范围内
 
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) elToast.style.display = 'none'; }
   }
@@ -1259,26 +1394,42 @@
   }
 
   function render() {
-    ctx.fillStyle = '#0d0b1a';
+    // 屏幕底 + 斗法场（整块居中铺满，实测铺不下时只在两侧留极少边带）
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#06050d';
     ctx.fillRect(0, 0, VW, VH);
-    ctx.save();
-    ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
 
-    ctx.strokeStyle = 'rgba(120,110,180,0.10)';
+    let ox = (VW - WORLD.w * zoom) / 2, oy = (VH - WORLD.h * zoom) / 2;
+    if (shake > 0.05) { ox += (Math.random() - 0.5) * shake; oy += (Math.random() - 0.5) * shake; }
+    ctx.setTransform(zoom, 0, 0, zoom, ox, oy);
+
+    // 场地地面
+    ctx.fillStyle = '#0d0b1a';
+    ctx.fillRect(0, 0, WORLD.w, WORLD.h);
+
+    // 灵脉纹路
+    ctx.strokeStyle = 'rgba(120,110,180,0.07)';
     ctx.lineWidth = 1;
     const step = 64;
-    const sx = Math.floor(cam.x / step) * step, sy = Math.floor(cam.y / step) * step;
     ctx.beginPath();
-    for (let gx = sx; gx < cam.x + VW + step; gx += step) { ctx.moveTo(gx, cam.y); ctx.lineTo(gx, cam.y + VH); }
-    for (let gy = sy; gy < cam.y + VH + step; gy += step) { ctx.moveTo(cam.x, gy); ctx.lineTo(cam.x + VW, gy); }
+    for (let gx = 0; gx <= WORLD.w; gx += step) { ctx.moveTo(gx, 0); ctx.lineTo(gx, WORLD.h); }
+    for (let gy = 0; gy <= WORLD.h; gy += step) { ctx.moveTo(0, gy); ctx.lineTo(WORLD.w, gy); }
     ctx.stroke();
 
+    // 洞窟晶簇
     for (const d of deco) {
-      if (d.x < cam.x - 20 || d.x > cam.x + VW + 20 || d.y < cam.y - 20 || d.y > cam.y + VH + 20) continue;
-      if (d.glow) { ctx.fillStyle = d.c; ctx.globalAlpha = 0.18; ctx.fillRect(d.x - d.r - 4, d.y - d.r - 4, (d.r + 4) * 2, (d.r + 4) * 2); ctx.globalAlpha = 1; }
+      if (d.glow) { ctx.globalAlpha = 0.16; ctx.fillStyle = d.c; ctx.fillRect(d.x - d.r - 4, d.y - d.r - 4, (d.r + 4) * 2, (d.r + 4) * 2); ctx.globalAlpha = 1; }
       ctx.fillStyle = d.c;
       ctx.fillRect(Math.round(d.x - d.r / 2), Math.round(d.y - d.r), d.r, d.r * 2);
     }
+
+    // 冲击环
+    for (const g of rings) {
+      ctx.globalAlpha = Math.max(0, g.life / g.max) * 0.7;
+      ctx.strokeStyle = g.col; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, 6.2832); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
 
     for (const h of items) drawItem(h);
     for (const m of monsters) drawMonster(m);
@@ -1286,7 +1437,62 @@
     for (const s of swords) drawProj(s);
     if (!player.dead) drawPlayer();
 
-    ctx.restore();
+    // 兽潮方向提示（在来敌那一侧，箭头指向场内）
+    if (waveCall) {
+      const e = waveCall.edge;
+      const px = e === 2 ? 104 : e === 3 ? WORLD.w - 104 : WORLD.w / 2;
+      const py = e === 0 ? 48 : e === 1 ? WORLD.h - 48 : WORLD.h / 2;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, waveCall.t / 0.6);
+      ctx.translate(px, py);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 15px system-ui, -apple-system, "Segoe UI", sans-serif';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(8,5,16,0.82)';
+      const label = '兽潮 · 第' + waveCall.no + ' 波';
+      ctx.strokeText(label, 0, 0);
+      ctx.fillStyle = '#ff8a5b'; ctx.fillText(label, 0, 0);
+      ctx.beginPath();
+      if (e === 0) { ctx.moveTo(0, 16); ctx.lineTo(-7, 27); ctx.lineTo(7, 27); }
+      else if (e === 1) { ctx.moveTo(0, -16); ctx.lineTo(-7, -27); ctx.lineTo(7, -27); }
+      else if (e === 2) { ctx.moveTo(16, 0); ctx.lineTo(27, -7); ctx.lineTo(27, 7); }
+      else { ctx.moveTo(-16, 0); ctx.lineTo(-27, -7); ctx.lineTo(-27, 7); }
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    // 妖兽碎屑（画在最上层，割草才有飞溅感）
+    for (const p of parts) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.col;
+      ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+    }
+    ctx.globalAlpha = 1;
+
+    // 场地边框：明确"斗法场＝屏幕"，越界即出界
+    ctx.strokeStyle = 'rgba(140,130,220,0.30)'; ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, WORLD.w - 2, WORLD.h - 2);
+
+    // ---- 屏幕坐标层 ----
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (combo >= 3) {
+      const a = Math.min(1, comboT / 0.45);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.translate(VW / 2, Math.max(96, VH * 0.26));
+      ctx.scale(1 + comboPop * 0.3, 1 + comboPop * 0.3);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 30px system-ui, -apple-system, "Segoe UI", sans-serif';
+      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(8,5,16,0.85)';
+      ctx.strokeText('连斩 ×' + combo, 0, 0);
+      ctx.fillStyle = combo >= 25 ? '#ffd24a' : combo >= 12 ? '#ff9a4a' : '#ffe27a';
+      ctx.fillText('连斩 ×' + combo, 0, 0);
+      ctx.font = 'bold 13px system-ui, -apple-system, "Segoe UI", sans-serif';
+      ctx.lineWidth = 4;
+      ctx.strokeText(combo >= 12 ? '割草中' : '收割中', 0, 27);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText(combo >= 12 ? '割草中' : '收割中', 0, 27);
+      ctx.restore();
+    }
 
     const info = realmInfo();
     elHp.style.width = (player.hp / player.maxhp * 100) + '%';
@@ -1297,6 +1503,16 @@
     elDeath.style.display = player.dead ? 'flex' : 'none';
   }
 
+  // 屏幕尺寸/方向变化后，把越界实体收回斗法场内（斗法场即屏幕，不能有实体留在场外）
+  function fitWorld() {
+    player.x = Math.max(0, Math.min(WORLD.w - player.w, player.x));
+    player.y = Math.max(0, Math.min(WORLD.h - player.h, player.y));
+    for (const m of monsters) {
+      m.x = Math.max(0, Math.min(WORLD.w - m.w, m.x));
+      m.y = Math.max(0, Math.min(WORLD.h - m.h, m.y));
+    }
+  }
+
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
@@ -1305,6 +1521,5 @@
     requestAnimationFrame(loop);
   }
 
-  resize();
   requestAnimationFrame(loop);
 })();
