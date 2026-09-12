@@ -137,8 +137,8 @@
     if (kills >= 20) t = 4; else if (kills >= 12) t = 3; else if (kills >= 7) t = 2; else if (kills >= 3) t = 1;
     return 1 + t * 0.32;
   }
-  // 妖兽数量随境界递增：炼气 5 → 筑基 8 → 金丹 11 → 元婴 14 → 化神 17
-  const FOE_BY_TIER = [5, 8, 11, 14, 17];
+  // 妖兽数量随境界递增（在原基础上翻倍）：炼气 10 → 筑基 16 → 金丹 22 → 元婴 28 → 化神 34
+  const FOE_BY_TIER = [10, 16, 22, 28, 34];
   function targetFoeCount() { return FOE_BY_TIER[tierIdx()]; }
 
   let uid = 0;
@@ -153,9 +153,10 @@
     const t = tierIdx();
     const r = Math.random();
     let type;
-    if (t === 0) type = 'wolf';
-    else if (t === 1) type = r < 0.5 ? 'wolf' : 'spider';
-    else if (t === 2) type = r < 0.4 ? 'wolf' : r < 0.7 ? 'spider' : 'toad';
+    // 数量翻倍后同屏妖兽更多，种类也提前铺开，免得开局一片全是妖狼
+    if (t === 0) type = r < 0.72 ? 'wolf' : 'spider';
+    else if (t === 1) type = r < 0.46 ? 'wolf' : r < 0.78 ? 'spider' : 'toad';
+    else if (t === 2) type = r < 0.30 ? 'wolf' : r < 0.55 ? 'spider' : r < 0.80 ? 'toad' : 'ghost';
     else type = ['wolf', 'spider', 'toad', 'ghost', 'serpent'][Math.floor(Math.random() * 5)];
     const d = MTYPE[type];
     const mul = diffScaler();
@@ -174,7 +175,7 @@
   let monsters = [];
   let herbs = 0, kills = 0;
   let spawnTimer = 0;                                 // 妖兽补员计时（缓慢补足，不瞬间涌入）
-  for (let i = 0; i < 5; i++) monsters.push(spawnMonster());
+  for (let i = 0; i < targetFoeCount(); i++) monsters.push(spawnMonster());
 
   // ---------- 物品（灵草 / 灵石 / 丹药，各有形状） ----------
   let items = [];
