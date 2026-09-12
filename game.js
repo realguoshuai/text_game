@@ -568,8 +568,39 @@
   const player = {
     x: WORLD.w / 2, y: WORLD.h / 2, w: 28, h: 44,
     char: CHARS[0], speed: CHARS[0].speed, hp: 100, maxhp: 100, face: 1, atkCd: 0, inv: 0,
-    dead: false, respawn: 0, anim: 0
+    dead: false, respawn: 0, anim: 0,
+    dir: 'down', walkT: 0                // 四向朝向 + 行走动画计时（像素立绘用）
   };
+
+  // ---------- 像素角色图集（国风武侠免费素材，见 assets/CREDITS.txt） ----------
+  // 规格：6 列 × 5 行，单帧 64×64。行序：0 正面待机 / 1 正面行走 / 2 侧面行走 / 3 背面行走 / 4 背面待机
+  // 站立时一律取该行第 0 帧（生成时已把最中性的一帧旋到首位），所以不会出现"站立却劈叉"的姿势。
+  // 加载失败 / 桩测试环境会自动退回原来的程序化立绘，不影响可玩性。
+  const SPRITE_ROWS = { down: [0, 1], up: [4, 3], side: [0, 2] };   // [待机行, 行走行]
+  const sprites = { sword: null, thunder: null, blade: null };
+  const spriteFlash = { sword: null, thunder: null, blade: null }; // 受击白闪用的同规格剪影
+  (function loadSprites() {
+    if (typeof Image === 'undefined') return;
+    for (const id in sprites) {
+      const im = new Image();
+      im.onload = function () {
+        if (!im.width || im.width < 64) { sprites[id] = null; return; }
+        sprites[id] = im;
+        try {
+          const fc = document.createElement('canvas');
+          fc.width = im.width; fc.height = im.height;
+          const g = fc.getContext('2d');
+          g.drawImage(im, 0, 0);
+          g.globalCompositeOperation = 'source-in';   // 只保留人物像素，涂成纯白
+          g.fillStyle = '#ffffff';
+          g.fillRect(0, 0, fc.width, fc.height);
+          spriteFlash[id] = fc;
+        } catch (e) { spriteFlash[id] = null; }
+      };
+      im.onerror = function () { sprites[id] = null; };
+      im.src = 'assets/char_' + id + '.png';
+    }
+  })();
   window.GameAPI = {
     selectChar(id) { const c = CHARS.find(x => x.id === id); if (c) { player.char = c; player.speed = c.speed; } },
     // 供自动化/桩测试读取运行态（不改游戏行为）
@@ -586,7 +617,9 @@
         // 手机手感 / 画质（桩测试核对用）
         dash: dashT > 0, dashCd: +dashCd.toFixed(2), aim: Settings.aim,
         q: Settings.q, qLevel: qLevel, fps: fpsShown,
-        px: Math.round(player.x), py: Math.round(player.y), aimA: +aimAngle().toFixed(3)
+        px: Math.round(player.x), py: Math.round(player.y), aimA: +aimAngle().toFixed(3),
+        // 像素立绘：图集是否就绪 / 当前朝向（桩测试核对用）
+        sprite: !!sprites[player.char.id], dir: player.dir, walkT: +player.walkT.toFixed(3)
       };
     }
   };
@@ -723,6 +756,11 @@
       if (qLevel >= 1 && Math.random() < 0.7) burst(player.x + player.w / 2, player.y + player.h / 2, '#9fd4ff', 2, false);
     }
     if (dashCd > 0) dashCd -= dt;
+    // 四向朝向 + 行走动画计时（放在冲遁改写 mx/my 之后，冲刺时朝向也跟着冲的方向）
+    if (mx || my) {
+      player.dir = Math.abs(mx) >= Math.abs(my) ? (mx > 0 ? 'right' : 'left') : (my > 0 ? 'down' : 'up');
+      player.walkT += dt;
+    } else { player.walkT = 0; }
     player.x = Math.max(0, Math.min(WORLD.w - player.w, player.x + mx * spd * dt));
     player.y = Math.max(0, Math.min(WORLD.h - player.h, player.y + my * spd * dt));
 
@@ -946,7 +984,7 @@
 
   function drawPlayer() {
     const p = player, c = p.char;
-    const walking = (keys.up || keys.down || keys.left || keys.right || joy.active);
+    const walking = (keys.up || keys.down || keys.left || keys.right || joy.active) || dashT > 0;
     const t = p.anim * 9;
     const bob = walking ? -Math.abs(Math.sin(t)) * 1.4 : Math.sin(p.anim * 2.4) * 0.6;
     const swing = walking ? Math.sin(t) : 0;
@@ -958,10 +996,30 @@
     ctx.fillStyle = 'rgba(0,0,0,0.32)';
     ctx.beginPath(); ctx.ellipse(cx, feet - 1, p.w * 0.50, 4.2, 0, 0, 6.2832); ctx.fill();
 
+    // ① 像素图集（加载成功就用它；受击时换同类规格的白色剪影做闪烁）
+    const sheet = sprites[c.id];
+    if (sheet) {
+      const face = p.dir === 'up' ? 'up' : (p.dir === 'down' ? 'down' : 'side');
+      const rows = SPRITE_ROWS[face];
+      const row = walking ? rows[1] : rows[0];                 // 站着取第 0 帧（中性姿势），走起来循环 6 帧
+      const fr = walking ? (Math.floor(p.walkT * 9) % 6) : 0;
+      const img = (flash && spriteFlash[c.id]) ? spriteFlash[c.id] : sheet;
+      const S = 80;   // 1.25 倍绘制：人物实际约 46px 高（旧立绘约 47px），与 44 高的碰撞盒相当，
+                      // 避免出现"碰撞盒比人还大、看着没碰到却被蹭到"的问题
+      ctx.save();
+      ctx.translate(cx, feet);
+      if (face === 'side' && p.dir === 'right') ctx.scale(-1, 1);   // 素材只有朝左，朝右时镜像
+      // 单帧 64×64，人物脚底在帧底部，所以整帧上移 S，让脚踩在碰撞盒底边
+      ctx.drawImage(img, fr * 64, row * 64, 64, 64, -S / 2, -S, S, S);
+      ctx.restore();
+      return;
+    }
+
+    // ② 退回程序化立绘（图集未加载 / 加载失败 / 无浏览器桩环境）
     ctx.save();
     ctx.translate(cx, Math.round(feet + bob));
-    const S = p.h / 44;                       // 立绘按 44 单位身高设计，自动适配碰撞盒
-    ctx.scale(p.face * S, S);                 // 朝右设计，向左时整幅镜像
+    const SC = p.h / 44;                       // 立绘按 44 单位身高设计，自动适配碰撞盒
+    ctx.scale(p.face * SC, SC);                // 朝右设计，向左时整幅镜像
     ctx.lineJoin = 'round';
     if (c.id === 'blade') drawBladeMaster(swing, flash, p.anim);
     else if (c.id === 'thunder') drawThunderLord(swing, flash, p.anim);
