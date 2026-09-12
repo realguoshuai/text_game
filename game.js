@@ -53,14 +53,49 @@
     el.addEventListener('pointerleave', off);
     el.addEventListener('pointercancel', off);
   }
-  bindBtn('btn-up', 'up'); bindBtn('btn-down', 'down');
-  bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right');
   bindBtn('btn-atk', 'attack');
 
   // 触屏设备显示屏幕按钮
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     document.body.classList.add('touch');
   }
+
+  // ---------- 虚拟摇杆（圆盘拖动） ----------
+  const joy = { active: false, x: 0, y: 0, id: null };
+  const joyEl = document.getElementById('joystick');
+  const joyKnob = document.getElementById('joy-knob');
+  const JOY_R = 46;
+  function joyMove(e) {
+    if (!joy.active || e.pointerId !== joy.id) return;
+    const rect = joyEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const d = Math.hypot(dx, dy);
+    if (d > JOY_R) { dx = dx / d * JOY_R; dy = dy / d * JOY_R; }
+    joy.x = dx / JOY_R; joy.y = dy / JOY_R;
+    joyKnob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  }
+  function joyStart(e) {
+    joy.active = true; joy.id = e.pointerId;
+    if (joyEl.setPointerCapture) { try { joyEl.setPointerCapture(e.pointerId); } catch (_) {} }
+    joyMove(e); e.preventDefault();
+  }
+  function joyEnd(e) {
+    if (e.pointerId !== joy.id) return;
+    joy.active = false; joy.x = 0; joy.y = 0; joy.id = null;
+    joyKnob.style.transform = 'translate(0px,0px)';
+  }
+  if (joyEl) {
+    joyEl.addEventListener('pointerdown', joyStart);
+    joyEl.addEventListener('pointermove', joyMove);
+    joyEl.addEventListener('pointerup', joyEnd);
+    joyEl.addEventListener('pointercancel', joyEnd);
+    joyEl.addEventListener('pointerleave', joyEnd);
+  }
+
+  // 屏幕右半边点按 = 出剑（手机更直觉，桌面也可）
+  cv.addEventListener('pointerdown', e => { if (e.clientX > cv.clientWidth / 2) keys.attack = true; });
+  cv.addEventListener('pointerup', e => { if (e.clientX > cv.clientWidth / 2) keys.attack = false; });
 
   // ---------- 玩家 ----------
   const player = {
@@ -128,12 +163,13 @@
     }
     player.anim += dt;
 
-    // 移动
-    let mx = 0, my = 0;
-    if (keys.left) mx -= 1; if (keys.right) mx += 1;
-    if (keys.up) my -= 1; if (keys.down) my += 1;
+    // 移动（键盘 + 摇杆）
+    let mx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    let my = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    if (joy.active) { mx = joy.x; my = joy.y; }
     if (mx || my) {
-      const l = Math.hypot(mx, my); mx /= l; my /= l;
+      const l = Math.hypot(mx, my);
+      if (l > 1) { mx /= l; my /= l; }
       if (mx) player.face = mx > 0 ? 1 : -1;
     }
     player.x = Math.max(0, Math.min(WORLD.w - player.w, player.x + mx * player.speed * dt));
@@ -288,8 +324,12 @@
     for (const h of herbsList) drawHerb(h);
     for (const m of monsters) drawMonster(m);
     for (const s of swords) {
+      ctx.fillStyle = 'rgba(140,210,255,0.35)';
+      ctx.fillRect(Math.round(s.x - 16), Math.round(s.y - 5), 32, 10);
       ctx.fillStyle = '#cfe8ff';
-      ctx.fillRect(Math.round(s.x - 7), Math.round(s.y - 2), 14, 4);
+      ctx.fillRect(Math.round(s.x - 11), Math.round(s.y - 2), 22, 4);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(Math.round(s.x + (s.vx > 0 ? 8 : -12)), Math.round(s.y - 2), 4, 4);
     }
     if (!player.dead) drawPlayer();
 

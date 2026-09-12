@@ -47,19 +47,42 @@ html, body {
 #hud .stat { white-space: nowrap; }
 #hud .stat b { color: #ffd24a; }
 
-/* ---------- 触屏按钮 ---------- */
-#touch { display: none; }
-body.touch #touch {
+/* ---------- 摇杆 / 触屏操控 ---------- */
+#touch {
   display: flex;
   position: absolute;
   bottom: 0; left: 0; right: 0;
   justify-content: space-between;
   align-items: flex-end;
-  padding: 0 18px 22px;
+  padding: 0 18px 26px;
   pointer-events: none;
+  z-index: 4;
 }
-.pad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 6px; pointer-events: auto; }
-.pad .spacer { visibility: hidden; }
+#joystick {
+  position: relative;
+  width: 132px; height: 132px;
+  border-radius: 50%;
+  background: rgba(120,110,200,0.18);
+  border: 2px solid rgba(180,170,255,0.45);
+  pointer-events: auto;
+  touch-action: none;
+  flex: 0 0 auto;
+}
+#joy-base {
+  position: absolute; left: 50%; top: 50%;
+  width: 52px; height: 52px; margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: rgba(180,170,255,0.18);
+  border: 1px solid rgba(180,170,255,0.4);
+}
+#joy-knob {
+  position: absolute; left: 50%; top: 50%;
+  width: 56px; height: 56px; margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(150,140,240,0.7);
+  border: 1px solid rgba(220,215,255,0.8);
+  will-change: transform;
+}
 .btn {
   background: rgba(120,110,200,0.28);
   border: 1px solid rgba(180,170,255,0.5);
@@ -70,10 +93,11 @@ body.touch #touch {
 }
 .btn:active { background: rgba(150,140,240,0.55); }
 #btn-atk {
-  width: 84px; height: 84px; border-radius: 50%;
-  font-size: 16px; align-self: center;
-  background: rgba(224,70,79,0.32);
+  width: 96px; height: 96px; border-radius: 50%;
+  font-size: 17px; flex: 0 0 auto;
+  background: rgba(224,70,79,0.34);
   border-color: rgba(255,140,140,0.6);
+  pointer-events: auto;
 }
 #btn-atk:active { background: rgba(224,70,79,0.6); }
 
