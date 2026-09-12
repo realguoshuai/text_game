@@ -1,397 +1,86 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>凡人修仙录 · 实时版</title>
-  <meta name="theme-color" content="#07060f">
-  <!-- 从主屏图标启动=无 Safari 工具栏，视口不会被地址栏反复撑动（状态栏保持不透明，避免刘海压住 HUD） -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="凡人修仙录">
-  <meta name="description" content="修仙题材实时网页小游戏：操控修士在大地图上斩妖、采灵物、突破境界。每位修士各有武器与技能，突破可三选一构筑流派。">
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>凡人修仙录 · 坊市行（2D版）</title>
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="wrap">
-    <canvas id="game"></canvas>
+<canvas id="game"></canvas>
 
-    <!-- 缩放兜底：万一还是被浏览器放大了，给一个能点回来的出口 -->
-    <button id="viewfix" class="viewfix" hidden>视图被放大 · 点此还原</button>
-
-    <!-- HUD -->
-    <div id="hud">
-      <div class="hp-box">
-        <div class="hp-bar"><span id="hp-fill"></span></div>
-      </div>
-      <div class="stat">斩妖 <b id="kill-val">0</b></div>
-      <div class="stat">境界 <b id="realm-val">炼气期</b></div>
-      <div class="stat">构筑 <b id="build-val">未悟</b></div>
-      <div class="stat">兽潮 <b id="foe-val">5/8</b></div>
-      <div class="stat">灵石 <b id="stone-val">0</b></div>
-      <button id="btn-set" class="hud-btn push" aria-label="设置">⚙</button>
-      <button id="btn-mute" class="hud-btn" aria-label="音效开关">🔊</button>
-    </div>
-
-    <!-- 突破提示 -->
-    <div id="toast"></div>
-
-    <!-- 浮动摇杆（左半屏触摸出现） -->
-    <div id="joystick">
-      <div id="joy-base"></div>
-      <div id="joy-knob"></div>
-    </div>
-
-    <!-- 冲遁钮（半透明；冷却中更淡） -->
-    <div class="btn dash" id="btn-dash" aria-label="冲遁">
-      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-        <path d="M2.5 8h10.5a2.8 2.8 0 1 0-2.8-2.8" fill="none" stroke="#cfe4ff" stroke-width="1.8" stroke-linecap="round"/>
-        <path d="M2.5 13h14.5a2.8 2.8 0 1 1-2.8 2.8" fill="none" stroke="#cfe4ff" stroke-width="1.8" stroke-linecap="round"/>
-        <path d="M2.5 18h7" fill="none" stroke="#cfe4ff" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>
-    </div>
-
-    <!-- 出招钮（半隐藏、可拖动摆放；SVG 剑图标） -->
-    <div class="btn" id="btn-atk" aria-label="出招">
-      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-        <path d="M12 2 L14 4 L13 14 L11 14 L10 4 Z" fill="#e3eeff"/>
-        <rect x="8" y="14" width="8" height="2" fill="#d9b24a"/>
-        <rect x="11" y="16" width="2" height="5" fill="#6b4a2f"/>
-        <circle cx="12" cy="21.4" r="1.6" fill="#d9b24a"/>
-      </svg>
-    </div>
-
-    <!-- 突破三选一 -->
-    <div class="overlay" id="cardpick">
-      <h1 class="card-title">突破 · 择一而悟</h1>
-      <p id="card-sub" class="lead">感悟天地，取其一</p>
-      <div id="card-list"></div>
-    </div>
-
-    <!-- 结算 -->
-    <div class="overlay" id="result">
-      <h1 id="res-title">道心受创</h1>
-      <div id="res-body"></div>
-      <div class="res-btns">
-        <button id="again-btn">再来一局</button>
-        <button id="home-btn" class="ghost-btn">回洞府</button>
-      </div>
-    </div>
-
-    <!-- 设置 -->
-    <div class="overlay" id="settings">
-      <h1 class="set-title">设置</h1>
-      <div class="set-list">
-        <div class="set-row">
-          <div class="set-text">
-            <span class="set-label">辅助瞄准</span>
-            <span class="set-hint">出招自动转向最近妖兽，手机上更好打</span>
-          </div>
-          <div class="chips" data-key="aim">
-            <button class="chip" data-val="on">开</button>
-            <button class="chip" data-val="off">关</button>
-          </div>
-        </div>
-        <div class="set-row">
-          <div class="set-text">
-            <span class="set-label">画质</span>
-            <span class="set-hint">卡顿就调低，自动模式会按帧率自降</span>
-          </div>
-          <div class="chips" data-key="q">
-            <button class="chip" data-val="auto">自动</button>
-            <button class="chip" data-val="high">高</button>
-            <button class="chip" data-val="mid">中</button>
-            <button class="chip" data-val="low">低</button>
-          </div>
-        </div>
-        <div class="set-row">
-          <div class="set-text">
-            <span class="set-label">显示帧率</span>
-            <span class="set-hint">右上角显示 FPS</span>
-          </div>
-          <div class="chips" data-key="fps">
-            <button class="chip" data-val="on">开</button>
-            <button class="chip" data-val="off">关</button>
-          </div>
-        </div>
-        <div class="set-row">
-          <div class="set-text">
-            <span class="set-label">音效与震动</span>
-            <span class="set-hint">斩击、突破钟鸣与手机震动</span>
-          </div>
-          <div class="chips" data-key="sound">
-            <button class="chip" data-val="on">开</button>
-            <button class="chip" data-val="off">关</button>
-          </div>
-        </div>
-      </div>
-      <button id="set-close">返回</button>
-    </div>
-
-    <!-- 开场 + 角色选择 + 洞府 -->
-    <div class="overlay" id="intro">
-      <h1>凡人修仙录 · 实时版</h1>
-      <p class="lead">择一修士，入灵脉斩妖</p>
-      <div id="char-select">
-        <button class="char-card sel" data-char="sword">
-          <span class="c-emoji">🗡️</span>
-          <b>御剑仙</b><small>青袍剑修</small>
-          <span class="c-desc">远程飞剑追踪<br>金丹起可穿透<br>气血 105</span>
-        </button>
-        <button class="char-card" data-char="thunder">
-          <span class="c-emoji">⚡</span>
-          <b>雷法真君</b><small>紫霄法修</small>
-          <span class="c-desc">雷符全程穿透<br>射速快、清群强<br>气血 95</span>
-        </button>
-        <button class="char-card" data-char="blade">
-          <span class="c-emoji">🔥</span>
-          <b>赤焰刀客</b><small>烈焰武修</small>
-          <span class="c-desc">近战扇形横扫<br>重创击退<br>气血 132</span>
-        </button>
-      </div>
-
-      <div id="meta-box">
-        <button id="meta-toggle" class="ghost-btn">洞府 · 灵石 <b id="meta-stone">0</b></button>
-        <div id="meta-panel">
-          <div class="meta-sec"><h3>经脉 · 永久强化</h3><div id="up-list"></div></div>
-          <div class="meta-sec"><h3>今日任务</h3><div id="quest-list"></div></div>
-          <div class="meta-sec"><h3>成就</h3><div id="ach-list"></div></div>
-        </div>
-      </div>
-
-      <p class="ctrl-hint">
-        电脑：<span class="key">W A S D</span> 移动，<span class="key">J / 空格</span> 出招，<span class="key">Shift</span> 冲遁<br>
-        手机：左半屏拖动移动，右半屏点按（或出招钮）出招，左下「冲遁」闪避<br>
-        地图很大，妖兽从视野外成波涌来；突破时三选一，本局越打越强<br>
-        被围死即结束，成绩会记下来——破纪录只是差几只的事
-      </p>
-      <button id="start-btn">开始游戏</button>
-      <button class="ghost-btn" id="intro-set">⚙ 设置</button>
-      <p style="font-size:12px;opacity:.7"><a href="legacy/" style="color:#9a93d8">→ 也想玩文字版？</a></p>
-    </div>
-
-    <!-- 竖屏旋转引导（触屏竖屏时显示；转横屏或点「竖屏也能玩」后消失。网页无法强制转屏） -->
-    <div id="rotate-hint">
-      <div class="icon">📱</div>
-      <h2>请横置手机游玩</h2>
-      <p>横屏视野更开阔，左手摇杆、右手出招更顺手。</p>
-      <button id="rotate-ok" class="ghost-btn">我知道了，竖屏也能玩</button>
-    </div>
+<!-- ===== 左上：角色状态 ===== -->
+<div id="hud-status" class="hud">
+  <div id="portrait"></div>
+  <div id="status-bars">
+    <div class="name-row"><span id="p-name">同道长生</span><span id="p-realm">练气一层</span></div>
+    <div class="bar hp"><div id="bar-hp"></div><span id="txt-hp"></span></div>
+    <div class="bar mp"><div id="bar-mp"></div><span id="txt-mp"></span></div>
+    <div class="bar exp"><div id="bar-exp"></div><span id="txt-exp"></span></div>
+    <div class="stone-row"><span class="stone-icon"></span><span id="p-stones">0</span> 灵石</div>
   </div>
+</div>
 
-  <!-- 手机缩放防线（两段式）
-       ① 拦截：iOS Safari 从 iOS10 起忽略 user-scalable=no，而「左手摇杆 + 右手出招」的两根手指
-          会被它当成捏合缩放 —— 页面一放大就回不去。这里在最早时机拦掉全部缩放手势。
-       ② 补偿：万一还是被放大了（各浏览器行为不一致，光拦不可靠），把 #wrap 反向缩放，
-          让画面始终 1:1 铺满可视区；并通过 window.ZoomFix 把指针坐标换算回「未放大」坐标系，
-          供 game.js 的左右半屏判定与摇杆偏移使用。
-       未放大时 V.s = 1 / V.ox = V.oy = 0，ptX/ptY 是恒等函数 —— 正常情况行为与以前完全一致。 -->
-  <script>
-    (function () {
-      var NONPASSIVE = { passive: false };
+<!-- ===== 右上：小地图 + 时辰 ===== -->
+<div id="hud-minimap" class="hud">
+  <canvas id="minimap" width="150" height="112"></canvas>
+  <div id="clock">未时三刻 · 晴</div>
+</div>
 
-      /* ---------- ① 拦截缩放手势（Safari 专有事件 + 多指 + 双击） ---------- */
-      ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
-        document.addEventListener(t, function (e) { e.preventDefault(); }, NONPASSIVE);
-      });
-      document.addEventListener('touchstart', function (e) {
-        if (e.touches.length > 1) e.preventDefault();
-      }, NONPASSIVE);
-      document.addEventListener('touchmove', function (e) {
-        if (e.touches.length > 1 || (e.scale !== undefined && e.scale !== 1)) e.preventDefault();
-      }, NONPASSIVE);
-      var lastTap = 0;
-      document.addEventListener('touchend', function (e) {
-        if (e.touches.length !== 0) return;
-        var now = Date.now();
-        if (now - lastTap < 320) e.preventDefault();
-        lastTap = now;
-      }, NONPASSIVE);
-      document.addEventListener('dblclick', function (e) { e.preventDefault(); }, NONPASSIVE);
-      document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+<!-- ===== 右侧：任务追踪 ===== -->
+<div id="hud-quests" class="hud">
+  <div class="quest-title">任 务</div>
+  <div id="quest-list"></div>
+</div>
 
-      /* ---------- ② 缩放补偿（对外暴露 window.ZoomFix） ---------- */
-      var V = { on: false, s: 1, ox: 0, oy: 0 };
-      V.ptX = function (x) { return (x - V.ox) * V.s; };
-      V.ptY = function (y) { return (y - V.oy) * V.s; };
-      window.ZoomFix = V;
+<!-- ===== 底部中央：技能栏 ===== -->
+<div id="hud-skills" class="hud">
+  <div class="skill" data-skill="attack"><div class="skill-name">御剑</div><div class="skill-key">LMB</div><div class="skill-cd"></div></div>
+  <div class="skill" data-skill="flying" id="sk-flying"><div class="skill-name">剑力潮</div><div class="skill-key">Q</div><div class="skill-cd"></div></div>
+  <div class="skill" data-skill="dash" id="sk-dash"><div class="skill-name">血遁</div><div class="skill-key">Shift</div><div class="skill-cd"></div></div>
+  <div class="skill" data-skill="guard" id="sk-guard"><div class="skill-name">护体罡气</div><div class="skill-key">R</div><div class="skill-cd"></div></div>
+</div>
 
-      var wrapEl = document.getElementById('wrap');
-      var fixEl = document.getElementById('viewfix');
-      var vv = window.visualViewport;
-      var meta = document.querySelector('meta[name="viewport"]');
-      var metaBase = meta ? meta.getAttribute('content') : '';
-      var hardTried = false;
+<!-- ===== 底部右侧：功能按钮 ===== -->
+<div id="hud-menu" class="hud">
+  <div class="menu-btn" data-panel="char">角色<span class="kbd">C</span></div>
+  <div class="menu-btn" data-panel="bag">背包<span class="kbd">B</span></div>
+  <div class="menu-btn" data-panel="help">设置<span class="kbd">Esc</span></div>
+</div>
 
-      function sync() {
-        if (!vv) return;
-        var z = vv.scale || 1;
-        var on = z > 1.02;
-        V.on = on;
-        V.s = on ? z : 1;
-        V.ox = on ? (vv.offsetLeft || 0) : 0;
-        V.oy = on ? (vv.offsetTop || 0) : 0;
-        if (wrapEl) {
-          wrapEl.style.transformOrigin = '0 0';
-          wrapEl.style.transform = on
-            ? 'translate(' + V.ox + 'px,' + V.oy + 'px) scale(' + (1 / V.s) + ')'
-            : '';
-        }
-        document.body.classList.toggle('zoom-comp', on);
-        if (!fixEl) return;
-        if (!on) { fixEl.hidden = true; fixEl.dataset.auto = ''; return; }
-        fixEl.hidden = false;
-        fixEl.textContent = '已自动校正视图 ×' + z.toFixed(1) + ' · 点此彻底复位';
-        if (!fixEl.dataset.auto) {
-          // 画面已被自动校正，提示 4 秒后自动收起，不挡视线
-          fixEl.dataset.auto = '1';
-          setTimeout(function () { if (vv.scale > 1.02) fixEl.hidden = true; }, 4000);
-        }
-      }
+<!-- ===== 对话框 ===== -->
+<div id="dialog" class="panel hidden">
+  <div id="dialog-name"></div>
+  <div id="dialog-text"></div>
+  <div id="dialog-options"></div>
+  <div class="dialog-hint">数字键选择 · Esc 告辞</div>
+</div>
 
-      if (vv) {
-        vv.addEventListener('resize', sync);
-        vv.addEventListener('scroll', sync);
-        window.addEventListener('resize', sync);
-        window.addEventListener('orientationchange', function () { setTimeout(sync, 260); });
-        sync();
-      }
+<!-- ===== 角色 / 背包 / 商店 / 帮助 面板 ===== -->
+<div id="panel" class="panel hidden">
+  <div id="panel-title"></div>
+  <div id="panel-body"></div>
+  <div class="dialog-hint">Esc 关闭</div>
+</div>
 
-      // 提示按钮：先试不丢进度的复位（重写 viewport meta 逼浏览器重算缩放），失败才降级重载
-      if (fixEl) fixEl.addEventListener('click', function () {
-        if (hardTried) { location.reload(); return; }
-        try {
-          if (meta) {
-            meta.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');
-            setTimeout(function () { try { meta.setAttribute('content', metaBase); } catch (_) {} }, 150);
-          }
-          window.scrollTo(0, 0);
-        } catch (_) {}
-        setTimeout(function () {
-          if (vv && vv.scale > 1.02) { hardTried = true; fixEl.textContent = '浏览器缩放未复位 · 点此重新载入'; }
-        }, 400);
-      });
-    })();
-  </script>
-  <script src="game.js"></script>
-  <script>
-    (function () {
-      var intro = document.getElementById('intro');
-      var result = document.getElementById('result');
-      var rotateHint = document.getElementById('rotate-hint');
-      var metaPanel = document.getElementById('meta-panel');
-      var setPanel = document.getElementById('settings');
-      var isTouch = window.matchMedia('(pointer: coarse)').matches;
-      var selChar = 'sword';
+<!-- ===== 浮动提示 ===== -->
+<div id="toast"></div>
 
-      // 点击 / 触屏双绑（移动端 touchstart 先吃掉，避免合成 click 延迟）
-      function bind(el, fn) {
-        if (!el) return;
-        el.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
-        el.addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false });
-      }
+<!-- ===== 标题画面 ===== -->
+<div id="title" class="overlay">
+  <h1>凡人修仙录 · 坊市行</h1>
+  <p class="sub">—— 2D 俯视角版 · 数据承自文字版《凡人修仙录》 ——</p>
+  <div class="title-btns">
+    <button id="btn-new">初入江湖（新游戏）</button>
+    <button id="btn-continue">继续修行（读取存档）</button>
+  </div>
+  <div class="help-box">
+    <b>操作</b>：WASD / 方向键 移动 · 鼠标左键 / J 挥剑 · Q 飞剑 · Shift 血遁 · R 护体罡气<br>
+    <b>交互</b>：E 对话 / 采集 · C 角色（修为圆满可突破） · B 背包 · Esc 关闭面板
+  </div>
+</div>
 
-      // 用真实视口尺寸判定横竖屏，比 CSS orientation 媒体查询可靠（iOS/全屏场景下后者会卡住）
-      function updateOrientation() {
-        if (!isTouch || !document.body.classList.contains('started') || rotateHint.dataset.dismissed) {
-          document.body.classList.remove('show-rotate');
-          return;
-        }
-        var portrait = window.innerHeight > window.innerWidth;
-        document.body.classList.toggle('show-rotate', portrait);
-      }
-
-      function dismiss() {
-        if (result) result.style.display = 'none';
-        if (setPanel) setPanel.style.display = 'none';
-        if (window.GameAPI) { window.GameAPI.selectChar(selChar); window.GameAPI.start(); }
-        intro.style.display = 'none';
-        document.body.classList.add('started');
-        updateOrientation();
-      }
-      bind(document.getElementById('start-btn'), dismiss);
-
-      // 角色选择
-      var cards = document.querySelectorAll('.char-card');
-      function pick(c) {
-        selChar = c.getAttribute('data-char');
-        cards.forEach(function (x) { x.classList.remove('sel'); });
-        c.classList.add('sel');
-        if (window.GameAPI) window.GameAPI.selectChar(selChar);
-      }
-      cards.forEach(function (c) {
-        c.addEventListener('click', function () { pick(c); });
-        c.addEventListener('touchstart', function (e) { e.preventDefault(); pick(c); }, { passive: false });
-      });
-
-      // 结算面板按钮
-      bind(document.getElementById('again-btn'), function () {
-        if (result) result.style.display = 'none';
-        if (window.GameAPI) window.GameAPI.again();
-      });
-      bind(document.getElementById('home-btn'), function () {
-        if (result) result.style.display = 'none';
-        if (window.GameAPI) { window.GameAPI.openMeta(true); window.GameAPI.toHome(); }
-        intro.style.display = 'flex';
-        document.body.classList.remove('started');
-        updateOrientation();
-      });
-
-      // 洞府面板展开/收起
-      bind(document.getElementById('meta-toggle'), function () {
-        if (window.GameAPI) window.GameAPI.openMeta();
-      });
-
-      // ---------- 设置面板 ----------
-      function syncChips() {
-        if (!window.GameAPI || !window.GameAPI.opts) return;
-        var o = window.GameAPI.opts();
-        document.querySelectorAll('.chips').forEach(function (grp) {
-          var v = o[grp.getAttribute('data-key')];
-          if (typeof v === 'boolean') v = v ? 'on' : 'off';
-          grp.querySelectorAll('.chip').forEach(function (c) {
-            c.classList.toggle('sel', c.getAttribute('data-val') === String(v));
-          });
-        });
-      }
-      function setPanelOpen(on) {
-        if (!setPanel) return;
-        setPanel.style.display = on ? 'flex' : 'none';
-        // 菜单暂停与"选卡暂停"分开：关掉设置后该暂停的还暂停着
-        if (window.GameAPI && window.GameAPI.menuPause) window.GameAPI.menuPause(on);
-        if (on) syncChips();
-      }
-      bind(document.getElementById('btn-set'), function () { setPanelOpen(true); });
-      bind(document.getElementById('intro-set'), function () { setPanelOpen(true); });
-      bind(document.getElementById('set-close'), function () { setPanelOpen(false); });
-
-      document.querySelectorAll('.chips').forEach(function (grp) {
-        var key = grp.getAttribute('data-key');
-        grp.querySelectorAll('.chip').forEach(function (chip) {
-          bind(chip, function () {
-            if (window.GameAPI && window.GameAPI.setOpt) window.GameAPI.setOpt(key, chip.getAttribute('data-val'));
-            syncChips();
-          });
-        });
-      });
-      syncChips();
-
-      // 旋转 / 尺寸变化都重新判定（iOS 旋转后需延迟读取真实尺寸）
-      window.addEventListener('resize', updateOrientation);
-      window.addEventListener('orientationchange', function () { setTimeout(updateOrientation, 300); });
-
-      // 用户可手动忽略竖屏提示，绝不把人卡死
-      bind(document.getElementById('rotate-ok'), function () {
-        rotateHint.dataset.dismissed = '1';
-        document.body.classList.remove('show-rotate');
-      });
-
-      // 音效需在用户手势里解锁
-      function unlock() { if (window.GameAPI && window.GameAPI.unlockAudio) window.GameAPI.unlockAudio(); }
-      window.addEventListener('pointerdown', unlock, { once: true });
-      window.addEventListener('keydown', unlock, { once: true });
-    })();
-  </script>
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
 </body>
 </html>
