@@ -9,18 +9,21 @@
   const ctx = cv.getContext('2d');
   ctx.imageSmoothingEnabled = false;
 
-  // ---------- 视口 / 斗法场 ----------
-  // 斗法场＝屏幕：所有实体恒在可视范围内。武器打不到屏幕外，也不会出现"没看见怪就死了"。
-  let VW = 0, VH = 0, zoom = 1;
-  const WORLD = { w: 900, h: 560 };
-  const ARENA_MIN = { w: 640, h: 400 };   // 太小则保底，免得手机竖屏挤成一团
-  const ARENA_MAX = { w: 1180, h: 780 };  // 太大则封顶，免得大屏上妖兽走半天才到
+  // ---------- 视口 / 大地图 ----------
+  // 大地图 + 相机跟随：地图约为屏幕的 2×2 倍，妖兽散在地图各处、错开涌来，
+  // 密度自然回落（不再像"斗法场＝屏幕"那样全挤在一屏里）。
+  // 但武器射程仍按屏幕短边折算、出视野即散——不会出现"没看见怪就被打死"。
+  let VW = 0, VH = 0;
+  const WORLD = { w: 1600, h: 1100 };
+  const cam = { x: 0, y: 0 };
+  function viewMin() { return Math.min(VW, VH); }
+  function viewMax() { return Math.max(VW, VH); }
 
-  // 洞窟装饰（晶簇）：随斗法场尺寸重建
+  // 洞窟装饰（晶簇）：随地图尺寸重建
   const deco = [];
   function rebuildDeco() {
     deco.length = 0;
-    const n = Math.max(16, Math.round(WORLD.w * WORLD.h / 26000));
+    const n = Math.max(24, Math.round(WORLD.w * WORLD.h / 26000));
     for (let i = 0; i < n; i++) {
       deco.push({
         x: 24 + Math.random() * (WORLD.w - 48),
@@ -36,13 +39,17 @@
     VW = cv.clientWidth || window.innerWidth;
     VH = cv.clientHeight || window.innerHeight;
     cv.width = VW; cv.height = VH;
-    const nw = Math.round(Math.max(ARENA_MIN.w, Math.min(ARENA_MAX.w, VW)));
-    const nh = Math.round(Math.max(ARENA_MIN.h, Math.min(ARENA_MAX.h, VH)));
+    const nw = Math.round(Math.max(1400, Math.min(2600, VW * 2.0)));
+    const nh = Math.round(Math.max(900, Math.min(1900, VH * 2.0)));
     if (nw !== WORLD.w || nh !== WORLD.h) { WORLD.w = nw; WORLD.h = nh; rebuildDeco(); }
-    zoom = Math.min(VW / WORLD.w, VH / WORLD.h);   // 整块斗法场铺进屏幕
+  }
+  function centerCam() {
+    cam.x = Math.max(0, (WORLD.w - VW) / 2);
+    cam.y = Math.max(0, (WORLD.h - VH) / 2);
   }
   resize();
-  window.addEventListener('resize', function () { resize(); if (typeof fitWorld === 'function') fitWorld(); });
+  centerCam();
+  window.addEventListener('resize', function () { resize(); centerCam(); clampAll(); });
 
   // ---------- 输入 ----------
   const keys = { up: false, down: false, left: false, right: false, attack: false };
@@ -156,24 +163,36 @@
   function diffScaler() { return 1 + tierIdx() * 0.32; }
   // 伤害单独走更缓的曲线：同屏兽潮是原来的两倍，按原倍率会被围死，爽感变挫败感
   function dmgScaler() { return 1 + tierIdx() * 0.17; }
-  // 兽潮规模随境界递增：炼气 10 → 筑基 16 → 金丹 22 → 元婴 28 → 化神 34
-  const FOE_BY_TIER = [10, 16, 22, 28, 34];
+  // 兽潮规模随境界递增：炼气 8 → 筑基 12 → 金丹 16 → 元婴 20 → 化神 25
+  // 这是"全地图总量"。屏幕上同时能看到多少，另由"收拢距离"控制（见 AI 里的 chaseR）
+  const FOE_BY_TIER = [8, 12, 16, 20, 25];
   function targetFoeCount() { return FOE_BY_TIER[tierIdx()]; }
   // 每波间隔（秒），境界越高来得越急
   const WAVE_GAP_BY_TIER = [6.6, 6.0, 5.4, 4.8, 4.2];
 
   let uid = 0;
-  // 贴边落点：妖兽从斗法场四边涌入
+  // 落点 A：从视野的某一边外侧涌进（成波用，方向可播报）
+  // 落点 B：绕视野一圈的环带（零散补员用，散得开、不会全挤在一侧）
   function edgePos(edge) {
-    const M = 26;
-    if (edge === 0) return { x: 40 + Math.random() * (WORLD.w - 80), y: M * 0.6 };
-    if (edge === 1) return { x: 40 + Math.random() * (WORLD.w - 80), y: WORLD.h - M * 0.6 };
-    if (edge === 2) return { x: M * 0.6, y: 40 + Math.random() * (WORLD.h - 80) };
-    return { x: WORLD.w - M * 0.6, y: 40 + Math.random() * (WORLD.h - 80) };
+    const M = 52;
+    if (edge === 0) return { x: cam.x + Math.random() * VW, y: cam.y - M };
+    if (edge === 1) return { x: cam.x + Math.random() * VW, y: cam.y + VH + M };
+    if (edge === 2) return { x: cam.x - M, y: cam.y + Math.random() * VH };
+    return { x: cam.x + VW + M, y: cam.y + Math.random() * VH };
+  }
+  function ringPos() {
+    const r0 = viewMax() * 0.78, r1 = viewMax() * 1.30;
+    const a = Math.random() * 6.2832, r = r0 + Math.random() * (r1 - r0);
+    return { x: cam.x + VW / 2 + Math.cos(a) * r, y: cam.y + VH / 2 + Math.sin(a) * r };
+  }
+  function clampSpot(p) {
+    return {
+      x: Math.max(20, Math.min(WORLD.w - 60, p.x)),
+      y: Math.max(20, Math.min(WORLD.h - 60, p.y))
+    };
   }
   function spawnMonster(edge, rush) {
-    const e = (edge == null) ? (Math.random() * 4 | 0) : edge;
-    const pos = edgePos(e);
+    const pos = clampSpot(edge == null ? ringPos() : edgePos(edge));
     // 后期出现更强种类
     const t = tierIdx();
     const r = Math.random();
@@ -193,10 +212,11 @@
       w: Math.round(d.w * grow), h: Math.round(d.h * grow),
       color: d.color, dark: d.dark, glow: d.glow,
       hp: Math.round(d.hp * hpMul), maxhp: Math.round(d.hp * hpMul),
-      speed: d.speed * (elite ? 1.06 : 1) * (1 + t * 0.06),   // 场地小，速度随境界微增，保证压上来
+      speed: d.speed * (elite ? 1.06 : 1) * (1 + t * 0.06),   // 地图变大，速度随境界微增，保证压得上来
       dmg: Math.round(d.dmg * dmgScaler() * (elite ? 1.3 : 1)),
       sway: Math.random() * 6.283,                    // 冲锋时的侧向摆动相位（免得整队排成一条线）
       rush: rush ? 1.15 : 0,                          // 涌进场的加速冲刺
+      wander: 0, wanderA: 0,                          // 离得太远时先游荡（免得全图同时扑过来塞满屏幕）
       dx: 0, dy: 0, hit: 0, anim: Math.random() * 6
     };
   }
@@ -210,7 +230,7 @@
     if (monsters.length >= target) return 0;
     waveNo++;
     waveEdge = Math.floor(Math.random() * 4);
-    const n = Math.max(3, Math.round(target * 0.42));
+    const n = Math.max(3, Math.round(target * 0.34));
     let spawned = 0;
     for (let i = 0; i < n && monsters.length < target; i++) { monsters.push(spawnMonster(waveEdge, true)); spawned++; }
     // 不用 toast（每几秒弹一次太吵）：在场边画方向提示，顺带告诉你该朝哪边打
@@ -224,9 +244,11 @@
   function spawnItem() {
     const r = Math.random();
     const kind = r < 0.6 ? 'herb' : r < 0.85 ? 'stone' : 'pill';
+    // 落在地图各处没意义（没人会翻遍整幅图），改成落在视野附近，保证"看得见、捡得到"
+    const M = 110;
     items.push({
-      x: 60 + Math.random() * (WORLD.w - 120),
-      y: 60 + Math.random() * (WORLD.h - 120),
+      x: Math.max(30, Math.min(WORLD.w - 30, cam.x - M + Math.random() * (VW + M * 2))),
+      y: Math.max(30, Math.min(WORLD.h - 30, cam.y - M + Math.random() * (VH + M * 2))),
       kind, t: Math.random() * 6
     });
   }
@@ -290,7 +312,9 @@
         kills, wave: waveNo, foes: monsters.length, target: targetFoeCount(),
         hp: Math.round(player.hp), dead: player.dead, combo, comboBest,
         parts: parts.length, rings: rings.length, swords: swords.length, slashes: slashes.length,
-        world: [WORLD.w, WORLD.h], zoom, waveTimer: +waveTimer.toFixed(2)
+        world: [WORLD.w, WORLD.h], cam: [Math.round(cam.x), Math.round(cam.y)], view: [VW, VH],
+        // 屏幕内/外妖兽数（用来核对"密度"到底降没降）
+        inView: monsters.filter(m => m.x + m.w > cam.x && m.x < cam.x + VW && m.y + m.h > cam.y && m.y < cam.y + VH).length, waveTimer: +waveTimer.toFixed(2)
       };
     }
   };
@@ -301,9 +325,8 @@
 
   // ---------- 武器 / 技能（按境界进化，三种修士各异） ----------
   // 射程一律按屏幕短边折算（frac × 短边），所以永远不会飞到屏幕外去打"看不见的怪"。
-  function arenaMin() { return Math.min(WORLD.w, WORLD.h); }
   function weaponCfg() {
-    const w = player.char.id, t = tierIdx(), R = arenaMin();
+    const w = player.char.id, t = tierIdx(), R = viewMin();
     if (w === 'thunder') {
       const B = [
         { count: 1, spread: 0,    speed: 560, dmg: 11, frac: 0.70, pierce: true, cd: 0.26 },
@@ -465,8 +488,8 @@
         }
       }
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
-      // 射程到边即止：撞在斗法场边界上就散掉，不会飞到屏幕外去打看不见的怪
-      if (s.life <= 0 || s.x < 4 || s.x > WORLD.w - 4 || s.y < 4 || s.y > WORLD.h - 4) { swords.splice(i, 1); continue; }
+      // 出视野即散：射程按屏幕短边折算，越过视野就不再打"看不见的怪"
+      if (s.life <= 0 || s.x < cam.x - 36 || s.x > cam.x + VW + 36 || s.y < cam.y - 36 || s.y > cam.y + VH + 36) { swords.splice(i, 1); continue; }
       for (let j = monsters.length - 1; j >= 0; j--) {
         const m = monsters[j];
         if (s.hit.has(m.id)) continue;
@@ -487,13 +510,22 @@
       if (slashes[i].life <= 0) slashes.splice(i, 1);
     }
 
-    // 妖兽 AI：不再远处乱逛，全部朝玩家压上来（这才是"兽潮"），带轻微侧向摆动免成一条线
+    // 妖兽 AI：视野附近的全力压上（这才是"兽潮"）；离得太远的先就地游荡，
+    // 免得全图妖兽同时扑过来、屏幕又被塞满。都带轻微侧向摆动，免成一条线。
+    const chaseR = viewMax() * 0.55 + 90;   // 只让视野这一圈的压上来，远的先在外围游荡
     for (const m of monsters) {
       m.anim += dt;
       const dx = player.x + player.w / 2 - (m.x + m.w / 2);
       const dy = player.y + player.h / 2 - (m.y + m.h / 2);
       const l = Math.max(1, Math.hypot(dx, dy));
-      const ux = dx / l, uy = dy / l;
+      let ux = dx / l, uy = dy / l;
+      if (l > chaseR) {
+        m.wander -= dt;
+        if (m.wander <= 0) { m.wander = 1.2 + Math.random() * 1.9; m.wanderA = Math.random() * 6.2832; }
+        ux = Math.cos(m.wanderA) * 0.62 + ux * 0.38;
+        uy = Math.sin(m.wanderA) * 0.62 + uy * 0.38;
+        const ul2 = Math.hypot(ux, uy) || 1; ux /= ul2; uy /= ul2;
+      }
       const wob = Math.sin(m.anim * 2.1 + m.sway) * 0.26;
       m.dx = ux - uy * wob; m.dy = uy + ux * wob;
       const ul = Math.hypot(m.dx, m.dy) || 1; m.dx /= ul; m.dy /= ul;
@@ -577,7 +609,8 @@
       }
     }
 
-    // 斗法场即屏幕，无相机滚动：所有实体恒在可视范围内
+    // 相机跟随（夹在整幅地图内），所以屏幕只显示地图的一角
+    updateCam();
 
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) elToast.style.display = 'none'; }
   }
@@ -1393,30 +1426,34 @@
   }
 
   function render() {
-    // 屏幕底 + 斗法场（整块居中铺满，实测铺不下时只在两侧留极少边带）
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#06050d';
     ctx.fillRect(0, 0, VW, VH);
 
-    let ox = (VW - WORLD.w * zoom) / 2, oy = (VH - WORLD.h * zoom) / 2;
-    if (shake > 0.05) { ox += (Math.random() - 0.5) * shake; oy += (Math.random() - 0.5) * shake; }
-    ctx.setTransform(zoom, 0, 0, zoom, ox, oy);
+    // 相机 + 震屏（整像素对齐，抖起来也不糊字）
+    let ox = -Math.round(cam.x), oy = -Math.round(cam.y);
+    if (shake > 0.05) { ox += Math.round((Math.random() - 0.5) * shake); oy += Math.round((Math.random() - 0.5) * shake); }
+    ctx.setTransform(1, 0, 0, 1, ox, oy);
+
+    // 视野范围（世界坐标）：所有绘制都按它裁剪，地图再大也不多画一笔
+    const vx0 = cam.x - 40, vx1 = cam.x + VW + 40, vy0 = cam.y - 40, vy1 = cam.y + VH + 40;
 
     // 场地地面
     ctx.fillStyle = '#0d0b1a';
     ctx.fillRect(0, 0, WORLD.w, WORLD.h);
 
-    // 灵脉纹路
+    // 灵脉纹路（只画视野内的格线）
     ctx.strokeStyle = 'rgba(120,110,180,0.07)';
     ctx.lineWidth = 1;
     const step = 64;
     ctx.beginPath();
-    for (let gx = 0; gx <= WORLD.w; gx += step) { ctx.moveTo(gx, 0); ctx.lineTo(gx, WORLD.h); }
-    for (let gy = 0; gy <= WORLD.h; gy += step) { ctx.moveTo(0, gy); ctx.lineTo(WORLD.w, gy); }
+    for (let gx = Math.floor(vx0 / step) * step; gx <= vx1; gx += step) { ctx.moveTo(gx, vy0); ctx.lineTo(gx, vy1); }
+    for (let gy = Math.floor(vy0 / step) * step; gy <= vy1; gy += step) { ctx.moveTo(vx0, gy); ctx.lineTo(vx1, gy); }
     ctx.stroke();
 
-    // 洞窟晶簇
+    // 洞窟晶簇（视野裁剪）
     for (const d of deco) {
+      if (d.x < vx0 || d.x > vx1 || d.y < vy0 || d.y > vy1) continue;
       if (d.glow) { ctx.globalAlpha = 0.16; ctx.fillStyle = d.c; ctx.fillRect(d.x - d.r - 4, d.y - d.r - 4, (d.r + 4) * 2, (d.r + 4) * 2); ctx.globalAlpha = 1; }
       ctx.fillStyle = d.c;
       ctx.fillRect(Math.round(d.x - d.r / 2), Math.round(d.y - d.r), d.r, d.r * 2);
@@ -1424,40 +1461,18 @@
 
     // 冲击环
     for (const g of rings) {
+      if (g.x < vx0 || g.x > vx1 || g.y < vy0 || g.y > vy1) continue;
       ctx.globalAlpha = Math.max(0, g.life / g.max) * 0.7;
       ctx.strokeStyle = g.col; ctx.lineWidth = 2.4;
       ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, 6.2832); ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
-    for (const h of items) drawItem(h);
-    for (const m of monsters) drawMonster(m);
+    for (const h of items) if (h.x > vx0 && h.x < vx1 && h.y > vy0 && h.y < vy1) drawItem(h);
+    for (const m of monsters) if (m.x + m.w > vx0 && m.x < vx1 && m.y + m.h > vy0 && m.y < vy1) drawMonster(m);
     for (const s of slashes) drawSlash(s);
-    for (const s of swords) drawProj(s);
+    for (const s of swords) if (s.x > vx0 && s.x < vx1 && s.y > vy0 && s.y < vy1) drawProj(s);
     if (!player.dead) drawPlayer();
-
-    // 兽潮方向提示（在来敌那一侧，箭头指向场内）
-    if (waveCall) {
-      const e = waveCall.edge;
-      const px = e === 2 ? 104 : e === 3 ? WORLD.w - 104 : WORLD.w / 2;
-      const py = e === 0 ? 48 : e === 1 ? WORLD.h - 48 : WORLD.h / 2;
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, waveCall.t / 0.6);
-      ctx.translate(px, py);
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = 'bold 15px system-ui, -apple-system, "Segoe UI", sans-serif';
-      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(8,5,16,0.82)';
-      const label = '兽潮 · 第' + waveCall.no + ' 波';
-      ctx.strokeText(label, 0, 0);
-      ctx.fillStyle = '#ff8a5b'; ctx.fillText(label, 0, 0);
-      ctx.beginPath();
-      if (e === 0) { ctx.moveTo(0, 16); ctx.lineTo(-7, 27); ctx.lineTo(7, 27); }
-      else if (e === 1) { ctx.moveTo(0, -16); ctx.lineTo(-7, -27); ctx.lineTo(7, -27); }
-      else if (e === 2) { ctx.moveTo(16, 0); ctx.lineTo(27, -7); ctx.lineTo(27, 7); }
-      else { ctx.moveTo(-16, 0); ctx.lineTo(-27, -7); ctx.lineTo(-27, 7); }
-      ctx.closePath(); ctx.fill();
-      ctx.restore();
-    }
 
     // 妖兽碎屑（画在最上层，割草才有飞溅感）
     for (const p of parts) {
@@ -1467,12 +1482,17 @@
     }
     ctx.globalAlpha = 1;
 
-    // 场地边框：明确"斗法场＝屏幕"，越界即出界
-    ctx.strokeStyle = 'rgba(140,130,220,0.30)'; ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, WORLD.w - 2, WORLD.h - 2);
+    // 地图边界：走到灵脉尽头会撞见的岩壁
+    ctx.strokeStyle = 'rgba(140,130,220,0.22)'; ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, WORLD.w - 3, WORLD.h - 3);
 
     // ---- 屏幕坐标层 ----
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // 兽潮方向提示：贴在屏幕边缘指向来敌那一侧（顺带告诉你该朝哪边打）
+    if (waveCall) drawWaveHint(waveCall);
+
+    // 连斩
     if (combo >= 3) {
       const a = Math.min(1, comboT / 0.45);
       ctx.save();
@@ -1493,6 +1513,8 @@
       ctx.restore();
     }
 
+    if (typeof drawBossBar === 'function') drawBossBar();
+
     const info = realmInfo();
     elHp.style.width = (player.hp / player.maxhp * 100) + '%';
     elHerb.textContent = herbs;
@@ -1502,14 +1524,47 @@
     elDeath.style.display = player.dead ? 'flex' : 'none';
   }
 
-  // 屏幕尺寸/方向变化后，把越界实体收回斗法场内（斗法场即屏幕，不能有实体留在场外）
-  function fitWorld() {
+  // 兽潮来袭提示：贴在屏幕对应边，箭头指向场内
+  function drawWaveHint(w) {
+    const PAD = 96;
+    let px = VW / 2, py = VH / 2;
+    if (w.edge === 0) py = 92;
+    else if (w.edge === 1) py = VH - 92;
+    else if (w.edge === 2) px = PAD;
+    else px = VW - PAD;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, w.t / 0.6);
+    ctx.translate(px, py);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 15px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(8,5,16,0.82)';
+    const label = '兽潮 · 第' + w.no + '波';
+    ctx.strokeText(label, 0, 0);
+    ctx.fillStyle = '#ff8a5b'; ctx.fillText(label, 0, 0);
+    ctx.beginPath();
+    if (w.edge === 0) { ctx.moveTo(0, 16); ctx.lineTo(-7, 27); ctx.lineTo(7, 27); }
+    else if (w.edge === 1) { ctx.moveTo(0, -16); ctx.lineTo(-7, -27); ctx.lineTo(7, -27); }
+    else if (w.edge === 2) { ctx.moveTo(16, 0); ctx.lineTo(27, -7); ctx.lineTo(27, 7); }
+    else { ctx.moveTo(-16, 0); ctx.lineTo(-27, -7); ctx.lineTo(-27, 7); }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // 相机跟随玩家，并夹在整幅地图内
+  function updateCam() {
+    cam.x = Math.max(0, Math.min(WORLD.w - VW, player.x + player.w / 2 - VW / 2));
+    cam.y = Math.max(0, Math.min(WORLD.h - VH, player.y + player.h / 2 - VH / 2));
+  }
+
+  // 尺寸/方向变化后，把越界实体收回地图内
+  function clampAll() {
     player.x = Math.max(0, Math.min(WORLD.w - player.w, player.x));
     player.y = Math.max(0, Math.min(WORLD.h - player.h, player.y));
     for (const m of monsters) {
       m.x = Math.max(0, Math.min(WORLD.w - m.w, m.x));
       m.y = Math.max(0, Math.min(WORLD.h - m.h, m.y));
     }
+    updateCam();
   }
 
   function loop(now) {
