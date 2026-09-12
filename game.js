@@ -770,7 +770,12 @@
       const cfg = applyMods(weaponCfg());
       player.atkCd = cfg.cd;
       const aimA = aimAngle();                                      // 辅助瞄准：出招瞬间转向最近的威胁
-      if (!(mx || my)) player.face = Math.cos(aimA) >= 0 ? 1 : -1;  // 站桩时人跟着转，视觉更顺
+      if (!(mx || my)) {                                            // 站桩时人跟着转，视觉更顺
+        const ac = Math.cos(aimA), as = Math.sin(aimA);
+        player.face = ac >= 0 ? 1 : -1;
+        // 像素立绘走四向，所以朝向也要跟着瞄准方向转（否则会出现"朝下站着往上面打"）
+        player.dir = Math.abs(ac) >= Math.abs(as) ? (ac > 0 ? 'right' : 'left') : (as > 0 ? 'down' : 'up');
+      }
       if (cfg.kind === 'blade') {
         // 近战刀芒：瞄准方向的扇形重创 + 击退（扇形内全中，人堆里越砍越爽）
         const px = player.x + player.w / 2, py = player.y + player.h / 2;
