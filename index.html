@@ -55,11 +55,12 @@
       <p style="font-size:12px;opacity:.7"><a href="legacy/" style="color:#9a93d8">→ 也想玩文字版？</a></p>
     </div>
 
-    <!-- 竖屏旋转引导（触屏竖屏时显示，转横屏自动消失；网页无法强制转屏） -->
+    <!-- 竖屏旋转引导（触屏竖屏时显示；转横屏或点「竖屏也能玩」后消失。网页无法强制转屏） -->
     <div id="rotate-hint">
       <div class="icon">📱</div>
       <h2>请横置手机游玩</h2>
       <p>横屏视野更开阔，左手摇杆、右手出剑更顺手。<br>也可点「横屏全屏游玩」先进入全屏。</p>
+      <button id="rotate-ok" class="ghost-btn">我知道了，竖屏也能玩</button>
     </div>
 
     <!-- 死亡 -->
@@ -73,18 +74,49 @@
   <script>
     (function () {
       var intro = document.getElementById('intro');
+      var rotateHint = document.getElementById('rotate-hint');
+      var isTouch = window.matchMedia('(pointer: coarse)').matches;
+
+      // 用真实视口尺寸判定横竖屏，比 CSS orientation 媒体查询可靠（iOS/全屏场景下后者会卡住）
+      function updateOrientation() {
+        if (!isTouch || !document.body.classList.contains('started') || rotateHint.dataset.dismissed) {
+          document.body.classList.remove('show-rotate');
+          return;
+        }
+        var portrait = window.innerHeight > window.innerWidth;
+        document.body.classList.toggle('show-rotate', portrait);
+      }
+
       function dismiss() {
         intro.style.display = 'none';
         document.body.classList.add('started');   // 进入游戏后才显示竖屏旋转引导
+        updateOrientation();
       }
       document.getElementById('start-btn').addEventListener('click', dismiss);
       document.getElementById('start-btn').addEventListener('touchstart', function (e) { e.preventDefault(); dismiss(); }, { passive: false });
-      // 横屏全屏游玩：尽量进全屏（全屏后视野最大、横屏体验最佳）。
-      // 注意：网页无法强制旋转屏幕，竖屏旋转引导由 CSS media 控制。
+
+      // 旋转 / 尺寸变化都重新判定（iOS 旋转后需延迟读取真实尺寸）
+      window.addEventListener('resize', updateOrientation);
+      window.addEventListener('orientationchange', function () { setTimeout(updateOrientation, 300); });
+
+      // 用户可手动忽略竖屏提示，绝不把人卡死
+      document.getElementById('rotate-ok').addEventListener('click', function () {
+        rotateHint.dataset.dismissed = '1';
+        document.body.classList.remove('show-rotate');
+      });
+
+      // 横屏全屏游玩：Android Chrome 进全屏并锁定横屏；iOS 不支持全屏/锁屏，需手动旋转
       document.getElementById('land-btn').addEventListener('click', function () {
         var el = document.documentElement;
         var req = el.requestFullscreen || el.webkitRequestFullscreen;
-        if (req) { try { req.call(el); } catch (e) {} }
+        if (req) {
+          try {
+            var p = req.call(el);
+            if (p && typeof p.then === 'function' && screen.orientation && screen.orientation.lock) {
+              p.then(function () { try { screen.orientation.lock('landscape'); } catch (e) {} }).catch(function () {});
+            }
+          } catch (e) {}
+        }
       });
     })();
   </script>

@@ -133,10 +133,8 @@ html, body {
 #rotate-hint h2 { font-size: 22px; letter-spacing: 2px; color: #ffd24a; }
 #rotate-hint p { font-size: 13px; line-height: 1.9; color: #cfcbe8; max-width: 300px; }
 @keyframes rotphone { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
-/* 仅在「已开始游戏」且「触屏 + 竖屏」时显示 */
-@media (orientation: portrait) and (pointer: coarse) {
-  body.started #rotate-hint { display: flex; }
-}
+/* 由 JS 根据真实视口尺寸切换 show-rotate 类（比 CSS orientation 媒体查询可靠） */
+body.show-rotate #rotate-hint { display: flex; }
 
 /* ---------- 开场 / 死亡 浮层 ---------- */
 .overlay {
