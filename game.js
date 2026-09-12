@@ -178,14 +178,33 @@
   }
   for (let i = 0; i < 8; i++) spawnItem();
 
-  // ---------- 飞剑 ----------
+  // ---------- 飞剑 / 刀芒 ----------
   let swords = [];
+  let slashes = [];
+
+  // ---------- 可选修士（三种外形 / 武器 / 技能） ----------
+  const CHARS = [
+    { id: 'sword',   name: '御剑仙',   color: '#3a5a8c', accent: '#dff0ff', speed: 158, weapon: 'sword'   },
+    { id: 'thunder', name: '雷法真君', color: '#5b3a8c', accent: '#ffe27a', speed: 150, weapon: 'thunder' },
+    { id: 'blade',   name: '赤焰刀客', color: '#8c3a3a', accent: '#ff8a5b', speed: 174, weapon: 'blade'   }
+  ];
+  const TIER_NAMES  = ['炼气期', '筑基期', '金丹期', '元婴期', '化神期'];
+  const SKILL_NAMES = {
+    sword:   ['单锋剑', '双锋剑', '追魂三剑', '追魂巨剑', '五雷追魂'],
+    thunder: ['雷符', '双雷符', '雷网', '奔雷诀', '紫霄神雷'],
+    blade:   ['斩', '烈斩', '回风斩', '裂地斩', '炎武斩']
+  };
+  function tierIdx() { if (kills < 3) return 0; if (kills < 7) return 1; if (kills < 12) return 2; if (kills < 20) return 3; return 4; }
+  function realmInfo() { const t = tierIdx(); return { name: TIER_NAMES[t], skill: SKILL_NAMES[player.char.id][t] }; }
 
   // ---------- 玩家 ----------
   const player = {
     x: WORLD.w / 2, y: WORLD.h / 2, w: 22, h: 30,
-    speed: 158, hp: 100, maxhp: 100, face: 1, atkCd: 0, inv: 0,
+    char: CHARS[0], speed: CHARS[0].speed, hp: 100, maxhp: 100, face: 1, atkCd: 0, inv: 0,
     dead: false, respawn: 0, anim: 0
+  };
+  window.GameAPI = {
+    selectChar(id) { const c = CHARS.find(x => x.id === id); if (c) { player.char = c; player.speed = c.speed; } }
   };
   // ---------- 相机 ----------
   const cam = { x: 0, y: 0 };
@@ -195,21 +214,38 @@
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
 
-  // ---------- 飞剑进化（按境界） ----------
-  // 炼气:单锋 -> 筑基:双锋 -> 金丹:追魂三剑 -> 元婴:追魂巨剑 -> 化神:五雷追魂
-  function swordCfg() {
-    if (kills < 3)  return { count: 1, spread: 0,    homing: false, speed: 440, dmg: 13, life: 1.1, size: 1.0,  pierce: false, cd: 0.34 };
-    if (kills < 7)  return { count: 2, spread: 0.20, homing: false, speed: 480, dmg: 14, life: 1.2, size: 1.1,  pierce: false, cd: 0.32 };
-    if (kills < 12) return { count: 3, spread: 0.26, homing: true,  speed: 520, dmg: 15, life: 1.5, size: 1.1,  pierce: false, cd: 0.30 };
-    if (kills < 20) return { count: 3, spread: 0.30, homing: true,  speed: 620, dmg: 18, life: 1.7, size: 1.3,  pierce: false, cd: 0.28 };
-    return                { count: 5, spread: 0.36, homing: true,  speed: 700, dmg: 21, life: 1.9, size: 1.45, pierce: true,  cd: 0.26 };
-  }
-  function realmInfo() {
-    if (kills < 3)  return { name: '炼气期', skill: '单锋剑' };
-    if (kills < 7)  return { name: '筑基期', skill: '双锋剑' };
-    if (kills < 12) return { name: '金丹期', skill: '追魂三剑' };
-    if (kills < 20) return { name: '元婴期', skill: '追魂巨剑' };
-    return                { name: '化神期', skill: '五雷追魂' };
+  // ---------- 武器 / 技能（按境界进化，三种修士各异） ----------
+  function weaponCfg() {
+    const w = player.char.id, t = tierIdx();
+    if (w === 'thunder') {
+      const T = [
+        { count: 1, spread: 0,    speed: 560, dmg: 11, life: 1.0, pierce: true, cd: 0.26 },
+        { count: 2, spread: 0.18, speed: 600, dmg: 12, life: 1.1, pierce: true, cd: 0.24 },
+        { count: 3, spread: 0.24, speed: 640, dmg: 13, life: 1.3, pierce: true, cd: 0.22 },
+        { count: 4, spread: 0.30, speed: 700, dmg: 15, life: 1.5, pierce: true, cd: 0.20 },
+        { count: 5, spread: 0.36, speed: 760, dmg: 18, life: 1.7, pierce: true, cd: 0.18 }
+      ][t];
+      return Object.assign({ kind: 'thunder' }, T);
+    }
+    if (w === 'blade') {
+      const T = [
+        { range: 46, arc: 1.1, dmg: 22, knock: 130, cd: 0.42 },
+        { range: 50, arc: 1.2, dmg: 26, knock: 150, cd: 0.40 },
+        { range: 56, arc: 1.3, dmg: 30, knock: 170, cd: 0.38 },
+        { range: 62, arc: 1.4, dmg: 36, knock: 200, cd: 0.36 },
+        { range: 70, arc: 1.5, dmg: 44, knock: 230, cd: 0.34 }
+      ][t];
+      return Object.assign({ kind: 'blade' }, T);
+    }
+    // 御剑仙：飞剑追踪
+    const T = [
+      { count: 1, spread: 0,    homing: false, speed: 440, dmg: 13, life: 1.1, size: 1.0,  pierce: false, cd: 0.34 },
+      { count: 2, spread: 0.20, homing: false, speed: 480, dmg: 14, life: 1.2, size: 1.1,  pierce: false, cd: 0.32 },
+      { count: 3, spread: 0.26, homing: true,  speed: 520, dmg: 15, life: 1.5, size: 1.1,  pierce: false, cd: 0.30 },
+      { count: 3, spread: 0.30, homing: true,  speed: 620, dmg: 18, life: 1.7, size: 1.3,  pierce: false, cd: 0.28 },
+      { count: 5, spread: 0.36, homing: true,  speed: 700, dmg: 21, life: 1.9, size: 1.45, pierce: true,  cd: 0.26 }
+    ][t];
+    return Object.assign({ kind: 'sword' }, T);
   }
   const TIER_KILLS = [3, 7, 12, 20];
   let lastTierIdx = 0;
@@ -230,6 +266,21 @@
       if (d < bd) { bd = d; best = m; }
     }
     return best;
+  }
+
+  // 击杀结算（掉落灵物 + 补一只 + 突破提示）。剑/刀共用
+  function onKill(j) {
+    const m = monsters[j];
+    monsters.splice(j, 1);
+    kills++;
+    items.push({ x: m.x, y: m.y, kind: ['herb', 'herb', 'stone', 'pill'][Math.floor(Math.random() * 4)], t: 0 });
+    monsters.push(spawnMonster());
+    while (lastTierIdx < TIER_KILLS.length && kills >= TIER_KILLS[lastTierIdx]) {
+      const info = realmInfo();
+      elToast.textContent = '突破！' + info.name + ' · ' + info.skill;
+      elToast.style.display = 'block'; toastT = 2.2;
+      lastTierIdx++;
+    }
   }
 
   // ---------- 更新 ----------
@@ -257,22 +308,43 @@
     player.x = Math.max(0, Math.min(WORLD.w - player.w, player.x + mx * player.speed * dt));
     player.y = Math.max(0, Math.min(WORLD.h - player.h, player.y + my * player.speed * dt));
 
-    // 攻击（飞剑进化）
+    // 攻击（按所选修士的武器 / 技能）
     player.atkCd -= dt;
     if (keys.attack && player.atkCd <= 0) {
-      const cfg = swordCfg();
+      const cfg = weaponCfg();
       player.atkCd = cfg.cd;
-      const base = player.face > 0 ? 0 : Math.PI;
-      for (let i = 0; i < cfg.count; i++) {
-        const off = (i - (cfg.count - 1) / 2) * cfg.spread;
-        const a = base + off;
-        const sp = cfg.speed;
-        swords.push({
-          x: player.x + player.w / 2, y: player.y + player.h / 2,
-          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-          life: cfg.life, dmg: cfg.dmg, homing: cfg.homing,
-          size: cfg.size, pierce: cfg.pierce, hit: new Set()
-        });
+      if (cfg.kind === 'blade') {
+        // 近战刀芒：面朝方向扇形重创 + 击退
+        const px = player.x + player.w / 2, py = player.y + player.h / 2;
+        const fwd = player.face > 0 ? 0 : Math.PI;
+        slashes.push({ x: px, y: py, dir: player.face, range: cfg.range, arc: cfg.arc, life: 0.18, max: 0.18 });
+        for (let j = monsters.length - 1; j >= 0; j--) {
+          const m = monsters[j];
+          const dx = m.x + m.w / 2 - px, dy = m.y + m.h / 2 - py;
+          const d = Math.hypot(dx, dy);
+          if (d > cfg.range + Math.max(m.w, m.h) * 0.5) continue;
+          let diff = Math.atan2(dy, dx) - fwd;
+          while (diff > Math.PI) diff -= 2 * Math.PI;
+          while (diff < -Math.PI) diff += 2 * Math.PI;
+          if (Math.abs(diff) > cfg.arc / 2) continue;
+          m.hp -= cfg.dmg; m.hit = 0.12;
+          const kl = Math.max(1, d);
+          m.x = Math.max(0, Math.min(WORLD.w - m.w, m.x + dx / kl * cfg.knock * 0.14));
+          m.y = Math.max(0, Math.min(WORLD.h - m.h, m.y + dy / kl * cfg.knock * 0.14));
+          if (m.hp <= 0) onKill(j);
+        }
+      } else {
+        const base = player.face > 0 ? 0 : Math.PI;
+        for (let i = 0; i < cfg.count; i++) {
+          const off = (i - (cfg.count - 1) / 2) * cfg.spread;
+          const a = base + off;
+          swords.push({
+            kind: cfg.kind, x: player.x + player.w / 2, y: player.y + player.h / 2,
+            vx: Math.cos(a) * cfg.speed, vy: Math.sin(a) * cfg.speed,
+            life: cfg.life, dmg: cfg.dmg, homing: cfg.homing,
+            size: cfg.size || 1, pierce: cfg.pierce, hit: new Set()
+          });
+        }
       }
     }
     if (player.inv > 0) player.inv -= dt;
@@ -302,21 +374,16 @@
           m.hp -= s.dmg; m.hit = 0.12;
           if (!s.pierce) { swords.splice(i, 1); }
           else s.hit.add(m.id);
-          if (m.hp <= 0) {
-            monsters.splice(j, 1); kills++;
-            items.push({ x: m.x, y: m.y, kind: ['herb', 'herb', 'stone', 'pill'][Math.floor(Math.random() * 4)], t: 0 });
-            monsters.push(spawnMonster());
-            // 突破提示
-            while (lastTierIdx < TIER_KILLS.length && kills >= TIER_KILLS[lastTierIdx]) {
-              const info = realmInfo();
-              elToast.textContent = '突破！' + info.name + ' · ' + info.skill;
-              elToast.style.display = 'block'; toastT = 2.2;
-              lastTierIdx++;
-            }
-          }
+          if (m.hp <= 0) { onKill(j); }
           if (!s.pierce) break;
         }
       }
+    }
+
+    // 刀芒寿命
+    for (let i = slashes.length - 1; i >= 0; i--) {
+      slashes[i].life -= dt;
+      if (slashes[i].life <= 0) slashes.splice(i, 1);
     }
 
     // 妖兽 AI
@@ -360,51 +427,108 @@
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) elToast.style.display = 'none'; }
   }
 
-  // ---------- 绘制：修士（圆头 + 发髻 + 道袍 + 飘带 + 手持飞剑） ----------
+  // ---------- 绘制：修士（三种外形 / 武器） ----------
   function drawPlayer() {
-    const p = player;
+    const p = player, c = p.char;
     const walk = (keys.up || keys.down || keys.left || keys.right || joy.active);
     const bob = Math.sin(p.anim * 8) * (walk ? 1.4 : 0.5);
     const x = Math.round(p.x), y = Math.round(p.y + bob);
     const cx = x + p.w / 2;
     const flash = p.inv > 0 && (Math.floor(p.anim * 20) % 2);
-    const robe  = flash ? '#b8b8d8' : '#3a5a8c';   // 道袍青蓝
-    const robe2 = flash ? '#c9c9e6' : '#2c4a78';   // 交领深
-    const skin  = flash ? '#e8e8f0' : '#f0cda2';
-    const hair  = '#241c33';
+    const skin = flash ? '#e8e8f0' : '#f0cda2';
+    const hair = '#241c33';
     // 影子
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(x + 2, y + p.h - 2, p.w - 4, 4);
-    // 道袍身体（上窄下宽梯形）
+
+    if (c.id === 'blade') {
+      // 赤焰刀客：壮硕赤甲 + 大刀
+      const armor = flash ? '#d8b0a8' : c.color;
+      const armor2 = flash ? '#e8c4bc' : '#6e2a2a';
+      ctx.fillStyle = armor;
+      ctx.beginPath();
+      ctx.moveTo(cx - 9, y + 11); ctx.lineTo(cx + 9, y + 11);
+      ctx.lineTo(cx + 12, y + p.h - 3); ctx.lineTo(cx - 12, y + p.h - 3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = armor2; ctx.fillRect(cx - 7, y + 13, 14, 8);          // 胸甲
+      ctx.fillStyle = '#caa84a';                                            // 护心镜
+      ctx.beginPath(); ctx.arc(cx, y + 17, 2.4, 0, 6.28); ctx.fill();
+      ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(cx, y + 8, 6.5, 6.2, 0, 0, 6.28); ctx.fill();
+      ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(cx, y + 4, 5.2, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = '#241c33';
+      if (p.face > 0) ctx.fillRect(cx + 1.5, y + 8, 1.6, 1.6); else ctx.fillRect(cx - 3.1, y + 8, 1.6, 1.6);
+      // 大刀（朝面向）
+      ctx.save();
+      ctx.translate(cx + p.face * 10, y + 16);
+      ctx.rotate(p.face > 0 ? -0.5 : Math.PI + 0.5);
+      ctx.fillStyle = '#6b4a2a'; ctx.fillRect(-1.5, 0, 3, 16);             // 刀柄
+      ctx.fillStyle = '#cfd6e0';                                            // 刀身（弯）
+      ctx.beginPath(); ctx.moveTo(0, -2); ctx.quadraticCurveTo(16, -8, 18, -18); ctx.lineTo(13, -18); ctx.quadraticCurveTo(12, -8, -3, -2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff8a5b'; ctx.fillRect(-3, -3, 6, 3);               // 刀镡
+      ctx.restore();
+      return;
+    }
+
+    if (c.id === 'thunder') {
+      // 雷法真君：紫袍 + 法杖（雷珠）
+      const robe = flash ? '#cdbce6' : c.color;
+      const robe2 = flash ? '#ddcdf0' : '#432a6e';
+      ctx.fillStyle = robe;
+      ctx.beginPath();
+      ctx.moveTo(cx - 7, y + 11); ctx.lineTo(cx + 7, y + 11);
+      ctx.lineTo(cx + 10, y + p.h - 3); ctx.lineTo(cx - 10, y + p.h - 3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = robe2;                                               // 交领
+      ctx.beginPath();
+      ctx.moveTo(cx - 7, y + 11); ctx.lineTo(cx, y + 16); ctx.lineTo(cx + 7, y + 11);
+      ctx.lineTo(cx + 3, y + 11); ctx.lineTo(cx, y + 14); ctx.lineTo(cx - 3, y + 11);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffe27a'; ctx.fillRect(cx - 7, y + 19, 14, 2);     // 雷纹腰带
+      ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx - 4, y + 21); ctx.lineTo(cx - 1, y + 24); ctx.lineTo(cx + 2, y + 21); ctx.lineTo(cx + 5, y + 24); ctx.stroke();
+      ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(cx, y + 8, 6, 6.4, 0, 0, 6.28); ctx.fill();
+      ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(cx, y + 3, 5, Math.PI, 0); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, y + 1.2, 2.6, 0, 6.28); ctx.fill();
+      ctx.fillStyle = '#d9b24a'; ctx.fillRect(cx - 0.6, y - 1.8, 1.2, 4);
+      ctx.fillStyle = '#241c33';
+      if (p.face > 0) ctx.fillRect(cx + 1.5, y + 8, 1.4, 1.4); else ctx.fillRect(cx - 2.9, y + 8, 1.4, 1.4);
+      // 法杖（雷珠）
+      ctx.save();
+      ctx.translate(cx + p.face * 9, y + 15);
+      ctx.rotate(p.face > 0 ? 0 : Math.PI);
+      ctx.fillStyle = '#6b4a8c'; ctx.fillRect(-1.5, -2, 3, 18);           // 杖身
+      const g = ctx.createRadialGradient(0, -6, 1, 0, -6, 8);
+      g.addColorStop(0, '#fff7c0'); g.addColorStop(0.5, '#ffe27a'); g.addColorStop(1, 'rgba(255,210,120,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -6, 8, 0, 6.28); ctx.fill();
+      ctx.fillStyle = '#fff7c0'; ctx.beginPath(); ctx.arc(0, -6, 3, 0, 6.28); ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    // 御剑仙（默认）：青蓝道袍 + 发髻 + 手持飞剑
+    const robe  = flash ? '#b8b8d8' : '#3a5a8c';
+    const robe2 = flash ? '#c9c9e6' : '#2c4a78';
     ctx.fillStyle = robe;
     ctx.beginPath();
     ctx.moveTo(cx - 6, y + 11); ctx.lineTo(cx + 6, y + 11);
     ctx.lineTo(cx + 10, y + p.h - 3); ctx.lineTo(cx - 10, y + p.h - 3);
     ctx.closePath(); ctx.fill();
-    // 交领（V）
     ctx.fillStyle = robe2;
     ctx.beginPath();
     ctx.moveTo(cx - 6, y + 11); ctx.lineTo(cx, y + 16); ctx.lineTo(cx + 6, y + 11);
     ctx.lineTo(cx + 3, y + 11); ctx.lineTo(cx, y + 14); ctx.lineTo(cx - 3, y + 11);
     ctx.closePath(); ctx.fill();
-    // 腰带
-    ctx.fillStyle = '#caa84a';
-    ctx.fillRect(cx - 7, y + 19, 14, 3);
-    // 飘带（移动时向后飘）
+    ctx.fillStyle = '#caa84a'; ctx.fillRect(cx - 7, y + 19, 14, 3);
     const tilt = walk ? Math.sin(p.anim * 8) * 3 : 0;
     ctx.fillStyle = 'rgba(150,180,255,0.5)';
     ctx.beginPath();
     ctx.moveTo(cx - 7, y + 20); ctx.lineTo(cx - 12 - tilt, y + 26); ctx.lineTo(cx - 6, y + 24);
     ctx.closePath(); ctx.fill();
-    // 头（圆润）
-    ctx.fillStyle = skin;
-    ctx.beginPath(); ctx.ellipse(cx, y + 8, 6, 6.4, 0, 0, 6.2832); ctx.fill();
-    // 发髻 + 簪
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(cx, y + 8, 6, 6.4, 0, 0, 6.2832); ctx.fill();
     ctx.fillStyle = hair;
-    ctx.beginPath(); ctx.arc(cx, y + 3, 5, Math.PI, 0); ctx.fill();       // 额发
-    ctx.beginPath(); ctx.arc(cx, y + 1.5, 2.6, 0, 6.2832); ctx.fill();   // 发髻
-    ctx.fillStyle = '#d9b24a'; ctx.fillRect(cx - 0.6, y - 1.6, 1.2, 4);  // 簪
-    // 眼（朝向）
+    ctx.beginPath(); ctx.arc(cx, y + 3, 5, Math.PI, 0); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, y + 1.5, 2.6, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#d9b24a'; ctx.fillRect(cx - 0.6, y - 1.6, 1.2, 4);
     ctx.fillStyle = '#241c33';
     if (p.face > 0) ctx.fillRect(cx + 1.5, y + 8, 1.4, 1.4);
     else ctx.fillRect(cx - 2.9, y + 8, 1.4, 1.4);
@@ -538,14 +662,47 @@
     }
   }
 
-  // ---------- 绘制：飞剑（真实剑形，按速度方向旋转） ----------
-  function drawSword(s) {
-    const sz = s.size;
+  // ---------- 绘制：刀芒（近战扇形） ----------
+  function drawSlash(s) {
+    const a = Math.max(0, s.life / s.max);
+    const fwd = s.dir > 0 ? 0 : Math.PI;
+    ctx.save();
+    ctx.translate(Math.round(s.x), Math.round(s.y));
+    ctx.globalAlpha = a;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, s.range, fwd - s.arc / 2, fwd + s.arc / 2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,138,91,0.28)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,220,120,0.9)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, s.range, fwd - s.arc / 2, fwd + s.arc / 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- 绘制：飞弹（飞剑 / 雷符） ----------
+  function drawProj(s) {
+    const sz = s.size || 1;
+    if (s.kind === 'thunder') {
+      // 雷符：发光雷珠 + 锯齿电光
+      ctx.save();
+      ctx.translate(Math.round(s.x), Math.round(s.y));
+      const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 11 * sz);
+      g.addColorStop(0, '#fff7c0'); g.addColorStop(0.4, '#c9a8ff'); g.addColorStop(1, 'rgba(120,90,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 11 * sz, 0, 6.28); ctx.fill();
+      ctx.strokeStyle = '#e6d2ff'; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(4 * sz, -3 * sz); ctx.lineTo(1 * sz, -6 * sz); ctx.lineTo(6 * sz, -9 * sz);
+      ctx.moveTo(0, 0); ctx.lineTo(-4 * sz, 3 * sz); ctx.lineTo(-1 * sz, 6 * sz); ctx.lineTo(-6 * sz, 9 * sz);
+      ctx.stroke();
+      ctx.fillStyle = '#fff7c0'; ctx.beginPath(); ctx.arc(0, 0, 3 * sz, 0, 6.28); ctx.fill();
+      ctx.restore();
+      return;
+    }
+    // 飞剑：真实剑形（追魂=翠青，其余=冰蓝）
     const ang = Math.atan2(s.vy, s.vx);
     ctx.save();
     ctx.translate(Math.round(s.x), Math.round(s.y));
     ctx.rotate(ang);
-    // 配色：追魂=翠青，其余=冰蓝
     const bladeCol = s.homing ? '#c9ffe6' : '#dff0ff';
     const edgeCol  = s.homing ? '#7dffc0' : '#9fd4ff';
     const guardCol = s.homing ? '#e8c95a' : '#c9a84a';
@@ -603,7 +760,8 @@
 
     for (const h of items) drawItem(h);
     for (const m of monsters) drawMonster(m);
-    for (const s of swords) drawSword(s);
+    for (const s of slashes) drawSlash(s);
+    for (const s of swords) drawProj(s);
     if (!player.dead) drawPlayer();
 
     ctx.restore();

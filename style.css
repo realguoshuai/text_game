@@ -159,6 +159,23 @@ body.show-rotate #rotate-hint { display: flex; }
 .overlay button:active { background: #5d4ca8; }
 #death { display: none; }
 
+/* ---------- 角色选择 ---------- */
+#char-select { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 340px; margin: 2px 0; }
+.char-card {
+  width: 96px; padding: 12px 8px; border-radius: 14px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(180,170,255,0.3);
+  color: #e8e6f5; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  cursor: pointer; font: inherit; transition: all .15s ease;
+}
+.char-card .c-emoji { font-size: 28px; }
+.char-card b { font-size: 15px; letter-spacing: 1px; }
+.char-card small { font-size: 11px; opacity: .7; }
+.char-card .c-desc { font-size: 10px; opacity: .65; line-height: 1.4; text-align: center; margin-top: 2px; }
+.char-card.sel { border-color: #ffd24a; background: rgba(255,210,74,0.12); box-shadow: 0 0 0 2px rgba(255,210,74,0.4); }
+.char-card:active { transform: scale(0.97); }
+.lead { font-size: 15px; color: #cfcbe8; margin-bottom: 2px; }
+.ctrl-hint { font-size: 12px; opacity: .8; line-height: 1.8; }
+
 /* ---------- 窄屏适配 ---------- */
 @media (max-width: 900px) {
   #hud .hp-box { width: 120px; }

@@ -40,18 +40,32 @@
       </svg>
     </div>
 
-    <!-- 开场 -->
+    <!-- 开场 + 角色选择 -->
     <div class="overlay" id="intro">
       <h1>凡人修仙录 · 实时版</h1>
-      <p>
-        你是一名初入灵脉的修士。<br>
-        电脑：<span class="key">W A S D</span> 移动，<span class="key">J / 空格</span> 发飞剑<br>
-        手机：<b>左半屏按住拖动</b>移动，<b>右半屏点按</b>（或飞剑钮）出剑<br>
-        斩妖越多，飞剑越厉害——单锋→双锋→追魂三剑→巨剑→五雷<br>
-        妖兽有妖狼/毒蛛/火蟾/鬼面/灵蛇，灵物有灵草/灵石/丹药。
+      <p class="lead">择一修士，入灵脉斩妖</p>
+      <div id="char-select">
+        <button class="char-card sel" data-char="sword">
+          <span class="c-emoji">🗡️</span>
+          <b>御剑仙</b><small>青袍剑修</small>
+          <span class="c-desc">远程飞剑追踪<br>越斩越强</span>
+        </button>
+        <button class="char-card" data-char="thunder">
+          <span class="c-emoji">⚡</span>
+          <b>雷法真君</b><small>紫霄法修</small>
+          <span class="c-desc">雷符穿透<br>射速快</span>
+        </button>
+        <button class="char-card" data-char="blade">
+          <span class="c-emoji">🔥</span>
+          <b>赤焰刀客</b><small>烈焰武修</small>
+          <span class="c-desc">近战横扫<br>重创击退</span>
+        </button>
+      </div>
+      <p class="ctrl-hint">
+        电脑：<span class="key">W A S D</span> 移动，<span class="key">J / 空格</span> 出招<br>
+        手机：左半屏拖动移动，右半屏点按（或飞剑钮）出招
       </p>
-      <button id="start-btn">入灵脉</button>
-      <button class="ghost-btn" id="land-btn">⇄ 横屏全屏游玩</button>
+      <button id="start-btn">开始游戏</button>
       <p style="font-size:12px;opacity:.7"><a href="legacy/" style="color:#9a93d8">→ 也想玩文字版？</a></p>
     </div>
 
@@ -59,7 +73,7 @@
     <div id="rotate-hint">
       <div class="icon">📱</div>
       <h2>请横置手机游玩</h2>
-      <p>横屏视野更开阔，左手摇杆、右手出剑更顺手。<br>也可点「横屏全屏游玩」先进入全屏。</p>
+      <p>横屏视野更开阔，左手摇杆、右手出剑更顺手。</p>
       <button id="rotate-ok" class="ghost-btn">我知道了，竖屏也能玩</button>
     </div>
 
@@ -76,6 +90,7 @@
       var intro = document.getElementById('intro');
       var rotateHint = document.getElementById('rotate-hint');
       var isTouch = window.matchMedia('(pointer: coarse)').matches;
+      var selChar = 'sword';
 
       // 用真实视口尺寸判定横竖屏，比 CSS orientation 媒体查询可靠（iOS/全屏场景下后者会卡住）
       function updateOrientation() {
@@ -88,12 +103,26 @@
       }
 
       function dismiss() {
+        if (window.GameAPI) window.GameAPI.selectChar(selChar);
         intro.style.display = 'none';
         document.body.classList.add('started');   // 进入游戏后才显示竖屏旋转引导
         updateOrientation();
       }
       document.getElementById('start-btn').addEventListener('click', dismiss);
       document.getElementById('start-btn').addEventListener('touchstart', function (e) { e.preventDefault(); dismiss(); }, { passive: false });
+
+      // 角色选择
+      var cards = document.querySelectorAll('.char-card');
+      function pick(c) {
+        selChar = c.getAttribute('data-char');
+        cards.forEach(function (x) { x.classList.remove('sel'); });
+        c.classList.add('sel');
+        if (window.GameAPI) window.GameAPI.selectChar(selChar);
+      }
+      cards.forEach(function (c) {
+        c.addEventListener('click', function () { pick(c); });
+        c.addEventListener('touchstart', function (e) { e.preventDefault(); pick(c); }, { passive: false });
+      });
 
       // 旋转 / 尺寸变化都重新判定（iOS 旋转后需延迟读取真实尺寸）
       window.addEventListener('resize', updateOrientation);
@@ -103,20 +132,6 @@
       document.getElementById('rotate-ok').addEventListener('click', function () {
         rotateHint.dataset.dismissed = '1';
         document.body.classList.remove('show-rotate');
-      });
-
-      // 横屏全屏游玩：Android Chrome 进全屏并锁定横屏；iOS 不支持全屏/锁屏，需手动旋转
-      document.getElementById('land-btn').addEventListener('click', function () {
-        var el = document.documentElement;
-        var req = el.requestFullscreen || el.webkitRequestFullscreen;
-        if (req) {
-          try {
-            var p = req.call(el);
-            if (p && typeof p.then === 'function' && screen.orientation && screen.orientation.lock) {
-              p.then(function () { try { screen.orientation.lock('landscape'); } catch (e) {} }).catch(function () {});
-            }
-          } catch (e) {}
-        }
       });
     })();
   </script>
