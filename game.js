@@ -285,10 +285,11 @@
   function addShake(v) { shake = Math.min(9, shake + v); }
 
   // ---------- 可选修士（三种外形 / 武器 / 技能） ----------
+  // hpBase：近战要贴脸挨打，血厚；雷修脆皮但清群快
   const CHARS = [
-    { id: 'sword',   name: '御剑仙',   color: '#3a5a8c', accent: '#dff0ff', speed: 158, weapon: 'sword'   },
-    { id: 'thunder', name: '雷法真君', color: '#5b3a8c', accent: '#ffe27a', speed: 150, weapon: 'thunder' },
-    { id: 'blade',   name: '赤焰刀客', color: '#8c3a3a', accent: '#ff8a5b', speed: 174, weapon: 'blade'   }
+    { id: 'sword',   name: '御剑仙',   color: '#3a5a8c', accent: '#dff0ff', speed: 158, hpBase: 105, weapon: 'sword'   },
+    { id: 'thunder', name: '雷法真君', color: '#5b3a8c', accent: '#ffe27a', speed: 150, hpBase: 95,  weapon: 'thunder' },
+    { id: 'blade',   name: '赤焰刀客', color: '#8c3a3a', accent: '#ff8a5b', speed: 174, hpBase: 132, weapon: 'blade'   }
   ];
   const TIER_NAMES  = ['炼气期', '筑基期', '金丹期', '元婴期', '化神期'];
   const SKILL_NAMES = {
@@ -314,7 +315,9 @@
         parts: parts.length, rings: rings.length, swords: swords.length, slashes: slashes.length,
         world: [WORLD.w, WORLD.h], cam: [Math.round(cam.x), Math.round(cam.y)], view: [VW, VH],
         // 屏幕内/外妖兽数（用来核对"密度"到底降没降）
-        inView: monsters.filter(m => m.x + m.w > cam.x && m.x < cam.x + VW && m.y + m.h > cam.y && m.y < cam.y + VH).length, waveTimer: +waveTimer.toFixed(2)
+        inView: monsters.filter(m => m.x + m.w > cam.x && m.x < cam.x + VW && m.y + m.h > cam.y && m.y < cam.y + VH).length,
+        bosses: runBossKills, scrolls: scrollCount, cards: taken.length,
+        paused: paused, runOver: runOver, tierTimes: tierTimes.slice(), waveTimer: +waveTimer.toFixed(2)
       };
     }
   };
@@ -367,7 +370,6 @@
   const elKill = document.getElementById('kill-val');
   const elRealm = document.getElementById('realm-val');
   const elFoe = document.getElementById('foe-val');
-  const elDeath = document.getElementById('death');
   const elToast = document.getElementById('toast');
   let toastT = 0;
 
@@ -380,39 +382,59 @@
     return best;
   }
 
-  // 击杀结算（碎屑 + 连斩 + 掉落 + 突破提示）。剑/刀共用
+  // 击杀结算（碎屑 + 连斩 + 掉落 + 突破三选一 + 妖王/妖皇）。剑/刀/雷共用
   function onKill(j) {
     const m = monsters[j];
+    if (!m) return;
     const mx = m.x + m.w / 2, my = m.y + m.h / 2;
+    const isBoss = !!m.boss;
     monsters.splice(j, 1);
     kills++;
+    if (isBoss) runBossKills++;
     // 割草反馈：不补位（减员是看得见的），补员交给兽潮波次
-    burst(mx, my, m.glow || '#ffffff', m.elite ? 18 : 9, !!m.elite);
-    addShake(m.elite ? 5 : 2);
+    burst(mx, my, m.glow || '#ffffff', isBoss ? 36 : (m.elite ? 18 : 9), !!m.elite || isBoss);
+    addShake(isBoss ? 9 : (m.elite ? 5 : 2));
+    if (isBoss) { Sfx.boss(); buzz(45); }
+    else if (m.elite) Sfx.elite();
+    else Sfx.kill();
+    // 噬血：击杀回血（妖王回得多）
+    if (mods.leech) player.hp = Math.min(player.maxhp, player.hp + mods.leech * (isBoss ? 6 : 1));
+    // 雷罚：概率引发小范围连锁
+    if (mods.shock && Math.random() < mods.shock) {
+      const R = 92;
+      rings.push({ x: mx, y: my, r: 8, grow: R * 2.6, life: 0.34, max: 0.34, col: '#9fd4ff' });
+      for (let k = monsters.length - 1; k >= 0; k--) {
+        const o = monsters[k];
+        if (!o) continue;
+        if (Math.hypot(o.x + o.w / 2 - mx, o.y + o.h / 2 - my) > R) continue;
+        o.hp -= rollDmg(14); o.hit = 0.14;
+        if (o.hp <= 0) onKill(k);
+      }
+    }
     combo++; comboT = COMBO_WIN; comboPop = 1;
     killTimes.push(clock);
     if (killTimes.length > 90) killTimes.shift();
-    if (items.length < 16) items.push({ x: mx, y: my, kind: ['herb', 'herb', 'stone', 'pill'][Math.floor(Math.random() * 4)], t: 0 });
+    // 掉落：妖王必掉仙缘古卷，杂兵 2.5% 撞仙缘
+    if (isBoss) items.push({ x: mx, y: my, kind: 'scroll', t: 0 });
+    else if (Math.random() < 0.025) items.push({ x: mx, y: my, kind: 'scroll', t: 0 });
+    else if (items.length < 16) items.push({ x: mx, y: my, kind: ['herb', 'herb', 'stone', 'pill'][Math.floor(Math.random() * 4)], t: 0 });
     while (lastTierIdx < TIER_KILLS.length && kills >= TIER_KILLS[lastTierIdx]) {
-      const info = realmInfo();
-      elToast.textContent = '突破！' + info.name + ' · ' + info.skill + '　兽潮将至 ' + targetFoeCount() + ' 只';
-      elToast.style.display = 'block'; toastT = 2.4;
       lastTierIdx++;
+      tierTimes[lastTierIdx] = Math.round(clock);
       waveTimer = Math.min(waveTimer, 1.2);   // 突破后立刻起一波，规模立刻见长
+      offerCards(lastTierIdx);                // 三选一（会暂停游戏）
     }
+    // 妖皇被斩 = 通关
+    if (m.boss === 2) { settle(true); return; }
+    // 化神之后斩满一定数量 → 妖皇降临
+    if (!finalSpawned && tierIdx() >= 4 && kills >= 130) { finalSpawned = true; spawnBoss(true); }
   }
 
   // ---------- 更新 ----------
   let last = performance.now();
   function update(dt) {
-    if (player.dead) {
-      player.respawn -= dt;
-      if (player.respawn <= 0) {
-        player.dead = false; player.hp = player.maxhp;
-        player.x = WORLD.w / 2; player.y = WORLD.h / 2;
-      }
-      return;
-    }
+    // 暂停（突破选卡 / 结算）时冻结整局：dt 不推进，避免"看完卡回来就已经被围死"
+    if (paused || runOver) return;
     player.anim += dt;
 
     // 移动（键盘 + 浮动摇杆）
@@ -430,7 +452,7 @@
     // 攻击（按所选修士的武器 / 技能）
     player.atkCd -= dt;
     if (keys.attack && player.atkCd <= 0) {
-      const cfg = weaponCfg();
+      const cfg = applyMods(weaponCfg());
       player.atkCd = cfg.cd;
       if (cfg.kind === 'blade') {
         // 近战刀芒：面朝方向扇形重创 + 击退（扇形内全中，人堆里越砍越爽）
@@ -440,6 +462,7 @@
         let hits = 0;
         for (let j = monsters.length - 1; j >= 0; j--) {
           const m = monsters[j];
+          if (!m) continue;
           const dx = m.x + m.w / 2 - px, dy = m.y + m.h / 2 - py;
           const d = Math.hypot(dx, dy);
           if (d > cfg.range + Math.max(m.w, m.h) * 0.5) continue;
@@ -447,7 +470,8 @@
           while (diff > Math.PI) diff -= 2 * Math.PI;
           while (diff < -Math.PI) diff += 2 * Math.PI;
           if (Math.abs(diff) > cfg.arc / 2) continue;
-          m.hp -= cfg.dmg; m.hit = 0.14;
+          m.hp -= rollDmg(cfg.dmg); m.hit = 0.14;
+          Sfx.hit();
           hits++;
           const kl = Math.max(1, d);
           m.x = Math.max(0, Math.min(WORLD.w - m.w, m.x + dx / kl * cfg.knock * 0.14));
@@ -492,9 +516,12 @@
       if (s.life <= 0 || s.x < cam.x - 36 || s.x > cam.x + VW + 36 || s.y < cam.y - 36 || s.y > cam.y + VH + 36) { swords.splice(i, 1); continue; }
       for (let j = monsters.length - 1; j >= 0; j--) {
         const m = monsters[j];
+        // 连锁击杀/妖王入场都会改数组长度，索引可能指空，必须兜一下
+        if (!m) continue;
         if (s.hit.has(m.id)) continue;
         if (aabb({ x: s.x - 9, y: s.y - 9, w: 18, h: 18 }, m)) {
-          m.hp -= s.dmg; m.hit = 0.14;
+          m.hp -= rollDmg(s.dmg); m.hit = 0.14;
+          Sfx.hit();
           burst(m.x + m.w / 2, m.y + m.h / 2, m.glow || '#fff', 3, false);
           if (!s.pierce) { swords.splice(i, 1); }
           else s.hit.add(m.id);
@@ -562,13 +589,20 @@
         player.hp -= m.dmg; player.inv = 0.85;
         burst(player.x + player.w / 2, player.y + player.h / 2, '#ff5a5a', 7, false);
         addShake(6);
-        if (player.hp <= 0) { player.hp = 0; player.dead = true; player.respawn = 1.6; }
+        Sfx.hurt(); buzz(20);
+        if (player.hp <= 0) { player.hp = 0; settle(false); return; }
       }
     }
 
     // 兽潮波次：成波涌来，波与波之间留空档，让"割完一波"有实感
     waveTimer -= dt;
     if (waveTimer <= 0) { waveTimer = WAVE_GAP_BY_TIER[tierIdx()]; launchWave(false); }
+    // 妖王：每 4 波来一只（妖皇已出就不再出）
+    if (!finalSpawned && waveNo >= bossNextWave) {
+      bossNextWave = waveNo + 4;
+      if (!monsters.some(function (x) { return !!x.boss; })) spawnBoss(false);
+    }
+    updateBosses(dt);
     // 细水补员：只补到目标的一半，剩下的靠下一波涌进来
     dripTimer -= dt;
     if (dripTimer <= 0) {
@@ -594,17 +628,21 @@
     if (comboPop > 0) comboPop = Math.max(0, comboPop - dt * 3.4);
     if (waveCall) { waveCall.t -= dt; if (waveCall.t <= 0) waveCall = null; }
 
-    // 物品：轻微磁吸（割完一波自动往身上收）+ 拾取治疗
+    // 物品：磁吸（引灵词条会放大范围）+ 拾取治疗 / 仙缘觉醒
     for (let i = items.length - 1; i >= 0; i--) {
       const h = items[i];
       h.t += dt;
       const dx = player.x + player.w / 2 - h.x, dy = player.y + player.h / 2 - h.y;
       const d = Math.hypot(dx, dy);
-      if (d < 96 && d > 1) { h.x += dx / d * 132 * dt; h.y += dy / d * 132 * dt; }
+      const magnetR = 96 * (1 + mods.magnet);
+      if (d < magnetR && d > 1) { h.x += dx / d * 132 * dt; h.y += dy / d * 132 * dt; }
       if (aabb(player, { x: h.x - 12, y: h.y - 12, w: 24, h: 24 })) {
         items.splice(i, 1); herbs++;
-        const heal = h.kind === 'pill' ? 24 : h.kind === 'stone' ? 9 : 3;
-        player.hp = Math.min(player.maxhp, player.hp + heal);
+        if (h.kind === 'scroll') { awaken(); }
+        else {
+          const heal = h.kind === 'pill' ? 24 : h.kind === 'stone' ? 9 : 3;
+          player.hp = Math.min(player.maxhp, player.hp + heal);
+        }
         if (items.length < 7) spawnItem();
       }
     }
@@ -1065,6 +1103,16 @@
       ctx.beginPath(); ctx.ellipse(cx, y + H - 2, W * 0.52, 6.5, 0, 0, 6.2832); ctx.stroke();
     }
 
+    // 妖王蓄力预警：脚下扩散的红圈，看到就躲（否则会被冲击波掀飞）
+    if (m.boss && m.atkT < 0.55) {
+      const k = 1 - m.atkT / 0.55;
+      const R = (m.boss === 2 ? 200 : 150) * (0.30 + 0.70 * k);
+      ctx.globalAlpha = 0.25 + 0.55 * k;
+      ctx.strokeStyle = '#ff7a3c'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, y + H / 2, R, 0, 6.2832); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     ctx.save();
     ctx.translate(x, y + bob);
     if (m.face < 0) { ctx.translate(W, 0); ctx.scale(-1, 1); }   // 按移动方向转身
@@ -1326,7 +1374,28 @@
   function drawItem(h) {
     const pulse = 0.6 + 0.4 * Math.sin(h.t * 3 + performance.now() / 400);
     const x = Math.round(h.x), y = Math.round(h.y + Math.sin(h.t * 2 + performance.now() / 500) * 2);
-    if (h.kind === 'herb') {
+    if (h.kind === 'scroll') {
+      // 仙缘古卷：金轴卷面 + 飘出的灵气
+      ctx.fillStyle = 'rgba(255,210,74,' + (0.26 * pulse).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(x, y, 17, 0, 6.28); ctx.fill();
+      ctx.fillStyle = '#f2e3b8';
+      ctx.beginPath();
+      ctx.moveTo(x - 9, y - 10); ctx.lineTo(x + 9, y - 10);
+      ctx.lineTo(x + 9, y + 10); ctx.lineTo(x - 9, y + 10);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#c9a84a';
+      ctx.beginPath(); ctx.ellipse(x - 9, y, 2.6, 10, 0, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x + 9, y, 2.6, 10, 0, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = '#9a7a2a'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 5, y - 5);
+      ctx.moveTo(x - 5, y - 1); ctx.lineTo(x + 5, y - 1);
+      ctx.moveTo(x - 5, y + 3); ctx.lineTo(x + 1, y + 3);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,240,160,0.9)';
+      ctx.beginPath(); ctx.arc(x + 4, y - 16 - pulse * 3, 1.6, 0, 6.28); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - 6, y - 20 - pulse * 2, 1.2, 0, 6.28); ctx.fill();
+    } else if (h.kind === 'herb') {
       ctx.fillStyle = `rgba(80,220,140,${0.22 * pulse})`;
       ctx.beginPath(); ctx.arc(x, y, 14, 0, 6.28); ctx.fill();
       ctx.strokeStyle = '#3fae5a'; ctx.lineWidth = 2;                        // 茎
@@ -1517,11 +1586,11 @@
 
     const info = realmInfo();
     elHp.style.width = (player.hp / player.maxhp * 100) + '%';
-    elHerb.textContent = herbs;
+    if (elHerb) elHerb.textContent = herbs;
     elKill.textContent = kills;
     elFoe.textContent = monsters.length + '/' + targetFoeCount();
     elRealm.textContent = info.name + ' · ' + info.skill;
-    elDeath.style.display = player.dead ? 'flex' : 'none';
+    if (elStone) elStone.textContent = meta.stones;
   }
 
   // 兽潮来袭提示：贴在屏幕对应边，箭头指向场内
@@ -1565,6 +1634,507 @@
       m.y = Math.max(0, Math.min(WORLD.h - m.h, m.y));
     }
     updateCam();
+  }
+
+  // ==========================================================================================
+  // 元层：突破三选一构筑 / 结算与最高纪录 / 音效震动 / 妖王与通关 / 洞府永久成长 / 任务成就
+  // ==========================================================================================
+
+  // ---------- 音效（WebAudio 合成，零素材文件；无声卡/不支持时全部静默降级） ----------
+  const Sfx = (function () {
+    let ac = null, enabled = true, lastHit = 0;
+    try { enabled = localStorage.getItem('im_mute') !== '1'; } catch (_) {}
+    function acInit() {
+      if (ac) return ac;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { ac = new AC(); } catch (_) { ac = null; }
+      return ac;
+    }
+    function tone(f0, f1, dur, type, vol) {
+      if (!enabled) return;
+      const a = acInit(); if (!a) return;
+      const t = a.currentTime;
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = type || 'square';
+      o.frequency.setValueAtTime(f0, t);
+      if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + dur + 0.03);
+    }
+    function noise(dur, vol) {
+      if (!enabled) return;
+      const a = acInit(); if (!a) return;
+      const n = Math.max(1, Math.floor(a.sampleRate * dur));
+      const buf = a.createBuffer(1, n, a.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = a.createBufferSource(), g = a.createGain();
+      src.buffer = buf; g.gain.value = vol;
+      src.connect(g); g.connect(a.destination);
+      src.start();
+    }
+    return {
+      unlock() { const a = acInit(); if (a && a.state === 'suspended') { try { a.resume(); } catch (_) {} } },
+      isOn() { return enabled; },
+      toggle() { enabled = !enabled; try { localStorage.setItem('im_mute', enabled ? '0' : '1'); } catch (_) {} return enabled; },
+      hit() { const n = performance.now(); if (n - lastHit < 60) return; lastHit = n; tone(330, 150, 0.05, 'square', 0.045); },
+      kill() { tone(190, 80, 0.09, 'triangle', 0.06); },
+      elite() { tone(270, 95, 0.15, 'sawtooth', 0.07); },
+      hurt() { noise(0.12, 0.14); tone(150, 70, 0.14, 'sawtooth', 0.06); },
+      tier() { tone(523, 784, 0.16, 'sine', 0.09); setTimeout(function () { tone(784, 1046, 0.22, 'sine', 0.08); }, 120); },
+      pick() { tone(880, 1320, 0.10, 'sine', 0.07); },
+      boss() { tone(95, 62, 0.7, 'sawtooth', 0.09); },
+      die() { tone(300, 60, 0.6, 'sawtooth', 0.09); },
+      win() { [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tone(f, f, 0.26, 'sine', 0.09); }, i * 140); }); }
+    };
+  })();
+  function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (_) {} }
+
+  // ---------- 持久化：纪录 / 洞府资源 ----------
+  const REC_KEY = 'im_records_v2', MET_KEY = 'im_meta_v2';
+  function loadJSON(k, d) { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; } catch (_) { return d; } }
+  function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  let rec = loadJSON(REC_KEY, null);
+  if (!rec || typeof rec !== 'object') rec = {};
+  if (typeof rec.bestKills !== 'number') rec.bestKills = 0;
+  if (typeof rec.bestTier !== 'number') rec.bestTier = 0;
+  if (typeof rec.bestCombo !== 'number') rec.bestCombo = 0;
+  if (typeof rec.bestWave !== 'number') rec.bestWave = 0;
+  if (typeof rec.bestTime !== 'number') rec.bestTime = 0;
+  if (typeof rec.bosses !== 'number') rec.bosses = 0;
+  if (typeof rec.clears !== 'number') rec.clears = 0;
+  if (!Array.isArray(rec.fastest) || rec.fastest.length !== 5) rec.fastest = [null, null, null, null, null];
+  let meta = loadJSON(MET_KEY, null);
+  if (!meta || typeof meta !== 'object') meta = {};
+  if (typeof meta.stones !== 'number') meta.stones = 0;
+  if (!meta.up || typeof meta.up !== 'object') meta.up = { atk: 0, spd: 0, hp: 0, mag: 0, crit: 0 };
+  if (!meta.ach || typeof meta.ach !== 'object') meta.ach = {};
+  if (!Array.isArray(meta.quests)) meta.quests = null;
+
+  // 洞府强化（灵石购买，永久生效）
+  const UPS = [
+    { id: 'atk',  name: '开脉', desc: '攻击力 +5%/级',   max: 5, cost: function (i) { return 30 + i * 30; } },
+    { id: 'spd',  name: '轻身', desc: '出招速度 +4%/级', max: 5, cost: function (i) { return 30 + i * 30; } },
+    { id: 'hp',   name: '壮体', desc: '气血上限 +15/级', max: 5, cost: function (i) { return 25 + i * 25; } },
+    { id: 'mag',  name: '引灵', desc: '拾取范围 +30%/级', max: 3, cost: function (i) { return 40 + i * 40; } },
+    { id: 'crit', name: '剑心', desc: '暴击率 +4%/级',   max: 5, cost: function (i) { return 45 + i * 45; } }
+  ];
+  const ACHS = [
+    { id: 'k100',  name: '初露锋芒', desc: '单局斩妖 100',      reward: 30,  test: function (r) { return r.kills >= 100; } },
+    { id: 'k300',  name: '万夫莫敌', desc: '单局斩妖 300',      reward: 80,  test: function (r) { return r.kills >= 300; } },
+    { id: 't4',    name: '化神之上', desc: '突破至化神期',      reward: 40,  test: function (r) { return r.tier >= 4; } },
+    { id: 'c20',   name: '割草大师', desc: '峰值连斩 ≥ 20',     reward: 50,  test: function (r) { return r.combo >= 20; } },
+    { id: 'boss5', name: '妖王克星', desc: '累计击败 5 只妖王', reward: 60,  test: function (r) { return r.bosses >= 5; } },
+    { id: 'clear', name: '平定灵脉', desc: '击败妖皇通关',      reward: 150, test: function (r) { return r.cleared; } }
+  ];
+  const QUEST_POOL = [
+    { id: 'qk80',  name: '单局斩妖 80 只',   reward: 30, test: function (r) { return r.kills >= 80; } },
+    { id: 'qk150', name: '单局斩妖 150 只',  reward: 55, test: function (r) { return r.kills >= 150; } },
+    { id: 'qc15',  name: '单局峰值连斩 15',  reward: 35, test: function (r) { return r.combo >= 15; } },
+    { id: 'qb',    name: '击败一只妖王',     reward: 40, test: function (r) { return r.bossKills >= 1; } },
+    { id: 'qt3',   name: '突破至金丹期',     reward: 30, test: function (r) { return r.tier >= 2; } },
+    { id: 'qs',    name: '单局存活 180 秒',  reward: 35, test: function (r) { return r.time >= 180; } }
+  ];
+  function todayKey() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function ensureQuests() {
+    const k = todayKey();
+    if (meta.qdate !== k || !meta.quests) {
+      meta.qdate = k;
+      const pool = QUEST_POOL.slice(), picks = [];
+      for (let i = 0; i < 3 && pool.length; i++) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+      meta.quests = picks.map(function (id) { return { id: id, done: false }; });
+      saveJSON(MET_KEY, meta);
+    }
+  }
+
+  // ---------- 构筑词条（突破三选一） ----------
+  let paused = true;              // 开场前先冻结，免得还没开始就被围死
+  let runOver = false;
+  let pendingCards = null;
+  let taken = [];
+  let scrollCount = 0;
+  let runBossKills = 0, finalSpawned = false, bossNextWave = 3;
+  let tierTimes = [null, null, null, null, null];
+  const mods = { dmg: 1, cd: 1, count: 0, pierce: 0, range: 1, crit: 0, critMul: 2.0, leech: 0, shock: 0, magnet: 0, hpBonus: 0 };
+
+  const CARDS = [
+    { id: 'atk',    name: '锋锐',     w: 10, desc: '攻击力 +18%',            apply: function () { mods.dmg += 0.18; } },
+    { id: 'spd',    name: '迅捷',     w: 10, desc: '出招速度 +15%',          apply: function () { mods.cd *= 0.85; } },
+    { id: 'range',  name: '长驱',     w: 7,  desc: '攻击范围 +18%',          apply: function () { mods.range += 0.18; } },
+    { id: 'crit',   name: '锐意',     w: 9,  desc: '暴击率 +12%（2 倍伤害）', apply: function () { mods.crit += 0.12; } },
+    { id: 'critd',  name: '摧枯',     w: 6,  desc: '暴击伤害 +70%',          apply: function () { mods.critMul += 0.7; } },
+    { id: 'multi',  name: '万剑归宗', w: 6,  desc: '弹道 +1（近战改为扩大刀围）', apply: function () { mods.count += 1; } },
+    { id: 'pierce', name: '透骨',     w: 6,  desc: '攻击穿透，可贯穿多敌',   apply: function () { mods.pierce += 1; } },
+    { id: 'leech',  name: '噬血',     w: 7,  desc: '每斩一妖回血 1.5',       apply: function () { mods.leech += 1.5; } },
+    { id: 'hp',     name: '淬体',     w: 8,  desc: '气血上限 +25（并回满）', apply: function () { mods.hpBonus += 25; player.maxhp = (player.char.hpBase || 100) + mods.hpBonus; player.hp = player.maxhp; } },
+    { id: 'shock',  name: '雷罚',     w: 5,  desc: '击杀时 30% 引发冲击波',  apply: function () { mods.shock += 0.30; } },
+    { id: 'magnet', name: '引灵',     w: 5,  desc: '拾取范围 +70%',          apply: function () { mods.magnet += 0.7; } }
+  ];
+  function pickCard() {
+    let total = 0;
+    for (const c of CARDS) total += c.w;
+    let r = Math.random() * total;
+    for (const c of CARDS) { r -= c.w; if (r <= 0) return c; }
+    return CARDS[CARDS.length - 1];
+  }
+  // 洞府强化作为本局基底
+  function applyBaseMods() {
+    mods.dmg = 1 + meta.up.atk * 0.05;
+    mods.cd = Math.pow(0.96, meta.up.spd);
+    mods.crit = meta.up.crit * 0.04;
+    mods.critMul = 2.0;
+    mods.magnet = meta.up.mag * 0.30;
+    mods.count = 0; mods.pierce = 0; mods.range = 1; mods.leech = 0; mods.shock = 0;
+    mods.hpBonus = meta.up.hp * 15;
+    player.maxhp = (player.char.hpBase || 100) + mods.hpBonus;
+    player.hp = player.maxhp;
+  }
+  function rollDmg(base) {
+    let d = base * mods.dmg;
+    if (mods.crit > 0 && Math.random() < mods.crit) d *= mods.critMul;
+    return d;
+  }
+  // 词条作用到武器配置上（伤害倍率不在这里乘，统一由 rollDmg 结算，免得重复叠乘）
+  function applyMods(c) {
+    c.cd = c.cd * mods.cd;
+    if (c.kind === 'blade') {
+      c.range *= mods.range;
+      c.arc = Math.min(2.8, c.arc + mods.count * 0.14);
+    } else {
+      c.count += mods.count;
+      c.life *= mods.range;
+      if (mods.pierce) c.pierce = true;
+    }
+    return c;
+  }
+
+  // ---------- DOM ----------
+  const elStone = document.getElementById('stone-val');
+  const elCard = document.getElementById('cardpick');
+  const elCardList = document.getElementById('card-list');
+  const elCardSub = document.getElementById('card-sub');
+  const elResult = document.getElementById('result');
+  const elResTitle = document.getElementById('res-title');
+  const elResBody = document.getElementById('res-body');
+  const elMetaPanel = document.getElementById('meta-panel');
+  const elUpList = document.getElementById('up-list');
+  const elQuestList = document.getElementById('quest-list');
+  const elAchList = document.getElementById('ach-list');
+  const elMetaStone = document.getElementById('meta-stone');
+  const elMute = document.getElementById('btn-mute');
+
+  function renderCards() {
+    if (!elCardList) return;
+    elCardList.innerHTML = '';
+    for (let i = 0; i < pendingCards.picks.length; i++) {
+      const c = pendingCards.picks[i];
+      const b = document.createElement('button');
+      b.className = 'card';
+      b.innerHTML = '<b>' + c.name + '</b><small>' + c.desc + '</small>';
+      (function (idx) { b.addEventListener('click', function () { chooseCard(idx); }); })(i);
+      elCardList.appendChild(b);
+    }
+    if (elCardSub) elCardSub.textContent = pendingCards.tier >= 0 ? '突破 ' + TIER_NAMES[pendingCards.tier] + ' · 择一而悟' : '仙缘觉醒 · 择一';
+    if (elCard) elCard.style.display = 'flex';
+  }
+  function chooseCard(i) {
+    if (!pendingCards) return;
+    const c = pendingCards.picks[i];
+    if (!c) return;
+    c.apply();
+    taken.push(c.name);
+    Sfx.pick();
+    updateCardHud();
+    if (elCard) elCard.style.display = 'none';
+    pendingCards = null;
+    nextCard();                       // 一帧内连破两境时，接着弹下一张
+  }
+  let cardQueue = [];
+  function offerCards(tier) {
+    const pool = CARDS.slice(), picks = [];
+    for (let i = 0; i < 3 && pool.length; i++) {
+      const c = pickCard();
+      const k = pool.indexOf(c);
+      picks.push(pool.splice(k < 0 ? 0 : k, 1)[0]);
+    }
+    cardQueue.push({ tier: tier, picks: picks });
+    if (!pendingCards) nextCard();
+  }
+  function nextCard() {
+    pendingCards = cardQueue.shift() || null;
+    if (pendingCards) {
+      paused = true;
+      Sfx.tier(); buzz(30);
+      const info = realmInfo();
+      elToast.textContent = '突破！' + info.name + ' · ' + info.skill;
+      elToast.style.display = 'block'; toastT = 2.4;
+      renderCards();
+    } else {
+      paused = false;
+    }
+  }
+
+  // ---------- 妖王 / 妖皇 ----------
+  function spawnBoss(isFinal) {
+    const t = tierIdx();
+    const hp = Math.round((isFinal ? 1100 : 200) * (1 + t * 0.6));
+    const pos = clampSpot(edgePos(Math.floor(Math.random() * 4)));
+    const m = {
+      id: ++uid, type: 'wolf', boss: isFinal ? 2 : 1, elite: true,
+      x: pos.x, y: pos.y, face: 1,
+      w: isFinal ? 104 : 78, h: isFinal ? 82 : 62,
+      color: isFinal ? '#6a2f8c' : '#7a3a2a', dark: isFinal ? '#3c1a52' : '#4a2018',
+      glow: isFinal ? '#e0a0ff' : '#ffb04a',
+      hp: hp, maxhp: hp,
+      speed: isFinal ? 86 : 98,
+      dmg: Math.round((isFinal ? 26 : 16) * dmgScaler()),
+      sway: Math.random() * 6.283, rush: 0, wander: 0, wanderA: 0,
+      dx: 0, dy: 0, hit: 0, anim: Math.random() * 6, atkT: 2.4
+    };
+    monsters.push(m);
+    elToast.textContent = isFinal ? '妖皇降临 · 混沌魔君' : '妖王出世 · 撼地魔猿';
+    elToast.style.display = 'block'; toastT = isFinal ? 3.4 : 2.4;
+    Sfx.boss(); buzz(40);
+    return m;
+  }
+  function updateBosses(dt) {
+    for (let i = monsters.length - 1; i >= 0; i--) {
+      const m = monsters[i];
+      if (!m.boss) continue;
+      m.atkT -= dt;
+      if (m.atkT > 0) continue;
+      m.atkT = m.boss === 2 ? 2.2 : 3.0;
+      const bx = m.x + m.w / 2, by = m.y + m.h / 2;
+      const R = m.boss === 2 ? 200 : 150;
+      rings.push({ x: bx, y: by, r: 12, grow: R * 2.4, life: 0.5, max: 0.5, col: m.glow });
+      addShake(4);
+      const pxn = player.x + player.w / 2, pyn = player.y + player.h / 2;
+      if (Math.hypot(pxn - bx, pyn - by) < R + 14 && player.inv <= 0) {
+        player.hp -= Math.round(m.dmg * 0.55); player.inv = 0.9;
+        Sfx.hurt(); buzz(20); addShake(7);
+        if (player.hp <= 0) { player.hp = 0; settle(false); }
+      }
+    }
+  }
+  function drawBossBar() {
+    let b = null;
+    for (const m of monsters) if (m.boss) { b = m; break; }
+    if (!b) return;
+    const W = Math.min(420, VW - 150), x = (VW - W) / 2, y = VH - 52;
+    ctx.save();
+    ctx.fillStyle = 'rgba(8,5,16,0.72)';
+    ctx.fillRect(x - 3, y - 3, W + 6, 18);
+    const hp = Math.max(0, b.hp / b.maxhp);
+    ctx.fillStyle = b.boss === 2 ? '#c86aff' : '#ff9a3a';
+    ctx.fillRect(x, y, Math.round(W * hp), 12);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+    ctx.strokeRect(x - 3.5, y - 3.5, W + 7, 19);
+    ctx.font = 'bold 12px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#ffe27a';
+    ctx.fillText((b.boss === 2 ? '妖皇 · 混沌魔君' : '妖王 · 撼地魔猿') + '　' + Math.max(0, Math.ceil(b.hp)) + '/' + b.maxhp, VW / 2, y - 6);
+    ctx.restore();
+  }
+
+  // ---------- 稀有掉落：仙缘觉醒 ----------
+  function awaken() {
+    const c = pickCard();
+    c.apply();
+    taken.push(c.name);
+    scrollCount++;
+    Sfx.pick();
+    const px = player.x + player.w / 2, py = player.y + player.h / 2;
+    for (let i = 0; i < 3; i++) burst(px + (Math.random() - 0.5) * 70, py + (Math.random() - 0.5) * 70, '#ffe27a', 14, true);
+    addShake(5);
+    elToast.textContent = '仙缘觉醒 · 【' + c.name + '】' + c.desc;
+    elToast.style.display = 'block'; toastT = 2.4;
+    updateCardHud();
+  }
+
+  // ---------- 结算 ----------
+  function settle(cleared) {
+    if (runOver) return;
+    runOver = true; paused = true; player.dead = true;
+    if (cleared) { Sfx.win(); buzz([40, 60, 120]); } else { Sfx.die(); buzz(80); }
+
+    const r = {
+      kills: kills, tier: tierIdx(), combo: comboBest, wave: waveNo,
+      time: Math.round(clock), cleared: !!cleared, bossKills: runBossKills
+    };
+    const prev = { kills: rec.bestKills, tier: rec.bestTier, combo: rec.bestCombo, time: rec.bestTime };
+    const nb = [];
+    if (r.kills > rec.bestKills) { rec.bestKills = r.kills; nb.push('斩妖纪录 → ' + r.kills); }
+    if (r.tier > rec.bestTier) { rec.bestTier = r.tier; nb.push('最高境界 → ' + TIER_NAMES[r.tier]); }
+    if (r.combo > rec.bestCombo) { rec.bestCombo = r.combo; nb.push('峰值连斩 → ' + r.combo); }
+    if (r.wave > rec.bestWave) rec.bestWave = r.wave;
+    if (r.time > rec.bestTime) rec.bestTime = r.time;
+    for (let i = 0; i < 5; i++) {
+      if (tierTimes[i] == null) continue;
+      if (rec.fastest[i] == null || tierTimes[i] < rec.fastest[i]) {
+        rec.fastest[i] = tierTimes[i];
+        if (i >= 1) nb.push('最快' + TIER_NAMES[i] + ' → ' + tierTimes[i] + 's');
+      }
+    }
+    if (cleared) rec.clears++;
+    const before = rec.bosses;
+    rec.bosses += r.bossKills;
+
+    let gain = Math.round(r.kills / 2) + r.tier * 4 + r.bossKills * 8 + (cleared ? 120 : 0);
+    ensureQuests();
+    const qdone = [];
+    for (const q of meta.quests) {
+      if (q.done) continue;
+      const def = QUEST_POOL.find(function (x) { return x.id === q.id; });
+      if (def && def.test(r)) { q.done = true; gain += def.reward; qdone.push(def.name + ' +' + def.reward); }
+    }
+    const adone = [];
+    const ar = Object.assign({}, r, { bosses: before + r.bossKills });
+    for (const a of ACHS) {
+      if (meta.ach[a.id]) continue;
+      if (a.test(ar)) { meta.ach[a.id] = 1; gain += a.reward; adone.push(a.name + ' +' + a.reward); }
+    }
+    meta.stones += gain;
+    saveJSON(REC_KEY, rec); saveJSON(MET_KEY, meta);
+
+    showResult(r, prev, nb, qdone, adone, gain);
+  }
+
+  function showResult(r, prev, nb, qdone, adone, gain) {
+    if (!elResBody) return;
+    elResTitle.textContent = r.cleared ? '平定灵脉 · 通关！' : '道心受创';
+    elResTitle.style.color = r.cleared ? '#ffd24a' : '#e0464f';
+    const diff = r.kills - prev.kills;
+    const near = (!r.cleared && prev.kills > 0 && diff < 0 && diff > -15) ? '<p class="res-near">距最高纪录只差 ' + (-diff) + ' 只——再来一局？</p>' : '';
+    elResBody.innerHTML =
+      near +
+      '<table class="res-tb">' +
+      '<tr><td>斩妖</td><td><b>' + r.kills + '</b>　<i>纪录 ' + rec.bestKills + '</i></td></tr>' +
+      '<tr><td>境界</td><td><b>' + TIER_NAMES[r.tier] + '</b>　<i>最高 ' + TIER_NAMES[rec.bestTier] + '</i></td></tr>' +
+      '<tr><td>峰值连斩</td><td><b>' + r.combo + '</b>　<i>纪录 ' + rec.bestCombo + '</i></td></tr>' +
+      '<tr><td>妖潮波次</td><td><b>' + r.wave + '</b></td></tr>' +
+      '<tr><td>妖王</td><td><b>' + r.bossKills + '</b></td></tr>' +
+      '<tr><td>用时</td><td><b>' + r.time + 's</b></td></tr>' +
+      '<tr><td>构筑</td><td><b>' + (taken.length ? taken.join(' · ') : '—') + '</b></td></tr>' +
+      '</table>' +
+      (nb.length ? '<p class="res-new">新纪录：' + nb.join('　') + '</p>' : '') +
+      (qdone.length ? '<p class="res-q">任务完成：' + qdone.join('　') + '</p>' : '') +
+      (adone.length ? '<p class="res-q">达成成就：' + adone.join('　') + '</p>' : '') +
+      '<p class="res-gain">获得灵石 <b>+' + gain + '</b>　（共 ' + meta.stones + '）</p>';
+    elResult.style.display = 'flex';
+  }
+
+  function resetRun() {
+    kills = 0; herbs = 0; lastTierIdx = 0; waveNo = 0; waveTimer = 2.6; dripTimer = 0;
+    clock = 0; combo = 0; comboT = 0; comboBest = 0; comboPop = 0; shake = 0;
+    killTimes.length = 0; parts.length = 0; rings.length = 0;
+    swords.length = 0; slashes.length = 0; items.length = 0; monsters.length = 0;
+    taken = []; scrollCount = 0; runOver = false; runBossKills = 0; finalSpawned = false; bossNextWave = 3;
+    tierTimes = [null, null, null, null, null]; pendingCards = null; cardQueue = [];
+    player.dead = false; player.respawn = 0; player.inv = 0; player.anim = 0;
+    player.x = WORLD.w / 2; player.y = WORLD.h / 2;
+    applyBaseMods();
+    centerCam(); updateCam();
+    for (let i = 0; i < 8; i++) spawnItem();
+    const n0 = Math.ceil(targetFoeCount() * 0.6);
+    for (let i = 0; i < n0; i++) monsters.push(spawnMonster(null, true));
+    if (elResult) elResult.style.display = 'none';
+    if (elCard) elCard.style.display = 'none';
+    if (elToast) { elToast.style.display = 'none'; toastT = 0; }
+    paused = false;
+    updateCardHud();
+  }
+
+  // ---------- 洞府面板（永久成长 / 任务 / 成就） ----------
+  function updateCardHud() {
+    let el = document.getElementById('build-val');
+    if (!el) return;
+    el.textContent = taken.length ? taken.length + ' 重' : '未悟';
+  }
+  function renderMeta() {
+    if (!elUpList) return;
+    ensureQuests();
+    if (elMetaStone) elMetaStone.textContent = meta.stones;
+    let h = '';
+    for (const u of UPS) {
+      const lv = meta.up[u.id] | 0, cost = u.cost(lv), maxed = lv >= u.max, can = !maxed && meta.stones >= cost;
+      h += '<div class="up-row' + (can ? ' can' : '') + '">'
+        + '<span class="up-name">' + u.name + '<i>' + u.desc + '</i></span>'
+        + '<span class="up-lv">' + lv + '/' + u.max + '</span>'
+        + '<button class="up-buy" data-up="' + u.id + '"' + (can ? '' : ' disabled') + '>'
+        + (maxed ? '圆满' : cost + ' 灵石') + '</button></div>';
+    }
+    elUpList.innerHTML = h;
+    for (const b of elUpList.querySelectorAll('.up-buy')) {
+      b.addEventListener('click', function () { buyUp(b.getAttribute('data-up')); });
+    }
+    if (elQuestList) {
+      elQuestList.innerHTML = meta.quests.map(function (q) {
+        const def = QUEST_POOL.find(function (x) { return x.id === q.id; });
+        return '<div class="q-row' + (q.done ? ' done' : '') + '"><span>' + (def ? def.name : q.id) + '</span><b>' + (q.done ? '已完成' : '+' + (def ? def.reward : 0)) + '</b></div>';
+      }).join('');
+    }
+    if (elAchList) {
+      elAchList.innerHTML = ACHS.map(function (a) {
+        const got = !!meta.ach[a.id];
+        return '<div class="q-row' + (got ? ' done' : '') + '"><span>' + a.name + '<i>' + a.desc + '</i></span><b>' + (got ? '已达成' : '+' + a.reward) + '</b></div>';
+      }).join('');
+    }
+  }
+  function buyUp(id) {
+    const u = UPS.find(function (x) { return x.id === id; });
+    if (!u) return;
+    const lv = meta.up[id] | 0;
+    if (lv >= u.max) return;
+    const cost = u.cost(lv);
+    if (meta.stones < cost) return;
+    meta.stones -= cost;
+    meta.up[id] = lv + 1;
+    saveJSON(MET_KEY, meta);
+    Sfx.pick();
+    renderMeta();
+    renderMetaStone();
+  }
+  function renderMetaStone() { if (elMetaStone) elMetaStone.textContent = meta.stones; if (elStone) elStone.textContent = meta.stones; }
+
+  // ---------- 对外接口（开场 / 结算按钮 / 测试用） ----------
+  window.GameAPI.start = function () {
+    Sfx.unlock();
+    ensureQuests();
+    applyBaseMods();
+    resetRun();
+  };
+  window.GameAPI.unlockAudio = function () { Sfx.unlock(); };
+  window.GameAPI.again = function () { resetRun(); };
+  window.GameAPI.toggleMute = function () { const on = Sfx.toggle(); if (elMute) elMute.textContent = on ? '🔊' : '🔇'; return on; };
+  let metaOpen = false;
+  window.GameAPI.openMeta = function (force) {
+    metaOpen = (force === undefined) ? !metaOpen : !!force;
+    if (elMetaPanel) elMetaPanel.style.display = metaOpen ? 'block' : 'none';
+    renderMeta();
+    renderMetaStone();
+  };
+  window.GameAPI.records = function () { return { rec: rec, meta: meta, taken: taken.slice() }; };
+  window.GameAPI.mods = function () { return Object.assign({}, mods); };
+  window.GameAPI.paused = function () { return paused; };
+  // 供自动化测试使用：直接选定第 i 张牌，避免桩环境里点不到 DOM
+  window.GameAPI.autoPick = function (i) {
+    if (!pendingCards) return false;
+    chooseCard(typeof i === 'number' ? i : 0);
+    return true;
+  };
+  window.GameAPI.cardQ = function () { return (pendingCards ? 1 : 0) + cardQueue.length; };
+  window.GameAPI.stones = function () { return meta.stones; };
+  window.GameAPI.resultShown = function () { return runOver; };
+  // 回洞府：冻结当前局，回到开场界面看成长与任务
+  window.GameAPI.toHome = function () { resetRun(); paused = true; renderMeta(); renderMetaStone(); };
+
+  if (elMute) {
+    elMute.textContent = Sfx.isOn() ? '🔊' : '🔇';
+    elMute.addEventListener('click', function (e) { e.stopPropagation(); window.GameAPI.toggleMute(); });
   }
 
   function loop(now) {

@@ -186,3 +186,90 @@ body.show-rotate #rotate-hint { display: flex; }
   .overlay h1 { font-size: 26px; }
   .overlay p { font-size: 13px; }
 }
+
+/* ================= 新增：音效钮 / 突破选卡 / 结算 / 洞府 ================= */
+
+/* 开场浮层内容变多，允许滚动（手机上看得全） */
+.overlay { overflow-y: auto; }
+
+/* ---------- HUD 音效开关（HUD 整体 pointer-events:none，这里单独放开） ---------- */
+.hud-btn {
+  pointer-events: auto;
+  margin-left: auto;
+  width: 30px; height: 30px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; line-height: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(180,200,255,0.28);
+  border-radius: 50%;
+  color: #e8e6f5;
+  cursor: pointer;
+}
+.hud-btn:active { background: rgba(140,170,255,0.3); }
+
+/* ---------- 突破三选一 ---------- */
+#cardpick { display: none; z-index: 9; }
+#cardpick .card-title { color: #ffe27a; }
+#card-list { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 620px; }
+.card {
+  width: 148px; min-height: 112px; padding: 14px 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(180,170,255,0.36);
+  border-radius: 14px;
+  color: #e8e6f5; font: inherit; cursor: pointer;
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+.card b { font-size: 17px; letter-spacing: 2px; color: #ffe27a; }
+.card small { font-size: 12px; line-height: 1.6; opacity: .86; }
+.card:active { transform: scale(0.96); border-color: #ffd24a; background: rgba(255,210,74,0.14); }
+
+/* ---------- 结算面板 ---------- */
+#result { display: none; z-index: 9; }
+#res-body { width: 100%; max-width: 420px; }
+.res-tb { width: 100%; border-collapse: collapse; font-size: 13px; }
+.res-tb td { padding: 5px 6px; border-bottom: 1px dashed rgba(180,170,255,0.18); text-align: left; }
+.res-tb td:first-child { color: #b9b3d8; width: 88px; }
+.res-tb b { color: #ffd24a; }
+.res-tb i { font-style: normal; font-size: 11px; opacity: .6; margin-left: 8px; }
+.res-near { color: #ff9a4a; font-size: 14px; }
+.res-new { color: #7dffc0; font-size: 13px; }
+.res-q { color: #9fd4ff; font-size: 13px; }
+.res-gain { font-size: 14px; }
+.res-gain b { color: #ffd24a; }
+.res-btns { display: flex; gap: 12px; align-items: center; }
+
+/* ---------- 洞府（永久成长 / 任务 / 成就） ---------- */
+#meta-box { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#meta-box b { color: #ffd24a; }
+#meta-panel {
+  display: none;
+  width: 100%; max-width: 420px;
+  max-height: 40vh; overflow-y: auto;
+  text-align: left;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(180,170,255,0.24);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.meta-sec { margin-bottom: 10px; }
+.meta-sec h3 { font-size: 13px; font-weight: 500; color: #b9b3d8; margin-bottom: 5px; letter-spacing: 1px; }
+.up-row, .q-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0; font-size: 12px;
+  border-bottom: 1px dashed rgba(180,170,255,0.14);
+}
+.up-row:last-child, .q-row:last-child { border-bottom: none; }
+.up-name, .q-row span { flex: 1; display: flex; flex-direction: column; }
+.up-name i, .q-row i { font-style: normal; font-size: 11px; opacity: .6; }
+.up-lv { font-size: 11px; opacity: .75; min-width: 30px; text-align: right; }
+.up-buy {
+  padding: 5px 10px; border-radius: 8px; font: inherit; font-size: 11px; cursor: pointer;
+  background: rgba(255,255,255,0.06); color: #b9b3d8;
+  border: 1px solid rgba(180,170,255,0.3);
+}
+.up-row.can .up-buy { color: #ffd24a; border-color: rgba(255,210,74,0.6); background: rgba(255,210,74,0.12); }
+.up-buy:disabled { opacity: .45; cursor: default; }
+.q-row b { font-size: 11px; color: #9fd4ff; white-space: nowrap; }
+.q-row.done span, .q-row.done b { opacity: .5; text-decoration: line-through; }
+
