@@ -256,42 +256,90 @@
       g.fillRect(Math.round(x), Math.round(y), s, s);
     }
 
-    // 9.5) 地图道具：freepixel 图集装饰（树/塔/雕像/晶簇/灯笼/骨骸…，融入背景预渲染，各画质档位都显示）
+    // 9.5) 地图道具：按主题簇布置（竹林/晶矿/废墟/迷雾林/灯笼阵/古树森），融入修仙世界
     // 图集未加载时（初始化 / 桩环境）跳过本段；propImg 加载完成会重建背景把道具铺进来。
     if (propImg && propImg.width) {
-      const DECOR = [
-        ['tree_giant',1,120,160],['tree_maple',1,110,150],['tree_pine',1,100,140],['tree_willow',1,90,130],
-        ['tree_dead',1,100,140],['tree_crystal',1,100,140],['tower_ruin',1,100,140],['tower_stone',1,90,130],
-        ['tower_wizard',1,110,150],['mausoleum',1,90,120],['hut',1,90,130],['altar',1,70,100],['fountain',1,80,120],
-        ['statue_dragon',2,70,100],['statue_lion',2,60,90],['statue_demon',1,80,110],['gate_stone',1,90,130],
-        ['gate_bamboo',1,90,120],['arch_stone',1,80,120],['arch_dark',1,80,120],['well',2,60,90],
-        ['crystal_stand',2,60,90],['geode',2,60,90],['obelisk',2,50,80],['bamboo',2,80,120],['vine',2,50,90],
-        ['rock_moss',5,18,34],['rock_gray',5,16,30],['rock_pile',5,14,28],['rock_moss_lit',5,18,34],['cairn',4,20,36],
-        ['grass_tuft',6,10,22],['mush_blue',5,16,30],['mush_red',5,16,30],['crystal_purple',4,30,50],
-        ['crystal_blue',4,30,50],['crystal_green',4,24,42],['lantern_red',4,30,50],['lantern_yellow',4,20,36],
-        ['brazier',3,28,46],['torch',3,20,40],['campfire',3,22,40],['bones',3,24,44],['skulls',3,24,44],
-        ['web_sac',3,26,48],['wisp',3,24,44],['wisp_gold',3,30,52]
+      const CLUSTERS = [
+        { name: 'bamboo',  pool: [['bamboo', 3, 70, 120], ['grass_tuft', 2, 10, 22]],
+          r: [120, 260], n: [4, 10] },
+        { name: 'crystal', pool: [['crystal_purple', 2, 28, 48], ['crystal_blue', 2, 28, 48], ['crystal_green', 2, 24, 42],
+                                  ['crystal_stand', 1, 55, 90], ['geode', 2, 30, 55], ['rock_moss_lit', 2, 16, 34],
+                                  ['rock_moss', 2, 16, 34]],
+          r: [110, 240], n: [5, 12] },
+        { name: 'ruin',    pool: [['tower_ruin', 1, 85, 140], ['arch_stone', 1, 70, 110], ['statue_lion', 1, 55, 90],
+                                  ['statue_dragon', 1, 60, 95], ['gate_stone', 1, 70, 110], ['bones', 2, 20, 40],
+                                  ['skulls', 1, 20, 40]],
+          r: [140, 300], n: [4, 10] },
+        { name: 'miasma',  pool: [['tree_dead', 2, 90, 140], ['tree_willow', 2, 70, 120], ['web_sac', 2, 24, 44],
+                                  ['skulls', 2, 20, 40], ['bones', 2, 20, 40], ['vine', 3, 40, 90]],
+          r: [130, 280], n: [5, 12] },
+        { name: 'lantern', pool: [['lantern_red', 2, 30, 50], ['lantern_yellow', 2, 20, 36], ['brazier', 2, 24, 44],
+                                  ['torch', 2, 18, 34], ['campfire', 1, 20, 40]],
+          r: [90, 180], n: [4, 8] },
+        { name: 'forest',  pool: [['tree_giant', 2, 110, 160], ['tree_maple', 2, 100, 150], ['tree_pine', 2, 80, 130],
+                                  ['grass_tuft', 2, 10, 22], ['mush_blue', 2, 14, 28], ['mush_red', 2, 14, 28]],
+          r: [140, 320], n: [5, 14] }
       ];
-      let cw = 0; const cum = DECOR.map(function (d) { cw += d[1]; return cw; });
-      const M = 90;                                   // 距地图边界留白，避免道具压在雾崖上
-      const N = Math.max(40, Math.round(A / 30000));
-      const placed = [];
-      for (let i = 0; i < N; i++) {
-        const r = Math.random() * cw;
-        let di = 0; while (di < cum.length - 1 && r > cum[di]) di++;
-        const d = DECOR[di];
-        const th = rd(d[2], d[3]);
-        const bx = PROP_BOXES[d[0]];
-        if (!bx) continue;
-        const wx = rd(M, W - M), wy = rd(M, H - M);
-        placed.push([wy, d[0], wx, wy, th, bx, (d[2] <= 36 ? rd(-0.12, 0.12) : 0)]);
+      const FILL = [
+        ['rock_moss', 3, 14, 30], ['rock_gray', 2, 12, 24], ['rock_pile', 2, 12, 26], ['cairn', 2, 16, 30],
+        ['grass_tuft', 4, 8, 18], ['mush_blue', 2, 12, 22], ['mush_red', 2, 12, 22], ['crystal_purple', 1, 18, 32], ['vine', 2, 30, 70]
+      ];
+      const M = 110;                                   // 距地图边界留白，避免道具压在雾崖上
+      function pick(pool) {
+        let cw = 0; for (const d of pool) cw += d[1];
+        let r = Math.random() * cw;
+        for (const d of pool) { r -= d[1]; if (r <= 0) return d; }
+        return pool[pool.length - 1];
       }
-      placed.sort(function (a, b) { return a[0] - b[0]; });   // 画家算法：下排后画，自然遮挡
+      const placed = [];
+      function put(key, wx, wy, th, rot) {
+        const bx = PROP_BOXES[key]; if (!bx) return;
+        placed.push([wy, key, wx, wy, th, bx, rot]);
+      }
+      // 主题簇：同一片区域只出现同一风格，形成"生态/遗迹"
+      const clusterCount = Math.max(4, Math.round(A / 180000));
+      for (let i = 0; i < clusterCount; i++) {
+        const theme = CLUSTERS[(Math.random() * CLUSTERS.length) | 0];
+        const cx = rd(M, W - M), cy = rd(M, H - M), R = rd(theme.r[0], theme.r[1]);
+        const count = (rd(theme.n[0], theme.n[1]) + 0.5) | 0;
+        for (let k = 0; k < count; k++) {
+          const ang = Math.random() * 6.2832, dist = Math.pow(Math.random(), 0.55) * R; // 中心密、边缘疏
+          const wx = Math.max(M, Math.min(W - M, cx + Math.cos(ang) * dist));
+          const wy = Math.max(M, Math.min(H - M, cy + Math.sin(ang) * dist));
+          const d = pick(theme.pool);
+          const th = rd(d[2], d[3]);
+          const rot = (d[2] <= 36 ? rd(-0.12, 0.12) : 0);
+          put(d[0], wx, wy, th, rot);
+        }
+        // 簇外围零星散落同主题小物件，自然过渡
+        for (let k = 0, nk = 2 + ((Math.random() * 3) | 0); k < nk; k++) {
+          const ang = Math.random() * 6.2832, dist = R + rd(20, 80);
+          const wx = Math.max(M, Math.min(W - M, cx + Math.cos(ang) * dist));
+          const wy = Math.max(M, Math.min(H - M, cy + Math.sin(ang) * dist));
+          const d = pick(theme.pool);
+          const th = rd(d[2] * 0.55, d[3] * 0.75);
+          put(d[0], wx, wy, th, 0);
+        }
+      }
+      // 全局稀疏填充：石头、草、蘑菇、晶石，避免大地图太空
+      const fillN = Math.max(8, Math.round(A / 90000));
+      for (let i = 0; i < fillN; i++) {
+        const d = pick(FILL);
+        const wx = rd(M, W - M), wy = rd(M, H - M);
+        const th = rd(d[2], d[3]);
+        const rot = (d[2] <= 18 ? rd(-0.18, 0.18) : 0);
+        put(d[0], wx, wy, th, rot);
+      }
+      // 画家算法排序，下排后画，自然遮挡
+      placed.sort(function (a, b) { return a[0] - b[0]; });
+      // 绘制：统一压暗滤镜，让 freepixel 素材融入暗色修仙背景；脚底投影 + 小件轻微旋转
+      g.save();
+      g.filter = 'brightness(0.80) contrast(1.08) saturate(0.90)';
       for (const p of placed) {
         const key = p[1], wx = p[2], wy = p[3], th = p[4], bx = p[5], rot = p[6];
         const sc = th / bx[3];
         const dw = bx[2] * sc, dh = bx[3] * sc;
-        g.globalAlpha = 0.22; g.fillStyle = '#000';
+        g.globalAlpha = 0.22; g.fillStyle = '#05060d';
         g.beginPath(); g.ellipse(wx, wy + 2, dw * 0.42, dh * 0.10, 0, 0, 6.2832); g.fill();
         g.globalAlpha = 1;
         g.save();
@@ -300,9 +348,23 @@
         g.drawImage(propImg, bx[0], bx[1], bx[2], bx[3], -dw / 2, -dh, dw, dh);
         g.restore();
       }
+      g.filter = 'none';
+      g.restore();
     }
 
-    // 10) 地图边界：雾崖 + 远山剪影（走到尽头能"看见"边界）
+    // 10) 场景雾气：柔化道具边缘、统一远近层次
+    g.save();
+    g.globalAlpha = 0.12;
+    for (let i = 0, n = Math.round(A / 140000); i < n; i++) {
+      const x = rd(0, W), y = rd(0, H), R = rd(140, 380);
+      const rg = g.createRadialGradient(x, y, 0, x, y, R);
+      rg.addColorStop(0, 'rgba(10, 14, 30, 0.55)');
+      rg.addColorStop(1, 'rgba(10, 14, 30, 0)');
+      g.fillStyle = rg; g.beginPath(); g.arc(x, y, R, 0, 6.2832); g.fill();
+    }
+    g.restore();
+
+    // 11) 地图边界：雾崖 + 远山剪影（走到尽头能"看见"边界）
     g.fillStyle = 'rgba(7,9,20,0.85)';
     for (let i = 0; i < 34; i++) {
       const bw = W / 34, x = i * bw + rd(-bw * 0.3, bw * 0.3);
@@ -984,7 +1046,8 @@
       const ul = Math.hypot(m.dx, m.dy) || 1; m.dx /= ul; m.dy /= ul;
       const spd = m.speed * (m.rush > 0 ? 1.65 : 1);   // 涌进场的一瞬冲得更快
       if (m.rush > 0) m.rush -= dt;
-      if (m.dx > 0.15) m.face = 1; else if (m.dx < -0.15) m.face = -1;
+      // 妖兽始终面朝玩家（左右转身），而不只是按水平速度翻转；这样斜向/上下追来时也明显转身
+      m.face = (player.x >= m.x) ? 1 : -1;
       m.x += m.dx * spd * dt;
       m.y += m.dy * spd * dt;
       if (m.hit > 0) m.hit -= dt;
@@ -1582,9 +1645,24 @@
     const fkey = foeSpriteKey(m);
     if (foeImg && fkey) {
       const b = FOE_BOXES[fkey];
-      const sc = H / b[3];                          // 内容高度对齐到碰撞盒高度
-      const dw = b[2] * sc, dh = b[3] * sc;
-      ctx.drawImage(foeImg, b[0], b[1], b[2], b[3], W / 2 - dw / 2, H - dh, dw, dh);
+      // 伪动作：呼吸缩放 + 冲锋拉伸 + 受击闪白/震动；让单帧素材也能"活"起来
+      const breath = 1 + Math.sin(m.anim * 3.2 + m.sway) * 0.032;
+      const rushS  = m.rush > 0 ? 1.14 : 1;       // 冲刺时身体略拉长
+      const hitShake = m.hit > 0 ? Math.sin(m.hit * 35) * 1.6 : 0;
+      const sc = (H / b[3]) * breath;
+      const dw = b[2] * sc * rushS, dh = b[3] * sc;
+      const sx = W / 2 - dw / 2 + hitShake, sy = H - dh;
+      if (m.hit > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.45;
+        ctx.drawImage(foeImg, b[0], b[1], b[2], b[3], sx, sy, dw, dh);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.filter = 'brightness(1.45)';
+      }
+      ctx.drawImage(foeImg, b[0], b[1], b[2], b[3], sx, sy, dw, dh);
+      if (m.hit > 0) { ctx.filter = 'none'; ctx.restore(); }
     }
     // ② 退回程序化立绘（图集未加载 / 加载失败 / 无浏览器桩环境）
     else if (m.type === 'wolf')         drawWolf(W, H, m, body, dark, glow, ink);
