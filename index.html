@@ -1,77 +1,113 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>凡人修仙录 · 坊市（等距视角）</title>
-<link rel="stylesheet" href="css/iso.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>修仙小游戏 · 入口</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(184,142,72,.18), transparent 60%),
+      radial-gradient(900px 500px at 50% 120%, rgba(120,80,30,.16), transparent 60%),
+      linear-gradient(160deg, #14100a 0%, #0c0906 50%, #16110a 100%);
+    color: #e8dcc4;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 18px 48px;
+  }
+  .wrap { width: 100%; max-width: 720px; }
+  .title {
+    text-align: center;
+    margin-bottom: 6px;
+    font-size: clamp(28px, 7vw, 44px);
+    letter-spacing: .18em;
+    font-weight: 700;
+    background: linear-gradient(180deg, #f3d98a, #b8893f);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 18px rgba(184,142,72,.25);
+  }
+  .subtitle {
+    text-align: center;
+    color: #b9a888;
+    letter-spacing: .22em;
+    font-size: clamp(12px, 3.4vw, 15px);
+    margin-bottom: 34px;
+  }
+  .cards { display: grid; grid-template-columns: 1fr; gap: 18px; }
+  @media (min-width: 560px) { .cards { grid-template-columns: 1fr 1fr; } }
+  .card {
+    position: relative;
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid rgba(184,142,72,.55);
+    border-radius: 16px;
+    padding: 22px 20px 20px;
+    background: linear-gradient(160deg, rgba(30,22,11,.92), rgba(14,10,5,.92));
+    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 12px 40px rgba(0,0,0,.45), 0 0 24px rgba(184,142,72,.10);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    overflow: hidden;
+  }
+  .card::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(400px 200px at 50% 0%, rgba(184,142,72,.12), transparent 70%);
+    opacity: 0; transition: opacity .18s ease;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-4px);
+    border-color: rgba(243,217,138,.85);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 18px 48px rgba(0,0,0,.5), 0 0 36px rgba(184,142,72,.28);
+    outline: none;
+  }
+  .card:hover::after, .card:focus-visible::after { opacity: 1; }
+  .card .badge {
+    display: inline-block; font-size: 12px; letter-spacing: .2em;
+    color: #d8b878; border: 1px solid rgba(184,142,72,.4);
+    border-radius: 999px; padding: 3px 12px; margin-bottom: 14px;
+  }
+  .card h2 {
+    font-size: 22px; letter-spacing: .08em; margin-bottom: 10px;
+    color: #f1dcab;
+  }
+  .card p { color: #b6a98e; font-size: 14px; line-height: 1.7; }
+  .card .go {
+    margin-top: 16px; display: inline-flex; align-items: center; gap: 6px;
+    color: #e8c989; font-size: 14px; letter-spacing: .1em;
+  }
+  .card .go .arrow { transition: transform .18s ease; }
+  .card:hover .go .arrow { transform: translateX(4px); }
+  .foot {
+    text-align: center; color: #6f6450; font-size: 12px; letter-spacing: .12em;
+    margin-top: 36px;
+  }
+</style>
 </head>
 <body>
-
-<!-- ===== 游戏画布（最底层，接收鼠标/触摸） ===== -->
-<canvas id="game"></canvas>
-
-<!-- ===== UI 覆盖层：整体 pointer-events:none 让点击穿透到 canvas ===== -->
-<div id="uiLayer">
-
-  <!-- 左上：角色状态栏 -->
-  <div id="statusBar" class="uiPanel">
-    <div id="avatar"></div>
-    <div id="statusRight">
-      <div class="row1">
-        <span id="pName">逍遥长生</span>
-        <span id="pPower">战 1268</span>
-      </div>
-      <div class="bar hp"><div id="barHp"></div><span id="txtHp">860 / 860</span></div>
-      <div class="bar mp"><div id="barMp"></div><span id="txtMp">420 / 420</span></div>
+  <div class="wrap">
+    <div class="title">修仙小游戏</div>
+    <div class="subtitle">— 选一处，入道 —</div>
+    <div class="cards">
+      <a class="card" href="ImmortalGame/">
+        <span class="badge">等距 · 像素</span>
+        <h2>修仙坊市</h2>
+        <p>等距视角的修仙坊市。操控角色行走于街巷，与书生、商贩等 NPC 交谈，逛遍楼阁摊位。</p>
+        <span class="go">进入坊市 <span class="arrow">→</span></span>
+      </a>
+      <a class="card" href="legacy/">
+        <span class="badge">文字 · 养成</span>
+        <h2>凡人问道录</h2>
+        <p>文字修仙养成。历练、炼丹、宗门、秘境，一路从凡人问道长生。（旧版备份）</p>
+        <span class="go">进入旧版 <span class="arrow">→</span></span>
+      </a>
     </div>
+    <div class="foot">个人作品 · 非商业用途</div>
   </div>
-
-  <!-- 右上：小地图 + 时辰 + 任务列表 -->
-  <div id="infoBar">
-    <canvas id="minimap" width="132" height="132"></canvas>
-    <div id="clock">未时二刻</div>
-    <div id="questBox" class="uiPanel">
-      <div class="qTitle">任 务</div>
-      <div class="qItem"><span class="qName">拜入青玄宗</span></div>
-      <div class="qItem" id="itemTalk"><span class="qName">与接引弟子对话</span><span class="qProg" id="qTalk">0/1</span></div>
-      <div class="qItem"><span class="qName">采集灵药</span><span class="qProg" id="qHerb">2/3</span></div>
-      <div class="qItem"><span class="qName">试炼之路</span></div>
-    </div>
-  </div>
-
-  <!-- 底部：技能栏 + 功能按钮 -->
-  <div id="bottomBar">
-    <div id="skillBar">
-      <div class="skill interactive"><span class="skName">剑诀</span><span class="skKey">1</span></div>
-      <div class="skill interactive"><span class="skName">灵力弹</span><span class="skKey">2</span></div>
-      <div class="skill interactive"><span class="skName">身法</span><span class="skKey">3</span></div>
-      <div class="skill interactive"><span class="skName">护体</span><span class="skKey">4</span></div>
-    </div>
-    <div id="funcBar">
-      <div class="func interactive">境界</div>
-      <div class="func interactive">角色</div>
-      <div class="func interactive">功法</div>
-      <div class="func interactive">背包</div>
-      <div class="func interactive">炼器</div>
-      <div class="func interactive">设置</div>
-    </div>
-  </div>
-
-  <!-- 对话面板（交互元素，单独开启 pointer-events） -->
-  <div id="dialog" class="uiPanel hidden interactive">
-    <div id="dlgName">NPC</div>
-    <div id="dlgText">……</div>
-    <div id="dlgBtns"><button id="dlgClose">继续</button></div>
-  </div>
-
-  <div id="toast"></div>
-
-  <!-- 竖屏提示（仅手机竖屏显示，纯提示不打断） -->
-  <div id="rotateHint"><span class="rot">⟳</span>建议横屏体验<br>画面更完整</div>
-</div>
-
-<script src="js/iso.js"></script>
 </body>
 </html>
