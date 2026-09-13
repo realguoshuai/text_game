@@ -34,16 +34,24 @@
   let W = 0, H = 0;
   let TILE_W = 64, TILE_H = 32;      // 标准 45° 等距：宽高比 2:1
   let HW = TILE_W / 2, HH = TILE_H / 2;
+  let viewZoom = 1.0;                // 双指捏合缩放（0.6~2.0），仅手势/滚轮调节，无 UI 控件
 
   function applyScale() {
     const small = window.innerWidth < 760;
-    // 固定视角（缩放控件已移除，保证操作流畅）；手机端瓦片更小，同屏可见更多地图
+    // 手机端瓦片更小，同屏可见更多地图；乘 viewZoom 实现捏合缩放
     const baseW = small ? 44 : 56;
     const baseH = small ? 22 : 28;
-    TILE_W = baseW;
-    TILE_H = baseH;
+    TILE_W = baseW * viewZoom;
+    TILE_H = baseH * viewZoom;
     HW = TILE_W / 2; HH = TILE_H / 2;
   }
+
+  // —— 桌面滚轮缩放（手机端用双指捏合，见触摸事件区）——
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    viewZoom = Math.min(2.0, Math.max(0.6, viewZoom * (e.deltaY < 0 ? 1.12 : 0.89)));
+    applyScale();
+  }, { passive: false });
   function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
@@ -580,6 +588,30 @@
     touchStart = null;
   });
   canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+  // —— 双指捏合缩放（竖屏 / 横屏都可用；捏合时取消点按）——
+  let pinch = null;                 // { dist0, zoom0 }
+  function pinchDist(e) {
+    const t = e.touches;
+    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  }
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      pinch = { dist0: pinchDist(e), zoom0: viewZoom };
+      touchStart = null;             // 两指按下 → 本次点动作废
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    if (pinch && e.touches.length >= 2) {
+      e.preventDefault();
+      const z = pinch.zoom0 * (pinchDist(e) / pinch.dist0);
+      viewZoom = Math.min(2.0, Math.max(0.6, z));
+      applyScale();
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    if (pinch && e.touches.length < 2) pinch = null;   // 抬起一指 → 结束本次捏合
+  });
 
   // =====================================================
   // 十一、对话面板
