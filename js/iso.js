@@ -36,8 +36,9 @@
 
   function applyScale() {
     const small = window.innerWidth < 760;
-    TILE_W = small ? 48 : 64;
-    TILE_H = small ? 24 : 32;
+    // 视角略抬高（整体缩小瓦片 ≈ 同屏可见更多地图面积），缓解建筑拥挤感
+    TILE_W = small ? 44 : 56;
+    TILE_H = small ? 22 : 28;
     HW = TILE_W / 2; HH = TILE_H / 2;
   }
   function resize() {
@@ -54,7 +55,7 @@
   // 二、地图数据（二维数组）
   //   0 = 地面（可走）   1 = 建筑/障碍（不可走）   2 = 装饰（石板/景物，可走）
   // =====================================================
-  const MAP_W = 22, MAP_H = 22;
+  const MAP_W = 36, MAP_H = 36;     // 扩大地图，给建筑留出开阔间距
   const map = [];
   for (let y = 0; y < MAP_H; y++) map.push(new Array(MAP_W).fill(0));
 
@@ -64,41 +65,52 @@
         if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) map[y][x] = v;
   }
 
-  fill(8, 8, 6, 6, 2);      // 中央广场（石板）
-  fill(1, 10, 20, 2, 2);    // 横向主街
-  fill(10, 1, 2, 20, 2);    // 纵向主街
+  fill(13, 13, 12, 12, 2);   // 中央广场（石板）
+  fill(0, 17, 36, 2, 2);     // 横向主街（贯穿东西）
+  fill(17, 0, 2, 36, 2);     // 纵向主街（贯穿南北）
 
-  // —— 建筑：占地图标 1（不可走），登记用于绘制与深度排序
-  //   frame 对应 buildings.png 横排 4 帧（AI 生成夜景商铺，256×224/帧）：0接引台 1聚宝阁 2丹房 3器坊
+  // —— 建筑：四角主楼 + 沿街小铺，拉开间距降低密度
+  //   frame 对应 buildings.png 横排 6 帧（256×224/帧）：0接引台 1聚宝阁 2丹房 3器坊 4沿街铺 5临街铺
   const buildings = [
     { x: 3,  y: 3,  w: 5, h: 4, h3d: 46, frame: 0, name: '接引台', roof: '#4a5a7a' },
-    { x: 14, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
-    { x: 3,  y: 14, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
-    { x: 14, y: 14, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
-    { x: 3,  y: 7,  w: 3, h: 2, h3d: 40, frame: 4, name: '沿街铺', roof: '#5a4a38' },
-    { x: 9,  y: 18, w: 3, h: 2, h3d: 40, frame: 5, name: '临街铺', roof: '#5a4a38' },
+    { x: 28, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
+    { x: 3,  y: 28, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
+    { x: 28, y: 28, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
+    { x: 9,  y: 15, w: 3, h: 2, h3d: 40, frame: 4, name: '沿街铺', roof: '#5a4a38' },
+    { x: 20, y: 9,  w: 3, h: 2, h3d: 40, frame: 5, name: '临街铺', roof: '#5a4a38' },
   ];
   buildings.forEach(b => fill(b.x, b.y, b.w, b.h, 1));
 
   // —— 装饰物：国风道具（帧表见 DECOR_FRAME）
   //   实体道具（石狮/水井/火盆/木桩/像/货摊等）所在格标 1 不可穿行；灯笼挂空中、牌坊可穿行
   const props = [
-    { x: 9,  y: 7,  kind: 'lantern' },  { x: 12, y: 7,  kind: 'lantern' },
-    { x: 9,  y: 15, kind: 'lantern' },  { x: 12, y: 15, kind: 'lantern' },
-    { x: 7,  y: 9,  kind: 'lanternY' }, { x: 14, y: 9,  kind: 'lanternY' },
-    { x: 9,  y: 6,  kind: 'lion' },   { x: 12, y: 6,  kind: 'lion' },   // 接引台前石狮
-    { x: 8,  y: 14, kind: 'well' },                                     // 丹房旁水井
-    { x: 9,  y: 9,  kind: 'brazier' },  { x: 12, y: 12, kind: 'brazier' },  // 广场火盆
-    { x: 13, y: 14, kind: 'dummy' },    { x: 14, y: 13, kind: 'dummy' },    // 器坊前练功桩
-    { x: 17, y: 11, kind: 'gate' },                                     // 东街石牌坊（可穿行）
-    { x: 13, y: 12, kind: 'statue' },                                   // 广场武雕像
-    { x: 8,  y: 9,  kind: 'stall' },                                    // 布棚货摊（AI）
-    { x: 13, y: 9,  kind: 'tea' },                                      // 茶摊伞桌（AI）
-    { x: 6,  y: 12, kind: 'string' },   { x: 15, y: 12, kind: 'string' },   // 灯笼串（AI）
-    { x: 9,  y: 13, kind: 'string' },
-    { x: 9,  y: 8,  kind: 'crates' },   { x: 12, y: 8,  kind: 'crates' },   // 货箱筐堆（AI）
-    { x: 5,  y: 16, kind: 'pond' },                                     // 荷塘小桥（AI）
-    { x: 12, y: 5,  kind: 'crystal' },  { x: 7,  y: 12, kind: 'crystal' },  // 灵晶簇（FreePixel）
+    // 灯笼（悬挂，可穿行）
+    { x: 15, y: 11, kind: 'lantern' }, { x: 21, y: 11, kind: 'lantern' },
+    { x: 15, y: 25, kind: 'lantern' }, { x: 21, y: 25, kind: 'lantern' },
+    { x: 11, y: 18, kind: 'lantern' }, { x: 25, y: 18, kind: 'lantern' },
+    { x: 14, y: 16, kind: 'lanternY' },{ x: 22, y: 16, kind: 'lanternY' },
+    // 石狮（建筑前，实心）
+    { x: 5,  y: 8,  kind: 'lion' }, { x: 6,  y: 8,  kind: 'lion' },
+    { x: 29, y: 8,  kind: 'lion' }, { x: 30, y: 8,  kind: 'lion' },
+    // 广场火盆 / 武雕像（实心）
+    { x: 17, y: 18, kind: 'brazier' }, { x: 19, y: 18, kind: 'brazier' }, { x: 18, y: 22, kind: 'brazier' },
+    { x: 18, y: 19, kind: 'statue' },
+    // 器坊前练功桩（实心）
+    { x: 27, y: 29, kind: 'dummy' }, { x: 27, y: 31, kind: 'dummy' },
+    // 丹房旁水井 / 荷塘（实心）
+    { x: 8,  y: 30, kind: 'well' },
+    { x: 5,  y: 22, kind: 'pond' },
+    // 布棚货摊 / 茶摊（实心）
+    { x: 26, y: 9,  kind: 'stall' },
+    { x: 9,  y: 29, kind: 'tea' },
+    // 灯笼串（沿街，实心）
+    { x: 10, y: 17, kind: 'string' }, { x: 26, y: 17, kind: 'string' },
+    { x: 18, y: 10, kind: 'string' }, { x: 18, y: 26, kind: 'string' },
+    // 货箱 / 灵晶（实心）
+    { x: 16, y: 22, kind: 'crates' }, { x: 20, y: 22, kind: 'crates' },
+    { x: 12, y: 18, kind: 'crystal' },{ x: 24, y: 18, kind: 'crystal' },
+    // 东街石牌坊（可穿行）
+    { x: 34, y: 18, kind: 'gate' },
   ];
   const SOLID_PROPS = new Set(['lion', 'well', 'brazier', 'dummy', 'statue', 'stall', 'tea', 'string', 'crates', 'pond', 'crystal']);
   props.forEach(p => { map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2; });
@@ -108,28 +120,28 @@
   // =====================================================
   //  sprite 对应 ASSETS 键名；素材缺失时自动用彩色占位小人
   const npcs = [
-    { id: 'jieyin', name: '接引弟子', mx: 10.5, my: 6.5, color: '#7fc4ff',
+    { id: 'jieyin', name: '接引弟子', mx: 10.5, my: 9.5, color: '#7fc4ff',
       sprite: 'npcVillager', face: 'down', hasQuest: true,
       talk: '可是来拜师的？青玄宗收徒有规矩：先寻引路之人，再过问心阶。\n（任务：与接引弟子对话 0/1 —— 你已完成对话，可去丹房、器坊一带转转。）' },
-    { id: 'shangren', name: '灵石商人', mx: 13.5, my: 8.5, color: '#8fd3ff',
+    { id: 'shangren', name: '灵石商人', mx: 24.5, my: 9.5, color: '#8fd3ff',
       sprite: 'npcMerchant', face: 'left', hasQuest: false,
       talk: '灵石通万物，道友可要换些丹药符箓？\n（此处为商店占位，日后接背包与交易面板。）' },
-    { id: 'zayi', name: '杂役弟子', mx: 6.5, my: 12.5, color: '#9fd48a',
+    { id: 'zayi', name: '杂役弟子', mx: 10.5, my: 30.5, color: '#9fd48a',
       sprite: 'npcVillager', face: 'down', hasQuest: false,
       talk: '（擦汗）丹房今日要三株灵药，我采了两株，还差一株……\n（任务：采集灵药 2/3）' },
-    { id: 'hedaozhang', name: '何道长', mx: 16.5, my: 11.5, color: '#c9a0dc',
+    { id: 'hedaozhang', name: '何道长', mx: 31.5, my: 25.5, color: '#c9a0dc',
       sprite: 'npcVillager', face: 'right', hasQuest: true,
       talk: '贫道观你印堂微暗，近日不宜远行。\n（任务：求得一道护身符，可去找灵石商人。）' },
-    { id: 'baifashi', name: '摆法师', mx: 7.5, my: 8.5, color: '#e0c068',
+    { id: 'baifashi', name: '摆法师', mx: 18.5, my: 15.5, color: '#e0c068',
       sprite: 'npcMerchant', face: 'down', hasQuest: false,
       talk: '占一卦三枚灵石——今日宜静不宜动，宜东南，忌西北。' },
   ];
 
   const player = {
-    mx: 10.5, my: 12.5,
+    mx: 18.5, my: 21.5,
     target: null,           // {mx,my} 目标点；null = 停止
     speed: 3.0,             // 格/秒
-    face: 'down', walking: false, walkT: 0,
+    face: 'up', walking: false, walkT: 0,
   };
 
   // =====================================================
@@ -272,7 +284,7 @@
     const A = isoToScreen(b.x, b.y);
     const C = isoToScreen(b.x + b.w, b.y + b.h);
     const cx = (A.x + C.x) / 2, bottomY = C.y;
-    let dw = (b.w + b.h) * HW * 0.92;
+    let dw = (b.w + b.h) * HW * 0.86;
     let dh = dw * (BLD_FH / BLD_FW);            // 保持素材宽高比
 
     if (SPR.buildings) {
@@ -282,7 +294,7 @@
       const B = isoToScreen(b.x + b.w, b.y);
       const D = isoToScreen(b.x, b.y + b.h);
       const hgt = b.h3d;
-      dw = (b.w + b.h) * HW * 0.92;             // 占位盒仍按占地比例
+      dw = (b.w + b.h) * HW * 0.86;             // 占位盒仍按占地比例
       dh = (b.w + b.h) * HH * 0.92 + hgt;
       ctx.fillStyle = '#4a3c2c';
       ctx.beginPath();
@@ -343,8 +355,8 @@
   function drawCharacter(o, isPlayer, time) {
     const s = isoToScreen(o.mx, o.my);
     if (s.x < -90 || s.x > W + 90 || s.y < -160 || s.y > H + 90) return;
-    const bob = (isPlayer && o.walking) ? Math.abs(Math.sin(o.walkT * 10)) * 3
-                                        : Math.sin(time * 2 + o.mx) * 1.2;
+    const moving = isPlayer && o.walking;          // 仅玩家移动时播放行走动画
+    const bob = moving ? Math.abs(Math.sin(o.walkT * 10)) * 3 : 0;   // NPC / 静止玩家：不原地晃动
     const baseY = s.y - bob;
     const key = isPlayer ? 'player' : o.sprite;
     const img = SPR[key];
@@ -357,8 +369,8 @@
       const dh = TILE_H * 2.4;
       const dw = dh * (cfg.cellW / cfg.cellH);
       const dirRow = cfg.dir[o.face] ?? 0;
-      const animT = (isPlayer && o.walking) ? o.walkT : time + o.mx;
-      const frame = Math.floor(animT * 6) % cfg.frames;
+      // 静止时固定用第 0 帧（站立姿势），避免 NPC/玩家原地踏步
+      const frame = moving ? Math.floor(o.walkT * 6) % cfg.frames : 0;
       const sx = frame * cfg.cellW;
       const sy = dirRow * cfg.cellH;
       ctx.drawImage(img, sx, sy, cfg.cellW, cfg.cellH, s.x - dw / 2, baseY - dh + 4, dw, dh);
