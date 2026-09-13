@@ -451,18 +451,18 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
     ground:       'assets/tiles/ground.png',
     buildings:    'assets/tiles/buildings.png',
     decorations:  'assets/tiles/decorations.png',
-    player:       'assets/char_blade.png',
-    npcMerchant:  'assets/char_sword.png',
-    npcVillager:  'assets/char_thunder.png',
+    player:       'assets/char_thunder.png',      // 雷法真君（男）：割草游戏三角色里选的男性模型
+    npcMerchant:  'assets/char_sword.png',        // 御剑仙（白发老者）：商人/长者感
+    npcVillager:  'assets/char_blade.png',        // 原主角图转为弟子系 NPC
     npcScholar:   'assets/char_scholar.png',
     uiIcons:      'assets/ui/icons.png',
     uiAvatar:     'assets/ui/avatar.png',
   };
   const SPR = {};                       // 只放「加载成功」的图片
   const SHEETS = {                        // 角色 sprite sheet 布局（6列×5行，64×64/格）
-    player:      { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
-    npcMerchant: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
-    npcVillager: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
+    player:      { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, idle: { down: 0, right: 0, left: 4, up: 0 } },
+    npcMerchant: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, idle: { down: 0, right: 0, left: 2, up: 0 } },
+    npcVillager: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, idle: { down: 0, right: 0, left: 4, up: 0 } },
     npcScholar:  { cols: 4, rows: 4, cellW: 64, cellH: 64, frames: 4, dir: { down: 0, right: 1, left: 2, up: 3 }, scale: 0.62 },
   };
   const missing = [];
@@ -684,8 +684,9 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
       const dh = TILE_H * 2.4 * sc;
       const dw = dh * (cfg.cellW / cfg.cellH);
       const dirRow = cfg.dir[o.face] ?? 0;
-      // 静止时固定用第 0 帧（站立姿势），避免 NPC/玩家原地踏步
-      const frame = moving ? Math.floor(o.walkT * 6) % cfg.frames : 0;
+      // 静止时用该朝向的「站立帧」（部分贴图侧向第 0 帧是迈步，需按朝向指定）
+      const idleF = (cfg.idle && cfg.idle[o.face]) || 0;
+      const frame = moving ? Math.floor(o.walkT * 6) % cfg.frames : idleF;
       const sx = frame * cfg.cellW;
       const sy = dirRow * cfg.cellH;
       ctx.drawImage(img, sx, sy, cfg.cellW, cfg.cellH, s.x - dw / 2, baseY - dh + 4, dw, dh);
