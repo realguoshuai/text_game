@@ -9,9 +9,9 @@
  *   assets/tiles/ground.png        等距地面：横向 2 帧（64×32/帧）—— 0=土地 1=青石板
  *   assets/tiles/buildings.png     等距建筑（按占地比例缩放绘制，透明底）
  *   assets/tiles/decorations.png   国风装饰：横排 12 帧（96×96/帧）垂柳/青松/竹/灯笼×2/石狮/水井/火盆/练功桩/石牌坊/玉龙像/武雕像
- *   assets/characters/player.png           玩家立绘（底边居中对齐脚点）
- *   assets/characters/npc_merchant.png     商人 NPC
- *   assets/characters/npc_villager.png     村民/弟子 NPC
+ *   assets/char_blade.png          玩家四向行走帧表（6列×5行，64×64/格）
+ *   assets/char_sword.png          商人 NPC 四向行走帧表
+ *   assets/char_thunder.png        村民/弟子 NPC 四向行走帧表
  *   assets/ui/panel.png            UI 底板（自动铺到状态栏/任务栏/对话框）
  *   assets/ui/icons.png            技能图标：横向 4 格（64×64/格）
  *
@@ -116,19 +116,19 @@
   //  sprite 对应 ASSETS 键名；素材缺失时自动用彩色占位小人
   const npcs = [
     { id: 'jieyin', name: '接引弟子', mx: 10.5, my: 6.5, color: '#7fc4ff',
-      sprite: 'npcVillager', hasQuest: true,
+      sprite: 'npcVillager', face: 'down', hasQuest: true,
       talk: '可是来拜师的？青玄宗收徒有规矩：先寻引路之人，再过问心阶。\n（任务：与接引弟子对话 0/1 —— 你已完成对话，可去丹房、器坊一带转转。）' },
     { id: 'shangren', name: '灵石商人', mx: 13.5, my: 8.5, color: '#8fd3ff',
-      sprite: 'npcMerchant', hasQuest: false,
+      sprite: 'npcMerchant', face: 'left', hasQuest: false,
       talk: '灵石通万物，道友可要换些丹药符箓？\n（此处为商店占位，日后接背包与交易面板。）' },
     { id: 'zayi', name: '杂役弟子', mx: 6.5, my: 12.5, color: '#9fd48a',
-      sprite: 'npcVillager', hasQuest: false,
+      sprite: 'npcVillager', face: 'down', hasQuest: false,
       talk: '（擦汗）丹房今日要三株灵药，我采了两株，还差一株……\n（任务：采集灵药 2/3）' },
     { id: 'hedaozhang', name: '何道长', mx: 16.5, my: 11.5, color: '#c9a0dc',
-      sprite: 'npcVillager', hasQuest: true,
+      sprite: 'npcVillager', face: 'right', hasQuest: true,
       talk: '贫道观你印堂微暗，近日不宜远行。\n（任务：求得一道护身符，可去找灵石商人。）' },
     { id: 'baifashi', name: '摆法师', mx: 7.5, my: 8.5, color: '#e0c068',
-      sprite: 'npcMerchant', hasQuest: false,
+      sprite: 'npcMerchant', face: 'down', hasQuest: false,
       talk: '占一卦三枚灵石——今日宜静不宜动，宜东南，忌西北。' },
   ];
 
@@ -136,7 +136,7 @@
     mx: 10.5, my: 12.5,
     target: null,           // {mx,my} 目标点；null = 停止
     speed: 3.0,             // 格/秒
-    face: 1, walking: false, walkT: 0,
+    face: 'down', walking: false, walkT: 0,
   };
 
   // =====================================================
@@ -146,14 +146,19 @@
     ground:       'assets/tiles/ground.png',
     buildings:    'assets/tiles/buildings.png',
     decorations:  'assets/tiles/decorations.png',
-    player:       'assets/characters/player.png',
-    npcMerchant:  'assets/characters/npc_merchant.png',
-    npcVillager:  'assets/characters/npc_villager.png',
+    player:       'assets/char_blade.png',
+    npcMerchant:  'assets/char_sword.png',
+    npcVillager:  'assets/char_thunder.png',
     uiPanel:      'assets/ui/panel.png',
     uiIcons:      'assets/ui/icons.png',
     uiAvatar:     'assets/ui/avatar.png',
   };
   const SPR = {};                       // 只放「加载成功」的图片
+  const SHEETS = {                        // 角色 sprite sheet 布局（6列×5行，64×64/格）
+    player:      { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
+    npcMerchant: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
+    npcVillager: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
+  };
   const missing = [];
   Object.keys(ASSETS).forEach(key => {
     const img = new Image();
@@ -341,19 +346,30 @@
     }
   }
 
-  /** 角色：有素材用立绘（底边居中对齐脚点），否则画占位小人 */
+  /** 角色：sprite sheet 四向行走动画（64×64/格），缺失则回退占位小人 */
   function drawCharacter(o, isPlayer, time) {
     const s = isoToScreen(o.mx, o.my);
     if (s.x < -90 || s.x > W + 90 || s.y < -160 || s.y > H + 90) return;
     const bob = (isPlayer && o.walking) ? Math.abs(Math.sin(o.walkT * 10)) * 3
                                         : Math.sin(time * 2 + o.mx) * 1.2;
     const baseY = s.y - bob;
-    const img = isPlayer ? SPR.player : SPR[o.sprite];
+    const key = isPlayer ? 'player' : o.sprite;
+    const img = SPR[key];
+    const cfg = SHEETS[key];
 
     ctx.fillStyle = 'rgba(0,0,0,.3)';
     ctx.beginPath(); ctx.ellipse(s.x, s.y, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
 
-    if (img) {
+    if (img && cfg) {
+      const dh = TILE_H * 2.4;
+      const dw = dh * (cfg.cellW / cfg.cellH);
+      const dirRow = cfg.dir[o.face] ?? 0;
+      const animT = (isPlayer && o.walking) ? o.walkT : time + o.mx;
+      const frame = Math.floor(animT * 6) % cfg.frames;
+      const sx = frame * cfg.cellW;
+      const sy = dirRow * cfg.cellH;
+      ctx.drawImage(img, sx, sy, cfg.cellW, cfg.cellH, s.x - dw / 2, baseY - dh + 4, dw, dh);
+    } else if (img) {
       const dh = TILE_H * 2.4, dw = dh * (img.width / img.height);
       ctx.drawImage(img, s.x - dw / 2, baseY - dh + 4, dw, dh);
     } else {
@@ -368,8 +384,9 @@
       ctx.beginPath(); ctx.arc(s.x, baseY - 30, 5.5, Math.PI, Math.PI * 2); ctx.fill();
       ctx.fillRect(s.x - 2, baseY - 36, 4, 4);
       ctx.fillStyle = '#1a1410';
-      ctx.fillRect(s.x + (isPlayer ? o.face * 2 : -2), baseY - 27, 2, 2);
-      ctx.fillRect(s.x + (isPlayer ? o.face * 2 + 4 : 2), baseY - 27, 2, 2);
+      const faceSign = (o.face === 'left') ? -1 : 1;
+      ctx.fillRect(s.x + (isPlayer ? faceSign * 2 : -2), baseY - 27, 2, 2);
+      ctx.fillRect(s.x + (isPlayer ? faceSign * 2 + 4 : 2), baseY - 27, 2, 2);
     }
 
     const headTop = baseY - (img ? TILE_H * 2.4 + 2 : 40);
@@ -615,7 +632,16 @@
         if (okX) player.mx = nx;
         if (okY) player.my = ny;
         if (!okX && !okY) { player.target = null; player.walking = false; }
-        else { player.walking = true; player.walkT += dt; player.face = (dx - dy) > 0 ? 1 : -1; }
+        else {
+          player.walking = true; player.walkT += dt;
+          // 屏幕坐标投影：sx = dx - dy, sy = dx + dy，取主方向
+          const sx = dx - dy, sy = dx + dy;
+          if (Math.abs(sy) > Math.abs(sx)) {
+            player.face = sy > 0 ? 'down' : 'up';
+          } else {
+            player.face = sx > 0 ? 'right' : 'left';
+          }
+        }
       }
     } else player.walking = false;
 
