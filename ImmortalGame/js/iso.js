@@ -235,8 +235,16 @@
     return { mx: (a + b) / 2, my: (b - a) / 2 };
   }
 
-  /** 摄像机平滑跟随：目标 = 玩家保持在画面中心，指数插值（帧率无关） */
+  /** 摄像机：拖动视角期间自由（带惯性衰减），其余时候平滑跟随玩家（指数插值，帧率无关） */
   function updateCamera(dt) {
+    if (camFree) {
+      cameraX += camVX; cameraY += camVY;
+      const decay = Math.exp(-5 * dt);
+      camVX *= decay; camVY *= decay;
+      if (Math.abs(camVX) < 0.05) camVX = 0;
+      if (Math.abs(camVY) < 0.05) camVY = 0;
+      return;
+    }
     const px = (player.mx - player.my) * (TILE_W / 2);
     const py = (player.mx + player.my) * (TILE_H / 2);
     const k = 1 - Math.exp(-6 * dt);
@@ -575,53 +583,90 @@
     const tx = Math.floor(t.mx), ty = Math.floor(t.my);
     if (tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H && tileAt(tx + 0.5, ty + 0.5) !== 1) {
       player.target = { mx: tx + 0.5, my: ty + 0.5 };
+      camFree = false;                               // 角色一动 → 镜头恢复跟随
     } else {
       toast('那里过不去。');
     }
   }
 
-  canvas.addEventListener('mousedown', e => { if (e.button === 0) handleTap(e.clientX, e.clientY); });
-  canvas.addEventListener('mousemove', e => {
-    hoverNpc = hitNpc(e.clientX, e.clientY);
-    canvas.style.cursor = hoverNpc ? 'pointer' : 'default';
-  });
-  // —— 手机端触摸：短按（位移 <16px、时长 <700ms）视为点按 ——
-  let touchStart = null;
-  canvas.addEventListener('touchstart', e => {
-    const t = e.changedTouches[0];
-    touchStart = { x: t.clientX, y: t.clientY, t: Date.now() };
-  }, { passive: true });
-  canvas.addEventListener('touchend', e => {
-    if (!touchStart) return;
-    const t = e.changedTouches[0];
-    const moved = Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y);
-    if (moved < 16 && Date.now() - touchStart.t < 700) handleTap(t.clientX, t.clientY);
-    touchStart = null;
-  });
-  canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  // —— 视角自由：拖动后暂停跟随，点地行走即恢复 ——
+  let camFree = false;
+  let camVX = 0, camVY = 0;                          // 松手后惯性（px/帧）
 
-  // —— 双指捏合缩放（竖屏 / 横屏都可用；捏合时取消点按）——
+  // —— 桌面：左键点按行走，按住拖动拉视角 ——
+  let mDown = null, mDrag = false;
+  canvas.style.cursor = 'grab';
+  canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    mDown = { x: e.clientX, y: e.clientY };
+    mDrag = false; camVX = camVY = 0;
+  });
+  window.addEventListener('mousemove', e => {
+    if (!mDown) {
+      hoverNpc = hitNpc(e.clientX, e.clientY);
+      canvas.style.cursor = hoverNpc ? 'pointer' : 'grab';
+      return;
+    }
+    const dx = e.clientX - mDown.x, dy = e.clientY - mDown.y;
+    if (!mDrag && Math.hypot(dx, dy) > 6) { mDrag = true; canvas.style.cursor = 'grabbing'; }
+    if (mDrag) {
+      cameraX += dx; cameraY += dy;
+      camVX = dx; camVY = dy;
+      camFree = true;
+      mDown = { x: e.clientX, y: e.clientY };
+    }
+  });
+  window.addEventListener('mouseup', () => {
+    if (mDown && !mDrag) handleTap(mDown.x, mDown.y);
+    mDown = null; mDrag = false;
+    canvas.style.cursor = 'grab';
+  });
+
+  // —— 手机：单指短按行走 / 单指拖动拉视角 / 双指捏合缩放 ——
+  let touchStart = null, touchLast = null, touchDrag = false;
   let pinch = null;                 // { dist0, zoom0 }
   function pinchDist(e) {
     const t = e.touches;
     return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
   }
   canvas.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
+    if (e.touches.length === 1) {
+      const t = e.changedTouches[0];
+      touchStart = { x: t.clientX, y: t.clientY, t: Date.now() };
+      touchLast = { x: t.clientX, y: t.clientY };
+      touchDrag = false; camVX = camVY = 0;
+    } else if (e.touches.length === 2) {
       pinch = { dist0: pinchDist(e), zoom0: viewZoom };
-      touchStart = null;             // 两指按下 → 本次点动作废
+      touchStart = null; touchDrag = false;
     }
   }, { passive: true });
   canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
     if (pinch && e.touches.length >= 2) {
-      e.preventDefault();
       const z = pinch.zoom0 * (pinchDist(e) / pinch.dist0);
       viewZoom = Math.min(2.0, Math.max(0.6, z));
       applyScale();
+      return;
+    }
+    if (e.touches.length === 1 && touchStart) {
+      const t = e.touches[0];
+      if (!touchDrag && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) > 10) touchDrag = true;
+      if (touchDrag) {
+        cameraX += t.clientX - touchLast.x;
+        cameraY += t.clientY - touchLast.y;
+        camVX = t.clientX - touchLast.x; camVY = t.clientY - touchLast.y;
+        camFree = true;
+        touchLast = { x: t.clientX, y: t.clientY };
+      }
     }
   }, { passive: false });
   canvas.addEventListener('touchend', e => {
     if (pinch && e.touches.length < 2) pinch = null;   // 抬起一指 → 结束本次捏合
+    if (touchStart && !touchDrag && e.touches.length === 0) {
+      const t = e.changedTouches[0];
+      if (Date.now() - touchStart.t < 700) handleTap(t.clientX, t.clientY);
+    }
+    if (e.touches.length === 0) { touchStart = null; touchDrag = false; }
   });
 
   // =====================================================
