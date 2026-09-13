@@ -1,0 +1,343 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #07060f;
+  color: #e8e6f5;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  /* 手机缩放防线：manipulation 干掉双击缩放，同时不破坏浮层内部滑动；
+     捏合缩放由 Safari 专有 gesture 事件 + #game 的 touch-action:none 拦掉 */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 被浏览器放大时的兜底还原按钮（正常情况一直隐藏；已在用缩放补偿时 4 秒后自动收起） */
+.viewfix {
+  position: fixed;
+  left: 50%;
+  top: 46px;
+  transform: translateX(-50%);
+  z-index: 90;
+  padding: 7px 13px;
+  border: 1px solid rgba(120, 220, 255, .55);
+  border-radius: 999px;
+  background: rgba(10, 22, 36, .9);
+  color: #bfe9ff;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.viewfix[hidden] { display: none; }
+
+/* 浮层里必须能上下滑动（选人/结算/设置/洞府面板），显式放行纵向平移 */
+.overlay, #meta-panel { touch-action: pan-y; }
+
+#wrap { position: relative; width: 100vw; height: 100dvh; }
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+  font-size: 13px;
+}
+#hud .hp-box { width: 150px; }
+#hud .hp-bar {
+  height: 12px; border-radius: 6px;
+  background: rgba(255,255,255,0.12);
+  overflow: hidden; border: 1px solid rgba(255,255,255,0.18);
+}
+#hp-fill {
+  display: block; height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #e0464f, #ff8a5b);
+  transition: width .12s linear;
+}
+#hud .stat { white-space: nowrap; }
+#hud .stat b { color: #ffd24a; }
+
+/* ---------- 突破提示 ---------- */
+#toast {
+  position: absolute;
+  top: 64px; left: 50%; transform: translateX(-50%);
+  display: none;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: rgba(74,59,140,0.85);
+  border: 1px solid rgba(180,170,255,0.6);
+  color: #ffe27a; font-size: 15px; letter-spacing: 1px;
+  pointer-events: none;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+  z-index: 6;
+  animation: toastpop .3s ease;
+}
+@keyframes toastpop { from { transform: translateX(-50%) scale(0.8); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+
+/* ---------- 浮动摇杆（左半屏触点出现，半透明） ---------- */
+#joystick {
+  position: fixed;
+  display: none;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: rgba(120,110,200,0.16);
+  border: 2px solid rgba(180,170,255,0.4);
+  pointer-events: none;
+  touch-action: none;
+  z-index: 4;
+}
+#joy-base {
+  position: absolute; left: 50%; top: 50%;
+  width: 52px; height: 52px; margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: rgba(180,170,255,0.16);
+  border: 1px solid rgba(180,170,255,0.4);
+}
+#joy-knob {
+  position: absolute; left: 50%; top: 50%;
+  width: 56px; height: 56px; margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(150,140,240,0.55);
+  border: 1px solid rgba(220,215,255,0.7);
+  will-change: transform;
+}
+
+/* ---------- 飞剑钮（半隐藏、可拖动、不固定） ---------- */
+.btn {
+  position: fixed;
+  right: 20px; bottom: 26px;
+  width: 60px; height: 60px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #dfeaff;
+  background: rgba(120,140,220,0.12);
+  border: 1px solid rgba(180,200,255,0.25);
+  opacity: 0.34;                 /* 半隐藏：平时淡显，按下才亮 */
+  user-select: none; touch-action: none;
+  z-index: 5;
+  backdrop-filter: blur(2px);
+  transition: opacity .15s ease, background .15s ease;
+}
+.btn svg { pointer-events: none; }
+.btn:active { opacity: 1; background: rgba(140,170,255,0.3); }
+
+/* ---------- 横屏游玩按钮（开场浮层） ---------- */
+.ghost-btn {
+  margin-top: 4px;
+  background: transparent; color: #cfcbe8;
+  border: 1px solid rgba(180,170,255,0.4); border-radius: 10px;
+  padding: 9px 20px; font-size: 14px; cursor: pointer;
+}
+.ghost-btn:active { background: rgba(120,110,200,0.22); }
+
+/* ---------- 竖屏旋转引导（触屏竖屏时盖一层，转横屏自动消失） ---------- */
+#rotate-hint {
+  position: absolute; inset: 0; z-index: 8;
+  display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding: 28px;
+  background: rgba(7,6,15,0.92);
+  color: #e8e6f5;
+}
+#rotate-hint .icon { font-size: 58px; animation: rotphone 2.2s ease-in-out infinite; }
+#rotate-hint h2 { font-size: 22px; letter-spacing: 2px; color: #ffd24a; }
+#rotate-hint p { font-size: 13px; line-height: 1.9; color: #cfcbe8; max-width: 300px; }
+@keyframes rotphone { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
+/* 由 JS 根据真实视口尺寸切换 show-rotate 类（比 CSS orientation 媒体查询可靠） */
+body.show-rotate #rotate-hint { display: flex; }
+
+/* ---------- 开场 / 死亡 浮层 ---------- */
+.overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; text-align: center;
+  background: rgba(7,6,15,0.82);
+  backdrop-filter: blur(2px);
+  padding: 24px;
+  z-index: 7;
+}
+.overlay h1 { font-size: 30px; letter-spacing: 4px; color: #ffd24a; }
+.overlay p { font-size: 14px; line-height: 1.9; color: #cfcbe8; max-width: 340px; }
+.overlay .key { color: #fff; background: rgba(255,255,255,0.12); border-radius: 5px; padding: 1px 7px; margin: 0 2px; }
+.overlay button {
+  margin-top: 6px;
+  background: #4a3b8c; color: #fff;
+  border: 1px solid #7a6bd0; border-radius: 10px;
+  padding: 12px 28px; font-size: 16px; cursor: pointer;
+}
+.overlay button:active { background: #5d4ca8; }
+#death { display: none; }
+
+/* ---------- 角色选择 ---------- */
+#char-select { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 340px; margin: 2px 0; }
+.char-card {
+  width: 96px; padding: 12px 8px; border-radius: 14px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(180,170,255,0.3);
+  color: #e8e6f5; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  cursor: pointer; font: inherit; transition: all .15s ease;
+}
+.char-card .c-emoji { font-size: 28px; }
+.char-card b { font-size: 15px; letter-spacing: 1px; }
+.char-card small { font-size: 11px; opacity: .7; }
+.char-card .c-desc { font-size: 10px; opacity: .65; line-height: 1.4; text-align: center; margin-top: 2px; }
+.char-card.sel { border-color: #ffd24a; background: rgba(255,210,74,0.12); box-shadow: 0 0 0 2px rgba(255,210,74,0.4); }
+.char-card:active { transform: scale(0.97); }
+.lead { font-size: 15px; color: #cfcbe8; margin-bottom: 2px; }
+.ctrl-hint { font-size: 12px; opacity: .8; line-height: 1.8; }
+
+/* ---------- 窄屏适配 ---------- */
+@media (max-width: 900px) {
+  #hud .hp-box { width: 120px; }
+  #hud { font-size: 12px; gap: 8px; padding: 8px 10px; }
+  .btn { width: 54px; height: 54px; right: 14px; bottom: 20px; }
+  .btn.dash { right: 76px; bottom: 20px; }
+  #joystick { width: 110px; height: 110px; }
+  #joy-knob { width: 50px; height: 50px; margin: -25px 0 0 -25px; }
+  .overlay h1 { font-size: 26px; }
+  .overlay p { font-size: 13px; }
+  #settings .set-row { padding: 9px 10px; gap: 10px; }
+  #settings .chips { flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
+}
+
+/* ================= 新增：冲遁钮 / 设置面板 ================= */
+
+/* ---------- 冲遁（闪避）钮：与出招钮同款半透明；冷却中更淡，就绪时稍亮 ---------- */
+.btn.dash { right: 92px; bottom: 26px; opacity: 0.22; }
+.btn.dash.ready { opacity: 0.42; }
+
+/* ---------- 设置 ---------- */
+#settings { display: none; z-index: 10; }
+#settings .set-title { color: #b9c8ff; font-size: 24px; letter-spacing: 6px; }
+#settings .set-list { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 8px; }
+#settings .set-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 380px; max-width: 88vw;
+  padding: 10px 12px; border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(180,170,255,0.24);
+  text-align: left;
+}
+#settings .set-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#settings .set-label { font-size: 14px; color: #e8e6f5; }
+#settings .set-hint { font-size: 11px; color: #9c98bb; line-height: 1.5; }
+#settings .chips { display: flex; gap: 5px; flex: 0 0 auto; }
+#settings .chip {
+  margin-top: 0;
+  min-width: 38px; padding: 6px 9px; border-radius: 8px;
+  font-family: inherit; font-size: 12px; line-height: 1.2;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(180,170,255,0.3);
+  color: #cfcbe8; cursor: pointer;
+  transition: all .12s ease;
+}
+#settings .chip.sel { background: rgba(255,210,74,0.16); border-color: #ffd24a; color: #ffe27a; }
+#settings .chip:active { transform: scale(0.96); }
+#settings #set-close { margin-top: 6px; }
+
+/* ================= 新增：音效钮 / 突破选卡 / 结算 / 洞府 ================= */
+
+/* 开场浮层内容变多，允许滚动（手机上看得全） */
+.overlay { overflow-y: auto; }
+
+/* ---------- HUD 音效开关（HUD 整体 pointer-events:none，这里单独放开） ---------- */
+.hud-btn {
+  pointer-events: auto;
+  width: 30px; height: 30px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; line-height: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(180,200,255,0.28);
+  border-radius: 50%;
+  color: #e8e6f5;
+  cursor: pointer;
+}
+.hud-btn.push { margin-left: auto; }
+.hud-btn:active { background: rgba(140,170,255,0.3); }
+
+/* ---------- 突破三选一 ---------- */
+#cardpick { display: none; z-index: 9; }
+#cardpick .card-title { color: #ffe27a; }
+#card-list { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 620px; }
+.card {
+  width: 148px; min-height: 112px; padding: 14px 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(180,170,255,0.36);
+  border-radius: 14px;
+  color: #e8e6f5; font: inherit; cursor: pointer;
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+.card b { font-size: 17px; letter-spacing: 2px; color: #ffe27a; }
+.card small { font-size: 12px; line-height: 1.6; opacity: .86; }
+.card:active { transform: scale(0.96); border-color: #ffd24a; background: rgba(255,210,74,0.14); }
+
+/* ---------- 结算面板 ---------- */
+#result { display: none; z-index: 9; }
+#res-body { width: 100%; max-width: 420px; }
+.res-tb { width: 100%; border-collapse: collapse; font-size: 13px; }
+.res-tb td { padding: 5px 6px; border-bottom: 1px dashed rgba(180,170,255,0.18); text-align: left; }
+.res-tb td:first-child { color: #b9b3d8; width: 88px; }
+.res-tb b { color: #ffd24a; }
+.res-tb i { font-style: normal; font-size: 11px; opacity: .6; margin-left: 8px; }
+.res-near { color: #ff9a4a; font-size: 14px; }
+.res-new { color: #7dffc0; font-size: 13px; }
+.res-q { color: #9fd4ff; font-size: 13px; }
+.res-gain { font-size: 14px; }
+.res-gain b { color: #ffd24a; }
+.res-btns { display: flex; gap: 12px; align-items: center; }
+
+/* ---------- 洞府（永久成长 / 任务 / 成就） ---------- */
+#meta-box { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#meta-box b { color: #ffd24a; }
+#meta-panel {
+  display: none;
+  width: 100%; max-width: 420px;
+  max-height: 40vh; overflow-y: auto;
+  text-align: left;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(180,170,255,0.24);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.meta-sec { margin-bottom: 10px; }
+.meta-sec h3 { font-size: 13px; font-weight: 500; color: #b9b3d8; margin-bottom: 5px; letter-spacing: 1px; }
+.up-row, .q-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0; font-size: 12px;
+  border-bottom: 1px dashed rgba(180,170,255,0.14);
+}
+.up-row:last-child, .q-row:last-child { border-bottom: none; }
+.up-name, .q-row span { flex: 1; display: flex; flex-direction: column; }
+.up-name i, .q-row i { font-style: normal; font-size: 11px; opacity: .6; }
+.up-lv { font-size: 11px; opacity: .75; min-width: 30px; text-align: right; }
+.up-buy {
+  padding: 5px 10px; border-radius: 8px; font: inherit; font-size: 11px; cursor: pointer;
+  background: rgba(255,255,255,0.06); color: #b9b3d8;
+  border: 1px solid rgba(180,170,255,0.3);
+}
+.up-row.can .up-buy { color: #ffd24a; border-color: rgba(255,210,74,0.6); background: rgba(255,210,74,0.12); }
+.up-buy:disabled { opacity: .45; cursor: default; }
+.q-row b { font-size: 11px; color: #9fd4ff; white-space: nowrap; }
+.q-row.done span, .q-row.done b { opacity: .5; text-decoration: line-through; }
+
