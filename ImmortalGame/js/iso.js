@@ -127,15 +127,18 @@
     { x: 9,  y: 20, kind: 'tea' },
     // 灯笼串（沿街，实心）
     { x: 10, y: 17, kind: 'string' }, { x: 17, y: 17, kind: 'string' },
-    { x: 18, y: 10, kind: 'string' }, { x: 18, y: 26, kind: 'string' },
+    { x: 18, y: 10, kind: 'string' }, { x: 18, y: 25, kind: 'string' },
     // 货箱 / 灵晶（实心）
     { x: 16, y: 22, kind: 'crates' }, { x: 20, y: 22, kind: 'crates' },
     { x: 12, y: 18, kind: 'crystal' },{ x: 24, y: 18, kind: 'crystal' },
     // 东街石牌坊（可穿行）
-    { x: 34, y: 18, kind: 'gate' },
+    { x: 24, y: 18, kind: 'gate' },
   ];
   const SOLID_PROPS = new Set(['lion', 'well', 'brazier', 'dummy', 'statue', 'stall', 'tea', 'string', 'crates', 'pond', 'crystal']);
-  props.forEach(p => { map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2; });
+  props.forEach(p => {
+    if (p.x < 0 || p.y < 0 || p.x >= MAP_W || p.y >= MAP_H) return;   // 越界装饰直接丢弃，防启动崩溃
+    map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2;
+  });
 
   // =====================================================
   // 三、NPC 与玩家
@@ -148,7 +151,7 @@
     { id: 'shangren', name: '灵石商人', mx: 24.5, my: 9.5, color: '#8fd3ff',
       sprite: 'npcMerchant', face: 'left', hasQuest: false,
       talk: '灵石通万物，道友可要换些丹药符箓？\n（此处为商店占位，日后接背包与交易面板。）' },
-    { id: 'zayi', name: '杂役弟子', mx: 10.5, my: 30.5, color: '#9fd48a',
+    { id: 'zayi', name: '杂役弟子', mx: 9.5, my: 21.5, color: '#9fd48a',
       sprite: 'npcVillager', face: 'down', hasQuest: false,
       talk: '（擦汗）丹房今日要三株灵药，我采了两株，还差一株……\n（任务：采集灵药 2/3）' },
     { id: 'hedaozhang', name: '何道长', mx: 22.5, my: 16.5, color: '#c9a0dc',
