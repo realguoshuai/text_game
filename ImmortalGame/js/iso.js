@@ -479,12 +479,22 @@
     ctx.fillRect(0, 0, W, H);
     if (glowCv) {
       ctx.globalCompositeOperation = 'lighter';
+      const drawn = [];   // 本帧已绘制光斑的屏幕位置（限密用）
+      const minGap = 40 * viewZoom;   // 光斑最小间距：随缩放变化，缩得越小越稀疏
       for (const L of lights) {
         const s = isoToScreen(L.mx, L.my);
         if (s.x < -160 || s.x > W + 160 || s.y < -160 || s.y > H + 160) continue;
-        const R = 80 * L.r;
-        ctx.globalAlpha = 0.62 + 0.14 * Math.sin(time * 6 + L.mx * 3.1);   // 烛光轻微闪烁
-        ctx.drawImage(glowCv, s.x - R, s.y - R - 10, R * 2, R * 2);
+        let crowded = false;
+        for (const d of drawn) {
+          const dx = d.x - s.x, dy = d.y - s.y;
+          if (dx * dx + dy * dy < minGap * minGap) { crowded = true; break; }
+        }
+        if (crowded) continue;               // 低倍率下灯光扎堆 → 只保留一个，防止叠成一片白
+        drawn.push(s);
+        const R = 80 * L.r * viewZoom;       // 光斑半径跟随缩放，与地物保持同比例
+        // 强度随缩放衰减：1.0 倍与原版一致，0.6 倍时约衰减到 78%，避免缩小后过曝
+        ctx.globalAlpha = Math.min(1, (0.62 + 0.14 * Math.sin(time * 6 + L.mx * 3.1)) * (0.45 + 0.55 * Math.min(viewZoom, 1.2)));
+        ctx.drawImage(glowCv, s.x - R, s.y - R - 10 * viewZoom, R * 2, R * 2);
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
