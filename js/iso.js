@@ -12,6 +12,7 @@
  *   assets/char_blade.png          玩家四向行走帧表（6列×5行，64×64/格）
  *   assets/char_sword.png          商人 NPC 四向行走帧表
  *   assets/char_thunder.png        村民/弟子 NPC 四向行走帧表
+ *   assets/char_scholar.png        书生 NPC 四向行走帧表（Godot 样本 32px 近邻放大至 64px）
  *   assets/ui/panel.png            UI 底板（自动铺到状态栏/任务栏/对话框）
  *   assets/ui/icons.png            技能图标：横向 4 格（64×64/格）
  *
@@ -135,6 +136,9 @@
     { id: 'baifashi', name: '摆法师', mx: 18.5, my: 15.5, color: '#e0c068',
       sprite: 'npcMerchant', face: 'down', hasQuest: false,
       talk: '占一卦三枚灵石——今日宜静不宜动，宜东南，忌西北。' },
+    { id: 'shusheng', name: '藏书楼书生', mx: 18.5, my: 26.5, color: '#a0c4e8',
+      sprite: 'npcScholar', face: 'up', hasQuest: false,
+      talk: '这本《青玄志异》缺了三页，道友可曾在坊市见过残卷？' },
   ];
 
   const player = {
@@ -154,6 +158,7 @@
     player:       'assets/char_blade.png',
     npcMerchant:  'assets/char_sword.png',
     npcVillager:  'assets/char_thunder.png',
+    npcScholar:   'assets/char_scholar.png',
     uiIcons:      'assets/ui/icons.png',
     uiAvatar:     'assets/ui/avatar.png',
   };
@@ -162,6 +167,7 @@
     player:      { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
     npcMerchant: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
     npcVillager: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
+    npcScholar:  { cols: 4, rows: 4, cellW: 64, cellH: 64, frames: 4, dir: { down: 0, right: 1, left: 2, up: 3 } },
   };
   const missing = [];
   Object.keys(ASSETS).forEach(key => {
