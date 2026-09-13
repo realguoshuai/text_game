@@ -8,7 +8,7 @@
  * 【素材约定】图片统一放 assets/，用相对路径加载；缺失或加载失败会自动回退到纯色占位符。
  *   assets/tiles/ground.png        等距地面：横向 2 帧（64×32/帧）—— 0=土地 1=青石板
  *   assets/tiles/buildings.png     等距建筑（按占地比例缩放绘制，透明底）
- *   assets/tiles/decorations.png   国风装饰：横排 12 帧（96×96/帧）垂柳/青松/竹/灯笼×2/石狮/水井/火盆/练功桩/石牌坊/玉龙像/武雕像
+ *   assets/tiles/decorations.png   国风装饰：横排 19 帧（96×96/帧）灯笼×2/石狮/水井/火盆/练功桩/石牌坊/武雕像/货摊/茶摊/灯笼串/幌子/货箱/荷塘/灵晶；0/1/2/10 帧已清空
  *   assets/char_blade.png          玩家四向行走帧表（6列×5行，64×64/格）
  *   assets/char_sword.png          商人 NPC 四向行走帧表
  *   assets/char_thunder.png        村民/弟子 NPC 四向行走帧表
@@ -80,13 +80,9 @@
   ];
   buildings.forEach(b => fill(b.x, b.y, b.w, b.h, 1));
 
-  // —— 装饰物：FreePixel 国风道具（帧表见 DECOR_FRAME）
-  //   实体道具（树/石狮/水井/火盆/木桩/像）所在格标 1 不可穿行；灯笼挂空中、牌坊可穿行
+  // —— 装饰物：国风道具（帧表见 DECOR_FRAME）
+  //   实体道具（石狮/水井/火盆/木桩/像/货摊等）所在格标 1 不可穿行；灯笼挂空中、牌坊可穿行
   const props = [
-    { x: 5,  y: 8,  kind: 'willow' }, { x: 16, y: 13, kind: 'willow' },
-    { x: 5,  y: 13, kind: 'pine' },   { x: 16, y: 8,  kind: 'pine' },
-    { x: 7,  y: 18, kind: 'pine' },   { x: 14, y: 18, kind: 'willow' },
-    { x: 6,  y: 5,  kind: 'bamboo' }, { x: 15, y: 5,  kind: 'bamboo' },
     { x: 9,  y: 7,  kind: 'lantern' },  { x: 12, y: 7,  kind: 'lantern' },
     { x: 9,  y: 15, kind: 'lantern' },  { x: 12, y: 15, kind: 'lantern' },
     { x: 7,  y: 9,  kind: 'lanternY' }, { x: 14, y: 9,  kind: 'lanternY' },
@@ -95,19 +91,16 @@
     { x: 9,  y: 9,  kind: 'brazier' },  { x: 12, y: 12, kind: 'brazier' },  // 广场火盆
     { x: 13, y: 14, kind: 'dummy' },    { x: 14, y: 13, kind: 'dummy' },    // 器坊前练功桩
     { x: 17, y: 11, kind: 'gate' },                                     // 东街石牌坊（可穿行）
-    { x: 8,  y: 12, kind: 'dragon' },                                   // 广场玉龙像
     { x: 13, y: 12, kind: 'statue' },                                   // 广场武雕像
     { x: 8,  y: 9,  kind: 'stall' },                                    // 布棚货摊（AI）
     { x: 13, y: 9,  kind: 'tea' },                                      // 茶摊伞桌（AI）
     { x: 6,  y: 12, kind: 'string' },   { x: 15, y: 12, kind: 'string' },   // 灯笼串（AI）
     { x: 9,  y: 13, kind: 'string' },
-    { x: 8,  y: 4,  kind: 'banner' },   { x: 4,  y: 13, kind: 'banner' },   // 幌子旗（AI）
-    { x: 17, y: 13, kind: 'banner' },
     { x: 9,  y: 8,  kind: 'crates' },   { x: 12, y: 8,  kind: 'crates' },   // 货箱筐堆（AI）
     { x: 5,  y: 16, kind: 'pond' },                                     // 荷塘小桥（AI）
     { x: 12, y: 5,  kind: 'crystal' },  { x: 7,  y: 12, kind: 'crystal' },  // 灵晶簇（FreePixel）
   ];
-  const SOLID_PROPS = new Set(['willow', 'pine', 'bamboo', 'lion', 'well', 'brazier', 'dummy', 'dragon', 'statue', 'stall', 'tea', 'string', 'banner', 'crates', 'pond', 'crystal']);
+  const SOLID_PROPS = new Set(['lion', 'well', 'brazier', 'dummy', 'statue', 'stall', 'tea', 'string', 'crates', 'pond', 'crystal']);
   props.forEach(p => { map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2; });
 
   // =====================================================
@@ -315,10 +308,10 @@
     ctx.fillText(b.name, cx, bottomY - dh - 6);
   }
 
-  /** 装饰：decorations.png 横向 12 帧（FreePixel 国风道具，每帧 96×96）；无素材画占位
-   *  帧表：0垂柳 1青松 2竹 3红灯笼 4黄灯笼 5石狮 6水井 7火盆 8练功桩 9石牌坊 10玉龙像 11武雕像 */
-  const DECOR_FRAME = { willow: 0, pine: 1, bamboo: 2, lantern: 3, lanternY: 4, lion: 5, well: 6, brazier: 7, dummy: 8, gate: 9, dragon: 10, statue: 11, stall: 12, tea: 13, string: 14, banner: 15, crates: 16, pond: 17, crystal: 18 };
-  const DECOR_SCALE = { willow: 1.4, pine: 1.3, bamboo: 1.1, lantern: 0.9, lanternY: 0.9, lion: 1.0, well: 1.05, brazier: 0.85, dummy: 0.95, gate: 1.6, dragon: 1.2, statue: 1.05, stall: 1.7, tea: 1.55, string: 1.5, banner: 1.5, crates: 1.0, pond: 2.4, crystal: 0.9 };
+  /** 装饰：decorations.png 横排 19 帧（96×96/帧）；0/1/2/10/15 帧已清空，无素材画占位
+   *  帧表：3红灯笼 4黄灯笼 5石狮 6水井 7火盆 8练功桩 9石牌坊 11武雕像 12货摊 13茶摊 14灯笼串 16货箱 17荷塘 18灵晶 */
+  const DECOR_FRAME = { lantern: 3, lanternY: 4, lion: 5, well: 6, brazier: 7, dummy: 8, gate: 9, statue: 11, stall: 12, tea: 13, string: 14, crates: 16, pond: 17, crystal: 18 };
+  const DECOR_SCALE = { lantern: 0.9, lanternY: 0.9, lion: 1.0, well: 1.05, brazier: 0.85, dummy: 0.95, gate: 1.6, statue: 1.05, stall: 1.7, tea: 1.55, string: 1.5, crates: 1.0, pond: 2.4, crystal: 0.9 };
   function drawProp(p) {
     const s = isoToScreen(p.x + 0.5, p.y + 0.5);
     if (s.x < -80 || s.x > W + 80 || s.y < -160 || s.y > H + 80) return;
