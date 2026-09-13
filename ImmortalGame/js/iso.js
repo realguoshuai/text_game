@@ -34,14 +34,35 @@
   let W = 0, H = 0;
   let TILE_W = 64, TILE_H = 32;      // 标准 45° 等距：宽高比 2:1
   let HW = TILE_W / 2, HH = TILE_H / 2;
+  let viewZoom = 1.1;                // 屏幕缩放：滚轮 / ＋－ 按钮调节，整体缩放世界
 
   function applyScale() {
     const small = window.innerWidth < 760;
     // 视角略抬高（整体缩小瓦片 ≈ 同屏可见更多地图面积），缓解建筑拥挤感
-    TILE_W = small ? 44 : 56;
-    TILE_H = small ? 22 : 28;
+    const baseW = small ? 44 : 56;
+    const baseH = small ? 22 : 28;
+    TILE_W = baseW * viewZoom;
+    TILE_H = baseH * viewZoom;
     HW = TILE_W / 2; HH = TILE_H / 2;
   }
+
+  // —— 屏幕缩放（滚轮 + 按钮）——
+  function setZoom(z) {
+    viewZoom = Math.min(2.0, Math.max(0.6, z));
+    applyScale();
+    const lbl = document.getElementById('zoomLabel');
+    if (lbl) lbl.textContent = Math.round(viewZoom * 100) + '%';
+  }
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    setZoom(viewZoom * (e.deltaY < 0 ? 1.12 : 0.89));
+  }, { passive: false });
+  const _zb = document.getElementById('zoomIn');
+  const _zs = document.getElementById('zoomOut');
+  const _zr = document.getElementById('zoomReset');
+  if (_zb) _zb.onclick = () => setZoom(viewZoom * 1.15);
+  if (_zs) _zs.onclick = () => setZoom(viewZoom * 0.87);
+  if (_zr) _zr.onclick = () => setZoom(1.1);
   function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
@@ -56,7 +77,7 @@
   // 二、地图数据（二维数组）
   //   0 = 地面（可走）   1 = 建筑/障碍（不可走）   2 = 装饰（石板/景物，可走）
   // =====================================================
-  const MAP_W = 36, MAP_H = 36;     // 扩大地图，给建筑留出开阔间距
+  const MAP_W = 26, MAP_H = 26;     // 适度缩小地图，建筑聚拢，缓解空旷感
   const map = [];
   for (let y = 0; y < MAP_H; y++) map.push(new Array(MAP_W).fill(0));
 
@@ -72,13 +93,13 @@
 
   // —— 建筑：四角主楼 + 沿街小铺，拉开间距降低密度
   //   frame 对应 buildings.png 横排 6 帧（256×224/帧）：0接引台 1聚宝阁 2丹房 3器坊 4沿街铺 5临街铺
-  const buildings = [
+  const   buildings = [
     { x: 3,  y: 3,  w: 5, h: 4, h3d: 46, frame: 0, name: '接引台', roof: '#4a5a7a' },
-    { x: 28, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
-    { x: 3,  y: 28, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
-    { x: 28, y: 28, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
-    { x: 9,  y: 15, w: 3, h: 2, h3d: 40, frame: 4, name: '沿街铺', roof: '#5a4a38' },
-    { x: 20, y: 9,  w: 3, h: 2, h3d: 40, frame: 5, name: '临街铺', roof: '#5a4a38' },
+    { x: 19, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
+    { x: 3,  y: 19, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
+    { x: 19, y: 19, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
+    { x: 9,  y: 13, w: 3, h: 2, h3d: 40, frame: 4, name: '沿街铺', roof: '#5a4a38' },
+    { x: 18, y: 8,  w: 3, h: 2, h3d: 40, frame: 5, name: '临街铺', roof: '#5a4a38' },
   ];
   buildings.forEach(b => fill(b.x, b.y, b.w, b.h, 1));
 
@@ -92,20 +113,20 @@
     { x: 14, y: 16, kind: 'lanternY' },{ x: 22, y: 16, kind: 'lanternY' },
     // 石狮（建筑前，实心）
     { x: 5,  y: 8,  kind: 'lion' }, { x: 6,  y: 8,  kind: 'lion' },
-    { x: 29, y: 8,  kind: 'lion' }, { x: 30, y: 8,  kind: 'lion' },
+    { x: 20, y: 8,  kind: 'lion' }, { x: 21, y: 8,  kind: 'lion' },
     // 广场火盆 / 武雕像（实心）
     { x: 17, y: 18, kind: 'brazier' }, { x: 19, y: 18, kind: 'brazier' }, { x: 18, y: 22, kind: 'brazier' },
     { x: 18, y: 19, kind: 'statue' },
     // 器坊前练功桩（实心）
-    { x: 27, y: 29, kind: 'dummy' }, { x: 27, y: 31, kind: 'dummy' },
+    { x: 18, y: 20, kind: 'dummy' }, { x: 18, y: 22, kind: 'dummy' },
     // 丹房旁水井 / 荷塘（实心）
-    { x: 8,  y: 30, kind: 'well' },
-    { x: 5,  y: 22, kind: 'pond' },
+    { x: 8,  y: 21, kind: 'well' },
+    { x: 5,  y: 13, kind: 'pond' },
     // 布棚货摊 / 茶摊（实心）
-    { x: 26, y: 9,  kind: 'stall' },
-    { x: 9,  y: 29, kind: 'tea' },
+    { x: 17, y: 9,  kind: 'stall' },
+    { x: 9,  y: 20, kind: 'tea' },
     // 灯笼串（沿街，实心）
-    { x: 10, y: 17, kind: 'string' }, { x: 26, y: 17, kind: 'string' },
+    { x: 10, y: 17, kind: 'string' }, { x: 17, y: 17, kind: 'string' },
     { x: 18, y: 10, kind: 'string' }, { x: 18, y: 26, kind: 'string' },
     // 货箱 / 灵晶（实心）
     { x: 16, y: 22, kind: 'crates' }, { x: 20, y: 22, kind: 'crates' },
@@ -130,19 +151,19 @@
     { id: 'zayi', name: '杂役弟子', mx: 10.5, my: 30.5, color: '#9fd48a',
       sprite: 'npcVillager', face: 'down', hasQuest: false,
       talk: '（擦汗）丹房今日要三株灵药，我采了两株，还差一株……\n（任务：采集灵药 2/3）' },
-    { id: 'hedaozhang', name: '何道长', mx: 31.5, my: 25.5, color: '#c9a0dc',
+    { id: 'hedaozhang', name: '何道长', mx: 22.5, my: 16.5, color: '#c9a0dc',
       sprite: 'npcVillager', face: 'right', hasQuest: true,
       talk: '贫道观你印堂微暗，近日不宜远行。\n（任务：求得一道护身符，可去找灵石商人。）' },
     { id: 'baifashi', name: '摆法师', mx: 18.5, my: 15.5, color: '#e0c068',
       sprite: 'npcMerchant', face: 'down', hasQuest: false,
       talk: '占一卦三枚灵石——今日宜静不宜动，宜东南，忌西北。' },
-    { id: 'shusheng', name: '藏书楼书生', mx: 18.5, my: 26.5, color: '#a0c4e8',
+    { id: 'shusheng', name: '藏书楼书生', mx: 18.5, my: 22.5, color: '#a0c4e8',
       sprite: 'npcScholar', face: 'up', hasQuest: false,
       talk: '这本《青玄志异》缺了三页，道友可曾在坊市见过残卷？' },
   ];
 
   const player = {
-    mx: 18.5, my: 21.5,
+    mx: 13, my: 13,
     target: null,           // {mx,my} 目标点；null = 停止
     speed: 3.0,             // 格/秒
     face: 'up', walking: false, walkT: 0,
@@ -167,7 +188,7 @@
     player:      { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
     npcMerchant: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
     npcVillager: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
-    npcScholar:  { cols: 4, rows: 4, cellW: 64, cellH: 64, frames: 4, dir: { down: 0, right: 1, left: 2, up: 3 } },
+    npcScholar:  { cols: 4, rows: 4, cellW: 64, cellH: 64, frames: 4, dir: { down: 0, right: 1, left: 2, up: 3 }, scale: 0.62 },
   };
   const missing = [];
   Object.keys(ASSETS).forEach(key => {
@@ -381,10 +402,11 @@
     const cfg = SHEETS[key];
 
     ctx.fillStyle = 'rgba(0,0,0,.3)';
-    ctx.beginPath(); ctx.ellipse(s.x, s.y, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s.x, s.y, 12 * viewZoom, 5 * viewZoom, 0, 0, Math.PI * 2); ctx.fill();
 
     if (img && cfg) {
-      const dh = TILE_H * 2.4;
+      const sc = cfg.scale || 1;
+      const dh = TILE_H * 2.4 * sc;
       const dw = dh * (cfg.cellW / cfg.cellH);
       const dirRow = cfg.dir[o.face] ?? 0;
       // 静止时固定用第 0 帧（站立姿势），避免 NPC/玩家原地踏步
