@@ -347,7 +347,7 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
 
   // =====================================================
   // 二、地图数据（二维数组）
-  //   0 = 地面（可走）   1 = 建筑/障碍（不可走）   2 = 装饰（石板/景物，可走）
+  //   0 = 草地（可走）   1 = 建筑/障碍（不可走）   2 = 石板路/景物（可走）
   // =====================================================
   const MAP_W = 24, MAP_H = 24;     // 再缩一档（26→24）：走路距离变短，建筑更聚拢
   const map = [];
@@ -359,9 +359,15 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
         if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) map[y][x] = v;
   }
 
-  fill(12, 12, 10, 10, 2);   // 中央广场（石板）
-  fill(0, 17, 36, 2, 2);     // 横向主街（贯穿东西）
-  fill(17, 0, 2, 36, 2);     // 纵向主街（贯穿南北）
+  fill(0, 11, 24, 2, 2);     // 横向石板街（贯穿东西）
+  fill(11, 0, 2, 24, 2);     // 纵向石板街（贯穿南北）
+  fill(9, 9, 6, 6, 2);       // 中央广场（石板）
+  // 各建筑门前石板引道，连到主街 —— 小城镇路网
+  fill(5, 7, 2, 4, 2);       // 接引台前
+  fill(20, 7, 2, 4, 2);      // 聚宝阁前
+  fill(5, 13, 2, 6, 2);      // 丹房前
+  fill(20, 13, 2, 6, 2);     // 器坊前
+  fill(18, 10, 3, 1, 2);     // 临街铺前
 
   // —— 建筑：四角主楼 + 沿街小铺，拉开间距降低密度
   //   frame 对应 buildings.png 横排 6 帧（256×224/帧）：0接引台 1聚宝阁 2丹房 3器坊 4沿街铺 5临街铺
@@ -383,28 +389,28 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
     { x: 15, y: 23, kind: 'lantern' }, { x: 21, y: 23, kind: 'lantern' },
     { x: 11, y: 18, kind: 'lantern' }, { x: 23, y: 18, kind: 'lantern' },
     { x: 14, y: 16, kind: 'lanternY' },{ x: 22, y: 16, kind: 'lanternY' },
-    // 石狮（建筑前，实心）
-    { x: 5,  y: 8,  kind: 'lion' }, { x: 6,  y: 8,  kind: 'lion' },
-    { x: 20, y: 8,  kind: 'lion' }, { x: 21, y: 8,  kind: 'lion' },
+    // 石狮（建筑门前两侧，实心，不挡引道）
+    { x: 3,  y: 8,  kind: 'lion' }, { x: 7,  y: 8,  kind: 'lion' },
+    { x: 18, y: 7,  kind: 'lion' }, { x: 22, y: 7,  kind: 'lion' },
     // 广场火盆 / 武雕像（实心）
-    { x: 17, y: 18, kind: 'brazier' }, { x: 19, y: 18, kind: 'brazier' }, { x: 18, y: 22, kind: 'brazier' },
-    { x: 18, y: 19, kind: 'statue' },
+    { x: 9,  y: 9,  kind: 'brazier' }, { x: 14, y: 9,  kind: 'brazier' }, { x: 9,  y: 14, kind: 'brazier' },
+    { x: 12, y: 9,  kind: 'statue' },
     // 器坊前练功桩（实心）
     { x: 18, y: 20, kind: 'dummy' }, { x: 18, y: 22, kind: 'dummy' },
     // 丹房旁水井 / 荷塘（实心）
     { x: 8,  y: 21, kind: 'well' },
-    { x: 5,  y: 13, kind: 'pond' },
-    // 布棚货摊 / 茶摊（实心）
-    { x: 17, y: 9,  kind: 'stall' },
+    { x: 2,  y: 13, kind: 'pond' },
+    // 布棚货摊 / 茶摊（实心，街边草地）
+    { x: 16, y: 10, kind: 'stall' },
     { x: 9,  y: 20, kind: 'tea' },
     // 灯笼串（沿街，实心）
-    { x: 10, y: 17, kind: 'string' }, { x: 17, y: 17, kind: 'string' },
-    { x: 18, y: 10, kind: 'string' }, { x: 18, y: 23, kind: 'string' },
+    { x: 3,  y: 10, kind: 'string' }, { x: 16, y: 13, kind: 'string' },
+    { x: 10, y: 17, kind: 'string' }, { x: 18, y: 23, kind: 'string' },
     // 货箱 / 灵晶（实心）
-    { x: 16, y: 22, kind: 'crates' }, { x: 20, y: 22, kind: 'crates' },
+    { x: 16, y: 19, kind: 'crates' }, { x: 17, y: 22, kind: 'crates' },
     { x: 12, y: 18, kind: 'crystal' },
     // 东街石牌坊（可穿行）
-    { x: 23, y: 17, kind: 'gate' },
+    { x: 23, y: 12, kind: 'gate' },
   ];
   const SOLID_PROPS = new Set(['lion', 'well', 'brazier', 'dummy', 'statue', 'stall', 'tea', 'string', 'crates', 'pond', 'crystal']);
   props.forEach(p => {
@@ -420,19 +426,19 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
     { id: 'jieyin', name: '接引弟子', mx: 10.5, my: 9.5, color: '#7fc4ff',
       sprite: 'npcVillager', face: 'down', hasQuest: true,
       talk: '可是来拜师的？青玄宗收徒有规矩：先寻引路之人，再过问心阶。\n（任务：与接引弟子对话 0/1 —— 你已完成对话，可去丹房、器坊一带转转。）' },
-    { id: 'shangren', name: '灵石商人', mx: 22.5, my: 9.5, color: '#8fd3ff',
+    { id: 'shangren', name: '灵石商人', mx: 16.5, my: 11.5, color: '#8fd3ff',
       sprite: 'npcMerchant', face: 'left', hasQuest: false,
       talk: '灵石通万物，道友可要换些丹药符箓？\n（此处为商店占位，日后接背包与交易面板。）' },
-    { id: 'zayi', name: '杂役弟子', mx: 9.5, my: 21.5, color: '#9fd48a',
+    { id: 'zayi', name: '杂役弟子', mx: 6.5, my: 16.5, color: '#9fd48a',
       sprite: 'npcVillager', face: 'down', hasQuest: false,
       talk: '（擦汗）丹房今日要三株灵药，我采了两株，还差一株……\n（任务：采集灵药 2/3）' },
-    { id: 'hedaozhang', name: '何道长', mx: 22.5, my: 16.5, color: '#c9a0dc',
+    { id: 'hedaozhang', name: '何道长', mx: 20.5, my: 15.5, color: '#c9a0dc',
       sprite: 'npcVillager', face: 'right', hasQuest: true,
       talk: '贫道观你印堂微暗，近日不宜远行。\n（任务：求得一道护身符，可去找灵石商人。）' },
-    { id: 'baifashi', name: '摆法师', mx: 18.5, my: 15.5, color: '#e0c068',
+    { id: 'baifashi', name: '摆法师', mx: 12.5, my: 14.5, color: '#e0c068',
       sprite: 'npcMerchant', face: 'down', hasQuest: false,
       talk: '占一卦三枚灵石——今日宜静不宜动，宜东南，忌西北。' },
-    { id: 'shusheng', name: '藏书楼书生', mx: 18.5, my: 22.5, color: '#a0c4e8',
+    { id: 'shusheng', name: '藏书楼书生', mx: 14.5, my: 12.5, color: '#a0c4e8',
       sprite: 'npcScholar', face: 'up', hasQuest: false,
       talk: '这本《青玄志异》缺了三页，道友可曾在坊市见过残卷？' },
   ];
@@ -579,8 +585,7 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
     ctx.lineTo(p.x - HW, p.y + HH);
     ctx.closePath();
     ctx.fillStyle = v === 2 ? ((tx + ty) % 2 ? '#7f7868' : '#8a8272')
-                            : v === 1 ? '#5a4a38'
-                            : ((tx + ty) % 2 ? '#63543d' : '#6a5a42');
+                            : ((tx + ty) % 2 ? '#5c7c3c' : '#648442');   // 石板 / 草地
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,.12)';
     ctx.lineWidth = 1;
@@ -829,7 +834,7 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const v = map[y][x];
-        mctx.fillStyle = v === 1 ? '#6a5a42' : v === 2 ? '#8a8272' : '#4a4230';
+        mctx.fillStyle = v === 1 ? '#6a5a42' : v === 2 ? '#8a8272' : '#4d6b33';
         mctx.fillRect(x * CELL, y * CELL, CELL, CELL);
       }
     }
