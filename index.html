@@ -21,7 +21,7 @@
     justify-content: center;
     padding: 32px 18px 48px;
   }
-  .wrap { width: 100%; max-width: 720px; }
+  .wrap { width: 100%; max-width: 1020px; }
   .title {
     text-align: center;
     margin-bottom: 6px;
@@ -41,45 +41,62 @@
     margin-bottom: 34px;
   }
   .cards { display: grid; grid-template-columns: 1fr; gap: 18px; }
-  @media (min-width: 560px) { .cards { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 880px) { .cards { grid-template-columns: repeat(3, 1fr); } }
   .card {
+    --ac: #d8b878;                 /* 每张卡自己的点缀色 */
     position: relative;
-    display: block;
+    display: flex;
+    flex-direction: column;
     text-decoration: none;
     color: inherit;
-    border: 1px solid rgba(184,142,72,.55);
+    border: 1px solid rgba(184,142,72,.45);
     border-radius: 16px;
-    padding: 22px 20px 20px;
+    padding: 24px 20px 20px;
     background: linear-gradient(160deg, rgba(30,22,11,.92), rgba(14,10,5,.92));
-    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 12px 40px rgba(0,0,0,.45), 0 0 24px rgba(184,142,72,.10);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 12px 40px rgba(0,0,0,.45);
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     overflow: hidden;
   }
+  .card::before {                  /* 顶部一条点缀色光带 */
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--ac), transparent);
+    opacity: .75;
+  }
   .card::after {
     content: ""; position: absolute; inset: 0;
-    background: radial-gradient(400px 200px at 50% 0%, rgba(184,142,72,.12), transparent 70%);
+    background: radial-gradient(420px 220px at 50% 0%, var(--ac), transparent 70%);
     opacity: 0; transition: opacity .18s ease;
+    pointer-events: none;
   }
   .card:hover, .card:focus-visible {
     transform: translateY(-4px);
-    border-color: rgba(243,217,138,.85);
-    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 18px 48px rgba(0,0,0,.5), 0 0 36px rgba(184,142,72,.28);
+    border-color: var(--ac);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 18px 48px rgba(0,0,0,.5), 0 0 30px color-mix(in srgb, var(--ac) 30%, transparent);
     outline: none;
   }
-  .card:hover::after, .card:focus-visible::after { opacity: 1; }
+  .card:hover::after, .card:focus-visible::after { opacity: .10; }
+  .icon {
+    width: 54px; height: 54px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; margin-bottom: 16px;
+    background: rgba(0,0,0,.35);
+    border: 1px solid color-mix(in srgb, var(--ac) 55%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--ac) 22%, transparent);
+  }
   .card .badge {
+    align-self: flex-start;
     display: inline-block; font-size: 12px; letter-spacing: .2em;
-    color: #d8b878; border: 1px solid rgba(184,142,72,.4);
+    color: var(--ac); border: 1px solid color-mix(in srgb, var(--ac) 40%, transparent);
     border-radius: 999px; padding: 3px 12px; margin-bottom: 14px;
   }
   .card h2 {
-    font-size: 22px; letter-spacing: .08em; margin-bottom: 10px;
+    font-size: 21px; letter-spacing: .08em; margin-bottom: 10px;
     color: #f1dcab;
   }
-  .card p { color: #b6a98e; font-size: 14px; line-height: 1.7; }
+  .card p { color: #b6a98e; font-size: 14px; line-height: 1.7; flex: 1; }
   .card .go {
     margin-top: 16px; display: inline-flex; align-items: center; gap: 6px;
-    color: #e8c989; font-size: 14px; letter-spacing: .1em;
+    color: var(--ac); font-size: 14px; letter-spacing: .1em;
   }
   .card .go .arrow { transition: transform .18s ease; }
   .card:hover .go .arrow { transform: translateX(4px); }
@@ -87,6 +104,10 @@
     text-align: center; color: #6f6450; font-size: 12px; letter-spacing: .12em;
     margin-top: 36px;
   }
+  /* 三张卡各自的点缀色：坊市=青玉 · 问道=墨紫 · 实时=赤金 */
+  .card.c-fang  { --ac: #8fd3c8; }
+  .card.c-wen   { --ac: #b9a0e0; }
+  .card.c-shi   { --ac: #f0b060; }
 </style>
 </head>
 <body>
@@ -94,29 +115,26 @@
     <div class="title">修仙小游戏</div>
     <div class="subtitle">— 选一处，入道 —</div>
     <div class="cards">
-      <a class="card" href="ImmortalGame/">
+      <a class="card c-fang" href="ImmortalGame/">
+        <span class="icon">🏮</span>
         <span class="badge">等距 · 像素</span>
         <h2>修仙坊市</h2>
         <p>等距视角的修仙坊市。操控角色行走于街巷，与书生、商贩等 NPC 交谈，逛遍楼阁摊位。</p>
         <span class="go">进入坊市 <span class="arrow">→</span></span>
       </a>
-      <a class="card" href="legacy/">
+      <a class="card c-wen" href="legacy/">
+        <span class="icon">📜</span>
         <span class="badge">文字 · 养成</span>
         <h2>凡人问道录</h2>
         <p>文字修仙养成。历练、炼丹、宗门、秘境，一路从凡人问道长生。（旧版备份）</p>
         <span class="go">进入旧版 <span class="arrow">→</span></span>
       </a>
-      <a class="card" href="realtime/">
+      <a class="card c-shi" href="realtime/">
+        <span class="icon">⚔️</span>
         <span class="badge">实时 · 割草</span>
         <h2>凡人修仙录 · 实时版</h2>
         <p>剑/刀/雷三位修士任选。实时走位斩妖兽，炼气筑基直至化神，突破三选一构筑流派，妖王妖皇等你来战。</p>
         <span class="go">进入实时版 <span class="arrow">→</span></span>
-      </a>
-      <a class="card" href="ImmortalGame/battle/">
-        <span class="badge">2D · 动作</span>
-        <h2>坊市行 · 斩妖</h2>
-        <p>俯视角动作修仙。挥剑斩妖、突破境界、搜刮灵石，于坊市与后山之间杀出一条长生路。</p>
-        <span class="go">进入斩妖 <span class="arrow">→</span></span>
       </a>
     </div>
     <div class="foot">个人作品 · 非商业用途</div>
