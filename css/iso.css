@@ -14,15 +14,22 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
 /* ===== UI 覆盖层：鼠标穿透 ===== */
 #uiLayer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 .interactive { pointer-events: auto; }
-/* .uiPanel：若 assets/ui/panel.png 存在，JS 会自动给它铺上水墨底板 */
-.uiPanel { background-color: rgba(18,13,6,.9); background-size: 100% 100%; }
+/* .uiPanel：暗金半透明面板 + 发光描边（高清，由 CSS 控制，不依赖贴图） */
+.uiPanel {
+  background: linear-gradient(160deg, rgba(30,22,11,.93), rgba(14,10,5,.93));
+  border: 1px solid rgba(184,142,72,.55);
+  box-shadow: 0 2px 14px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,220,140,.10), 0 0 10px rgba(200,150,60,.12);
+  backdrop-filter: blur(2px);
+}
 
 /* ===== 左上状态栏 ===== */
 #statusBar { position: absolute; top: 14px; left: 14px; display: flex; gap: 10px;
-  align-items: flex-start; padding: 8px 12px 8px 8px; border: 1px solid #6b5629; border-radius: 8px; }
-#avatar { width: 62px; height: 62px; border-radius: 50%; flex: none;
+  align-items: flex-start; padding: 8px 12px 8px 8px; border: 1px solid rgba(184,142,72,.6);
+  border-radius: 10px; box-shadow: 0 2px 14px rgba(0,0,0,.5), 0 0 10px rgba(200,150,60,.12); }
+#avatar { width: 62px; height: 62px; border-radius: 50%; flex: none; overflow: hidden;
   background: radial-gradient(circle at 35% 30%, #6b5233, #3a2c18 70%);
-  border: 2px solid #a8894e; box-shadow: 0 0 8px rgba(0,0,0,.6); }
+  border: 2px solid #c9a55a; box-shadow: 0 0 10px rgba(200,150,60,.45), 0 0 8px rgba(0,0,0,.6);
+  background-size: cover; background-position: center top; }
 #statusRight { min-width: 230px; }
 .row1 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
 #pName { font-size: 16px; font-weight: bold; color: #ffe9b3; text-shadow: 0 1px 2px #000; }
@@ -37,11 +44,11 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
 
 /* ===== 右上信息栏 ===== */
 #infoBar { position: absolute; top: 14px; right: 14px; width: 210px; text-align: center; }
-#minimap { border: 2px solid #a8894e; border-radius: 4px; background: #0d0a06;
-  display: block; margin: 0 auto 6px; }
+#minimap { border: 2px solid rgba(200,160,80,.7); border-radius: 4px; background: #0d0a06;
+  display: block; margin: 0 auto 6px; box-shadow: 0 0 8px rgba(200,150,60,.22); }
 #clock { display: inline-block; font-size: 12px; color: #d8c68f; background: rgba(0,0,0,.45);
   padding: 2px 8px; border-radius: 3px; margin-bottom: 8px; text-shadow: 0 1px 2px #000; }
-#questBox { border: 1px solid #6b5629; border-radius: 6px; padding: 8px 10px; text-align: left; }
+#questBox { border: 1px solid rgba(184,142,72,.55); border-radius: 6px; padding: 8px 10px; text-align: left; }
 .qTitle { color: #ffe9b3; letter-spacing: 6px; font-size: 14px; border-bottom: 1px solid #6b5629;
   padding-bottom: 4px; margin-bottom: 6px; text-align: center; }
 .qItem { display: flex; justify-content: space-between; font-size: 12px;
@@ -55,23 +62,27 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
 #bottomBar { position: absolute; bottom: 16px; left: 0; right: 0; display: flex;
   flex-direction: column; align-items: center; gap: 10px; }
 #skillBar { display: flex; gap: 8px; }
-.skill { position: relative; width: 56px; height: 56px; cursor: pointer;
-  background: linear-gradient(#3a2e1a, #1f1810); background-size: cover;
-  border: 2px solid #8a6f3a; border-radius: 8px; }
-.skill:hover { border-color: #d4ac2b; }
-.skName { display: block; text-align: center; margin-top: 14px; font-size: 12px;
-  color: #ffe9b3; text-shadow: 0 1px 2px #000; }
-.skKey { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center;
-  font-size: 10px; color: #a99767; }
+.skill { position: relative; width: 56px; height: 56px; cursor: pointer; overflow: hidden;
+  background-color: rgba(20,15,8,.85);
+  border: 2px solid rgba(184,142,72,.6); border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,220,140,.12); }
+.skill:hover { border-color: #ffd75e; box-shadow: 0 0 12px rgba(255,210,90,.45); }
+.skName { position: absolute; left: 0; right: 0; bottom: 1px; text-align: center;
+  font-size: 10px; color: #ffe9b3; text-shadow: 0 1px 2px #000; line-height: 1.2;
+  background: linear-gradient(transparent, rgba(0,0,0,.78)); padding: 4px 0 1px; }
+.skKey { position: absolute; top: 2px; right: 4px; font-size: 9px; color: #a99767;
+  text-shadow: 0 1px 2px #000; }
 #funcBar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .func { padding: 7px 14px; font-size: 13px; color: #ffe9b3; cursor: pointer;
-  background: rgba(30,22,10,.85); border: 1px solid #8a6f3a; border-radius: 6px; }
-.func:hover { background: rgba(60,45,20,.9); }
+  background: linear-gradient(160deg, rgba(40,30,15,.9), rgba(20,15,8,.9));
+  border: 1px solid rgba(184,142,72,.55); border-radius: 6px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.4); }
+.func:hover { background: linear-gradient(160deg, rgba(60,45,20,.95), rgba(30,22,10,.95)); border-color: #ffd75e; }
 
 /* ===== 对话面板 ===== */
 #dialog { position: absolute; left: 50%; bottom: 100px; transform: translateX(-50%);
-  width: 520px; border: 2px solid #a8894e; border-radius: 8px; padding: 14px 18px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.7); }
+  width: 520px; border: 2px solid rgba(200,160,80,.7); border-radius: 10px; padding: 14px 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.7), 0 0 14px rgba(200,150,60,.15); }
 #dlgName { color: #ffd75e; font-size: 16px; font-weight: bold; margin-bottom: 8px; }
 #dlgText { font-size: 14px; line-height: 1.8; color: #e8dcc0; white-space: pre-wrap; min-height: 72px; }
 #dlgBtns { text-align: right; margin-top: 8px; }

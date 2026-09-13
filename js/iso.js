@@ -154,7 +154,6 @@
     player:       'assets/char_blade.png',
     npcMerchant:  'assets/char_sword.png',
     npcVillager:  'assets/char_thunder.png',
-    uiPanel:      'assets/ui/panel.png',
     uiIcons:      'assets/ui/icons.png',
     uiAvatar:     'assets/ui/avatar.png',
   };
@@ -174,11 +173,7 @@
 
   /** UI 底板 / 技能图标 / 头像存在时铺到对应元素（icons 是 4 格横排，按格取位） */
   function applyUiSkins() {
-    if (SPR.uiPanel) {
-      document.querySelectorAll('.uiPanel').forEach(el => {
-        el.style.backgroundImage = 'url(' + ASSETS.uiPanel + ')';
-      });
-    }
+    // 面板背景交由 CSS 控制（高清暗金半透明 + 发光描边），不再铺贴图
     if (SPR.uiIcons) {
       document.querySelectorAll('.skill').forEach((el, i) => {
         el.style.backgroundImage = 'url(' + ASSETS.uiIcons + ')';
@@ -251,16 +246,20 @@
   // =====================================================
   // 七、绘制
   // =====================================================
-  /** 地面：ground.png 横向 2 帧（0=土地 1=石板）；无素材则画纯色菱形 */
+  // 地面变体：ground.png 横向 12 帧（每帧 64×64 源 tile，绘制时压成 64×32 菱形）
+  const GROUND_FRAMES = 12, GTILE_W = 64, GTILE_H = 64;
+  /** 地面：ground.png 横向 12 帧（随机选帧消除规律重复）；无素材则画纯色菱形 */
   function drawGroundTile(tx, ty) {
     const v = tileVisual(tx, ty);
     const p = isoToScreen(tx, ty);                 // 菱形上顶点
     if (p.x < -TILE_W || p.x > W + TILE_W || p.y < -TILE_H * 4 || p.y > H + TILE_H * 4) return; // 视口裁剪
 
     if (SPR.ground) {
-      // 素材源帧固定 64×32；若是整张 tileset，把 sx/sy 换成目标瓦片源坐标即可
-      const sx = (v === 2) ? 64 : 0;               // 石板/装饰格用第 2 帧
-      ctx.drawImage(SPR.ground, sx, 0, 64, 32, p.x - HW, p.y, TILE_W, TILE_H);
+      // 伪随机选帧，消除平铺规律感；石板格（v===2）取后 4 帧更整齐
+      const h = (tx * 73 + ty * 31) >>> 0;
+      const fi = (v === 2) ? 8 + (h % 4) : h % 8;
+      const sx = (fi % GROUND_FRAMES) * GTILE_W;
+      ctx.drawImage(SPR.ground, sx, 0, GTILE_W, GTILE_H, p.x - HW, p.y, TILE_W, TILE_H);
       return;
     }
     ctx.beginPath();
@@ -286,6 +285,19 @@
     const cx = (A.x + C.x) / 2, bottomY = C.y;
     let dw = (b.w + b.h) * HW * 0.86;
     let dh = dw * (BLD_FH / BLD_FW);            // 保持素材宽高比
+
+    // 落地投影：覆盖建筑占地范围的半透明菱形阴影
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.34)';
+    const sw = (b.w + b.h) * HW * 0.96, sh = (b.w + b.h) * HH * 0.92;
+    ctx.beginPath();
+    ctx.moveTo(cx, bottomY - sh);
+    ctx.lineTo(cx + sw, bottomY);
+    ctx.lineTo(cx, bottomY + sh);
+    ctx.lineTo(cx - sw, bottomY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
     if (SPR.buildings) {
       ctx.drawImage(SPR.buildings, (b.frame || 0) * BLD_FW, 0, BLD_FW, BLD_FH,
