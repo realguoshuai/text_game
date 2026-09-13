@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>凡人修仙录 · 坊市（等距视角）</title>
-<link rel="stylesheet" href="css/iso.css">
+<link rel="stylesheet" href="css/iso.css?v=20260913b">
 </head>
 <body>
 
@@ -80,6 +80,36 @@
   <div id="rotateHint"><span class="rot">⟳</span>建议横屏体验<br>画面更完整</div>
 </div>
 
-<script src="js/iso.js"></script>
+<script>
+/* 启动自检：任何脚本报错 / 资源加载失败 / 引擎未启动，都在屏幕上直接显示，
+   便于手机端远程排障（截图即可看到原因）。引擎正常时不显示任何内容。 */
+(function(){
+  function show(msg){
+    var el = document.getElementById('bootErr');
+    if (!el){
+      el = document.createElement('div');
+      el.id = 'bootErr';
+      el.style.cssText = 'position:fixed;left:10px;right:10px;bottom:130px;z-index:999;'
+        + 'background:rgba(122,22,22,.93);color:#ffe0e0;font-size:12px;line-height:1.6;'
+        + 'padding:9px 12px;border-radius:9px;word-break:break-all;pointer-events:none;';
+      (document.body || document.documentElement).appendChild(el);
+    }
+    el.textContent = msg;
+  }
+  window.addEventListener('error', function(e){
+    var t = e.target;
+    if (t && t.tagName === 'IMG') return;                 // 素材缺失已有占位回退，不打扰
+    if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')){
+      show('⚠️ 资源加载失败：' + (t.src || t.href || '') + '\n请下拉刷新页面重试');
+    } else {
+      show('⚠️ 引擎报错：' + (e.message || '未知错误'));
+    }
+  }, true);
+  setTimeout(function(){
+    if (!window.__ISO__) show('⚠️ 引擎未能启动（脚本被内容拦截器挡住或加载超时）。\n请下拉刷新，或关闭 Safari 内容拦截器后重试。');
+  }, 3500);
+})();
+</script>
+<script src="js/iso.js?v=20260913b"></script>
 </body>
 </html>

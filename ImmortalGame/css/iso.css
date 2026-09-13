@@ -167,8 +167,10 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
 #rotateHint .rot { font-size: 30px; display: block; animation: rotHint 1.6s ease-in-out infinite; }
 @keyframes rotHint { 0%,100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
 @media (orientation: portrait) and (max-width: 760px) {
-  #rotateHint { display: block; }
+  #rotateHint { display: block; animation: rotFade 5s forwards; }
 }
+/* 竖屏提示显示 5 秒后自动淡出，不遮挡画面 */
+@keyframes rotFade { 0%, 62% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* ===== 屏幕缩放控制（右下）===== */
 #zoomCtrl {
