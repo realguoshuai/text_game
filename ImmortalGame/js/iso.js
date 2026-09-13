@@ -34,35 +34,16 @@
   let W = 0, H = 0;
   let TILE_W = 64, TILE_H = 32;      // 标准 45° 等距：宽高比 2:1
   let HW = TILE_W / 2, HH = TILE_H / 2;
-  let viewZoom = 1.1;                // 屏幕缩放：滚轮 / ＋－ 按钮调节，整体缩放世界
 
   function applyScale() {
     const small = window.innerWidth < 760;
-    // 视角略抬高（整体缩小瓦片 ≈ 同屏可见更多地图面积），缓解建筑拥挤感
+    // 固定视角（缩放控件已移除，保证操作流畅）；手机端瓦片更小，同屏可见更多地图
     const baseW = small ? 44 : 56;
     const baseH = small ? 22 : 28;
-    TILE_W = baseW * viewZoom;
-    TILE_H = baseH * viewZoom;
+    TILE_W = baseW;
+    TILE_H = baseH;
     HW = TILE_W / 2; HH = TILE_H / 2;
   }
-
-  // —— 屏幕缩放（滚轮 + 按钮）——
-  function setZoom(z) {
-    viewZoom = Math.min(2.0, Math.max(0.6, z));
-    applyScale();
-    const lbl = document.getElementById('zoomLabel');
-    if (lbl) lbl.textContent = Math.round(viewZoom * 100) + '%';
-  }
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    setZoom(viewZoom * (e.deltaY < 0 ? 1.12 : 0.89));
-  }, { passive: false });
-  const _zb = document.getElementById('zoomIn');
-  const _zs = document.getElementById('zoomOut');
-  const _zr = document.getElementById('zoomReset');
-  if (_zb) _zb.onclick = () => setZoom(viewZoom * 1.15);
-  if (_zs) _zs.onclick = () => setZoom(viewZoom * 0.87);
-  if (_zr) _zr.onclick = () => setZoom(1.1);
   function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
@@ -77,7 +58,7 @@
   // 二、地图数据（二维数组）
   //   0 = 地面（可走）   1 = 建筑/障碍（不可走）   2 = 装饰（石板/景物，可走）
   // =====================================================
-  const MAP_W = 26, MAP_H = 26;     // 适度缩小地图，建筑聚拢，缓解空旷感
+  const MAP_W = 24, MAP_H = 24;     // 再缩一档（26→24）：走路距离变短，建筑更聚拢
   const map = [];
   for (let y = 0; y < MAP_H; y++) map.push(new Array(MAP_W).fill(0));
 
@@ -87,7 +68,7 @@
         if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) map[y][x] = v;
   }
 
-  fill(13, 13, 12, 12, 2);   // 中央广场（石板）
+  fill(12, 12, 10, 10, 2);   // 中央广场（石板）
   fill(0, 17, 36, 2, 2);     // 横向主街（贯穿东西）
   fill(17, 0, 2, 36, 2);     // 纵向主街（贯穿南北）
 
@@ -108,8 +89,8 @@
   const props = [
     // 灯笼（悬挂，可穿行）
     { x: 15, y: 11, kind: 'lantern' }, { x: 21, y: 11, kind: 'lantern' },
-    { x: 15, y: 25, kind: 'lantern' }, { x: 21, y: 25, kind: 'lantern' },
-    { x: 11, y: 18, kind: 'lantern' }, { x: 25, y: 18, kind: 'lantern' },
+    { x: 15, y: 23, kind: 'lantern' }, { x: 21, y: 23, kind: 'lantern' },
+    { x: 11, y: 18, kind: 'lantern' }, { x: 23, y: 18, kind: 'lantern' },
     { x: 14, y: 16, kind: 'lanternY' },{ x: 22, y: 16, kind: 'lanternY' },
     // 石狮（建筑前，实心）
     { x: 5,  y: 8,  kind: 'lion' }, { x: 6,  y: 8,  kind: 'lion' },
@@ -127,12 +108,12 @@
     { x: 9,  y: 20, kind: 'tea' },
     // 灯笼串（沿街，实心）
     { x: 10, y: 17, kind: 'string' }, { x: 17, y: 17, kind: 'string' },
-    { x: 18, y: 10, kind: 'string' }, { x: 18, y: 25, kind: 'string' },
+    { x: 18, y: 10, kind: 'string' }, { x: 18, y: 23, kind: 'string' },
     // 货箱 / 灵晶（实心）
     { x: 16, y: 22, kind: 'crates' }, { x: 20, y: 22, kind: 'crates' },
-    { x: 12, y: 18, kind: 'crystal' },{ x: 24, y: 18, kind: 'crystal' },
+    { x: 12, y: 18, kind: 'crystal' },
     // 东街石牌坊（可穿行）
-    { x: 24, y: 18, kind: 'gate' },
+    { x: 23, y: 17, kind: 'gate' },
   ];
   const SOLID_PROPS = new Set(['lion', 'well', 'brazier', 'dummy', 'statue', 'stall', 'tea', 'string', 'crates', 'pond', 'crystal']);
   props.forEach(p => {
@@ -148,7 +129,7 @@
     { id: 'jieyin', name: '接引弟子', mx: 10.5, my: 9.5, color: '#7fc4ff',
       sprite: 'npcVillager', face: 'down', hasQuest: true,
       talk: '可是来拜师的？青玄宗收徒有规矩：先寻引路之人，再过问心阶。\n（任务：与接引弟子对话 0/1 —— 你已完成对话，可去丹房、器坊一带转转。）' },
-    { id: 'shangren', name: '灵石商人', mx: 24.5, my: 9.5, color: '#8fd3ff',
+    { id: 'shangren', name: '灵石商人', mx: 22.5, my: 9.5, color: '#8fd3ff',
       sprite: 'npcMerchant', face: 'left', hasQuest: false,
       talk: '灵石通万物，道友可要换些丹药符箓？\n（此处为商店占位，日后接背包与交易面板。）' },
     { id: 'zayi', name: '杂役弟子', mx: 9.5, my: 21.5, color: '#9fd48a',
@@ -405,7 +386,7 @@
     const cfg = SHEETS[key];
 
     ctx.fillStyle = 'rgba(0,0,0,.3)';
-    ctx.beginPath(); ctx.ellipse(s.x, s.y, 12 * viewZoom, 5 * viewZoom, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s.x, s.y, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
 
     if (img && cfg) {
       const sc = cfg.scale || 1;
@@ -500,8 +481,6 @@
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
-
-    drawMinimap();
   }
 
   // 光源表：灯笼/火盆 + 各建筑窗光（一次性构建）
@@ -706,6 +685,7 @@
     frames++;
     update(dt);
     render();
+    if (frames % 8 === 0) drawMinimap();   // 小地图降频重绘（每 8 帧），省 CPU 保流畅
   }
   requestAnimationFrame(loop);
 
