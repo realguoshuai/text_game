@@ -1705,7 +1705,7 @@
         } else {
           f.bpath = null;
         }
-        f.face = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+        setFaceHys(f, dx, dy);
         // 复活/被击退后的无敌窗口内不结算伤害，否则刚站起来就被连击再倒
         if (dist < MELEE + 0.15 && f.atkCd <= 0 && player.invuln <= 0) {
           f.atkCd = 1.0; f.atkAnim = 0.32;
@@ -1738,7 +1738,7 @@
         }
         if (couldStand(f.x + sx2b * sp2, f.y)) { f.x += sx2b * sp2; moving = true; }
         if (couldStand(f.x, f.y + sy2b * sp2)) { f.y += sy2b * sp2; moving = true; }
-        f.face = Math.abs(hxx) > Math.abs(hyy) ? (hxx > 0 ? 'right' : 'left') : (hyy > 0 ? 'down' : 'up');
+        setFaceHys(f, hxx, hyy);
         chaseDbg.key = f.key; chaseDbg.los = hlos ? 1 : 0;
         chaseDbg.sx = +sx2b.toFixed(3); chaseDbg.sy = +sy2b.toFixed(3);
         chaseDbg.bp = f.bpath ? (f.bpath.x + ',' + f.bpath.y) : '';
@@ -1822,6 +1822,15 @@
     if (f.anim === act) return;
     f.anim = act; f.animT = 0;
     f.animHold = BEAST_DUR[act] || 0;
+  }
+  /** 朝向滞回：主方向位移量不足 FACE_DEAD 时保持原朝向，防止追击贴身时左右抖动翻转 */
+  var FACE_DEAD = 0.45;
+  function setFaceHys(f, dx, dy) {
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (Math.abs(dx) >= FACE_DEAD) f.face = dx > 0 ? 'right' : 'left';
+    } else {
+      if (Math.abs(dy) >= FACE_DEAD) f.face = dy > 0 ? 'down' : 'up';
+    }
   }
   /** 贴一帧怪到屏幕上。flip=true 时以屏幕 x=px 为镜像轴 —— 侧视素材只有朝右一版，
    *  朝左只能镜像；横坐标要按锚点比例反着算，否则翻面后角色会整体偏左半个身位。 */
