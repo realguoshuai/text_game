@@ -11,7 +11,7 @@
   var TILE_W = 120, TILE_H = 60, HW = 60, HH = 30, THICK = 15;
 
   // 角色 sprite sheet（6列×5行，64×64/格）：行0=正面 行1=右 行2=左 行3=背
-  var SHEET = { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } };
+  var SHEET = { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, pxScale: 2 };
   var PLAYER_SRC = 'assets/char_player.png';
 
   var IMG = {};              // file -> Image
@@ -19,6 +19,10 @@
   var PAL = {}, WALK = '';
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0 };
   var camX = 0, camY = 0, time = 0;
+  // 视口缩放：Zt=目标倍数、Z=平滑跟随值；zAx/zAy=缩放锚点（默认屏幕中心）
+  // 幅度刻意收窄在 0.62~1.72（约 ±40%）：再小地图碎成蚂蚁、再大贴图糊成色块
+  var Z = 1, Zt = 1, ZMIN = 0.62, ZMAX = 1.72, zAx = 0, zAy = 0, zAnchor = false;
+  var ZSTEP = 1.10;   // 每次滚轮/按键的步进（约 10%，手感温和）
   var fadeA = 0, fadeDir = 0, pending = null, portalLock = 0;
   var HOLD = false, held = false;
   var cloudCv = null;
@@ -28,10 +32,10 @@
 
   // ---------------- 基础数学 ----------------
   function isoToScreen(mx, my) {
-    return { x: (mx - my) * HW + camX, y: (mx + my) * HH + camY };
+    return { x: (mx - my) * HW * Z + camX, y: (mx + my) * HH * Z + camY };
   }
   function screenToIso(sx, sy) {
-    var a = (sx - camX) / HW, b = (sy - camY) / HH;
+    var a = (sx - camX) / (HW * Z), b = (sy - camY) / (HH * Z);
     return { mx: (a + b) / 2, my: (b - a) / 2 };
   }
   function cellChar(x, y) {
@@ -42,6 +46,50 @@
   function walkable(x, y) {
     var c = cellChar(x, y);
     return WALK.indexOf(c) >= 0 && !isSolid(x, y);
+  }
+
+  // ---------------- 视口缩放 ----------------
+  function setZoom(nz, ax, ay) {
+    nz = Math.max(ZMIN, Math.min(ZMAX, nz));
+    if (ax !== undefined) { zAx = ax; zAy = ay; zAnchor = true; }
+    if (!zAnchor) { zAx = W / 2; zAy = H / 2; zAnchor = true; }
+    Zt = nz;
+    updateZoomUI();
+  }
+  function zoomBy(f, ax, ay) { setZoom(Zt * f, ax, ay); }
+  function updateZoomUI() {
+    var el = document.getElementById('zoomVal');
+    if (el) el.textContent = Math.round(Zt * 100) + '%';
+    var rg = document.getElementById('zRange');
+    if (rg) rg.value = Math.round(Zt * 100);
+    var zi = document.getElementById('zIn'), zo = document.getElementById('zOut');
+    if (zi) zi.disabled = Zt >= ZMAX - 1e-6;
+    if (zo) zo.disabled = Zt <= ZMIN + 1e-6;
+  }
+  function buildZoomUI() {
+    var zin = document.getElementById('zIn'), zout = document.getElementById('zOut'),
+      zr = document.getElementById('zReset'), rg = document.getElementById('zRange');
+    if (zin) zin.onclick = function () { zoomBy(ZSTEP, W / 2, H / 2); };
+    if (zout) zout.onclick = function () { zoomBy(1 / ZSTEP, W / 2, H / 2); };
+    if (zr) zr.onclick = function () { setZoom(1, W / 2, H / 2); };
+    if (rg) {
+      rg.min = Math.round(ZMIN * 100); rg.max = Math.round(ZMAX * 100);
+      rg.value = Math.round(Zt * 100);
+      rg.oninput = function () { setZoom(this.value / 100, W / 2, H / 2); };
+    }
+    updateZoomUI();
+  }
+  // 每帧平滑逼近目标缩放；按锚点做比例换算，使锚点下的画面不位移
+  function stepZoom(dt) {
+    if (Z === Zt) return;
+    var nz = Z + (Zt - Z) * (1 - Math.pow(0.0009, dt));
+    if (Math.abs(Zt - nz) < 0.002) nz = Zt;
+    var r = nz / Z;
+    if (zAnchor) {
+      camX = zAx - (zAx - camX) * r;
+      camY = zAy - (zAy - camY) * r;
+    }
+    Z = nz;
   }
   function solidFrom(mp) {
     var s = {};
@@ -93,7 +141,15 @@
       return Promise.all(list.map(loadImg)).then(function () {
         buildCloudSprite();
         buildButtons();
+        buildZoomUI();
         var q = new URLSearchParams(location.search);
+        // ?z=1.25 可直接以指定缩放打开（同样受 0.62~1.72 限制）
+        var zq = parseFloat(q.get('z'));
+        if (zq > 0) {
+          Z = Zt = Math.max(ZMIN, Math.min(ZMAX, zq));
+          zAnchor = true; zAx = W / 2; zAy = H / 2;
+          updateZoomUI();
+        }
         var mid = q.get('map');
         var start = IDX[q.get('map')] ? q.get('map') : data.start.map;
         var m = IDX[start] || MAPS[0];
@@ -164,6 +220,7 @@
 
   // ---------------- 绘制 ----------------
   function drawGround() {
+    var tw = TILE_W * Z, th = TILE_H * Z;
     for (var y = 0; y < CUR.h; y++) {
       for (var x = 0; x < CUR.w; x++) {
         var file = PAL[CUR.ground[y][x]];
@@ -171,68 +228,76 @@
         var img = IMG['assets/sliced/' + file];
         if (!img) continue;
         var p = isoToScreen(x, y);
-        if (p.x < -TILE_W * 1.6 || p.x > W + TILE_W * 1.6 || p.y < -TILE_H * 4 || p.y > H + TILE_H * 4) continue;
-        // 统一按宽度归一到 TILE_W，保证菱形水平对角线与网格严格对齐
-        var s = TILE_W / img.width;
-        ctx.drawImage(img, p.x - TILE_W / 2, p.y, TILE_W, img.height * s);
+        if (p.x < -tw * 1.6 || p.x > W + tw * 1.6 || p.y < -th * 4 || p.y > H + th * 4) continue;
+        // 统一按宽度归一到 TILE_W*Z，保证菱形水平对角线与网格严格对齐
+        var s = tw / img.width;
+        ctx.drawImage(img, p.x - tw / 2, p.y, tw, img.height * s);
       }
     }
   }
 
   function drawPortal(pt) {
     var p = isoToScreen(pt.x, pt.y);
-    var cx = p.x, cy = p.y + HH;
+    var cx = p.x, cy = p.y + HH * Z;
     var k = 1 + 0.14 * Math.sin(time * 3.4);
+    var R = 66 * k * Z;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    var rg = ctx.createRadialGradient(cx, cy, 2, cx, cy, 66 * k);
+    var rg = ctx.createRadialGradient(cx, cy, 2, cx, cy, R);
     rg.addColorStop(0, 'rgba(120,240,255,.55)');
     rg.addColorStop(0.5, 'rgba(70,200,255,.22)');
     rg.addColorStop(1, 'rgba(60,180,255,0)');
     ctx.fillStyle = rg;
-    ctx.beginPath(); ctx.arc(cx, cy, 66 * k, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832); ctx.fill();
     ctx.restore();
 
     ctx.save();
     ctx.strokeStyle = 'rgba(150,250,255,' + (0.72 + 0.26 * Math.sin(time * 3.4)) + ')';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.5 * Z;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - HH - 3); ctx.lineTo(cx + HW - 4, cy);
-    ctx.lineTo(cx, cy + HH + 3); ctx.lineTo(cx - HW + 4, cy);
+    ctx.moveTo(cx, cy - HH * Z - 3 * Z); ctx.lineTo(cx + HW * Z - 4 * Z, cy);
+    ctx.lineTo(cx, cy + HH * Z + 3 * Z); ctx.lineTo(cx - HW * Z + 4 * Z, cy);
     ctx.closePath(); ctx.stroke();
     ctx.restore();
 
-    ctx.font = 'bold 15px "Microsoft YaHei",sans-serif';
+    ctx.font = 'bold ' + (15 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
     var label = '⇄ ' + pt.label;
-    ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(6,12,24,.8)';
-    ctx.strokeText(label, cx, cy - 46);
+    ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.8)';
+    ctx.strokeText(label, cx, cy - 46 * Z);
     ctx.fillStyle = '#9df6ff';
-    ctx.fillText(label, cx, cy - 46);
+    ctx.fillText(label, cx, cy - 46 * Z);
   }
 
   function drawCharacter() {
     var img = IMG[PLAYER_SRC];
     var p = isoToScreen(player.mx, player.my);
-    var dh = TILE_H * 2.4, dw = dh * (SHEET.cellW / SHEET.cellH);
-    var baseY = p.y + HH;
+    // 角色是 64px 帧的像素画：按整数倍 2× 绘制（128px），每个源像素＝2×2 方块，
+    // 缩放时也不会被插值糊掉 —— 所以角色单独走最近邻，不跟随背景的平滑开关
+    var dh = SHEET.cellH * SHEET.pxScale * Z, dw = dh * (SHEET.cellW / SHEET.cellH);
+    var baseY = p.y + HH * Z;
     // 影子
     ctx.save();
     ctx.globalAlpha = 0.3;
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.ellipse(p.x, baseY - 2, TILE_W * 0.20, TILE_H * 0.20, 0, 0, 6.2832);
+    ctx.ellipse(p.x, baseY - 2, TILE_W * 0.20 * Z, TILE_H * 0.20 * Z, 0, 0, 6.2832);
     ctx.fill();
     ctx.restore();
     if (!img) return;
     var row = SHEET.dir[player.face] || 0;
     var frame = (player.walk > 0 ? Math.floor(player.walk * 6) % SHEET.frames : 0);
     var sx = frame * SHEET.cellW, sy = row * SHEET.cellH;
+    var sm = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, sx, sy, SHEET.cellW, SHEET.cellH,
       p.x - dw / 2, baseY - dh + 4, dw, dh);
+    ctx.imageSmoothingEnabled = sm;
   }
 
   function render() {
+    // Z<=1 保持硬边像素观感；放大时开插值，避免就近邻放大出锯齿方块
+    ctx.imageSmoothingEnabled = Z > 1.02;
     drawSky();
     if (!CUR) return;
     drawGround();
@@ -255,9 +320,10 @@
       if (!img) return;
       var ax = o.x + ((o.fw || 1) - 1) / 2, ay = o.y + ((o.fh || 1) - 1) / 2;
       var p = isoToScreen(ax, ay);
-      var bx = p.x, by = p.y + HH + (o.dy || 0);
-      if (bx < -400 || bx > W + 400 || by < -500 || by > H + 600) return;
-      ctx.drawImage(img, Math.round(bx - img.width / 2), Math.round(by - img.height));
+      var bx = p.x, by = p.y + HH * Z + (o.dy || 0) * Z;
+      var ow = img.width * Z, oh = img.height * Z;
+      if (bx < -ow || bx > W + ow || by < -oh * 1.4 || by > H + oh * 1.6) return;
+      ctx.drawImage(img, Math.round(bx - ow / 2), Math.round(by - oh), Math.round(ow), Math.round(oh));
     });
 
     // 洞外虚空柔化（地图边缘渐隐到天空）
@@ -278,8 +344,8 @@
     player.mx = player.tx = x; player.my = player.ty = y;
     player.face = 'down'; player.walk = 0;
     portalLock = 0.5;
-    camX = W / 2 - (x - y) * HW;
-    camY = H / 2 - (x + y) * HH;
+    camX = W / 2 - (x - y) * HW * Z;
+    camY = H / 2 - (x + y) * HH * Z;
     document.getElementById('mapName').textContent = CUR.name;
     var btns = document.querySelectorAll('#mapBtns button');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.id === CUR.id);
@@ -294,7 +360,15 @@
   }
 
   var keys = {};
-  window.addEventListener('keydown', function (e) { keys[e.key.toLowerCase()] = 1; if (e.key.indexOf('Arrow') === 0) e.preventDefault(); });
+  window.addEventListener('keydown', function (e) {
+    var k = e.key;
+    keys[k.toLowerCase()] = 1;
+    if (k.indexOf('Arrow') === 0) e.preventDefault();
+    // 键盘缩放：+ / - 步进，0 复位
+    if (k === '+' || k === '=') zoomBy(ZSTEP, W / 2, H / 2);
+    else if (k === '-' || k === '_') zoomBy(1 / ZSTEP, W / 2, H / 2);
+    else if (k === '0') setZoom(1, W / 2, H / 2);
+  });
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = 0; });
 
   function inputDir() {
@@ -308,6 +382,7 @@
 
   function update(dt) {
     time += dt;
+    stepZoom(dt);
     if (portalLock > 0) portalLock -= dt;
 
     // —— 过渡状态机 ——
@@ -362,7 +437,7 @@
 
   function updateCam(dt) {
     var k = 1 - Math.pow(0.0016, dt);
-    var px = (player.mx - player.my) * HW, py = (player.mx + player.my) * HH;
+    var px = (player.mx - player.my) * HW * Z, py = (player.mx + player.my) * HH * Z;
     camX += (W / 2 - px - camX) * k;
     camY += (H / 2 - py - camY) * k;
   }
@@ -375,10 +450,41 @@
     if (walkable(cx, cy) && !isSolid(cx, cy)) { player.tx = cx; player.ty = cy; }
   }
   canvas.addEventListener('mousedown', function (e) { if (e.button === 0) onClick(e); });
-  canvas.addEventListener('touchstart', function (e) {
-    if (e.touches[0]) onClick(e.touches[0]); e.preventDefault();
+
+  // 鼠标滚轮缩放（以指针为锚点）
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = canvas.getBoundingClientRect();
+    // 单次事件限幅，避免一格滚轮就跳到底；触控板小增量则保持顺滑
+    var f = Math.pow(1.0022, -e.deltaY);
+    f = Math.max(0.90, Math.min(1.11, f));
+    zoomBy(f, e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
-  canvas.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+
+  // 触屏双指捏合缩放
+  function touchDist(e) {
+    var a = e.touches[0], b = e.touches[1];
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+  function touchMid(e) {
+    var r = canvas.getBoundingClientRect(), a = e.touches[0], b = e.touches[1];
+    return { x: (a.clientX + b.clientX) / 2 - r.left, y: (a.clientY + b.clientY) / 2 - r.top };
+  }
+  var pinchD = 0;
+  canvas.addEventListener('touchstart', function (e) {
+    if (e.touches.length >= 2) { pinchD = touchDist(e); e.preventDefault(); return; }
+    if (e.touches[0]) onClick(e.touches[0]);
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', function (e) {
+    if (e.touches.length >= 2) {
+      var d = touchDist(e);
+      if (pinchD > 0 && d > 0) { var m = touchMid(e); zoomBy(d / pinchD, m.x, m.y); }
+      pinchD = d;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', function (e) { if (e.touches.length < 2) pinchD = 0; });
 
   function buildButtons() {
     var box = document.getElementById('mapBtns');
@@ -409,7 +515,8 @@
     if (window.__dbg && CUR) {
       window.__dbg.textContent = JSON.stringify({
         map: CUR.id, fade: +fadeA.toFixed(2), held: held,
-        mx: +player.mx.toFixed(2), my: +player.my.toFixed(2)
+        mx: +player.mx.toFixed(2), my: +player.my.toFixed(2),
+        zoom: +Z.toFixed(3), zoomT: +Zt.toFixed(3)
       });
     }
     requestAnimationFrame(loop);
@@ -420,7 +527,8 @@
     get ready() { return ready; },
     get map() { return CUR ? CUR.id : null; },
     list: function () { return MAPS.map(function (m) { return { id: m.id, name: m.name, w: m.w, h: m.h, objects: m.objects.length, portals: m.portals.map(function (p) { return { x: p.x, y: p.y, to: p.to }; }) }; }); },
-    state: function () { return { map: CUR && CUR.id, mx: +player.mx.toFixed(2), my: +player.my.toFixed(2), fade: +fadeA.toFixed(2) }; },
+    state: function () { return { map: CUR && CUR.id, mx: +player.mx.toFixed(2), my: +player.my.toFixed(2), fade: +fadeA.toFixed(2), zoom: +Z.toFixed(3) }; },
+    setZoom: function (z) { setZoom(z, W / 2, H / 2); return Zt; },
     goto: function (id, x, y) { switchTo(id, x === undefined ? IDX[id].home.x : x, y === undefined ? IDX[id].home.y : y, false); },
     /** 把玩家放到当前地图第 i 个传送门上，下一次 update 即触发切换 */
     stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; portalLock = 0; },

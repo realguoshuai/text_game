@@ -30,6 +30,25 @@
   .maps button.on{background:linear-gradient(180deg,#4a6da8,#2c4570);border-color:#ffd75e;
     color:#fff;box-shadow:0 0 10px rgba(255,215,94,.5)}
 
+  #zoombar{margin-top:9px}
+  #zoombar .t{font-size:12px;color:#c9bda0;margin-bottom:6px;letter-spacing:1px;display:flex;
+    justify-content:space-between;align-items:center}
+  #zoombar .t b{color:#8bf3ff;font-family:ui-monospace,Consolas,monospace;font-weight:600}
+  .zline{display:flex;align-items:center;gap:7px;pointer-events:auto}
+  .zline button{pointer-events:auto;cursor:pointer;font-family:inherit;
+    background:rgba(30,44,70,.85);color:#f0e3c2;border:1px solid rgba(214,178,96,.5);
+    border-radius:7px;width:28px;height:26px;font-size:15px;line-height:1;transition:.15s}
+  .zline button:hover{background:rgba(58,84,128,.95);border-color:#ffd75e;color:#fff}
+  .zline button:disabled{opacity:.38;cursor:default;border-color:rgba(214,178,96,.25)}
+  .zline #zReset{width:auto;padding:0 9px;font-size:12px}
+  #zRange{-webkit-appearance:none;appearance:none;width:128px;height:4px;cursor:pointer;
+    background:linear-gradient(90deg,rgba(139,243,255,.75),rgba(214,178,96,.65));
+    border-radius:3px;outline:none;pointer-events:auto}
+  #zRange::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:#ffe6a6;border:1px solid #6b5a2e;box-shadow:0 0 6px rgba(255,215,94,.7);cursor:pointer}
+  #zRange::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;
+    background:#ffe6a6;box-shadow:0 0 6px rgba(255,215,94,.7);cursor:pointer}
+
   #bottom{bottom:14px;left:50%;transform:translateX(-50%);padding:8px 16px;
     font-size:12.5px;color:#c9bda0;text-align:center;line-height:1.7}
   #bottom kbd{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
@@ -51,11 +70,21 @@
 <div id="topright" class="hud panel">
   <div class="t">地图速切（无缝流转）</div>
   <div class="maps" id="mapBtns"></div>
+  <div id="zoombar">
+    <div class="t"><span>视图缩放</span><b id="zoomVal">100%</b></div>
+    <div class="zline">
+      <button id="zOut" title="缩小（-）">−</button>
+      <input id="zRange" type="range" min="62" max="172" value="100" step="1">
+      <button id="zIn" title="放大（+）">+</button>
+      <button id="zReset" title="复位（0）">100%</button>
+    </div>
+  </div>
 </div>
 
 <div id="bottom" class="hud panel">
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> 行走　·　
-  点击格子移动　·　走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）
+  点击格子移动　·　<span class="hl">滚轮 / +/-</span> 缩放视图（0.62~1.72 倍）　·　
+  走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）
 </div>
 
 <div id="loader">仙岛加载中…</div>

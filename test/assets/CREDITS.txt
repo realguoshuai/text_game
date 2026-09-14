@@ -1,0 +1,20 @@
+素材来源与授权
+================
+
+1) 地图场景 / 地砖 / 建筑 / 道具（assets/sliced/*.png）
+   —— AI 生成（Gemini）的等距仙岛场景图，经 tools/slice_sheet.py 连通域切图得到。
+   原始大图归档于仓库外的 sucai/（不随仓库发布）。
+
+2) 玩家角色（assets/char_player.png，384×320 = 6 列 × 5 行 × 64px）
+   —— 来自「FrameRonin 免费角色包 · 武侠修仙」主题（frameronin.com/free-character-library/）
+   源文件：001-1787889793963-frames64-oldfix2.png（384×832，该包 1 号角色，
+   也是官方 Godot 示例的默认角色），由 tools/build_player_atlas.py 重排为游戏行序：
+   行0 正面走 / 行1 右走（左走水平镜像）/ 行2 左走 / 行3 背面走 / 行4 正面站立。
+   本地素材库路径 text_game/AssetLibrary/武侠修仙/（不在本仓库内）。
+
+   ⚠️ 授权提示：作者称该包为「免费赠送」，但页面与本包内均未写明授权条款。
+   个人学习 / 原型项目可用并注明出处；若要商用到公开产品，请先向作者确认
+   （见 text_game/AssetLibrary/README.md）。
+
+3) 替换素材：同名 PNG 覆盖 assets/ 下文件即可，游戏零改动。
+   换主角：python tools/build_player_atlas.py <编号>   （编号见 --list 生成的 20 人总览）。
