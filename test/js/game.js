@@ -21,7 +21,7 @@
    * SIDE_ACT 的取值必须与 test/tools/add_craftpix_heroes.py 里 ACTS 的顺序一致。
    */
   var SIDE_ACT = { idle: 0, walk: 1, run: 2, atkA: 3, atkB: 4, dead: 5 };
-  var ACT_DUR = { atkA: 0.45, atkB: 0.75, dead: 1.5 };   // 一次性动作的播放时长（秒）
+  var ACT_DUR = { atkA: 0.65, atkB: 1.0, dead: 1.5 };   // 一次性动作的播放时长（秒）；攻击放慢才看得清
   var ACT_CN = { idle: '待机', walk: '行走', run: '奔跑', atkA: '攻击 A', atkB: '攻击 B', dead: '倒地' };
   var RUN_MUL = 1.75;      // 奔跑速度倍率
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
@@ -995,17 +995,26 @@
     var dir = (player.face === 'left') ? -1 : 1;
     var p = isoToScreen(player.mx, player.my);
     var cx = p.x + dir * 13 * Z, cy = p.y + HH * Z - 32 * Z;
-    var r = (big ? 40 : 28) * Z;
-    var sweep = big ? 1.9 : 1.4;
+    var r = (big ? 58 : 42) * Z;
+    var sweep = big ? 2.4 : 1.8;
     var a0 = -1.15 + (k - 0.5) * sweep;
     ctx.save();
-    ctx.globalAlpha = 0.8 * a;
-    ctx.strokeStyle = big ? '#ffd36b' : '#d6ecff';
-    ctx.lineWidth = (big ? 5.5 : 3.2) * Z;
+    ctx.globalAlpha = 0.92 * a;
+    ctx.strokeStyle = big ? '#ffd36b' : '#eaf6ff';
+    ctx.lineWidth = (big ? 8 : 5) * Z;
     ctx.lineCap = 'round';
+    ctx.shadowColor = big ? 'rgba(255,180,60,.9)' : 'rgba(160,220,255,.9)';
+    ctx.shadowBlur = 10 * Z;
     ctx.beginPath();
-    if (dir > 0) ctx.arc(cx, cy, r, a0, a0 + 0.95, false);
-    else ctx.arc(cx, cy, r, Math.PI - a0, Math.PI - a0 - 0.95, true);
+    if (dir > 0) ctx.arc(cx, cy, r, a0, a0 + 1.15, false);
+    else ctx.arc(cx, cy, r, Math.PI - a0, Math.PI - a0 - 1.15, true);
+    ctx.stroke();
+    // 内圈第二道弧，重击双弧更醒目
+    ctx.globalAlpha = 0.45 * a;
+    ctx.lineWidth = (big ? 4.5 : 2.6) * Z;
+    ctx.beginPath();
+    if (dir > 0) ctx.arc(cx, cy, r * 0.72, a0 + 0.18, a0 + 1.0, false);
+    else ctx.arc(cx, cy, r * 0.72, Math.PI - a0 - 0.18, Math.PI - a0 - 1.0, true);
     ctx.stroke();
     ctx.restore();
   }
@@ -1327,7 +1336,7 @@
     var d = inputDir();
     if (player.dead) d = { dx: 0, dy: 0 };              // 倒地期间不接受移动输入
     var running = !!((keys['shift'] || joyVec.run) && (d.dx || d.dy));  // 按住 Shift / 摇杆推满 = 奔跑
-    var speed = 5.2 * (running ? RUN_MUL : 1);
+    var speed = 3.8 * (running ? RUN_MUL : 1);   // 5.2 太飘，降到 3.8 格/秒
     var px0 = player.mx, py0 = player.my;
 
     if (d.dx || d.dy) {
