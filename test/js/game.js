@@ -250,7 +250,7 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
   var LOAD_PLAN = [
-    { url: 'assets/maps.json?v=1', json: true, weight: 62, label: '读取地图数据' },
+    { url: 'assets/maps.json?v=2', json: true, weight: 62, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.png?v=1', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
     { url: 'assets/chars_atlas.png?v=3', atlas: 'chars', weight: 323, label: '载入人物动作' },
     { url: 'assets/foes_atlas.png?v=3', atlas: 'foes', weight: 1099, label: '载入妖兽图鉴' },
@@ -1263,7 +1263,12 @@
   });
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = 0; });
 
+  // 浮动摇杆的当前输入（触屏端由 initMobile 写入；桌面端恒为 0，不影响键盘）
+  var joyVec = { x: 0, y: 0, run: false };
+
   function inputDir() {
+    // 摇杆推着的时候优先接管（模拟量 0~1）；松开/没推就走键盘
+    if (joyVec.x || joyVec.y) return { dx: joyVec.x, dy: joyVec.y };
     var dx = 0, dy = 0;
     if (keys['a'] || keys['arrowleft']) dx -= 1;
     if (keys['d'] || keys['arrowright']) dx += 1;
@@ -1318,7 +1323,7 @@
 
     var d = inputDir();
     if (player.dead) d = { dx: 0, dy: 0 };              // 倒地期间不接受移动输入
-    var running = !!(keys['shift'] && (d.dx || d.dy));  // 按住 Shift = 奔跑
+    var running = !!((keys['shift'] || joyVec.run) && (d.dx || d.dy));  // 按住 Shift / 摇杆推满 = 奔跑
     var speed = 5.2 * (running ? RUN_MUL : 1);
     var px0 = player.mx, py0 = player.my;
 
@@ -1479,7 +1484,17 @@
       var d = Math.hypot(f.x - player.mx, f.y - player.my);
       if (d < bd) { bd = d; best = f; }
     }
-    if (!best) return;
+    if (!best) {
+      // 挥空也锁敌：仇恨圈内最近的妖兽在哪边，脸就转向哪边（只转向不出伤害）
+      var near = null, nd = AGGRO;
+      for (var j = 0; j < foes.length; j++) {
+        var g = foes[j]; if (!g.alive) continue;
+        var d2 = Math.hypot(g.x - player.mx, g.y - player.my);
+        if (d2 < nd) { nd = d2; near = g; }
+      }
+      if (near) setFaceFromDelta(near.x - player.mx, near.y - player.my);
+      return;
+    }
     setFaceFromDelta(best.x - player.mx, best.y - player.my);
     var real = Math.max(1, Math.round(player.atk - best.def));
     best.hp -= real; best.flash = 0.22;
@@ -2167,13 +2182,55 @@
     if (!isTouch) return;
     document.body.classList.add('touch');
 
+    // —— 浮动摇杆（左半屏触点出现，推动即走、推满奔跑）——
+    // 借 realtime（凡人修仙录）的成熟设计：不固定位置，按在哪摇杆出现在哪。
+    // 左半屏归摇杆、右半屏保留「点地面移动」；pointerdown preventDefault 掉
+    // 兼容鼠标事件，避免起杆那一下又被当成点击寻路。
+    var joyEl = document.getElementById('joystick');
+    var joyKnob = document.getElementById('joy-knob');
+    var JOY_R = 48;
+    var joy = { active: false, id: null };
+    function joyStart(e) {
+      if (e.clientX > window.innerWidth / 2) return;   // 右半屏留给点地移动 / 出招按钮
+      joy.active = true; joy.id = e.pointerId;
+      var size = joyEl.offsetWidth || 120;
+      joyEl.style.left = (e.clientX - size / 2) + 'px';
+      joyEl.style.top = (e.clientY - size / 2) + 'px';
+      joyEl.style.display = 'block';
+      joyKnob.style.transform = 'translate(0px,0px)';
+      joyMove(e); e.preventDefault();
+    }
+    function joyMove(e) {
+      if (!joy.active || e.pointerId !== joy.id) return;
+      var rect = joyEl.getBoundingClientRect();
+      var dx = e.clientX - (rect.left + rect.width / 2);
+      var dy = e.clientY - (rect.top + rect.height / 2);
+      var dd = Math.hypot(dx, dy);
+      if (dd > JOY_R) { dx = dx / dd * JOY_R; dy = dy / dd * JOY_R; }
+      joyVec.x = dx / JOY_R; joyVec.y = dy / JOY_R;
+      joyVec.run = dd >= JOY_R * 0.95;                 // 推满边缘 = 奔跑
+      joyKnob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      e.preventDefault();
+    }
+    function joyEnd(e) {
+      if (e.pointerId !== joy.id) return;
+      joy.active = false; joy.id = null;
+      joyVec.x = 0; joyVec.y = 0; joyVec.run = false;
+      joyKnob.style.transform = 'translate(0px,0px)';
+      joyEl.style.display = 'none';
+    }
+    canvas.addEventListener('pointerdown', joyStart);
+    window.addEventListener('pointermove', joyMove, { passive: false });
+    window.addEventListener('pointerup', joyEnd);
+    window.addEventListener('pointercancel', joyEnd);
+
     // —— 操作提示精简 + 自动收起 ——
     // 原文案是给键盘玩家的（WASD / J/K / Shift / 1~6），手机上既没用又长到压住半屏。
     // 换成真·触屏操作：游戏没有"滑动移动"，移动是点地面寻路，别写成滑动。
     var bottom = document.getElementById('bottom');
     if (bottom) {
-      bottom.innerHTML = '点地面移动 · 右下角 <b>攻击A / 重击B</b> 出手 · 靠近妖兽自动开打 · ' +
-        '<span class="hl">点这里收起</span>';
+      bottom.innerHTML = '左半屏按住摇杆移动（推满奔跑）· 右下角 <b>攻击A / 重击B</b> 出手 · ' +
+        '右半屏点地也能走 · <span class="hl">点这里收起</span>';
       var hideTimer = null;
       function schedule() { clearTimeout(hideTimer); hideTimer = setTimeout(function () { bottom.classList.add('faded'); }, 6000); }
       bottom.addEventListener('click', function () {

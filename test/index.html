@@ -162,6 +162,16 @@
   body.touch #topright .maps button,
   body.touch #topright #herobar .heros button{padding:6px 9px;font-size:12px}
 
+  /* ---------- 浮动摇杆（触屏左半屏按住出现，半透明；借 realtime 的设计） ---------- */
+  #joystick{position:fixed;width:120px;height:120px;z-index:40;display:none;
+    pointer-events:none;opacity:.55;will-change:left,top}
+  #joy-base{position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle,rgba(20,30,52,.55),rgba(12,18,34,.35));
+    border:2px solid rgba(255,255,255,.4)}
+  #joy-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+    border-radius:50%;background:rgba(240,227,194,.65);border:2px solid rgba(255,255,255,.75);
+    box-shadow:0 2px 10px rgba(0,0,0,.35)}
+
   #loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 50% 38%,#16233f,#0a1120 72%);z-index:99}
   .loadbox{width:min(360px,80vw);text-align:center}
@@ -236,6 +246,8 @@
     <div class="acts" id="actBtns"></div>
   </div>
 </div>
+
+<div id="joystick"><div id="joy-base"></div><div id="joy-knob"></div></div>
 
 <div id="loader">
   <div class="loadbox">
