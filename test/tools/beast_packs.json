@@ -1,0 +1,72 @@
+{
+  "_spec": {
+    "purpose": "怪物包登记表 —— 新下一个包，只要把目录丢进 ImmortalGame/sucai/、在 packs[] 补一条、跑 build_beasts_atlas.py，就完成接入。",
+    "cell": "所有帧图必须是「单行」精灵表：高 = 格高，宽 = 格宽 × 帧数（本轮三包统一 128×128/格）。",
+    "acts": "动作名 -> 候选文件名列表，按序取第一个存在的文件。包级 acts 覆盖全局 acts。",
+    "caps": "每个动作最多保留的帧数：超出就等距抽样（一次性动作永远保留首末帧）。",
+    "fps": "各动作播放帧率；攻击/受击/倒地的实际时长还会被引擎的一次性动作时长夹住。",
+    "anchor": "整只怪统一水平锚点：把 idle 第 0 帧的内容中心平移到格中心，全动作共用同一位移 —— 绝不逐帧裁包围盒居中（那会让攻击帧/倒地帧之间抽搐）。",
+    "box": "纵向取该怪所有动作的内容并集上边界，统一裁到格底（素材各帧内容底边都落在格底 y=127/128）。",
+    "body": "该怪在游戏里的目标体格（屏幕像素，按 walk 中性姿态的身体高度计）。\n    参照物（都是实测屏幕高度，Z=1）：主角 70~78（等距 1 号 70、侧视吸血鬼/忍者 76）；\n    老妖兽 assassin 90 / wraith 104 / golem(精英) 124。所以小怪取 88~112、精英取 112~131。\n    引擎真正用的 fh 由脚本按「框高/基准高」换算（框里含举刀过头这类动作余量，直接填 fh 会算小），不用手填。",
+    "spawn": "该怪在灵泉灵瀑的刷怪格 [x,y]；引擎启动时从生成的 beasts.json 读，不再写死在 game.js 里。"
+  },
+  "acts": {
+    "idle": ["Idle.png"],
+    "walk": ["Walk.png"],
+    "run": ["Run.png"],
+    "atk": ["Attack.png", "Attack_1.png"],
+    "atk2": ["Attack_2.png", "Special.png", "Shot.png"],
+    "hurt": ["Hurt.png"],
+    "dead": ["Dead.png"]
+  },
+  "caps": { "idle": 5, "walk": 7, "run": 7, "atk": 6, "atk2": 6, "hurt": 2, "dead": 5 },
+  "fps": { "idle": 7, "walk": 10, "run": 13, "atk": 15, "atk2": 15, "hurt": 12, "dead": 9 },
+  "packs": [
+    {
+      "id": "craftpix-minotaur",
+      "dir": "sucai/怪物",
+      "license": "CraftPix free asset (Minotaur pack)",
+      "monsters": [
+        { "src": "Minotaur_1", "key": "minotaur_a", "cn": "牛魔·褐角", "body": 112,
+          "hp": 120, "atk": 15, "def": 9,  "exp": 30, "stones": [7, 14], "mv": 1.9,  "spawn": [12, 13] },
+        { "src": "Minotaur_2", "key": "minotaur_b", "cn": "牛魔·灰角", "body": 102,
+          "hp": 96,  "atk": 13, "def": 7,  "exp": 24, "stones": [6, 12], "mv": 2.3,  "spawn": [25, 21] },
+        { "src": "Minotaur_3", "key": "minotaur_c", "cn": "牛魔·玄角", "body": 112, "elite": true,
+          "hp": 175, "atk": 19, "def": 12, "exp": 48, "stones": [12, 22], "mv": 1.7, "spawn": [20, 27],
+          "acts": { "atk": ["Attack.png"], "atk2": ["Attack.png"] } }
+      ]
+    },
+    {
+      "id": "craftpix-humanoid",
+      "dir": "sucai/人形怪",
+      "license": "CraftPix free asset (Samurai pack)",
+      "monsters": [
+        { "src": "Samurai",           "key": "ronin_a", "cn": "游方刀客", "body": 92,
+          "hp": 62, "atk": 14, "def": 6, "exp": 16, "stones": [4, 9],  "mv": 3.0, "spawn": [7, 15],
+          "acts": { "atk": ["Attack_1.png"], "atk2": ["Attack_2.png"] } },
+        { "src": "Samurai_Archer",    "key": "ronin_b", "cn": "游方弓手", "body": 88,
+          "hp": 70, "atk": 17, "def": 5, "exp": 20, "stones": [5, 11], "mv": 2.4, "spawn": [28, 17],
+          "acts": { "atk": ["Shot.png", "Attack_1.png"], "atk2": ["Attack_3.png"] } },
+        { "src": "Samurai_Commander", "key": "ronin_c", "cn": "游方统领", "body": 112, "elite": true,
+          "hp": 150, "atk": 20, "def": 11, "exp": 44, "stones": [11, 20], "mv": 2.2, "spawn": [26, 26],
+          "acts": { "atk": ["Attack_1.png"], "atk2": ["Attack_2.png"] } }
+      ]
+    },
+    {
+      "id": "craftpix-gorgon",
+      "dir": "sucai/蛇妖",
+      "license": "CraftPix free asset (Gorgon pack)",
+      "monsters": [
+        { "src": "Gorgon_1", "key": "gorgon_a", "cn": "蛇妖·碧鳞", "body": 100,
+          "hp": 88, "atk": 16, "def": 8,  "exp": 26, "stones": [6, 13], "mv": 2.5, "spawn": [8, 20],
+          "acts": { "atk": ["Attack_2.png", "Attack_1.png"], "atk2": ["Special.png"] } },
+        { "src": "Gorgon_2", "key": "gorgon_b", "cn": "蛇妖·紫鳞", "body": 100,
+          "hp": 82, "atk": 18, "def": 7,  "exp": 26, "stones": [6, 13], "mv": 2.8, "spawn": [24, 20],
+          "acts": { "atk": ["Attack_2.png", "Attack_1.png"], "atk2": ["Special.png"] } },
+        { "src": "Gorgon_3", "key": "gorgon_c", "cn": "蛇妖·银鳞", "body": 118, "elite": true,
+          "hp": 165, "atk": 21, "def": 13, "exp": 50, "stones": [13, 24], "mv": 2.1, "spawn": [23, 9],
+          "acts": { "atk": ["Attack_3.png", "Attack_2.png"], "atk2": ["Special.png"] } }
+      ]
+    }
+  ]
+}

@@ -25,6 +25,9 @@
   var ACT_CN = { idle: '待机', walk: '行走', run: '奔跑', atkA: '攻击 A', atkB: '攻击 B', dead: '倒地' };
   var RUN_MUL = 1.75;      // 奔跑速度倍率
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
+  // 怪物（侧视多动作素材）一次性动作的播放时长（秒）；循环动作 idle/walk/run 按 fps 推进
+  var BEAST_DUR = { atk: 0.42, atk2: 0.58, hurt: 0.3, dead: 1.15 };
+  var BEAST_RUN_MV = 2.8;  // 移速达到这个值就用 run 动作追人，否则用 walk（没 run 素材的会自动回退到 walk）
   // 文件名带版本号：浏览器会缓存同名图片，换精灵时必须换名，否则玩家仍看到旧图
   // 主角外形可切换：1/5/10/14/18/20 取自「武侠修仙免费包」；31~33 取自 CraftPix 免费吸血鬼包；
   // 41~43 取自 CraftPix 免费忍者包（Fighter / Samurai / Shinobi）。
@@ -64,7 +67,9 @@
   var ATLAS = {
     tiles: { img: null, rect: null },
     chars: { img: null, rect: null },
-    foes: { img: null, rect: null }
+    // foes: rect = 老式「逐帧独立矩形」扁平表（等距妖兽，只有 idle/attack/death 三态）；
+    //       anim = 新式「每怪一组动作帧序列」（侧视多动作素材，见 assets/beasts.json）
+    foes: { img: null, rect: null, anim: null }
   };
   function atlasReady(a) { return !!(a.img && a.rect); }
 
@@ -107,9 +112,30 @@
     { x: 10, y: 20, t: 'dummy' }, { x: 16, y: 19, t: 'dummy' }, { x: 22, y: 20, t: 'dummy' },
     { x: 13, y: 25, t: 'dummy' }, { x: 21, y: 25, t: 'dummy' }
   ];
+  /* 灵泉灵瀑的怪：牛魔 / 游方 / 蛇妖 三族共 9 只，来自 sucai 下三个 CraftPix 怪物包。
+   * 属性、刷怪格、动作帧率全部写在 tools/beast_packs.json，由 build_beasts_atlas.py 生成
+   * assets/beasts.json，启动时灌进 FOE_DEFS 与 LINGQUAN_SPAWNS ——
+   * 以后加怪物包只改登记表 + 跑脚本，不用再动 game.js。
+   * ⚠ side:1 = 侧视素材（只有朝右一版），引擎按 face 做水平翻转，见 beastRect/drawFoe。 */
+  var BEASTS = [];              // assets/beasts.json 里的 monsters
+  var LINGQUAN_SPAWNS = [];
+  var BEAST_FALLBACK = { run: 'walk', atk2: 'atk', walk: 'idle', hurt: 'idle', dead: 'idle' };
+  function absorbBeasts(list) {
+    BEASTS = list || [];
+    LINGQUAN_SPAWNS = [];
+    for (var i = 0; i < BEASTS.length; i++) {
+      var b = BEASTS[i];
+      FOE_DEFS[b.key] = {
+        key: b.key, name: b.cn, hp: b.hp, atk: b.atk, def: b.def, exp: b.exp,
+        stones: b.stones, mv: b.mv, fh: b.fh, elite: !!b.elite, side: 1
+      };
+      if (b.spawn) LINGQUAN_SPAWNS.push({ x: b.spawn[0], y: b.spawn[1], t: b.key });
+    }
+  }
   var camX = 0, camY = 0, time = 0;
   var lastActShown = null;   // 动作试演面板的高亮同步（变化时才碰 DOM）
   var poseLock = null;       // ?pose=atkA 之类：把主角锁在某个动作上，用于核对素材/截图
+  var foePose = null;        // ?foeact=atk&i=0&k=0.45：把第 i 只怪锁在某个动作的中段（怪物素材核对）
   // 上一帧的绘制计数（QA 用）：确认 NPC 真的走了 drawNPC 分支，
   // 而不是被 <0 的兜底分支当成玩家画出来
   var _draw = { actor: 0, npc: 0 };
@@ -223,11 +249,12 @@
     { url: 'assets/maps.json', json: true, weight: 4, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.png', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
     { url: 'assets/chars_atlas.png?v=3', atlas: 'chars', weight: 323, label: '载入人物动作' },
-    { url: 'assets/foes_atlas.png', atlas: 'foes', weight: 1043, label: '载入妖兽图鉴' },
+    { url: 'assets/foes_atlas.png?v=2', atlas: 'foes', weight: 883, label: '载入妖兽图鉴' },
     { url: 'assets/tiles_atlas.json', json: true, weight: 4, label: '读取地貌索引' },
     { url: 'assets/chars_atlas.json?v=3', json: true, weight: 4, label: '读取人物索引' },
-    { url: 'assets/foes_atlas.json', json: true, weight: 4, label: '读取妖兽索引' },
-    { url: 'assets/heroes.json?v=1', json: true, weight: 4, label: '读取角色清单' }
+    { url: 'assets/foes_atlas.json?v=2', json: true, weight: 8, label: '读取妖兽索引' },
+    { url: 'assets/heroes.json?v=1', json: true, weight: 4, label: '读取角色清单' },
+    { url: 'assets/beasts.json?v=1', json: true, weight: 8, label: '读取怪物图录' }
   ];
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
@@ -330,11 +357,19 @@
         var data = LOAD_PLAN[0].value;
         ATLAS.tiles.img = LOAD_PLAN[1].value; ATLAS.tiles.rect = LOAD_PLAN[4].value;
         ATLAS.chars.img = LOAD_PLAN[2].value; ATLAS.chars.rect = LOAD_PLAN[5].value;
-        ATLAS.foes.img = LOAD_PLAN[3].value; ATLAS.foes.rect = LOAD_PLAN[6].value;
+        ATLAS.foes.img = LOAD_PLAN[3].value;
+        // 妖兽索引有两种形态：老版是「扁平 rect 表」，新版是 { rect, anims }。
+        // 两种都要能加载（老图集没有 anims，就只是少了多动作怪，不该白屏）。
+        var fj = LOAD_PLAN[6].value || {};
+        ATLAS.foes.rect = fj.rect || fj;
+        ATLAS.foes.anim = fj.anims || {};
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;
         if (hj && hj.heroes && hj.heroes.length) HERO_OPTIONS = hj.heroes;
+        // 怪物图录由 test/tools/build_beasts_atlas.py 生成：属性 + 刷怪格 + 动作帧率
+        var bj = LOAD_PLAN[8].value;
+        if (bj && bj.monsters && bj.monsters.length) absorbBeasts(bj.monsters);
 
       TILE_W = data.tileW; TILE_H = data.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
       PAL = data.tilePalette; WALK = data.walkable;
@@ -375,6 +410,9 @@
         // ?pose=run —— 把主角锁在某个动作上（核对素材/截图用），取值见 ACT_CN
         var pq = q.get('pose');
         if (pq && ACT_CN[pq]) { poseLock = pq; player.act = pq; player.actT = 0.05; }
+        // ?foeact=atk&i=0&k=0.45 —— 锁住第 i 只怪的某个动作（中段），用于核对怪物素材
+        var fq = q.get('foeact');
+        if (fq) foePose = { i: (+q.get('i') || 0), act: fq, k: Math.max(0, Math.min(0.95, +q.get('k') || 0.45)) };
         // 无头浏览器里 rAF 的 dt 常常接近 0（虚拟时钟只推进定时器、不推进帧），
         // 过渡动画就会卡在 fade≈0.08 永远走不完 —— 这是抓取环境的假象，不是引擎 bug。
         // 所以自测一律用 ISLES.tick(1/60) 手动推进固定步长，结果可复现。
@@ -425,6 +463,88 @@
             r.actBtns = document.querySelectorAll('#actBtns button').length;
             r.heroBtns = document.querySelectorAll('#heroBtns button').length;
             r.hero = PLAYER_SRC;
+            var pb = document.getElementById('probe');
+            if (!pb) { pb = document.createElement('div'); pb.id = 'probe'; pb.style.display = 'none'; document.body.appendChild(pb); }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
+        if (at === 'bestiary') {
+          // ?map=lingquan&autotest=bestiary —— 灵泉灵瀑怪物自测：
+          // 断言三族怪物已刷出、每只都有 idle/walk/atk/dead 帧、动作能切换且帧号真的在走、
+          // 受击切 hurt、击杀后走倒地再消失再复活、侧视素材朝左会翻转。
+          setTimeout(function () {
+            var r = { map: CUR.id, total: foes.length, fam: {}, acts: {}, err: [] };
+            foes.forEach(function (f) {
+              var fam = f.key.split('_')[0];
+              r.fam[fam] = (r.fam[fam] || 0) + 1;
+            });
+            var dbg = window.ISLES.beastDebug();
+            r.animKeys = dbg.length;
+            var bad = [];
+            dbg.forEach(function (d) {
+              ['idle', 'walk', 'atk', 'dead'].forEach(function (a) {
+                if (!d.acts[a]) bad.push(d.key + ':' + a);
+              });
+              r.drawSizes = r.drawSizes || {};
+              r.drawSizes[d.key] = { src: d.draw.idle.src, out: d.draw.idle.out, ax: +(d.ax || 0).toFixed(3) };
+            });
+            if (bad.length) r.err.push('缺动作 ' + bad.join(','));
+            // 动作切换：循环动作由「追人」驱动，所以要把玩家放进仇恨圈里看它真的走起来
+            var f0 = foes[0];
+            var seen = [];
+            ['idle', 'atk', 'hurt', 'dead'].forEach(function (a) {
+              window.ISLES.setFoeAnim(0, a);
+              for (var i = 0; i < 6; i++) window.ISLES.tick(1 / 60);
+              seen.push(a + '=' + f0.anim);
+            });
+            // 站远处（脱离仇恨）应回 idle；进仇恨圈应切 walk/run
+            f0.animHold = 0; f0.anim = 'idle';
+            player.mx = f0.x + 12; player.my = f0.y;
+            sim(1.0);
+            seen.push('far=' + f0.anim);
+            player.mx = f0.x + 4; player.my = f0.y;
+            for (var i2 = 0; i2 < 30; i2++) window.ISLES.tick(1 / 60);
+            seen.push('near=' + f0.anim + '/' + (f0.animHold > 0 ? 'hold' : 'free'));
+            r.acts = seen.join(' ');
+            r.chaseSpeed = +f0.def_.mv.toFixed(1);
+            r.runThreshold = BEAST_RUN_MV;
+            // 跑得快的怪（mv ≥ 阈值）必须切到 run 动作 —— 挑一只快的单独验
+            var fast = null;
+            for (var fi = 0; fi < foes.length; fi++) if (foes[fi].def_.mv >= BEAST_RUN_MV) { fast = foes[fi]; break; }
+            if (fast) {
+              fast.animHold = 0;
+              player.mx = fast.x + 4; player.my = fast.y;
+              for (var i3 = 0; i3 < 30; i3++) window.ISLES.tick(1 / 60);
+              r.fastFoe = fast.key + ' mv=' + fast.def_.mv + ' anim=' + fast.anim;
+            }
+            // 循环动作的帧号必须随时间变（否则是张死图）
+            window.ISLES.setFoeAnim(0, 'walk');
+            var fr = [];
+            for (var t = 0; t < 6; t++) {
+              window.ISLES.tick(1 / 12);
+              fr.push(beastPiece(f0).sx);
+            }
+            r.walkFrames = fr.join(',');
+            r.walkVaries = fr.some(function (v) { return v !== fr[0]; });
+            r.animTAfter = +f0.animT.toFixed(2);
+            // 朝向翻转
+            f0.face = 'right'; var pr = beastPiece(f0);
+            f0.face = 'left'; var pl = beastPiece(f0);
+            r.flip = { right: !!pr.flip, left: !!pl.flip, sameRect: pr.sx === pl.sx && pr.w === pl.w };
+            // 击杀 -> 倒地 -> 消失 -> 复活
+            player.mx = f0.x; player.my = f0.y; player.dead = false; player.invuln = 3;
+            f0.animHold = 0;
+            f0.hp = 1;
+            attackNearest();
+            r.killedDying = f0.dying > 0;
+            sim(0.5);
+            r.midDeadAnim = f0.anim === 'dead' && f0.alive === true;
+            sim(1.0);
+            r.afterDead = f0.alive === false;
+            player.hp = player.maxhp;
+            sim(20);                      // 复活窗口 10~16 秒，跑满 20 秒才谈得上"没复活"
+            r.respawned = f0.alive === true && f0.dying === 0 && f0.hp === f0.maxhp;
+            r.playerHp = player.hp;
             var pb = document.getElementById('probe');
             if (!pb) { pb = document.createElement('div'); pb.id = 'probe'; pb.style.display = 'none'; document.body.appendChild(pb); }
             pb.textContent = JSON.stringify(r);
@@ -830,10 +950,12 @@
     var hintEl = document.getElementById('hint');
     if (silent) hintEl.textContent = '踩上青色光门即可切换地图';
     else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试攻击（J 攻击A / K 重击B / 1~6 试动作）';
+    else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔、游方、蛇妖三族共 ' + LINGQUAN_SPAWNS.length + ' 只（J/K 出手，Shift 奔跑，1~6 试动作）';
     else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
-    // 只有碑林石阵刷妖兽（猎场）；青玄山门刷训练靶（调试场）；其它图清空战斗状态，避免切回去还残留怪物
-    if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：真猎场
+    // 只有碑林石阵刷妖兽（猎场）；青玄山门刷训练靶（调试场）；灵泉灵瀑刷三族怪物；其它图清空战斗状态
+    if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：老猎场
     else if (CUR.id === 'qingxuan') { foes = makeFoes(QINGXUAN_SPAWNS); }  // 青玄山门：调试场
+    else if (CUR.id === 'lingquan') { foes = makeFoes(LINGQUAN_SPAWNS); }  // 灵泉灵瀑：三族怪物
     else { foes = []; floaters = []; particles = []; player.targetFoe = null; }
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
@@ -1089,7 +1211,9 @@
         def_: d, key: d.key, name: d.name,
         x: cell.x, y: cell.y, home: cell,
         hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, exp: d.exp, stones: d.stones,
-        face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0
+        face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0,
+        // —— 动作状态机（侧视多动作素材用；老等距妖兽没有 anims，这些字段空转不影响）——
+        anim: 'idle', animT: 0, animHold: 0, dying: 0
       };
     });
   }
@@ -1132,7 +1256,7 @@
     var real = Math.max(1, Math.round(player.atk - best.def));
     best.hp -= real; best.flash = 0.22;
     addFloater(best.x, best.y - 0.3, '-' + real, '#ffd36b');
-    if (best.hp <= 0) killFoe(best);
+    if (best.hp <= 0) killFoe(best); else hurtFoe(best);
   }
   // 玩家主动出手（J/空格/点击妖兽）：锁定仇恨内最近的妖兽并打一下
   function attackNearest() {
@@ -1181,7 +1305,7 @@
         if (couldStand(g.x + dx / dd * 0.3, g.y)) g.x += dx / dd * 0.3;
         if (couldStand(g.x, g.y + dy / dd * 0.3)) g.y += dy / dd * 0.3;
       }
-      if (g.hp <= 0) killFoe(g);
+      if (g.hp <= 0) killFoe(g); else hurtFoe(g);
     }
     toast('重击命中 ' + hit.length + ' 只（冷却 ' + ATK_B_CD + ' 秒）');
     if (h0) h0.textContent = '重击命中 ' + hit.length + ' 只，' + ATK_B_CD + ' 秒后可再放';
@@ -1203,18 +1327,35 @@
       addFloater(f.x, f.y - 0.4, '靶子已重置', '#8bf3ff');
       return;
     }
-    f.alive = false; f.hp = 0;
+    if (f.dying > 0) return;            // 已经在倒地过程中，别重复结算
+    f.hp = 0;
     player.exp += f.exp;
     var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
     player.stones += st;
     addFloater(f.x, f.y - 0.4, '+' + st + ' 灵石', '#8bf3ff');
     spawnParticles(f.x, f.y);
     if (player.targetFoe === f) player.targetFoe = null;
-    f.respawn = 10 + Math.random() * 6;   // 一段时间后原地复活，打怪场常驻
+    // 有倒地素材就播倒地（新怪物包取自 Dead.png，老妖兽用图集里的 _death_N 帧），
+    // 播完由 updateFoes 收尾（置 alive=false 并排队复活）。没有素材才直接消失。
+    var hasDeadAnim = (ATLAS.foes.anim && ATLAS.foes.anim[f.key] && ATLAS.foes.anim[f.key].acts.dead);
+    var hasDeadRect = ATLAS.foes.rect && ATLAS.foes.rect[f.key + '_death_0'];
+    if (hasDeadAnim || hasDeadRect) {
+      f.dying = BEAST_DUR.dead;
+      if (hasDeadAnim) { f.anim = 'dead'; f.animT = 0; f.animHold = 0; }
+    } else {
+      f.alive = false;
+      f.respawn = 10 + Math.random() * 6;   // 一段时间后原地复活，打怪场常驻
+    }
+  }
+  /** 挨打时的受击反馈：有 hurt 动作就播一下（0.3 秒内不可被移动状态改写） */
+  function hurtFoe(f) {
+    if (f.dying > 0) return;
+    if (ATLAS.foes.anim && ATLAS.foes.anim[f.key]) setBeastAnim(f, 'hurt');
   }
   function respawnFoe(f) {
     var s = snapWalkable(CUR, f.home.x, f.home.y);
     f.x = s.x; f.y = s.y; f.hp = f.maxhp; f.alive = true; f.flash = 0; f.atkCd = 0;
+    f.dying = 0; f.anim = 'idle'; f.animT = 0; f.animHold = 0;
   }
   // 把玩家沿「背离凶手」方向推开，最多 tiles 格（每步 0.34 格，遇实体即停）。
   // 旧版这里直接把玩家瞬移回出生点 —— 玩家体感是「被击飞一下到了别的地方」，
@@ -1248,25 +1389,48 @@
   function updateFoes(dt) {
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i];
+      f.animT += dt;                                        // 动作计时（各状态共用）
+      if (f.animHold > 0) f.animHold = Math.max(0, f.animHold - dt);
+      // ?foeact=atk&i=0 —— 把第 i 只怪锁在某个动作的中段，供逐个动作截图核对
+      if (foePose && foes[foePose.i] === f) {
+        f.anim = foePose.act;
+        f.animT = (BEAST_DUR[foePose.act] || 0) * foePose.k;
+        f.animHold = 1; f.dying = foePose.act === 'dead' ? BEAST_DUR.dead : 0;
+        f.hp = f.maxhp; f.alive = true;
+        continue;
+      }
       if (!f.alive) { f.respawn -= dt; if (f.respawn <= 0) respawnFoe(f); continue; }
+      if (f.dying > 0) {                                    // 倒地中：把动作播完再消失
+        f.dying -= dt;
+        if (f.dying <= 0) { f.dying = 0; f.alive = false; f.respawn = 10 + Math.random() * 6; }
+        continue;
+      }
       if (f.flash > 0) f.flash = Math.max(0, f.flash - dt);
       if (f.atkAnim > 0) f.atkAnim = Math.max(0, f.atkAnim - dt);
-      if (f.def_.dummy) continue;        // 训练靶：不追、不打、不移动，站着挨揍
+      if (f.def_.dummy) { setBeastAnim(f, 'idle'); continue; }   // 训练靶：不追、不打、不移动
       var dx = player.mx - f.x, dy = player.my - f.y, dist = Math.hypot(dx, dy);
       f.atkCd -= dt;
+      var moving = false;
       if (dist < AGGRO && !player.dead) {
         var sp = f.def_.mv * dt, ux = dx / (dist || 1), uy = dy / (dist || 1);
-        if (couldStand(f.x + ux * sp, f.y)) f.x += ux * sp;
-        if (couldStand(f.x, f.y + uy * sp)) f.y += uy * sp;
+        if (couldStand(f.x + ux * sp, f.y)) { f.x += ux * sp; moving = true; }
+        if (couldStand(f.x, f.y + uy * sp)) { f.y += uy * sp; moving = true; }
         f.face = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
         // 复活/被击退后的无敌窗口内不结算伤害，否则刚站起来就被连击再倒
         if (dist < MELEE + 0.15 && f.atkCd <= 0 && player.invuln <= 0) {
           f.atkCd = 1.0; f.atkAnim = 0.32;
+          // 精英偶尔放重招（atk2），普通怪只有普通攻击
+          setBeastAnim(f, (f.def_.elite && Math.random() < 0.35) ? 'atk2' : 'atk');
           var real = Math.max(1, Math.round(f.atk - player.def * 0.5));
           player.hp -= real; player.flash = 0.25;
           addFloater(player.mx, player.my - 0.35, '-' + real, '#ff6b6b');
           if (player.hp <= 0) playerDown(f);
         }
+      }
+      // 动作切换只在这几种情形下发生：受击/攻击的锁定期结束后才允许被移动状态改写
+      if (f.animHold <= 0) {
+        if (moving) setBeastAnim(f, f.def_.mv >= BEAST_RUN_MV ? 'run' : 'walk');
+        else setBeastAnim(f, 'idle');
       }
     }
   }
@@ -1285,6 +1449,16 @@
   // 这样即便盲切方向偶有错位，妖兽也至少能显示出来而不会整只消失。
   function foeFrameKey(f) {
     var base = f.key, rect = ATLAS.foes.rect || {};
+    // 倒地：老图集里其实带了 golem/wraith/assassin 的 death_0..2 三帧，从前一直没人读 ——
+    // 顺手接上，让老妖兽也有倒地过程，而不是血一空就"啵"地消失。
+    if (f.dying > 0) {
+      var total = BEAST_DUR.dead, k = 1 - Math.max(0, f.dying) / total;
+      for (var j = 2; j >= 0; j--) {
+        var kd = base + '_death_' + j;
+        if (rect[kd] && k >= j / 3) return kd;
+      }
+      if (rect[base + '_death_0']) return base + '_death_0';
+    }
     if (f.atkAnim > 0) {
       var ka = base + '_attack_' + f.face;
       if (rect[ka]) return ka;
@@ -1295,9 +1469,56 @@
     for (var i = 0; i < keys.length; i++) if (keys[i].indexOf(base + '_') === 0) return keys[i];
     return base;
   }
+  /** 侧视怪物的取帧：循环动作（idle/walk/run）按 fps 走，一次性动作按播放进度走、停在末帧。
+   *  返回的对象比 foePiece 多两个字段：ax（锚点在帧内的归一化横坐标）与 flip（是否水平镜像）。
+   *  为什么要有 ax：引擎从前按「帧宽居中」摆怪，但侧视包的画手会把角色画在格子偏左/偏右，
+   *  逐帧也不一致；构建脚本已把全动作统一平移过一次，并把真实锚点比例写进图集，这里直接用。 */
+  function beastPiece(f) {
+    var a = ATLAS.foes.anim && ATLAS.foes.anim[f.key];
+    if (!a || !a.acts) return null;
+    var act = f.anim || 'idle';
+    if (!a.acts[act]) act = BEAST_FALLBACK[act] || 'idle';
+    if (!a.acts[act]) act = 'idle';
+    var arr = a.acts[act];
+    if (!arr || !arr.length) return null;
+    var i;
+    if (act === 'atk' || act === 'atk2' || act === 'hurt' || act === 'dead') {
+      var dur = BEAST_DUR[act] || 0.4;
+      var k = Math.max(0, Math.min(0.999, f.animT / dur));
+      i = Math.min(arr.length - 1, Math.floor(k * arr.length));
+    } else {
+      var fps = (a.fps && a.fps[act]) || 8;
+      i = Math.floor(f.animT * fps) % arr.length;
+    }
+    var r = arr[i];
+    return { img: ATLAS.foes.img, sx: r[0], sy: r[1], w: r[2], h: r[3],
+      ax: (a.ax != null ? a.ax : 0.5), flip: (f.face === 'left' || f.face === 'up') };
+  }
+  /** 切怪物动作；同一个动作重复调用不重置计时（否则 idle 会永远卡在第 0 帧） */
+  function setBeastAnim(f, act) {
+    if (f.anim === act) return;
+    f.anim = act; f.animT = 0;
+    f.animHold = BEAST_DUR[act] || 0;
+  }
+  /** 贴一帧怪到屏幕上。flip=true 时以屏幕 x=px 为镜像轴 —— 侧视素材只有朝右一版，
+   *  朝左只能镜像；横坐标要按锚点比例反着算，否则翻面后角色会整体偏左半个身位。 */
+  function blitFoe(pz, px, ax, dy, ow, oh, flip, alpha, lighter) {
+    ctx.save();
+    if (alpha != null && alpha < 1) ctx.globalAlpha = Math.max(0, alpha);
+    if (lighter) ctx.globalCompositeOperation = 'lighter';
+    if (flip) {
+      ctx.translate(px, 0); ctx.scale(-1, 1);
+      ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, -ow * ax, dy, ow, oh);
+    } else {
+      ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(px - ow * ax), dy, ow, oh);
+    }
+    ctx.restore();
+  }
   function drawFoe(f) {
-    if (!f.alive) return;
-    var pz = foePiece(foeFrameKey(f));
+    if (!f.alive && f.dying <= 0) return;
+    var bp = beastPiece(f);
+    var pz = bp || foePiece(foeFrameKey(f));
+    var ax = bp ? bp.ax : 0.5, flip = bp ? bp.flip : false;
     var p = isoToScreen(f.x, f.y);
     var baseY = p.y + HH * Z;
     ctx.save();
@@ -1307,25 +1528,23 @@
     ctx.restore();
     if (!pz) return;
     // 按「目标身高」归一化：图集各帧原始像素尺寸差很大（如石魔 idle 帧 348px 宽），
-    // 直接 1:1 画会忽大忽小、且整只偏大。这里统一缩放到 fh，再以脚底居中。
+    // 直接 1:1 画会忽大忽小、且整只偏大。这里统一缩放到 fh，再以脚底 + 锚点对齐格子中心。
     var th = f.def_.fh || 110;
     var k = th / pz.h;
     var ow = pz.w * k * Z, oh = th * Z;
-    var dx = p.x - ow / 2, dy = baseY - oh;
+    var dy = Math.round(baseY - oh);
+    var alpha = f.dying > 0 ? Math.min(1, f.dying / 0.4) : 1;   // 倒地末段淡出，接续原地复活
     var sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(dx), Math.round(dy), Math.round(ow), Math.round(oh));
+    blitFoe(pz, p.x, ax, dy, ow, oh, flip, alpha, false);
     if (f.flash > 0) {  // 受击闪白（lighter 只叠加在精灵像素上，透明处不显）
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = Math.min(0.9, f.flash * 4);
-      ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(dx), Math.round(dy), Math.round(ow), Math.round(oh));
-      ctx.restore();
+      blitFoe(pz, p.x, ax, dy, ow, oh, flip, Math.min(0.9, f.flash * 4) * alpha, true);
     }
     ctx.imageSmoothingEnabled = sm;
     if (f.def_.boss || f.def_.elite) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = f.def_.boss ? 'rgba(255,90,90,.7)' : 'rgba(255,200,90,.6)';
       ctx.lineWidth = 2 * Z;
-      ctx.beginPath(); ctx.ellipse(p.x, baseY - oh * 0.5, ow * 0.5, oh * 0.32, 0, 0, 6.2832); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(p.x, baseY - oh * 0.5, ow * 0.35, oh * 0.32, 0, 0, 6.2832); ctx.stroke();
       ctx.restore();
     }
     var dist = Math.hypot(f.x - player.mx, f.y - player.my);
@@ -1586,9 +1805,35 @@
     },
     foeInfo: function () {
       return foes.map(function (f) {
-        return { name: f.name, x: +f.x.toFixed(1), y: +f.y.toFixed(1), hp: f.hp,
-          dummy: !!f.def_.dummy, alive: f.alive };
+        return { name: f.name, key: f.key, x: +f.x.toFixed(1), y: +f.y.toFixed(1), hp: f.hp,
+          anim: f.anim, animT: +f.animT.toFixed(2), dying: +f.dying.toFixed(2),
+          side: !!f.def_.side, fh: f.def_.fh, dummy: !!f.def_.dummy, alive: f.alive };
       });
+    },
+    /** 逐 (怪 × 动作 × 帧) 解析帧并算出生效绘制尺寸 —— 供 headless 校验新怪物图集 */
+    beastDebug: function () {
+      var out = [];
+      var anim = ATLAS.foes.anim || {};
+      Object.keys(anim).forEach(function (k) {
+        var a = anim[k], fh = (FOE_DEFS[k] || {}).fh || 100;
+        var row = { key: k, cn: a.cn, ax: a.ax, box: a.box, fh: fh, acts: {}, draw: {} };
+        Object.keys(a.acts).forEach(function (act) {
+          var arr = a.acts[act];
+          row.acts[act] = arr.length;
+          var r = arr[0];
+          row.draw[act] = { src: [r[2], r[3]], out: [Math.round(r[2] * fh / r[3]), fh] };
+        });
+        out.push(row);
+      });
+      return out;
+    },
+    /** 把某只怪强行切到指定动作，用于截图核对每个动作的姿态 */
+    setFoeAnim: function (i, act) {
+      var f = foes[i]; if (!f) return null;
+      f.anim = act; f.animT = 0; f.animHold = 0;
+      f.animHold = (BEAST_DUR[act] || 0) > 0 ? BEAST_DUR[act] : 0;
+      f.animT = (BEAST_DUR[act] || 0) * 0.45;    // 停在动作中段，看得出挥击/倒地
+      return f.key + ':' + act;
     },
     /** 逐 (怪 × 状态 × 朝向) 解析帧并算出生效绘制尺寸，供 headless 校验图集与归一化 */
     foeDebug: function () {

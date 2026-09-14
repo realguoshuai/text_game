@@ -1,0 +1,542 @@
+{
+ "_spec": "由 test/tools/build_beasts_atlas.py 从 test/tools/beast_packs.json 生成，勿手改。",
+ "atlas": "foes_atlas.png",
+ "keys": [
+  "minotaur_a",
+  "minotaur_b",
+  "minotaur_c",
+  "ronin_a",
+  "ronin_b",
+  "ronin_c",
+  "gorgon_a",
+  "gorgon_b",
+  "gorgon_c"
+ ],
+ "monsters": [
+  {
+   "pack": "craftpix-minotaur",
+   "src": "Minotaur_1",
+   "key": "minotaur_a",
+   "cn": "牛魔·褐角",
+   "dir": "sucai/怪物",
+   "license": "CraftPix free asset (Minotaur pack)",
+   "fh": 117,
+   "bodyH": 91,
+   "hp": 120,
+   "atk": 15,
+   "def": 9,
+   "exp": 30,
+   "stones": [
+    7,
+    14
+   ],
+   "mv": 1.9,
+   "elite": false,
+   "spawn": [
+    12,
+    13
+   ],
+   "ax": 0.4779,
+   "box": [
+    -1,
+    33,
+    136,
+    95
+   ],
+   "contentH": 94,
+   "contentCX": 58.5,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "atk": 5,
+    "hurt": 2,
+    "dead": 4
+   },
+   "srcActs": {
+    "idle": 10,
+    "walk": 12,
+    "atk": 5,
+    "hurt": 3,
+    "dead": 5
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "atk": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-minotaur",
+   "src": "Minotaur_2",
+   "key": "minotaur_b",
+   "cn": "牛魔·灰角",
+   "dir": "sucai/怪物",
+   "license": "CraftPix free asset (Minotaur pack)",
+   "fh": 113,
+   "bodyH": 87,
+   "hp": 96,
+   "atk": 13,
+   "def": 7,
+   "exp": 24,
+   "stones": [
+    6,
+    12
+   ],
+   "mv": 2.3,
+   "elite": false,
+   "spawn": [
+    25,
+    21
+   ],
+   "ax": 0.4514,
+   "box": [
+    -1,
+    32,
+    144,
+    96
+   ],
+   "contentH": 95,
+   "contentCX": 47.5,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "atk": 5,
+    "hurt": 2,
+    "dead": 5
+   },
+   "srcActs": {
+    "idle": 10,
+    "walk": 12,
+    "atk": 5,
+    "hurt": 3,
+    "dead": 5
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "atk": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-minotaur",
+   "src": "Minotaur_3",
+   "key": "minotaur_c",
+   "cn": "牛魔·玄角",
+   "dir": "sucai/怪物",
+   "license": "CraftPix free asset (Minotaur pack)",
+   "fh": 114,
+   "bodyH": 93,
+   "hp": 175,
+   "atk": 19,
+   "def": 12,
+   "exp": 48,
+   "stones": [
+    12,
+    22
+   ],
+   "mv": 1.7,
+   "elite": true,
+   "spawn": [
+    20,
+    27
+   ],
+   "ax": 0.4962,
+   "box": [
+    -1,
+    33,
+    131,
+    95
+   ],
+   "contentH": 94,
+   "contentCX": 64.0,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "atk": 4,
+    "atk2": 4,
+    "hurt": 2,
+    "dead": 4
+   },
+   "srcActs": {
+    "idle": 10,
+    "walk": 12,
+    "atk": 4,
+    "atk2": 4,
+    "hurt": 3,
+    "dead": 5
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-humanoid",
+   "src": "Samurai",
+   "key": "ronin_a",
+   "cn": "游方刀客",
+   "dir": "sucai/人形怪",
+   "license": "CraftPix free asset (Samurai pack)",
+   "fh": 140,
+   "bodyH": 69,
+   "hp": 62,
+   "atk": 14,
+   "def": 6,
+   "exp": 16,
+   "stones": [
+    4,
+    9
+   ],
+   "mv": 3.0,
+   "elite": false,
+   "spawn": [
+    7,
+    15
+   ],
+   "ax": 0.3892,
+   "box": [
+    -1,
+    23,
+    167,
+    105
+   ],
+   "contentH": 104,
+   "contentCX": 28.0,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "run": 7,
+    "atk": 4,
+    "atk2": 5,
+    "hurt": 2,
+    "dead": 4
+   },
+   "srcActs": {
+    "idle": 6,
+    "walk": 9,
+    "run": 8,
+    "atk": 4,
+    "atk2": 5,
+    "hurt": 3,
+    "dead": 6
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-humanoid",
+   "src": "Samurai_Archer",
+   "key": "ronin_b",
+   "cn": "游方弓手",
+   "dir": "sucai/人形怪",
+   "license": "CraftPix free asset (Samurai pack)",
+   "fh": 146,
+   "bodyH": 70,
+   "hp": 70,
+   "atk": 17,
+   "def": 5,
+   "exp": 20,
+   "stones": [
+    5,
+    11
+   ],
+   "mv": 2.4,
+   "elite": false,
+   "spawn": [
+    28,
+    17
+   ],
+   "ax": 0.4779,
+   "box": [
+    -1,
+    12,
+    136,
+    116
+   ],
+   "contentH": 115,
+   "contentCX": 57.5,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "run": 7,
+    "atk": 6,
+    "atk2": 6,
+    "hurt": 2,
+    "dead": 4
+   },
+   "srcActs": {
+    "idle": 9,
+    "walk": 8,
+    "run": 8,
+    "atk": 14,
+    "atk2": 6,
+    "hurt": 3,
+    "dead": 5
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-humanoid",
+   "src": "Samurai_Commander",
+   "key": "ronin_c",
+   "cn": "游方统领",
+   "dir": "sucai/人形怪",
+   "license": "CraftPix free asset (Samurai pack)",
+   "fh": 125,
+   "bodyH": 94,
+   "hp": 150,
+   "atk": 20,
+   "def": 11,
+   "exp": 44,
+   "stones": [
+    11,
+    20
+   ],
+   "mv": 2.2,
+   "elite": true,
+   "spawn": [
+    26,
+    26
+   ],
+   "ax": 0.4887,
+   "box": [
+    -1,
+    23,
+    133,
+    105
+   ],
+   "contentH": 104,
+   "contentCX": 55.0,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "run": 7,
+    "atk": 4,
+    "atk2": 5,
+    "hurt": 2,
+    "dead": 4
+   },
+   "srcActs": {
+    "idle": 5,
+    "walk": 9,
+    "run": 8,
+    "atk": 4,
+    "atk2": 5,
+    "hurt": 2,
+    "dead": 6
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-gorgon",
+   "src": "Gorgon_1",
+   "key": "gorgon_a",
+   "cn": "蛇妖·碧鳞",
+   "dir": "sucai/蛇妖",
+   "license": "CraftPix free asset (Gorgon pack)",
+   "fh": 111,
+   "bodyH": 85,
+   "hp": 88,
+   "atk": 16,
+   "def": 8,
+   "exp": 26,
+   "stones": [
+    6,
+    13
+   ],
+   "mv": 2.5,
+   "elite": false,
+   "spawn": [
+    8,
+    20
+   ],
+   "ax": 0.4545,
+   "box": [
+    -1,
+    34,
+    143,
+    94
+   ],
+   "contentH": 93,
+   "contentCX": 51.5,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "run": 7,
+    "atk": 6,
+    "atk2": 5,
+    "hurt": 2,
+    "dead": 3
+   },
+   "srcActs": {
+    "idle": 7,
+    "walk": 13,
+    "run": 7,
+    "atk": 7,
+    "atk2": 5,
+    "hurt": 3,
+    "dead": 3
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-gorgon",
+   "src": "Gorgon_2",
+   "key": "gorgon_b",
+   "cn": "蛇妖·紫鳞",
+   "dir": "sucai/蛇妖",
+   "license": "CraftPix free asset (Gorgon pack)",
+   "fh": 111,
+   "bodyH": 85,
+   "hp": 82,
+   "atk": 18,
+   "def": 7,
+   "exp": 26,
+   "stones": [
+    6,
+    13
+   ],
+   "mv": 2.8,
+   "elite": false,
+   "spawn": [
+    24,
+    20
+   ],
+   "ax": 0.4962,
+   "box": [
+    -1,
+    34,
+    131,
+    94
+   ],
+   "contentH": 93,
+   "contentCX": 64.5,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "run": 7,
+    "atk": 6,
+    "atk2": 5,
+    "hurt": 2,
+    "dead": 3
+   },
+   "srcActs": {
+    "idle": 7,
+    "walk": 13,
+    "run": 7,
+    "atk": 7,
+    "atk2": 5,
+    "hurt": 3,
+    "dead": 3
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-gorgon",
+   "src": "Gorgon_3",
+   "key": "gorgon_c",
+   "cn": "蛇妖·银鳞",
+   "dir": "sucai/蛇妖",
+   "license": "CraftPix free asset (Gorgon pack)",
+   "fh": 130,
+   "bodyH": 85,
+   "hp": 165,
+   "atk": 21,
+   "def": 13,
+   "exp": 50,
+   "stones": [
+    13,
+    24
+   ],
+   "mv": 2.1,
+   "elite": true,
+   "spawn": [
+    23,
+    9
+   ],
+   "ax": 0.4676,
+   "box": [
+    -1,
+    34,
+    139,
+    94
+   ],
+   "contentH": 93,
+   "contentCX": 55.5,
+   "acts": {
+    "idle": 5,
+    "walk": 7,
+    "run": 7,
+    "atk": 6,
+    "atk2": 5,
+    "hurt": 2,
+    "dead": 3
+   },
+   "srcActs": {
+    "idle": 7,
+    "walk": 13,
+    "run": 7,
+    "atk": 7,
+    "atk2": 5,
+    "hurt": 3,
+    "dead": 3
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  }
+ ]
+}
