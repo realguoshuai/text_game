@@ -1,0 +1,1130 @@
+{
+ "count": 55,
+ "pieces": [
+  {
+   "file": "prop_031_33x102.png",
+   "w": 33,
+   "h": 102,
+   "area": 1524,
+   "fill": 0.45,
+   "aspect": 0.32,
+   "shape": "tall",
+   "use": "building",
+   "primary": "blue",
+   "families": {
+    "blue": 0.22
+   },
+   "top_rgb": [
+    104,
+    104,
+    156
+   ]
+  },
+  {
+   "file": "prop_044_95x40.png",
+   "w": 95,
+   "h": 40,
+   "area": 529,
+   "fill": 0.14,
+   "aspect": 2.38,
+   "shape": "flat_wide",
+   "use": "building",
+   "primary": "blue",
+   "families": {
+    "blue": 0.65
+   },
+   "top_rgb": [
+    156,
+    182,
+    208
+   ]
+  },
+  {
+   "file": "deco_037_42x28.png",
+   "w": 42,
+   "h": 28,
+   "area": 914,
+   "fill": 0.78,
+   "aspect": 1.5,
+   "shape": "iso_flat",
+   "use": "deco",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.21,
+    "pale_yellow": 0.13,
+    "other": 0.07
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "deco_041_28x39.png",
+   "w": 28,
+   "h": 39,
+   "area": 777,
+   "fill": 0.71,
+   "aspect": 0.72,
+   "shape": "tall",
+   "use": "deco",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.27,
+    "stone": 0.2
+   },
+   "top_rgb": [
+    104,
+    104,
+    104
+   ]
+  },
+  {
+   "file": "prop_042_45x35.png",
+   "w": 45,
+   "h": 35,
+   "area": 685,
+   "fill": 0.43,
+   "aspect": 1.29,
+   "shape": "iso_flat",
+   "use": "deco",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.43,
+    "blue": 0.09
+   },
+   "top_rgb": [
+    104,
+    104,
+    104
+   ]
+  },
+  {
+   "file": "deco_046_25x23.png",
+   "w": 25,
+   "h": 23,
+   "area": 438,
+   "fill": 0.76,
+   "aspect": 1.09,
+   "shape": "square",
+   "use": "deco",
+   "primary": "pale_yellow",
+   "families": {
+    "pale_yellow": 0.19,
+    "darkstone": 0.15,
+    "other": 0.08
+   },
+   "top_rgb": [
+    156,
+    156,
+    130
+   ]
+  },
+  {
+   "file": "deco_048_12x43.png",
+   "w": 12,
+   "h": 43,
+   "area": 406,
+   "fill": 0.79,
+   "aspect": 0.28,
+   "shape": "tall",
+   "use": "deco",
+   "primary": "lightstone",
+   "families": {
+    "lightstone": 1.0
+   },
+   "top_rgb": [
+    234,
+    234,
+    234
+   ]
+  },
+  {
+   "file": "deco_049_36x17.png",
+   "w": 36,
+   "h": 17,
+   "area": 395,
+   "fill": 0.65,
+   "aspect": 2.12,
+   "shape": "flat_wide",
+   "use": "deco",
+   "primary": "dark",
+   "families": {
+    "dark": 0.13,
+    "other": 0.11
+   },
+   "top_rgb": [
+    52,
+    52,
+    26
+   ]
+  },
+  {
+   "file": "deco_050_20x21.png",
+   "w": 20,
+   "h": 21,
+   "area": 341,
+   "fill": 0.81,
+   "aspect": 0.95,
+   "shape": "square",
+   "use": "deco",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.33,
+    "dark": 0.07,
+    "other": 0.07
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "building_007_141x136.png",
+   "w": 141,
+   "h": 136,
+   "area": 7756,
+   "fill": 0.4,
+   "aspect": 1.04,
+   "shape": "square",
+   "use": "foliage",
+   "primary": "green",
+   "families": {
+    "green": 0.18,
+    "dark": 0.15
+   },
+   "top_rgb": [
+    78,
+    130,
+    78
+   ]
+  },
+  {
+   "file": "building_010_120x106.png",
+   "w": 120,
+   "h": 106,
+   "area": 6703,
+   "fill": 0.53,
+   "aspect": 1.13,
+   "shape": "square",
+   "use": "foliage",
+   "primary": "green",
+   "families": {
+    "green": 0.17,
+    "darkstone": 0.12
+   },
+   "top_rgb": [
+    104,
+    156,
+    78
+   ]
+  },
+  {
+   "file": "prop_025_77x58.png",
+   "w": 77,
+   "h": 58,
+   "area": 3096,
+   "fill": 0.69,
+   "aspect": 1.33,
+   "shape": "iso_flat",
+   "use": "foliage",
+   "primary": "green",
+   "families": {
+    "green": 0.35,
+    "dark": 0.05
+   },
+   "top_rgb": [
+    104,
+    156,
+    78
+   ]
+  },
+  {
+   "file": "deco_034_44x43.png",
+   "w": 44,
+   "h": 43,
+   "area": 1408,
+   "fill": 0.74,
+   "aspect": 1.02,
+   "shape": "square",
+   "use": "foliage",
+   "primary": "green",
+   "families": {
+    "green": 0.09,
+    "dark": 0.06,
+    "other": 0.05
+   },
+   "top_rgb": [
+    104,
+    156,
+    78
+   ]
+  },
+  {
+   "file": "building_012_120x77.png",
+   "w": 120,
+   "h": 77,
+   "area": 5796,
+   "fill": 0.63,
+   "aspect": 1.56,
+   "shape": "iso_flat",
+   "use": "ground_tile",
+   "primary": "green",
+   "families": {
+    "green": 0.3,
+    "darkstone": 0.08
+   },
+   "top_rgb": [
+    156,
+    182,
+    78
+   ]
+  },
+  {
+   "file": "building_014_119x77.png",
+   "w": 119,
+   "h": 77,
+   "area": 5533,
+   "fill": 0.6,
+   "aspect": 1.55,
+   "shape": "iso_flat",
+   "use": "ground_tile",
+   "primary": "other",
+   "families": {
+    "other": 0.12,
+    "pale_yellow": 0.1,
+    "darkstone": 0.06
+   },
+   "top_rgb": [
+    182,
+    182,
+    156
+   ]
+  },
+  {
+   "file": "building_015_119x75.png",
+   "w": 119,
+   "h": 75,
+   "area": 5433,
+   "fill": 0.61,
+   "aspect": 1.59,
+   "shape": "iso_flat",
+   "use": "ground_tile",
+   "primary": "green",
+   "families": {
+    "green": 0.59,
+    "darkstone": 0.12
+   },
+   "top_rgb": [
+    104,
+    156,
+    78
+   ]
+  },
+  {
+   "file": "building_016_119x76.png",
+   "w": 119,
+   "h": 76,
+   "area": 5431,
+   "fill": 0.6,
+   "aspect": 1.57,
+   "shape": "iso_flat",
+   "use": "ground_tile",
+   "primary": "blue",
+   "families": {
+    "blue": 0.34,
+    "other": 0.04
+   },
+   "top_rgb": [
+    52,
+    208,
+    208
+   ]
+  },
+  {
+   "file": "building_017_118x75.png",
+   "w": 118,
+   "h": 75,
+   "area": 5343,
+   "fill": 0.6,
+   "aspect": 1.57,
+   "shape": "iso_flat",
+   "use": "ground_tile",
+   "primary": "blue",
+   "families": {
+    "blue": 0.34,
+    "darkstone": 0.06
+   },
+   "top_rgb": [
+    52,
+    208,
+    208
+   ]
+  },
+  {
+   "file": "building_018_115x73.png",
+   "w": 115,
+   "h": 73,
+   "area": 5114,
+   "fill": 0.61,
+   "aspect": 1.58,
+   "shape": "iso_flat",
+   "use": "ground_tile",
+   "primary": "other",
+   "families": {
+    "other": 0.29,
+    "stone": 0.19,
+    "darkstone": 0.1
+   },
+   "top_rgb": [
+    182,
+    182,
+    156
+   ]
+  },
+  {
+   "file": "building_021_112x88.png",
+   "w": 112,
+   "h": 88,
+   "area": 4548,
+   "fill": 0.46,
+   "aspect": 1.27,
+   "shape": "iso_flat",
+   "use": "ground_tile",
+   "primary": "other",
+   "families": {
+    "other": 0.14,
+    "stone": 0.13,
+    "darkstone": 0.06
+   },
+   "top_rgb": [
+    182,
+    182,
+    156
+   ]
+  },
+  {
+   "file": "building_013_77x122.png",
+   "w": 77,
+   "h": 122,
+   "area": 5743,
+   "fill": 0.61,
+   "aspect": 0.63,
+   "shape": "tall",
+   "use": "prop",
+   "primary": "green",
+   "families": {
+    "green": 0.28,
+    "stone": 0.15,
+    "darkstone": 0.13
+   },
+   "top_rgb": [
+    130,
+    156,
+    130
+   ]
+  },
+  {
+   "file": "prop_019_91x98.png",
+   "w": 91,
+   "h": 98,
+   "area": 4993,
+   "fill": 0.56,
+   "aspect": 0.93,
+   "shape": "square",
+   "use": "prop",
+   "primary": "other",
+   "families": {
+    "other": 0.07,
+    "darkstone": 0.05,
+    "blue": 0.05
+   },
+   "top_rgb": [
+    182,
+    182,
+    156
+   ]
+  },
+  {
+   "file": "prop_022_88x88.png",
+   "w": 88,
+   "h": 88,
+   "area": 4417,
+   "fill": 0.57,
+   "aspect": 1.0,
+   "shape": "square",
+   "use": "prop",
+   "primary": "other",
+   "families": {
+    "other": 0.25,
+    "darkstone": 0.11,
+    "blue": 0.04
+   },
+   "top_rgb": [
+    182,
+    182,
+    156
+   ]
+  },
+  {
+   "file": "prop_024_78x58.png",
+   "w": 78,
+   "h": 58,
+   "area": 3321,
+   "fill": 0.73,
+   "aspect": 1.34,
+   "shape": "iso_flat",
+   "use": "prop",
+   "primary": "pale_yellow",
+   "families": {
+    "pale_yellow": 0.25,
+    "darkstone": 0.1,
+    "other": 0.06
+   },
+   "top_rgb": [
+    156,
+    156,
+    130
+   ]
+  },
+  {
+   "file": "prop_027_91x55.png",
+   "w": 91,
+   "h": 55,
+   "area": 2713,
+   "fill": 0.54,
+   "aspect": 1.65,
+   "shape": "iso_flat",
+   "use": "prop",
+   "primary": "blue",
+   "families": {
+    "blue": 0.24,
+    "green": 0.21
+   },
+   "top_rgb": [
+    52,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "prop_028_37x95.png",
+   "w": 37,
+   "h": 95,
+   "area": 2007,
+   "fill": 0.57,
+   "aspect": 0.39,
+   "shape": "tall",
+   "use": "prop",
+   "primary": "dark",
+   "families": {
+    "dark": 0.07,
+    "red": 0.04,
+    "wood": 0.04
+   },
+   "top_rgb": [
+    156,
+    52,
+    26
+   ]
+  },
+  {
+   "file": "prop_029_77x66.png",
+   "w": 77,
+   "h": 66,
+   "area": 1941,
+   "fill": 0.38,
+   "aspect": 1.17,
+   "shape": "square",
+   "use": "prop",
+   "primary": "other",
+   "families": {
+    "other": 0.15,
+    "dark": 0.05
+   },
+   "top_rgb": [
+    104,
+    52,
+    52
+   ]
+  },
+  {
+   "file": "prop_030_80x59.png",
+   "w": 80,
+   "h": 59,
+   "area": 1614,
+   "fill": 0.34,
+   "aspect": 1.36,
+   "shape": "iso_flat",
+   "use": "prop",
+   "primary": "blue",
+   "families": {
+    "blue": 0.16,
+    "dark": 0.04
+   },
+   "top_rgb": [
+    156,
+    208,
+    234
+   ]
+  },
+  {
+   "file": "prop_032_61x62.png",
+   "w": 61,
+   "h": 62,
+   "area": 1552,
+   "fill": 0.41,
+   "aspect": 0.98,
+   "shape": "square",
+   "use": "prop",
+   "primary": "dark",
+   "families": {
+    "dark": 0.09,
+    "stone": 0.03,
+    "darkstone": 0.03
+   },
+   "top_rgb": [
+    26,
+    26,
+    26
+   ]
+  },
+  {
+   "file": "prop_033_66x61.png",
+   "w": 66,
+   "h": 61,
+   "area": 1400,
+   "fill": 0.35,
+   "aspect": 1.08,
+   "shape": "square",
+   "use": "prop",
+   "primary": "blue",
+   "families": {
+    "blue": 0.14,
+    "green": 0.04
+   },
+   "top_rgb": [
+    78,
+    104,
+    104
+   ]
+  },
+  {
+   "file": "prop_036_30x64.png",
+   "w": 30,
+   "h": 64,
+   "area": 940,
+   "fill": 0.49,
+   "aspect": 0.47,
+   "shape": "tall",
+   "use": "prop",
+   "primary": "red",
+   "families": {
+    "red": 0.11,
+    "dark": 0.06,
+    "other": 0.06
+   },
+   "top_rgb": [
+    130,
+    78,
+    52
+   ]
+  },
+  {
+   "file": "prop_043_17x60.png",
+   "w": 17,
+   "h": 60,
+   "area": 671,
+   "fill": 0.66,
+   "aspect": 0.28,
+   "shape": "tall",
+   "use": "prop",
+   "primary": "other",
+   "families": {
+    "other": 0.1,
+    "dark": 0.04,
+    "wood": 0.04
+   },
+   "top_rgb": [
+    104,
+    104,
+    78
+   ]
+  },
+  {
+   "file": "prop_045_88x41.png",
+   "w": 88,
+   "h": 41,
+   "area": 509,
+   "fill": 0.14,
+   "aspect": 2.15,
+   "shape": "flat_wide",
+   "use": "prop",
+   "primary": "blue",
+   "families": {
+    "blue": 0.63
+   },
+   "top_rgb": [
+    156,
+    182,
+    208
+   ]
+  },
+  {
+   "file": "prop_047_67x39.png",
+   "w": 67,
+   "h": 39,
+   "area": 419,
+   "fill": 0.16,
+   "aspect": 1.72,
+   "shape": "iso_flat",
+   "use": "prop",
+   "primary": "blue",
+   "families": {
+    "blue": 0.68
+   },
+   "top_rgb": [
+    156,
+    182,
+    234
+   ]
+  },
+  {
+   "file": "prop_051_50x26.png",
+   "w": 50,
+   "h": 26,
+   "area": 283,
+   "fill": 0.22,
+   "aspect": 1.92,
+   "shape": "iso_flat",
+   "use": "prop",
+   "primary": "blue",
+   "families": {
+    "blue": 0.68
+   },
+   "top_rgb": [
+    156,
+    182,
+    234
+   ]
+  },
+  {
+   "file": "island_002_527x464.png",
+   "w": 527,
+   "h": 464,
+   "area": 139469,
+   "fill": 0.57,
+   "aspect": 1.14,
+   "shape": "square",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.1,
+    "blue": 0.05,
+    "green": 0.05
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "scene_002_527x464.png",
+   "w": 527,
+   "h": 464,
+   "area": 139469,
+   "fill": 0.57,
+   "aspect": 1.14,
+   "shape": "square",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.1,
+    "blue": 0.05,
+    "green": 0.05
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "prop_011_109x108.png",
+   "w": 109,
+   "h": 108,
+   "area": 6534,
+   "fill": 0.56,
+   "aspect": 1.01,
+   "shape": "square",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.1,
+    "blue": 0.06,
+    "other": 0.04
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "prop_020_86x102.png",
+   "w": 86,
+   "h": 102,
+   "area": 4606,
+   "fill": 0.53,
+   "aspect": 0.84,
+   "shape": "square",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.26,
+    "pale_yellow": 0.06,
+    "other": 0.05
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "prop_023_73x105.png",
+   "w": 73,
+   "h": 105,
+   "area": 4248,
+   "fill": 0.55,
+   "aspect": 0.7,
+   "shape": "tall",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.26,
+    "stone": 0.11,
+    "blue": 0.08
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "prop_026_53x77.png",
+   "w": 53,
+   "h": 77,
+   "area": 2790,
+   "fill": 0.68,
+   "aspect": 0.69,
+   "shape": "tall",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.24,
+    "stone": 0.15,
+    "blue": 0.1
+   },
+   "top_rgb": [
+    130,
+    130,
+    130
+   ]
+  },
+  {
+   "file": "prop_035_37x74.png",
+   "w": 37,
+   "h": 74,
+   "area": 1218,
+   "fill": 0.44,
+   "aspect": 0.5,
+   "shape": "tall",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.13,
+    "other": 0.1
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "prop_038_21x90.png",
+   "w": 21,
+   "h": 90,
+   "area": 893,
+   "fill": 0.47,
+   "aspect": 0.23,
+   "shape": "tall",
+   "use": "rock",
+   "primary": "stone",
+   "families": {
+    "stone": 0.16,
+    "blue": 0.09,
+    "dark": 0.06
+   },
+   "top_rgb": [
+    156,
+    156,
+    156
+   ]
+  },
+  {
+   "file": "prop_039_23x64.png",
+   "w": 23,
+   "h": 64,
+   "area": 827,
+   "fill": 0.56,
+   "aspect": 0.36,
+   "shape": "tall",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.19,
+    "blue": 0.09,
+    "stone": 0.06
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "prop_040_22x63.png",
+   "w": 22,
+   "h": 63,
+   "area": 827,
+   "fill": 0.6,
+   "aspect": 0.35,
+   "shape": "tall",
+   "use": "rock",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.21,
+    "stone": 0.14
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "island_000_896x955.png",
+   "w": 896,
+   "h": 955,
+   "area": 362667,
+   "fill": 0.42,
+   "aspect": 0.94,
+   "shape": "square",
+   "use": "tower_tree",
+   "primary": "green",
+   "families": {
+    "green": 0.07,
+    "darkstone": 0.06,
+    "dark": 0.05
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "scene_000_896x955.png",
+   "w": 896,
+   "h": 955,
+   "area": 362667,
+   "fill": 0.42,
+   "aspect": 0.94,
+   "shape": "square",
+   "use": "tower_tree",
+   "primary": "green",
+   "families": {
+    "green": 0.07,
+    "darkstone": 0.06,
+    "dark": 0.05
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "island_001_665x707.png",
+   "w": 665,
+   "h": 707,
+   "area": 277156,
+   "fill": 0.59,
+   "aspect": 0.94,
+   "shape": "square",
+   "use": "tower_tree",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.11,
+    "blue": 0.05,
+    "other": 0.04
+   },
+   "top_rgb": [
+    104,
+    104,
+    104
+   ]
+  },
+  {
+   "file": "scene_001_665x707.png",
+   "w": 665,
+   "h": 707,
+   "area": 277156,
+   "fill": 0.59,
+   "aspect": 0.94,
+   "shape": "square",
+   "use": "tower_tree",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.11,
+    "blue": 0.05,
+    "other": 0.04
+   },
+   "top_rgb": [
+    104,
+    104,
+    104
+   ]
+  },
+  {
+   "file": "building_003_179x212.png",
+   "w": 179,
+   "h": 212,
+   "area": 20567,
+   "fill": 0.54,
+   "aspect": 0.84,
+   "shape": "square",
+   "use": "tower_tree",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.11,
+    "green": 0.04,
+    "blue": 0.04
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "building_004_168x198.png",
+   "w": 168,
+   "h": 198,
+   "area": 19835,
+   "fill": 0.6,
+   "aspect": 0.85,
+   "shape": "square",
+   "use": "tower_tree",
+   "primary": "green",
+   "families": {
+    "green": 0.2,
+    "dark": 0.05
+   },
+   "top_rgb": [
+    78,
+    130,
+    78
+   ]
+  },
+  {
+   "file": "building_006_120x168.png",
+   "w": 120,
+   "h": 168,
+   "area": 10743,
+   "fill": 0.53,
+   "aspect": 0.71,
+   "shape": "tall",
+   "use": "tower_tree",
+   "primary": "blue",
+   "families": {
+    "blue": 0.08,
+    "dark": 0.08,
+    "darkstone": 0.04
+   },
+   "top_rgb": [
+    52,
+    78,
+    104
+   ]
+  },
+  {
+   "file": "building_005_111x161.png",
+   "w": 111,
+   "h": 161,
+   "area": 10715,
+   "fill": 0.6,
+   "aspect": 0.69,
+   "shape": "tall",
+   "use": "tower_tree",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.19,
+    "blue": 0.04,
+    "stone": 0.04
+   },
+   "top_rgb": [
+    78,
+    78,
+    78
+   ]
+  },
+  {
+   "file": "building_008_94x149.png",
+   "w": 94,
+   "h": 149,
+   "area": 7287,
+   "fill": 0.52,
+   "aspect": 0.63,
+   "shape": "tall",
+   "use": "tower_tree",
+   "primary": "green",
+   "families": {
+    "green": 0.24,
+    "dark": 0.06
+   },
+   "top_rgb": [
+    78,
+    130,
+    78
+   ]
+  },
+  {
+   "file": "building_009_73x133.png",
+   "w": 73,
+   "h": 133,
+   "area": 6965,
+   "fill": 0.72,
+   "aspect": 0.55,
+   "shape": "tall",
+   "use": "tower_tree",
+   "primary": "darkstone",
+   "families": {
+    "darkstone": 0.29,
+    "pale_yellow": 0.2,
+    "other": 0.08
+   },
+   "top_rgb": [
+    156,
+    156,
+    130
+   ]
+  }
+ ]
+}

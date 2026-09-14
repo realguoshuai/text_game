@@ -1,0 +1,7 @@
+# 临时截图与一次性分析产物，不入库
+_shots/
+_analysis/
+*.log
+
+# 半成品批量切图产物（slice_sucai.py 曾被中断，未被 maps.json 引用；需要时本地重跑）
+assets/sliced_s*/
