@@ -79,7 +79,7 @@
   var MAPS = [], IDX = {}, CUR = null;
   var PAL = {}, WALK = '';
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
-    hp: 130, maxhp: 130, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
+    hp: 260, maxhp: 260, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
     attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0,
     // —— 动作状态机 ——
     act: 'idle',      // idle / walk / run / atkA / atkB / dead
