@@ -116,6 +116,19 @@ results.push(run('碑林 刷怪', 'map=beilin', ({ dbg }) => !!dbg && dbg.foes >
 results.push(run('战斗 击杀掉落', 'map=beilin&autotest=fight', ({ probe }) =>
   !!probe && probe.exp > 0 && probe.stones > 0));
 
+// 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）
+//      ② 伤害不再恒定（有浮动/暴击/连击）③ 背对目标砍不中、挥空自动转身。
+//      50 刀逐帧推进，预算要给足。
+results.push(run('战斗 手感三件套', 'map=qingxuan&autotest=combat', ({ probe }) =>
+  !!probe && probe.animComplete === true          // 动画播完
+  && probe.dmgKinds > 3                            // 伤害值有多种，不是恒定值
+  && probe.comboPeak >= 2                          // 连击能叠
+  && probe.crits >= 1                              // 出过暴击（50 刀 ×10%，缺一次即真异常）
+  && probe.backDmg === 0                           // 背对砍不中
+  && probe.faceAfterBack === 'down'                // 挥空自动转向目标
+  && probe.dmgMax > probe.dmgMin, { budget: 22000 }
+));
+
 // 9) 灵泉妖兽全量：9 只、五族、每只都能被镜像/动作状态机正确驱动；
 //    外加领地（leash）验收 —— 越界不许咬人、必须回巢、回巢后还能被重新拉起。
 //    这条 sim 的时长以「秒」计（20s + 14s），预算要给足。

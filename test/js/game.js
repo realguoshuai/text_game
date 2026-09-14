@@ -23,6 +23,22 @@
   var SIDE_ACT = { idle: 0, walk: 1, run: 2, atkA: 3, atkB: 4, dead: 5 };
   var ACT_DUR = { atkA: 0.65, atkB: 1.0, dead: 1.5 };   // 一次性动作的播放时长（秒）；攻击放慢才看得清
   var ACT_CN = { idle: '待机', walk: '行走', run: '奔跑', atkA: '攻击 A', atkB: '攻击 B', dead: '倒地' };
+  /* ---------------- 战斗手感参数 ----------------
+   * 这一组数值只影响「打起来什么感觉」，不动 FOE_DEFS 里的血量/攻防，
+   * 所以调整它们不会改变关卡难度，只改变节奏和反馈。 */
+  var ATK_A_CD = ACT_DUR.atkA;  // ★ 普攻冷却必须 ≥ 动作时长：旧版写死 0.45s 而动作是 0.65s，
+                                //   连按时 actT 被反复归零，6 帧挥击只播到前 4 帧就重来，
+                                //   玩家永远看不到完整的攻击动作。
+  var CRIT_RATE = 0.10;         // 普攻暴击率
+  var CRIT_MUL = 1.8;           // 暴击倍率
+  var DMG_JITTER = 0.15;        // 伤害浮动 ±15%（旧版是恒定值，每刀数字一模一样）
+  var COMBO_WIN = 2.0;          // 连击窗口：超过这么久没再命中就清零
+  var COMBO_STEP = 0.06;        // 每层连击 +6% 伤害
+  var COMBO_MAX = 5;            // 连击层数上限（+30%）
+  // 命中扇形：只打「面朝方向 ±60°」内的目标（cos60°=0.5）。
+  // 旧版只算距离不算朝向，背对怪物也能砍中，锁定感为零。
+  var FACE_ARC = 0.5;
+  var FACE_VEC = { right: { x: 1, y: 0 }, left: { x: -1, y: 0 }, down: { x: 0, y: 1 }, up: { x: 0, y: -1 } };
   var RUN_MUL = 1.0;       // 取消冲刺加速（Shift/摇杆推满不再提速）
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
   // 怪物（侧视多动作素材）一次性动作的播放时长（秒）；循环动作 idle/walk/run 按 fps 推进
@@ -85,7 +101,12 @@
     act: 'idle',      // idle / walk / run / atkA / atkB / dead
     actT: 0,          // 当前动作已播放时间（秒），用于一次性动作按进度取帧
     actHold: 0,       // >0 表示动作被锁定（攻击、倒地），期间不接受移动输入
-    atkBCd: 0 };      // 重击冷却
+    atkBCd: 0,        // 重击冷却
+    // —— 连击 ——
+    combo: 0,         // 当前连击层数
+    comboT: 0,        // 连击剩余窗口（秒），归零即断连
+    comboFoe: null,   // 连击锁定的对象；换目标就断连
+    critT: 0 };       // 刚打出暴击的余晖计时，用于连击数放大特效
   var screenFlash = 0;   // 受重击/被击退时的全屏红闪（避免玩家莫名其妙"换了个地方"）
 
   // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
@@ -780,6 +801,62 @@
             hp: Math.round(player.hp)
           });
         }
+        if (at === 'combat') {
+          // ?map=qingxuan&autotest=combat —— 验证本轮战斗手感改动真的生效：
+          // ① 攻击动画能完整播完（旧版 0.45s 冷却 < 0.65s 动作，连按会把动画截断在第四帧）
+          // ② 伤害不再恒定：±15% 浮动、会暴击、连击能叠加
+          // ③ 背对目标砍不中（朝向扇形判定），且挥空会自动转身
+          var pbc = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          var tg = foes[0];
+          var hits = 0, kinds = {}, kindN = 0, minD = 0, maxD = 0;
+          var actTPeak = 0, comboPeak = 0, critN = 0;
+          if (tg) {
+            player.path = null; player.targetFoe = null; player.dead = false; player.invuln = 99;
+            for (var ci = 0; ci < 50; ci++) {
+              player.mx = tg.x; player.my = tg.y + 1.0;    // 站在靶子下方，脸朝上正对它
+              player.tx = player.mx; player.ty = player.my; player.face = 'up';
+              player.attackCd = 0; player.actHold = 0; player.critT = 0;
+              var h0c = tg.hp;
+              attackNearest();
+              var peak = 0, wasCrit = false;
+              for (var cj = 0; cj < 90; cj++) {            // 把这一刀的动作逐帧播完
+                window.ISLES.tick(1 / 60);
+                if (player.actT > peak) peak = player.actT;
+                if (player.critT > 0) wasCrit = true;
+                if (player.actHold <= 0) break;
+              }
+              if (peak > actTPeak) actTPeak = peak;
+              if (player.combo > comboPeak) comboPeak = player.combo;
+              var dlt = h0c - tg.hp;
+              if (dlt > 0) {
+                hits++;
+                if (!kinds[dlt]) { kinds[dlt] = 1; kindN++; }
+                if (!minD || dlt < minD) minD = dlt;
+                if (dlt > maxD) maxD = dlt;
+                if (wasCrit) critN++;
+              }
+            }
+          }
+          var backDmg = -1, faceBack = '';
+          if (tg) {
+            player.mx = tg.x; player.my = tg.y - 1.0;      // 站在靶子上方、脸朝上 = 背对靶子
+            player.tx = player.mx; player.ty = player.my;
+            player.targetFoe = null; player.attackCd = 0; player.actHold = 0;
+            player.face = 'up';
+            var hb0 = tg.hp;
+            attackNearest();
+            backDmg = hb0 - tg.hp;                          // 必须为 0：背对砍不中
+            faceBack = player.face;                         // 应变成 down：挥空自动转身
+          }
+          pbc.textContent = JSON.stringify({
+            atkDur: ACT_DUR.atkA, atkCd: ATK_A_CD,
+            actTPeak: +actTPeak.toFixed(3),
+            animComplete: actTPeak >= ACT_DUR.atkA - 0.02,  // 动画播完 = 峰值达到动作时长
+            hits: hits, dmgMin: minD, dmgMax: maxD, dmgKinds: kindN,
+            crits: critN, comboPeak: comboPeak,
+            backDmg: backDmg, faceAfterBack: faceBack
+          });
+        }
         requestAnimationFrame(loop);
       }
     }).catch(function (e) {
@@ -1132,6 +1209,7 @@
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
     player.dead = false;
+    breakCombo();                     // 换图也断连，别把上一张图的连击带过来
   }
 
   function couldStand(x, y) {
@@ -1462,9 +1540,45 @@
       };
     });
   }
-  function addFloater(mx, my, text, color) {
-    floaters.push({ mx: mx, my: my, off: 0, text: text, color: color, life: 0.95, max: 0.95 });
+  function addFloater(mx, my, text, color, opts) {
+    var o = opts || {};
+    floaters.push({
+      mx: mx, my: my, off: 0, text: text, color: color,
+      life: o.crit ? 1.3 : 0.95, max: o.crit ? 1.3 : 0.95,
+      crit: !!o.crit, rise: o.crit ? 54 : 34      // 暴击飘得更久更高，一眼能分辨
+    });
   }
+  /** 目标是否落在角色「面朝方向」的扇形内（cos 值越小扇形越宽）
+   *  默认 FACE_ARC=0.5 → 正面 ±60°。贴脸重叠时不判朝向，直接算命中。 */
+  function inFacingArc(mx, my, cosv) {
+    var dx = mx - player.mx, dy = my - player.my;
+    var d = Math.hypot(dx, dy);
+    if (d < 0.4) return true;
+    var v = FACE_VEC[player.face] || FACE_VEC.down;
+    var need = (cosv === undefined) ? FACE_ARC : cosv;
+    return (dx / d) * v.x + (dy / d) * v.y >= need;
+  }
+  /** 统一伤害结算：基础(攻-防) → ±15% 浮动 → 连击加成 → 暴击判定
+   *  旧版是 max(1, round(atk-def))，恒定值 —— 打石魔每刀都是 8，连砍 17 刀数字都不动一下。
+   *  opts.heavy = 重击（暴击率翻倍） */
+  function rollDamage(pow, def, opts) {
+    var o = opts || {};
+    var base = Math.max(1, Math.round(pow - def));
+    var jitter = 1 + (Math.random() * 2 - 1) * DMG_JITTER;
+    var rate = o.heavy ? CRIT_RATE * 2 : CRIT_RATE;
+    var crit = Math.random() < rate;
+    var cMul = 1 + Math.min(player.combo, COMBO_MAX) * COMBO_STEP;
+    var dmg = base * jitter * cMul * (crit ? CRIT_MUL : 1);
+    return { dmg: Math.max(1, Math.round(dmg)), crit: crit, base: base };
+  }
+  /** 命中即累计连击；换目标自动断连（不能拿 A 攒连击去打 B） */
+  function bumpCombo(f) {
+    if (player.comboFoe !== f) player.combo = 0;
+    player.comboFoe = f;
+    player.combo = Math.min(COMBO_MAX, player.combo + 1);
+    player.comboT = COMBO_WIN;
+  }
+  function breakCombo() { player.combo = 0; player.comboT = 0; player.comboFoe = null; }
   function spawnParticles(mx, my) {
     for (var i = 0; i < 10; i++) {
       var a = Math.random() * 6.2832, sp = 1.5 + Math.random() * 2.5;
@@ -1487,30 +1601,32 @@
   // 玩家出手：范围 MELEE 内最近的妖兽受击；real=max(1,round(atk-def))
   function tryAttack() {
     if (player.dead) return;
-    if (player.attackCd > 0) return;
-    player.attackCd = 0.45;
+    // ★ 一次性动作没播完就不许出手。旧版冷却写死 0.45s 而动作长 0.65s，
+    //   连按时 actT 被反复归零，6 帧挥击只播到前 4 帧就重来，玩家永远看不到完整攻击动作。
+    if (player.actHold > 0 || player.attackCd > 0) return;
+    player.attackCd = ATK_A_CD;
     player.act = 'atkA'; player.actT = 0; player.actHold = ACT_DUR.atkA;   // 挥空也播，打不到也有反馈
-    var best = null, bd = MELEE;
+    // ① 只认「够近 且 在面朝扇形内」的目标 —— 背对着怪不再能砍中
+    // ② 范围内有怪但不在正面时，只转身挥空（有动作、无伤害），下一刀才真打
+    var best = null, bd = MELEE, near = null, nd = AGGRO;
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i]; if (!f.alive) continue;
       var d = Math.hypot(f.x - player.mx, f.y - player.my);
-      if (d < bd) { bd = d; best = f; }
+      if (d < nd) { nd = d; near = f; }
+      if (d < bd && inFacingArc(f.x, f.y)) { bd = d; best = f; }
     }
     if (!best) {
-      // 挥空也锁敌：仇恨圈内最近的妖兽在哪边，脸就转向哪边（只转向不出伤害）
-      var near = null, nd = AGGRO;
-      for (var j = 0; j < foes.length; j++) {
-        var g = foes[j]; if (!g.alive) continue;
-        var d2 = Math.hypot(g.x - player.mx, g.y - player.my);
-        if (d2 < nd) { nd = d2; near = g; }
-      }
       if (near) setFaceFromDelta(near.x - player.mx, near.y - player.my);
       return;
     }
     setFaceFromDelta(best.x - player.mx, best.y - player.my);
-    var real = Math.max(1, Math.round(player.atk - best.def));
-    best.hp -= real; best.flash = 0.22;
-    addFloater(best.x, best.y - 0.3, '-' + real, '#ffd36b');
+    var hit = rollDamage(player.atk, best.def);
+    best.hp -= hit.dmg;
+    best.flash = hit.crit ? 0.4 : 0.22;
+    bumpCombo(best);
+    addFloater(best.x, best.y - 0.3, (hit.crit ? '暴击 -' : '-') + hit.dmg,
+      hit.crit ? '#ffe66b' : '#ffd36b', { crit: hit.crit });
+    if (hit.crit) { player.critT = 0.45; addFloater(best.x, best.y - 1.1, '暴击！', '#ff9f43', { crit: true }); }
     if (best.hp <= 0) killFoe(best); else hurtFoe(best);
   }
   // 玩家主动出手（J/空格/点击妖兽）：锁定仇恨内最近的妖兽并打一下
@@ -1539,10 +1655,11 @@
     }
     player.atkBCd = ATK_B_CD;
     player.act = 'atkB'; player.actT = 0; player.actHold = ACT_DUR.atkB;
+    // 重击是横扫，扇形比普攻宽（±90°），但依然要求大致朝着目标
     var reach = MELEE + 0.55, hit = [];
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i]; if (!f.alive) continue;
-      if (Math.hypot(f.x - player.mx, f.y - player.my) <= reach) hit.push(f);
+      if (Math.hypot(f.x - player.mx, f.y - player.my) <= reach && inFacingArc(f.x, f.y, 0)) hit.push(f);
     }
     if (!hit.length) {
       toast('重击落空（冷却 ' + ATK_B_CD + ' 秒）');
@@ -1550,11 +1667,14 @@
       return;
     }
     setFaceFromDelta(hit[0].x - player.mx, hit[0].y - player.my);
+    var crits = 0;
     for (var j = 0; j < hit.length; j++) {
       var g = hit[j];
-      var real = Math.max(1, Math.round(player.atk * 2 - g.def));
-      g.hp -= real; g.flash = 0.3;
-      addFloater(g.x, g.y - 0.3, '-' + real, '#ffd36b');
+      var r = rollDamage(player.atk * 2, g.def, { heavy: true });
+      if (r.crit) crits++;
+      g.hp -= r.dmg; g.flash = r.crit ? 0.5 : 0.3;
+      addFloater(g.x, g.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
+        r.crit ? '#ffe66b' : '#ffd36b', { crit: r.crit });
       var dx = g.x - player.mx, dy = g.y - player.my, dd = Math.hypot(dx, dy) || 1;
       for (var s = 0; s < 3; s++) {                       // 把妖兽推开
         if (couldStand(g.x + dx / dd * 0.3, g.y)) g.x += dx / dd * 0.3;
@@ -1562,7 +1682,9 @@
       }
       if (g.hp <= 0) killFoe(g); else hurtFoe(g);
     }
-    toast('重击命中 ' + hit.length + ' 只（冷却 ' + ATK_B_CD + ' 秒）');
+    bumpCombo(hit[0]);
+    if (crits > 0) player.critT = 0.45;
+    toast('重击命中 ' + hit.length + ' 只' + (crits ? '（' + crits + ' 记暴击）' : '') + '（冷却 ' + ATK_B_CD + ' 秒）');
     if (h0) h0.textContent = '重击命中 ' + hit.length + ' 只，' + ATK_B_CD + ' 秒后可再放';
   }
   /** 动作试演（数字键 1~6）：直接切到指定动作，用来逐个核对素材效果 */
@@ -1632,6 +1754,7 @@
     player.stones -= lost;
     var pushed = foe ? knockBackPlayer(foe.x, foe.y, 0.6) : 0;   // 只轻推半步，不再大幅位移
     player.path = null; player.targetFoe = null;
+    breakCombo();                                                 // 倒地断连
     player.dead = true;
     player.act = 'dead'; player.actT = 0; player.actHold = ACT_DUR.dead;   // 播倒地动作
     player.flash = 0.5;
@@ -1756,8 +1879,11 @@
   function updateFloaters(dt) {
     if (clickMark) { clickMark.life -= dt; if (clickMark.life <= 0) clickMark = null; }
     for (var i = floaters.length - 1; i >= 0; i--) {
-      var f = floaters[i]; f.life -= dt; f.off += 34 * dt; if (f.life <= 0) floaters.splice(i, 1);
+      var f = floaters[i]; f.life -= dt; f.off += (f.rise || 34) * dt; if (f.life <= 0) floaters.splice(i, 1);
     }
+    // 连击窗口倒计时：超时断连。暴击余晖也在这里衰减（只用于连击数放大特效）
+    if (player.comboT > 0) { player.comboT -= dt; if (player.comboT <= 0) breakCombo(); }
+    if (player.critT > 0) player.critT = Math.max(0, player.critT - dt);
     for (var j = particles.length - 1; j >= 0; j--) {
       var p = particles[j]; p.life -= dt; p.mx += p.vx * dt; p.my += p.vy * dt; p.vy += 6 * dt;
       if (p.life <= 0) particles.splice(j, 1);
@@ -1904,6 +2030,34 @@
     ctx.fill(); ctx.stroke();
     ctx.restore();
   }
+  /** 连击数：屏幕上方居中，带窗口进度条（剩多久断连）与暴击放大 */
+  function drawCombo() {
+    if (player.combo < 2) return;
+    var k = Math.max(0, Math.min(1, player.comboT / COMBO_WIN));
+    var pop = 1 + (player.critT / 0.45) * 0.45;
+    var y = H * 0.26;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, k * 1.8);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold ' + (30 * Z * pop).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+    ctx.lineWidth = 5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.85)';
+    ctx.strokeText(player.combo + ' 连击', W / 2, y);
+    ctx.fillStyle = player.critT > 0 ? '#ffe66b' : '#ffd36b';
+    if (player.critT > 0) { ctx.shadowColor = 'rgba(255,190,60,.9)'; ctx.shadowBlur = 14 * Z; }
+    ctx.fillText(player.combo + ' 连击', W / 2, y);
+    ctx.shadowBlur = 0;
+    // 连击加成提示 + 窗口进度条
+    ctx.font = 'bold ' + (13 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+    ctx.lineWidth = 3 * Z;
+    var bonus = '+' + Math.round(player.combo * COMBO_STEP * 100) + '% 伤害';
+    ctx.strokeText(bonus, W / 2, y + 20 * Z); ctx.fillStyle = '#ffcf8a';
+    ctx.fillText(bonus, W / 2, y + 20 * Z);
+    var bw = 104 * Z, bh = 4 * Z, bx = W / 2 - bw / 2, by = y + 28 * Z;
+    ctx.globalAlpha = Math.min(1, k * 1.8) * 0.85;
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#ffb24d'; ctx.fillRect(bx, by, bw * k, bh);
+    ctx.restore();
+  }
   function drawFloaters() {
     for (var i = 0; i < floaters.length; i++) {
       var f = floaters[i];
@@ -1911,11 +2065,16 @@
       var y = p.y - 46 * Z - f.off;
       ctx.globalAlpha = Math.max(0, Math.min(1, f.life / f.max * 1.4));
       ctx.textAlign = 'center';
-      ctx.font = 'bold ' + (15 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
-      ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.85)';
+      // 暴击数字更大、带描边光晕，扫一眼就知道这一下不一样
+      var fs = (f.crit ? 23 : 15) * Z;
+      ctx.font = 'bold ' + fs.toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+      ctx.lineWidth = (f.crit ? 5 : 3.5) * Z; ctx.strokeStyle = 'rgba(6,12,24,.85)';
+      if (f.crit) { ctx.shadowColor = 'rgba(255,190,60,.95)'; ctx.shadowBlur = 12 * Z; }
       ctx.strokeText(f.text, p.x, y); ctx.fillStyle = f.color; ctx.fillText(f.text, p.x, y);
+      ctx.shadowBlur = 0;
     }
     ctx.globalAlpha = 1;
+    drawCombo();
     for (var j = 0; j < particles.length; j++) {
       var pt = particles[j];
       var q = isoToScreen(pt.mx, pt.my);
@@ -2129,6 +2288,12 @@
     act: function () {
       return { act: player.act, actT: +player.actT.toFixed(2), actHold: +player.actHold.toFixed(2),
         dead: player.dead, atkBCd: +player.atkBCd.toFixed(2), face: player.face };
+    },
+    /** 战斗手感状态：连击层数/窗口、暴击余晖、攻速冷却，调试与自测用 */
+    combat: function () {
+      return { combo: player.combo, comboT: +player.comboT.toFixed(2), critT: +player.critT.toFixed(2),
+        attackCd: +player.attackCd.toFixed(3), actHold: +player.actHold.toFixed(3),
+        atkDur: ACT_DUR.atkA, atkCd: ATK_A_CD, comboMax: COMBO_MAX };
     },
     foeInfo: function () {
       return foes.map(function (f) {
