@@ -19,6 +19,8 @@ _*.html
 # 临时分析目录（切片草稿、量测输出、预览图），不属于运行时资源
 _analysis/
 test/_analysis/
+# 妖兽单帧裁切源（策展中间物；运行时只用 assets/foes_atlas.png/.json）
+test/assets/foes/
 
 # 用户提供的原始 AI 场景素材（大体积 JPEG，源材料非运行时资源，不入库）
 sucai/
