@@ -17,20 +17,55 @@
   // 1 号是该包官方 Godot 示例的默认角色；其余几个同时兼任 NPC，不重复打包素材。
   // 直接指定：?hero=14
   var HERO_OPTIONS = [
-    { n: 1, src: 'assets/char_hero.png', label: '1 号' },
-    { n: 5, src: 'assets/npc_5.png', label: '5 号' },
-    { n: 10, src: 'assets/npc_10.png', label: '10 号' },
-    { n: 14, src: 'assets/npc_14.png', label: '14 号' },
-    { n: 18, src: 'assets/npc_18.png', label: '18 号' },
-    { n: 20, src: 'assets/npc_20.png', label: '20 号' }
+    { n: 1, file: 'char_hero.png', label: '1 号' },
+    { n: 5, file: 'npc_5.png', label: '5 号' },
+    { n: 10, file: 'npc_10.png', label: '10 号' },
+    { n: 14, file: 'npc_14.png', label: '14 号' },
+    { n: 18, file: 'npc_18.png', label: '18 号' },
+    { n: 20, file: 'npc_20.png', label: '20 号' }
   ];
-  var PLAYER_SRC = HERO_OPTIONS[0].src;
-  var npcSrc = function (c) { return 'assets/' + c + '.png'; };
+  var PLAYER_CHAR = HERO_OPTIONS[0].file;      // 主角当前用的动作表（chars_atlas 里的 key）
+  var PLAYER_SRC = PLAYER_CHAR;                // 主角图集 key（setHero / buildHeroUI 会改写；先给默认值，避免严格模式下未声明报错）
+  // maps.json 里 npc.char 写成 'npc_5'，对应动作表文件 npc_5.png
+  var npcCharFile = function (c) { return c + '.png'; };
 
-  var IMG = {};              // file -> Image
+  /* ---------------- 图集（atlas）----------------
+   * 原来每个图块、每个角色都是独立 PNG：43 + 6 + 12 = 61 个文件、61 次请求。
+   * 浏览器的同域并发只有 6 个左右，排队本身就要好几秒 —— 首屏慢主要慢在这里，
+   * 不是慢在字节数。现在打成 3 张图集，请求数 61 -> 3。
+   * 代价是每次绘制都要多传一个源矩形（sx/sy/sw/sh），见 drawPiece/drawActor。
+   */
+  var ATLAS = {
+    tiles: { img: null, rect: null },
+    chars: { img: null, rect: null },
+    foes: { img: null, rect: null }
+  };
+  function atlasReady(a) { return !!(a.img && a.rect); }
+
+  var IMG = {};              // file -> Image（只留给非图集的小图，例如云）
   var MAPS = [], IDX = {}, CUR = null;
   var PAL = {}, WALK = '';
-  var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null };
+  var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
+    hp: 130, maxhp: 130, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
+    attackCd: 0, targetFoe: null, dead: false, flash: 0 };
+
+  // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
+  // 严格模式下这些必须先用 var 声明，否则 switchTo 里 `foes=…` 会抛 ReferenceError 直接卡死启动。
+  var foes = [], floaters = [], particles = [], clickMark = null;
+  var MELEE = 1.45, AGGRO = 6.5;   // 近身出手半径 / 妖兽仇恨半径（格）
+  var FOE_DEFS = {
+    assassin: { key: 'assassin', name: '刀影飞镖',     hp: 42,  atk: 14, def: 4,  exp: 12, stones: [3, 7],   mv: 3.2,  scale: 1.00 },
+    golem:    { key: 'golem',    name: '九州震击石魔', hp: 130, atk: 16, def: 12, exp: 32, stones: [8, 16],  mv: 1.55, scale: 1.18, elite: true },
+    wraith:   { key: 'wraith',   name: '水墨幽魂',     hp: 74,  atk: 17, def: 7,  exp: 22, stones: [5, 11],  mv: 2.2,  scale: 1.02 }
+  };
+  // 12 只散布在 30×30 碑林；坐标由 snapWalkable 吸附到最近可走格，故可略放宽。
+  var BEILIN_SPAWNS = [
+    { x: 6,  y: 6,  t: 'assassin' }, { x: 10, y: 4,  t: 'assassin' }, { x: 22, y: 8,  t: 'assassin' },
+    { x: 25, y: 18, t: 'assassin' }, { x: 8,  y: 20, t: 'assassin' },
+    { x: 14, y: 10, t: 'golem' },    { x: 18, y: 16, t: 'golem' },    { x: 10, y: 22, t: 'golem' },
+    { x: 20, y: 5,  t: 'wraith' },   { x: 24, y: 22, t: 'wraith' },   { x: 5,  y: 15, t: 'wraith' },
+    { x: 16, y: 26, t: 'wraith' }
+  ];
   var camX = 0, camY = 0, time = 0;
   // 上一帧的绘制计数（QA 用）：确认 NPC 真的走了 drawNPC 分支，
   // 而不是被 <0 的兜底分支当成玩家画出来
@@ -129,40 +164,135 @@
   }
 
   // ---------------- 加载 ----------------
-  function loadImg(src) {
-    return new Promise(function (res) {
+  /* 首屏加载要解决两件事：
+   *   ① 请求数：61 个零散 PNG -> 3 张图集（tools/build_atlas.py 产出）
+   *   ② 可见进度：图集是大文件，只报「第几张好了」会长时间停在 0%。
+   *      所以用 XHR 拿 blob，读 e.loaded/e.total 得到字节级进度，
+   *      再按各文件的实际字节数加权合成总进度 —— 进度条才是匀速走的。
+   * 注意 Image 标签没有下载进度事件，这是必须绕道 XHR/blob 的原因。
+   */
+  // weight 用「预估 KB」当权重：进度是按权重加权的，所以大文件占大头，
+  // 进度条看起来才是匀速的。权重全程固定不变 —— 中途改用真实字节会让
+  // 分母突然变大、进度条倒退。
+  var LOAD_PLAN = [
+    { url: 'assets/maps.json', json: true, weight: 4, label: '读取地图数据' },
+    { url: 'assets/tiles_atlas.png', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
+    { url: 'assets/chars_atlas.png', atlas: 'chars', weight: 249, label: '载入人物动作' },
+    { url: 'assets/foes_atlas.png', atlas: 'foes', weight: 155, label: '载入妖兽图鉴' },
+    { url: 'assets/tiles_atlas.json', json: true, weight: 4, label: '读取地貌索引' },
+    { url: 'assets/chars_atlas.json', json: true, weight: 4, label: '读取人物索引' },
+    { url: 'assets/foes_atlas.json', json: true, weight: 4, label: '读取妖兽索引' }
+  ];
+  var loadUI = { bar: null, pct: null, tip: null, sub: null };
+
+  function fmtBytes(n) {
+    if (!n || n < 0) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  }
+
+  function setProgress(frac, label, sub) {
+    frac = Math.max(0, Math.min(1, frac));
+    if (loadUI.bar) loadUI.bar.style.width = (frac * 100).toFixed(1) + '%';
+    if (loadUI.pct) loadUI.pct.textContent = Math.round(frac * 100) + '%';
+    if (loadUI.tip && label) loadUI.tip.textContent = label;
+    if (loadUI.sub) loadUI.sub.textContent = sub || '';
+  }
+
+  /** XHR 取 blob：能拿到下载进度，且不依赖 fetch（file:// 下更宽容） */
+  function xhrBlob(url, onProgress, weight) {
+    return new Promise(function (res, rej) {
+      var x = new XMLHttpRequest();
+      x.open('GET', url, true);
+      x.responseType = 'blob';
+      if (onProgress) {
+        x.onprogress = function (e) {
+          if (e.lengthComputable) onProgress(weight, e.loaded, e.total);
+        };
+      }
+      x.onload = function () {
+        // file:// 协议下 status 为 0 也算成功
+        if (x.status === 200 || x.status === 0) res(x.response);
+        else rej(new Error(url + ' -> HTTP ' + x.status));
+      };
+      x.onerror = function () { rej(new Error(url + ' 网络错误')); };
+      x.onabort = function () { rej(new Error(url + ' 已取消')); };
+      x.send();
+    });
+  }
+
+  function blobJson(b) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onload = function () { try { res(JSON.parse(fr.result)); } catch (e) { rej(e); } };
+      fr.onerror = function () { rej(new Error('读取失败')); };
+      fr.readAsText(b);
+    });
+  }
+
+  function blobImage(b) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(b);
       var im = new Image();
-      im.onload = function () { IMG[src] = im; res(im); };
-      im.onerror = function () { res(null); };
-      im.src = src;
+      im.onload = function () { URL.revokeObjectURL(url); res(im); };
+      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('图片解码失败')); };
+      im.src = url;
     });
   }
 
   function boot() {
-    Promise.all([
-      fetch('assets/maps.json').then(function (r) { return r.json(); }),
-      fetch('assets/sliced/manifest.json').then(function (r) { return r.json(); })
-    ]).then(function (res) {
-      var data = res[0];
+    loadUI.bar = document.getElementById('loadBar');
+    loadUI.pct = document.getElementById('loadPct');
+    loadUI.tip = document.getElementById('loadTip');
+    loadUI.sub = document.getElementById('loadSub');
+
+    // 进度权重：JSON 给小权重、图集按实际字节数分配，这样进度条不会在
+    // 「几个 JSON 秒过、图集卡住」的落差里骗人。
+    var W_TOTAL = LOAD_PLAN.reduce(function (a, p) { return a + p.weight; }, 0);
+    var got = {};
+    function report(label, sub) {
+      var acc = 0;
+      LOAD_PLAN.forEach(function (p) {
+        acc += Math.min(1, got[p.url] || 0) * p.weight;
+      });
+      setProgress(acc / W_TOTAL, label, sub);
+    }
+
+    var step = 0;
+    function next() {
+      if (step >= LOAD_PLAN.length) return Promise.resolve();
+      var p = LOAD_PLAN[step++];
+      report(p.label, '');
+      return xhrBlob(p.url, function (w, loaded, tot) {
+        if (p.json) return;
+        got[p.url] = loaded / (tot || p.weight);
+        report(p.label, fmtBytes(loaded) + ' / ' + fmtBytes(tot));
+      }).then(function (blob) {
+        got[p.url] = 1;
+        return p.json ? blobJson(blob).then(function (v) { p.value = v; })
+                      : blobImage(blob).then(function (im) { p.value = im; });
+      }).then(function () {
+        report(p.label, '');
+        return next();
+      });
+    }
+
+    report('读取地图数据', '');
+    return next().then(function () {
+      setProgress(1, '就绪', '');
+      var data = LOAD_PLAN[0].value;
+      ATLAS.tiles.img = LOAD_PLAN[1].value; ATLAS.tiles.rect = LOAD_PLAN[4].value;
+      ATLAS.chars.img = LOAD_PLAN[2].value; ATLAS.chars.rect = LOAD_PLAN[5].value;
+      ATLAS.foes.img = LOAD_PLAN[3].value; ATLAS.foes.rect = LOAD_PLAN[6].value;
+
       TILE_W = data.tileW; TILE_H = data.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
       PAL = data.tilePalette; WALK = data.walkable;
       MAPS = data.maps;
       MAPS.forEach(function (m) { m.solid = solidFrom(m); m.home = nearWalkable(m); IDX[m.id] = m; });
 
-      var files = {};
-      Object.keys(PAL).forEach(function (k) { files[PAL[k]] = 1; });
-      MAPS.forEach(function (m) { m.objects.forEach(function (o) { files[o.piece] = 1; }); });
-      var list = Object.keys(files).map(function (f) { return 'assets/sliced/' + f; });
-      list.push(PLAYER_SRC);
-      NPC_FILES = {};
-      MAPS.forEach(function (m) {
-        (m.npcs || []).forEach(function (n) { NPC_FILES[npcSrc(n.char)] = 1; });
-      });
-      Object.keys(NPC_FILES).forEach(function (s) { list.push(s); });
-      HERO_OPTIONS.forEach(function (h) { if (list.indexOf(h.src) < 0) list.push(h.src); });
-
-      return Promise.all(list.map(loadImg)).then(function () {
-        var q = new URLSearchParams(location.search);
+      var q = new URLSearchParams(location.search);
+      {
         buildCloudSprite();
         buildButtons();
         buildZoomUI();
@@ -233,10 +363,23 @@
             });
           }, 60);
         }
+        if (at === 'fight') {
+          // ?map=beilin&autotest=fight —— 贴脸反复攻击，验证击杀掉落与修为增长
+          setTimeout(function () {
+            var f0 = foes[0];
+            if (f0) { player.mx = f0.x; player.my = f0.y; player.tx = f0.x; player.ty = f0.y; }
+            for (var i = 0; i < 120; i++) { window.ISLES.attackNearest(); window.ISLES.tick(0.5); }
+            var alive = foes.filter(function (x) { return x.alive; }).length;
+            var pb = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+            pb.textContent = JSON.stringify({ alive: alive, total: foes.length, exp: player.exp, stones: player.stones, hp: Math.round(player.hp) });
+          }, 60);
+        }
         requestAnimationFrame(loop);
-      });
+      }
     }).catch(function (e) {
-      document.getElementById('loader').textContent = '加载失败：' + e.message;
+      // 加载失败时把原因写在进度条下面 —— 只留一句「加载中」会让用户莫名其妙
+      if (loadUI.tip) loadUI.tip.textContent = '加载失败';
+      if (loadUI.sub) loadUI.sub.textContent = e.message;
       console.error(e);
     });
   }
@@ -284,19 +427,40 @@
   }
 
   // ---------------- 绘制 ----------------
+  /* 图集取件：把「图块名」翻译成 {img, sx, sy, w, h}
+   * 打包成图集后，每个绘制点除了目标矩形，还必须给出源矩形（sx/sy/sw/sh）。
+   * 抽成一个函数是为了只在这里处理「找不到」的情况 —— 少一个图块不该让整帧崩掉。
+   */
+  function piece(name) {
+    var a = ATLAS.tiles, r = a.rect && a.rect[name];
+    if (!a.img || !r) return null;
+    return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
+  }
+  function charPiece(file) {
+    var a = ATLAS.chars, r = a.rect && a.rect[file];
+    if (!a.img || !r) return null;
+    return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
+  }
+  function foePiece(name) {
+    var a = ATLAS.foes, r = a.rect && a.rect[name];
+    if (!a.img || !r) return null;
+    return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
+  }
+
   function drawGround() {
     var tw = TILE_W * Z, th = TILE_H * Z;
     for (var y = 0; y < CUR.h; y++) {
       for (var x = 0; x < CUR.w; x++) {
         var file = PAL[CUR.ground[y][x]];
         if (!file) continue;
-        var img = IMG['assets/sliced/' + file];
-        if (!img) continue;
+        var pz = piece(file);
+        if (!pz) continue;
         var p = isoToScreen(x, y);
         if (p.x < -tw * 1.6 || p.x > W + tw * 1.6 || p.y < -th * 4 || p.y > H + th * 4) continue;
         // 统一按宽度归一到 TILE_W*Z，保证菱形水平对角线与网格严格对齐
-        var s = tw / img.width;
-        ctx.drawImage(img, p.x - tw / 2, p.y, tw, img.height * s);
+        var s = tw / pz.w;
+        ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
+          p.x - tw / 2, p.y, tw, pz.h * s);
       }
     }
   }
@@ -335,7 +499,7 @@
   }
 
   /** 画一个角色（影子 + 按朝向/帧取图）。玩家与 NPC 共用同一套绘制，规格完全一致 */
-  function drawActor(img, mx, my, face, frame, bob) {
+  function drawActor(img, mx, my, face, frame, bob, ox, oy) {
     _draw.actor++;
     var p = isoToScreen(mx, my);
     var dh = SHEET.cellH * SHEET.pxScale * Z, dw = dh * (SHEET.cellW / SHEET.cellH);
@@ -350,7 +514,7 @@
     ctx.restore();
     if (!img) return null;
     var row = SHEET.dir[face] || 0;
-    var sx = frame * SHEET.cellW, sy = row * SHEET.cellH;
+    var sx = (ox || 0) + frame * SHEET.cellW, sy = (oy || 0) + row * SHEET.cellH;
     var sm = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, sx, sy, SHEET.cellW, SHEET.cellH,
@@ -360,16 +524,17 @@
   }
 
   function drawCharacter() {
+    var pz = charPiece(PLAYER_SRC); if (!pz) return;
     var frame = (player.walk > 0 ? Math.floor(player.walk * 6) % SHEET.frames : 0);
-    drawActor(IMG[PLAYER_SRC], player.mx, player.my, player.face, frame, 0);
+    drawActor(pz.img, player.mx, player.my, player.face, frame, 0, pz.sx, pz.sy);
   }
 
   /** NPC：站立取第 0 帧（图集已把最中性那帧旋到 0），叠一点极轻的呼吸起伏，不再是死图 */
   function drawNPC(n) {
     _draw.npc++;
-    var img = IMG[npcSrc(n.char)];
+    var pz = charPiece(npcCharFile(n.char)); if (!pz) return;
     var bob = Math.sin(time * 1.7 + n.x * 1.3 + n.y * 0.7) * 1.2;
-    var node = drawActor(img, n.x, n.y, n.face, 0, bob);
+    var node = drawActor(pz.img, n.x, n.y, n.face, 0, bob, pz.sx, pz.sy);
     if (!node) return;
     var near = Math.abs(player.mx - n.x) < 2.2 && Math.abs(player.my - n.y) < 2.2;
     var ty = node.top - 6 * Z;
@@ -397,6 +562,7 @@
     drawSky();
     if (!CUR) return;
     drawGround();
+    drawClickMark();
 
     // 传送门画在地面上、物件下
     CUR.portals.forEach(drawPortal);
@@ -416,15 +582,16 @@
       if (it.i === -2) { drawNPC(it.o); return; }
       if (it.i === -1) { drawCharacter(); return; }
       var o = it.o;
-      var img = IMG['assets/sliced/' + o.piece];
-      if (!img) return;
+      var pz = piece(o.piece);
+      if (!pz) return;
       var ax = o.x + ((o.fw || 1) - 1) / 2, ay = o.y + ((o.fh || 1) - 1) / 2;
       var p = isoToScreen(ax, ay);
       var bx = p.x, by = p.y + HH * Z + (o.dy || 0) * Z;
-      var ow = img.width * Z, oh = img.height * Z;
+      var ow = pz.w * Z, oh = pz.h * Z;
       if (bx < -ow || bx > W + ow || by < -oh * 1.4 || by > H + oh * 1.6) return;
-      ctx.drawImage(img, Math.round(bx - ow / 2), Math.round(by - oh), Math.round(ow), Math.round(oh));
+      ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(bx - ow / 2), Math.round(by - oh), Math.round(ow), Math.round(oh));
     });
+    drawFloaters();   // 伤害飘字 + 击杀粒子（猎场用）
 
     // 洞外虚空柔化（地图边缘渐隐到天空）
     var vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.30, W / 2, H / 2, Math.max(W, H) * 0.72);
@@ -436,6 +603,7 @@
       ctx.fillStyle = 'rgba(7,12,26,' + fadeA.toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }
+    updateHUD();
   }
 
   // ---------------- 逻辑 ----------------
@@ -455,6 +623,9 @@
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.id === CUR.id);
     document.getElementById('hint').textContent = silent ? '踩上青色光门即可切换地图'
       : '已传送至「' + CUR.name + '」 · ' + CUR.note;
+    // 只有碑林石阵刷妖兽（猎场）；其它图清空战斗状态，避免切回去还残留怪物
+    if (CUR.id === 'beilin') { foes = makeFoes(); }
+    else { foes = []; floaters = []; particles = []; player.targetFoe = null; }
   }
 
   function couldStand(x, y) {
@@ -599,6 +770,19 @@
       }
       // ★ 这里原来什么都没有 —— 点击移动全程不更新朝向，所以角色永远正对镜头
       setFaceFromDelta(dx, dy);
+    } else if (player.targetFoe && player.targetFoe.alive && !player.dead) {
+      // 锁定妖兽后自动追上去，贴脸自动出手（攻击受冷却约束）
+      var tf = player.targetFoe;
+      var tdx = tf.x - player.mx, tdy = tf.y - player.my, tdist = Math.hypot(tdx, tdy);
+      if (tdist > MELEE - 0.1) {
+        var tux = tdx / (tdist || 1), tuy = tdy / (tdist || 1), tsp = speed * dt;
+        if (couldStand(player.mx + tux * tsp, player.my)) player.mx += tux * tsp;
+        if (couldStand(player.mx, player.my + tuy * tsp)) player.my += tuy * tsp;
+        setFaceFromDelta(tdx, tdy);
+        player.walk = player.walk + dt;
+      } else {
+        tryAttack();
+      }
     }
 
     // 行走帧只在**真的挪动了**时才推进：贴着墙按方向键就是「转身站住」，
@@ -640,11 +824,230 @@
     return true;
   }
 
+  // ---------------- 妖兽战斗逻辑 ----------------
+  function makeFoes() {
+    return BEILIN_SPAWNS.map(function (s) {
+      var d = FOE_DEFS[s.t];
+      var cell = snapWalkable(CUR, s.x, s.y);
+      return {
+        def_: d, key: d.key, name: d.name,
+        x: cell.x, y: cell.y, home: cell,
+        hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, exp: d.exp, stones: d.stones,
+        face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0
+      };
+    });
+  }
+  function addFloater(mx, my, text, color) {
+    floaters.push({ mx: mx, my: my, off: 0, text: text, color: color, life: 0.95, max: 0.95 });
+  }
+  function spawnParticles(mx, my) {
+    for (var i = 0; i < 10; i++) {
+      var a = Math.random() * 6.2832, sp = 1.5 + Math.random() * 2.5;
+      particles.push({ mx: mx, my: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5, life: 0.6, max: 0.6, color: '#ffe1a0' });
+    }
+  }
+  // 玩家出手：范围 MELEE 内最近的妖兽受击；real=max(1,round(atk-def))
+  function tryAttack() {
+    if (player.dead) return;
+    if (player.attackCd > 0) return;
+    player.attackCd = 0.45;
+    var best = null, bd = MELEE;
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i]; if (!f.alive) continue;
+      var d = Math.hypot(f.x - player.mx, f.y - player.my);
+      if (d < bd) { bd = d; best = f; }
+    }
+    if (!best) return;
+    setFaceFromDelta(best.x - player.mx, best.y - player.my);
+    var real = Math.max(1, Math.round(player.atk - best.def));
+    best.hp -= real; best.flash = 0.22;
+    addFloater(best.x, best.y - 0.3, '-' + real, '#ffd36b');
+    if (best.hp <= 0) killFoe(best);
+  }
+  function killFoe(f) {
+    f.alive = false; f.hp = 0;
+    player.exp += f.exp;
+    var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
+    player.stones += st;
+    addFloater(f.x, f.y - 0.4, '+' + st + ' 灵石', '#8bf3ff');
+    spawnParticles(f.x, f.y);
+    if (player.targetFoe === f) player.targetFoe = null;
+    f.respawn = 10 + Math.random() * 6;   // 一段时间后原地复活，打怪场常驻
+  }
+  function respawnFoe(f) {
+    var s = snapWalkable(CUR, f.home.x, f.home.y);
+    f.x = s.x; f.y = s.y; f.hp = f.maxhp; f.alive = true; f.flash = 0; f.atkCd = 0;
+  }
+  function playerDie() {
+    var lost = Math.floor(player.stones * 0.3);
+    player.stones -= lost;
+    var s = (CUR && CUR.spawn) ? CUR.spawn : { x: CUR.home.x, y: CUR.home.y };
+    player.mx = player.tx = s.x; player.my = player.ty = s.y;
+    player.path = null; player.targetFoe = null;
+    player.hp = player.maxhp; player.dead = false; player.flash = 0.3;
+    addFloater(player.mx, player.my - 0.4, '被击退！', '#ff8080');
+    var h = document.getElementById('hint');
+    if (h) h.textContent = '力竭遁走，折损灵石 ' + lost + '（已回出生点）';
+  }
+  function updateFoes(dt) {
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i];
+      if (!f.alive) { f.respawn -= dt; if (f.respawn <= 0) respawnFoe(f); continue; }
+      if (f.flash > 0) f.flash = Math.max(0, f.flash - dt);
+      if (f.atkAnim > 0) f.atkAnim = Math.max(0, f.atkAnim - dt);
+      var dx = player.mx - f.x, dy = player.my - f.y, dist = Math.hypot(dx, dy);
+      f.atkCd -= dt;
+      if (dist < AGGRO && !player.dead) {
+        var sp = f.def_.mv * dt, ux = dx / (dist || 1), uy = dy / (dist || 1);
+        if (couldStand(f.x + ux * sp, f.y)) f.x += ux * sp;
+        if (couldStand(f.x, f.y + uy * sp)) f.y += uy * sp;
+        f.face = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+        if (dist < MELEE + 0.15 && f.atkCd <= 0) {
+          f.atkCd = 1.0; f.atkAnim = 0.32;
+          var real = Math.max(1, Math.round(f.atk - player.def * 0.5));
+          player.hp -= real; player.flash = 0.25;
+          addFloater(player.mx, player.my - 0.35, '-' + real, '#ff6b6b');
+          if (player.hp <= 0) playerDie();
+        }
+      }
+    }
+  }
+  function updateFloaters(dt) {
+    if (clickMark) { clickMark.life -= dt; if (clickMark.life <= 0) clickMark = null; }
+    for (var i = floaters.length - 1; i >= 0; i--) {
+      var f = floaters[i]; f.life -= dt; f.off += 34 * dt; if (f.life <= 0) floaters.splice(i, 1);
+    }
+    for (var j = particles.length - 1; j >= 0; j--) {
+      var p = particles[j]; p.life -= dt; p.mx += p.vx * dt; p.my += p.vy * dt; p.vy += 6 * dt;
+      if (p.life <= 0) particles.splice(j, 1);
+    }
+  }
+  // 图集键是 `base_idle_xxx` / `base_attack_xxx` 这种带状态后缀的，
+  // 而 foes 对象里只存了 base（f.key）。这里按「攻击帧优先、否则待机帧、再兜底取首帧」拼出真实键，
+  // 这样即便盲切方向偶有错位，妖兽也至少能显示出来而不会整只消失。
+  function foeFrameKey(f) {
+    var base = f.key, rect = ATLAS.foes.rect || {};
+    if (f.atkAnim > 0) {
+      var ka = base + '_attack_' + f.face;
+      if (rect[ka]) return ka;
+    }
+    var ki = base + '_idle_' + f.face;
+    if (rect[ki]) return ki;
+    var keys = Object.keys(rect);
+    for (var i = 0; i < keys.length; i++) if (keys[i].indexOf(base + '_') === 0) return keys[i];
+    return base;
+  }
+  function drawFoe(f) {
+    if (!f.alive) return;
+    var pz = foePiece(foeFrameKey(f));
+    var p = isoToScreen(f.x, f.y);
+    var baseY = p.y + HH * Z;
+    ctx.save();
+    ctx.globalAlpha = 0.3; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, TILE_W * 0.18 * Z, TILE_H * 0.18 * Z, 0, 0, 6.2832); ctx.fill();
+    ctx.restore();
+    if (!pz) return;
+    var sc = f.def_.scale || 1.15;
+    var ow = pz.w * Z * sc, oh = pz.h * Z * sc;
+    var dx = p.x - ow / 2, dy = baseY - oh;
+    var sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(dx), Math.round(dy), Math.round(ow), Math.round(oh));
+    if (f.flash > 0) {  // 受击闪白（lighter 只叠加在精灵像素上，透明处不显）
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.min(0.9, f.flash * 4);
+      ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(dx), Math.round(dy), Math.round(ow), Math.round(oh));
+      ctx.restore();
+    }
+    ctx.imageSmoothingEnabled = sm;
+    if (f.def_.boss || f.def_.elite) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = f.def_.boss ? 'rgba(255,90,90,.7)' : 'rgba(255,200,90,.6)';
+      ctx.lineWidth = 2 * Z;
+      ctx.beginPath(); ctx.ellipse(p.x, baseY - oh * 0.5, ow * 0.5, oh * 0.32, 0, 0, 6.2832); ctx.stroke();
+      ctx.restore();
+    }
+    var dist = Math.hypot(f.x - player.mx, f.y - player.my);
+    if (player.targetFoe === f || dist < 3.0) {
+      var ty = dy - 6 * Z;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold ' + (12 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+      ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.82)';
+      ctx.strokeText(f.name, p.x, ty); ctx.fillStyle = '#ffd0c0'; ctx.fillText(f.name, p.x, ty);
+      var bw = Math.max(40 * Z, ow * 0.7), bh = 5 * Z, bx = p.x - bw / 2, by = ty - 14 * Z;
+      ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = f.def_.boss ? '#ff5a5a' : (f.def_.elite ? '#ffb24d' : '#7be07b');
+      ctx.fillRect(bx, by, bw * Math.max(0, f.hp / f.maxhp), bh);
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1 * Z; ctx.strokeRect(bx, by, bw, bh);
+    }
+  }
+  // 点击行走的目标指示：落地菱形 + 扩散圈，淡出 0.7s，让玩家明确知道点到了哪格
+  function drawClickMark() {
+    if (!clickMark) return;
+    var p = isoToScreen(clickMark.mx, clickMark.my);
+    var cx = p.x, cy = p.y + HH * Z;
+    var t = Math.max(0, clickMark.life / clickMark.max);
+    var grow = 1 - t;
+    ctx.save();
+    var r = TILE_W * 0.5 * (0.4 + grow * 0.8) * Z;
+    ctx.globalAlpha = t * 0.8; ctx.strokeStyle = '#8bf3ff'; ctx.lineWidth = 2.5 * Z;
+    ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.5, 0, 0, 6.2832); ctx.stroke();
+    ctx.globalAlpha = t * 0.9; ctx.fillStyle = 'rgba(139,243,255,.30)'; ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 1.5 * Z;
+    var dw = HW * Z, dh = HH * Z;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - dh); ctx.lineTo(cx + dw, cy); ctx.lineTo(cx, cy + dh); ctx.lineTo(cx - dw, cy); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  function drawFloaters() {
+    for (var i = 0; i < floaters.length; i++) {
+      var f = floaters[i];
+      var p = isoToScreen(f.mx, f.my);
+      var y = p.y - 46 * Z - f.off;
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.life / f.max * 1.4));
+      ctx.textAlign = 'center';
+      ctx.font = 'bold ' + (15 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+      ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.85)';
+      ctx.strokeText(f.text, p.x, y); ctx.fillStyle = f.color; ctx.fillText(f.text, p.x, y);
+    }
+    ctx.globalAlpha = 1;
+    for (var j = 0; j < particles.length; j++) {
+      var pt = particles[j];
+      var q = isoToScreen(pt.mx, pt.my);
+      ctx.globalAlpha = Math.max(0, pt.life / pt.max);
+      ctx.fillStyle = pt.color;
+      var s = 4 * Z; ctx.fillRect(q.x - s / 2, q.y - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function updateHUD() {
+    var hpv = document.getElementById('hpv'); if (hpv) hpv.textContent = Math.max(0, Math.round(player.hp)) + '/' + player.maxhp;
+    var fill = document.getElementById('hpfill'); if (fill) fill.style.width = Math.max(0, player.hp / player.maxhp * 100) + '%';
+    var expv = document.getElementById('expv'); if (expv) expv.textContent = player.realmName + ' · 修为 ' + Math.round(player.exp);
+    var sv = document.getElementById('stonev'); if (sv) sv.textContent = player.stones;
+    var ft = document.getElementById('foetarget');
+    if (ft) {
+      if (player.targetFoe && player.targetFoe.alive) {
+        var f = player.targetFoe;
+        ft.style.display = 'block';
+        ft.querySelector('.ftname').textContent = f.name + '  ' + Math.max(0, Math.round(f.hp)) + '/' + f.maxhp;
+        ft.querySelector('.ftfill').style.width = Math.max(0, f.hp / f.maxhp * 100) + '%';
+      } else ft.style.display = 'none';
+    }
+  }
+
   // 点击移动
   function onClick(e) {
     var r = canvas.getBoundingClientRect();
     var iso = screenToIso(e.clientX - r.left, e.clientY - r.top);
-    setTargetCell(Math.round(iso.mx), Math.round(iso.my));
+    var cx = iso.mx, cy = iso.my;
+    // 点到妖兽：锁定追击（清空普通寻路目标）；点空地：取消锁定
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i]; if (!f.alive) continue;
+      if (Math.hypot(f.x - cx, f.y - cy) < 0.8) { player.targetFoe = f; player.path = null; return; }
+    }
+    player.targetFoe = null;
+    var tx = Math.round(cx), ty = Math.round(cy);
+    if (setTargetCell(tx, ty)) clickMark = { mx: tx, my: ty, life: 0.7, max: 0.7 };
   }
   canvas.addEventListener('mousedown', function (e) { if (e.button === 0) onClick(e); });
 
@@ -686,7 +1089,7 @@
   // ---------------- 主角外形切换 ----------------
   function setHero(h) {
     if (!h) return;
-    PLAYER_SRC = h.src;
+    PLAYER_SRC = h.file;
     try { localStorage.setItem('isles.hero', String(h.n)); } catch (e) { }
     var bs = document.querySelectorAll('#heroBtns button');
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', +bs[i].dataset.n === h.n);
@@ -706,7 +1109,7 @@
     var want = preferN || 0;
     if (!want) { try { want = +localStorage.getItem('isles.hero') || 0; } catch (e) { } }
     var pick = HERO_OPTIONS.filter(function (h) { return h.n === want; })[0] || HERO_OPTIONS[0];
-    PLAYER_SRC = pick.src;
+    PLAYER_SRC = pick.file;
     var bs = document.querySelectorAll('#heroBtns button');
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', +bs[i].dataset.n === pick.n);
     var nowEl = document.getElementById('heroNow');
@@ -739,6 +1142,7 @@
     var dt = Math.min(0.05, (ts - last) / 1000);
     last = ts;
     if (!held) update(dt);
+    if (ready) updateHUD();
     render();
     if (window.__dbg && CUR) {
       window.__dbg.textContent = JSON.stringify({
@@ -761,12 +1165,14 @@
     /** 等价于鼠标点击第 (x,y) 格：走的是 onClick 同一条设置目标格的路径 */
     clickCell: function (x, y) { return setTargetCell(x, y); },
     setZoom: function (z) { setZoom(z, W / 2, H / 2); return Zt; },
-    heroes: function () { return HERO_OPTIONS.map(function (h) { return { n: h.n, src: h.src }; }); },
+    heroes: function () { return HERO_OPTIONS.map(function (h) { return { n: h.n, src: h.file }; }); },
     setHero: function (n) { setHero(HERO_OPTIONS.filter(function (h) { return h.n === n; })[0]); return PLAYER_SRC; },
     goto: function (id, x, y) { switchTo(id, x === undefined ? IDX[id].home.x : x, y === undefined ? IDX[id].home.y : y, false); },
     /** 把玩家放到当前地图第 i 个传送门上，下一次 update 即触发切换 */
     stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; player.path = null; portalLock = 0; },
     tick: function (dt) { update(dt || 0.016); render(); },
+    attackNearest: function () { attackNearest(); },
+    foeCount: function () { return (foes || []).filter(function (f) { return f.alive; }).length; },
     _p: player
   };
 
