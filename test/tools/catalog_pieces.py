@@ -8,7 +8,7 @@ from collections import Counter
 import numpy as np
 from PIL import Image, ImageDraw
 
-ROOT = r"C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/immortal-isles"
+ROOT = r"C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test"
 SL = os.path.join(ROOT, "assets", "sliced")
 OUT_JSON = os.path.join(SL, "catalog.json")
 OUT_SHEET = os.path.join(SL, "_pieces_contact.png")

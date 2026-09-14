@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from scipy import ndimage
 
 SRC = 'C:/Users/Lenovo/.workbuddy/clipboard-images/clipboard-2026-09-14T02-58-19-170Z-4f37f117.jpg'
-ROOT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/immortal-isles'
+ROOT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test'
 OUT = os.path.join(ROOT, 'assets', 'sliced')
 os.makedirs(OUT, exist_ok=True)
 

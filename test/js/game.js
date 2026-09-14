@@ -12,13 +12,29 @@
 
   // 角色 sprite sheet（6列×5行，64×64/格）：行0=正面 行1=右 行2=左 行3=背
   var SHEET = { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, pxScale: 2 };
-  var PLAYER_SRC = 'assets/char_player.png';
+  // 文件名带版本号：浏览器会缓存同名图片，换精灵时必须换名，否则玩家仍看到旧图
+  // 主角外形可切换：全部取自「武侠修仙免费包」，规格一致（6 列 × 5 行 @64px）。
+  // 1 号是该包官方 Godot 示例的默认角色；其余几个同时兼任 NPC，不重复打包素材。
+  // 直接指定：?hero=14
+  var HERO_OPTIONS = [
+    { n: 1, src: 'assets/char_hero.png', label: '1 号' },
+    { n: 5, src: 'assets/npc_5.png', label: '5 号' },
+    { n: 10, src: 'assets/npc_10.png', label: '10 号' },
+    { n: 14, src: 'assets/npc_14.png', label: '14 号' },
+    { n: 18, src: 'assets/npc_18.png', label: '18 号' },
+    { n: 20, src: 'assets/npc_20.png', label: '20 号' }
+  ];
+  var PLAYER_SRC = HERO_OPTIONS[0].src;
+  var npcSrc = function (c) { return 'assets/' + c + '.png'; };
 
   var IMG = {};              // file -> Image
   var MAPS = [], IDX = {}, CUR = null;
   var PAL = {}, WALK = '';
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0 };
   var camX = 0, camY = 0, time = 0;
+  // 上一帧的绘制计数（QA 用）：确认 NPC 真的走了 drawNPC 分支，
+  // 而不是被 <0 的兜底分支当成玩家画出来
+  var _draw = { actor: 0, npc: 0 };
   // 视口缩放：Zt=目标倍数、Z=平滑跟随值；zAx/zAy=缩放锚点（默认屏幕中心）
   // 幅度刻意收窄在 0.62~1.72（约 ±40%）：再小地图碎成蚂蚁、再大贴图糊成色块
   var Z = 1, Zt = 1, ZMIN = 0.62, ZMAX = 1.72, zAx = 0, zAy = 0, zAnchor = false;
@@ -26,6 +42,7 @@
   var fadeA = 0, fadeDir = 0, pending = null, portalLock = 0;
   var HOLD = false, held = false;
   var cloudCv = null;
+  var NPC_FILES = {};
   var ready = false;
 
   var SKY_TOP = '#a9d6ee', SKY_MID = '#d7ecf9', SKY_BOT = '#f4fbfe';
@@ -137,12 +154,20 @@
       MAPS.forEach(function (m) { m.objects.forEach(function (o) { files[o.piece] = 1; }); });
       var list = Object.keys(files).map(function (f) { return 'assets/sliced/' + f; });
       list.push(PLAYER_SRC);
+      NPC_FILES = {};
+      MAPS.forEach(function (m) {
+        (m.npcs || []).forEach(function (n) { NPC_FILES[npcSrc(n.char)] = 1; });
+      });
+      Object.keys(NPC_FILES).forEach(function (s) { list.push(s); });
+      HERO_OPTIONS.forEach(function (h) { if (list.indexOf(h.src) < 0) list.push(h.src); });
 
       return Promise.all(list.map(loadImg)).then(function () {
+        var q = new URLSearchParams(location.search);
         buildCloudSprite();
         buildButtons();
         buildZoomUI();
-        var q = new URLSearchParams(location.search);
+        // 主角外形：?hero=14 指定 > 上次手选记忆 > 默认 1 号
+        buildHeroUI(+q.get('hero') || 0);
         // ?z=1.25 可直接以指定缩放打开（同样受 0.62~1.72 限制）
         var zq = parseFloat(q.get('z'));
         if (zq > 0) {
@@ -150,11 +175,13 @@
           zAnchor = true; zAx = W / 2; zAy = H / 2;
           updateZoomUI();
         }
-        var mid = q.get('map');
         var start = IDX[q.get('map')] ? q.get('map') : data.start.map;
         var m = IDX[start] || MAPS[0];
-        var sx = q.get('x') !== null ? +q.get('x') : (IDX[start] ? m.home.x : data.start.x);
-        var sy = q.get('y') !== null ? +q.get('y') : (IDX[start] ? m.home.y : data.start.y);
+        // 没显式给坐标时：起点图用 maps.json 里写好的 start（山门广场），
+        // 其它图落到离地图中心最近的可走格 —— 旧的写法把 start 里的坐标当摆设，一直没用上。
+        var useCfg = (start === data.start.map);
+        var sx = q.get('x') !== null ? +q.get('x') : (useCfg ? data.start.x : m.home.x);
+        var sy = q.get('y') !== null ? +q.get('y') : (useCfg ? data.start.y : m.home.y);
         switchTo(m.id, sx, sy, true);
         document.getElementById('loader').style.display = 'none';
         ready = true;
@@ -165,8 +192,20 @@
         window.__dbg = dbg;
         var at = q.get('autotest');
         HOLD = q.get('hold') === '1';
+        // 无头浏览器里 rAF 的 dt 常常接近 0（虚拟时钟只推进定时器、不推进帧），
+        // 过渡动画就会卡在 fade≈0.08 永远走不完 —— 这是抓取环境的假象，不是引擎 bug。
+        // 所以自测一律用 ISLES.tick(1/60) 手动推进固定步长，结果可复现。
+        function sim(seconds) {
+          var n = Math.round(seconds * 60);
+          for (var i = 0; i < n; i++) window.ISLES.tick(1 / 60);
+        }
         if (at && at.indexOf('portal') === 0) {
-          setTimeout(function () { window.ISLES.stepOnPortal(0); }, 150);
+          setTimeout(function () { window.ISLES.stepOnPortal(0); sim(3); }, 60);
+        }
+        if (at === 'walk') {
+          // 程序化按住「右」1.2 秒：读 #dbg 的 mx 有没有变大，即可确认键盘行走真的生效
+          keys['d'] = 1;
+          setTimeout(function () { sim(1.2); keys['d'] = 0; sim(0.1); }, 60);
         }
         requestAnimationFrame(loop);
       });
@@ -269,11 +308,10 @@
     ctx.fillText(label, cx, cy - 46 * Z);
   }
 
-  function drawCharacter() {
-    var img = IMG[PLAYER_SRC];
-    var p = isoToScreen(player.mx, player.my);
-    // 角色是 64px 帧的像素画：按整数倍 2× 绘制（128px），每个源像素＝2×2 方块，
-    // 缩放时也不会被插值糊掉 —— 所以角色单独走最近邻，不跟随背景的平滑开关
+  /** 画一个角色（影子 + 按朝向/帧取图）。玩家与 NPC 共用同一套绘制，规格完全一致 */
+  function drawActor(img, mx, my, face, frame, bob) {
+    _draw.actor++;
+    var p = isoToScreen(mx, my);
     var dh = SHEET.cellH * SHEET.pxScale * Z, dw = dh * (SHEET.cellW / SHEET.cellH);
     var baseY = p.y + HH * Z;
     // 影子
@@ -284,18 +322,50 @@
     ctx.ellipse(p.x, baseY - 2, TILE_W * 0.20 * Z, TILE_H * 0.20 * Z, 0, 0, 6.2832);
     ctx.fill();
     ctx.restore();
-    if (!img) return;
-    var row = SHEET.dir[player.face] || 0;
-    var frame = (player.walk > 0 ? Math.floor(player.walk * 6) % SHEET.frames : 0);
+    if (!img) return null;
+    var row = SHEET.dir[face] || 0;
     var sx = frame * SHEET.cellW, sy = row * SHEET.cellH;
     var sm = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, sx, sy, SHEET.cellW, SHEET.cellH,
-      p.x - dw / 2, baseY - dh + 4, dw, dh);
+      p.x - dw / 2, baseY - dh + 4 + (bob || 0) * Z, dw, dh);
     ctx.imageSmoothingEnabled = sm;
+    return { x: p.x, top: baseY - dh + 4 };
+  }
+
+  function drawCharacter() {
+    var frame = (player.walk > 0 ? Math.floor(player.walk * 6) % SHEET.frames : 0);
+    drawActor(IMG[PLAYER_SRC], player.mx, player.my, player.face, frame, 0);
+  }
+
+  /** NPC：站立取第 0 帧（图集已把最中性那帧旋到 0），叠一点极轻的呼吸起伏，不再是死图 */
+  function drawNPC(n) {
+    _draw.npc++;
+    var img = IMG[npcSrc(n.char)];
+    var bob = Math.sin(time * 1.7 + n.x * 1.3 + n.y * 0.7) * 1.2;
+    var node = drawActor(img, n.x, n.y, n.face, 0, bob);
+    if (!node) return;
+    var near = Math.abs(player.mx - n.x) < 2.2 && Math.abs(player.my - n.y) < 2.2;
+    var ty = node.top - 6 * Z;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold ' + (12 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+    ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.82)';
+    ctx.strokeText(n.name, node.x, ty);
+    ctx.fillStyle = near ? '#ffe9a6' : '#cfe6ff';
+    ctx.fillText(n.name, node.x, ty);
+    if (near && n.line) {                      // 走近了才说话
+      ctx.font = (12.5 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+      var w = ctx.measureText(n.line).width, pad = 7 * Z, hh = 19 * Z, ly = ty - 17 * Z;
+      ctx.fillStyle = 'rgba(10,18,34,.78)';
+      ctx.beginPath(); ctx.rect(node.x - w / 2 - pad, ly - hh + 6 * Z, w + pad * 2, hh); ctx.fill();
+      ctx.lineWidth = 1.5 * Z; ctx.strokeStyle = 'rgba(255,215,120,.55)'; ctx.stroke();
+      ctx.fillStyle = '#f2f6ff';
+      ctx.fillText(n.line, node.x, ly);
+    }
   }
 
   function render() {
+    _draw.actor = 0; _draw.npc = 0;
     // Z<=1 保持硬边像素观感；放大时开插值，避免就近邻放大出锯齿方块
     ctx.imageSmoothingEnabled = Z > 1.02;
     drawSky();
@@ -305,16 +375,20 @@
     // 传送门画在地面上、物件下
     CUR.portals.forEach(drawPortal);
 
-    // 物件按深度排序（x+y 大者更靠前）
+    // 物件按深度排序（x+y 大者更靠前）；NPC 与玩家一起参与排序
     var list = [];
     CUR.objects.forEach(function (o, i) {
       list.push({ k: (o.x + (o.fw || 1) - 1) + (o.y + (o.fh || 1) - 1) + 0.5, i: i, o: o });
     });
+    (CUR.npcs || []).forEach(function (n) { list.push({ k: n.x + n.y + 0.01, i: -2, o: n }); });
     list.push({ k: player.mx + player.my, i: -1, o: null });
     list.sort(function (a, b) { return a.k - b.k; });
 
     list.forEach(function (it) {
-      if (it.i < 0) { drawCharacter(); return; }
+      // 注意顺序：NPC 用 i=-2、玩家用 i=-1，两者都 <0。
+      // 必须先判 -2 再判 <0，否则 NPC 会全部被当成玩家画出来（地图上到处是主角的复制品）。
+      if (it.i === -2) { drawNPC(it.o); return; }
+      if (it.i === -1) { drawCharacter(); return; }
       var o = it.o;
       var img = IMG['assets/sliced/' + o.piece];
       if (!img) return;
@@ -341,6 +415,10 @@
   // ---------------- 逻辑 ----------------
   function switchTo(id, x, y, silent) {
     CUR = IDX[id] || MAPS[0];
+    // 落点若压在实体/虚空上（传送门落点、?x=&y= 手写坐标都可能），就近吸附到可走格，
+    // 否则玩家一落地就卡死、连传送阵都触发不了。
+    var sp = snapWalkable(CUR, x, y);
+    x = sp.x; y = sp.y;
     player.mx = player.tx = x; player.my = player.ty = y;
     player.face = 'down'; player.walk = 0;
     portalLock = 0.5;
@@ -354,9 +432,30 @@
   }
 
   function couldStand(x, y) {
-    var o = [[0, 0], [-0.25, 0], [0.25, 0], [0, -0.25], [0, 0.25]];
-    for (var i = 0; i < o.length; i++) if (!walkable(Math.round(x) + o[i][0], Math.round(y) + o[i][1])) return false;
-    return true;
+    // ⚠️ 这里必须只用「整数格」采样。
+    // 旧版写成 walkable(Math.round(x) - 0.25, ...) 之类，落到 CUR.ground[y][11.75]
+    // 取到 undefined，walkable 恒为 false —— 表现就是「WASD 只能转向、走不动」。
+    // 现在：目标格可走即可（配合横纵分轴推进，天然获得贴墙滑行手感）。
+    return walkable(Math.round(x), Math.round(y));
+  }
+  /** 把一个可能落在实体/虚空上的坐标吸附到最近的合法可走格（BFS 同心圈） */
+  function snapWalkable(mp, x, y) {
+    if (walkable(x, y)) return { x: x, y: y };
+    for (var r = 1; r <= 12; r++) {
+      var best = null, bd = 1e9;
+      for (var dx = -r; dx <= r; dx++) {
+        for (var dy = -r; dy <= r; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          var nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= mp.w || ny >= mp.h) continue;
+          if (WALK.indexOf(mp.ground[ny][nx]) < 0 || mp.solid['' + nx + ',' + ny]) continue;
+          var d = dx * dx + dy * dy;
+          if (d < bd) { bd = d; best = { x: nx, y: ny }; }
+        }
+      }
+      if (best) return best;
+    }
+    return { x: mp.home.x, y: mp.home.y };
   }
 
   var keys = {};
@@ -398,28 +497,33 @@
 
     var d = inputDir();
     var speed = 5.2;
-    var moving = false;
+    var px0 = player.mx, py0 = player.my;
+
+    // 朝向：按下方向键立刻转身（哪怕前面被挡，也该先转过来）
     if (d.dx || d.dy) {
+      if (Math.abs(d.dx) > Math.abs(d.dy)) player.face = d.dx > 0 ? 'right' : 'left';
+      else player.face = d.dy > 0 ? 'down' : 'up';
+    }
+
+    if (d.dx || d.dy) {
+      // 键盘直推：x/y 分轴推进，撞到实体时自动沿墙滑行
       var nx = player.mx + d.dx * speed * dt, ny = player.my + d.dy * speed * dt;
       if (couldStand(nx, player.my)) player.mx = nx;
       if (couldStand(player.mx, ny)) player.my = ny;
       player.tx = Math.round(player.mx); player.ty = Math.round(player.my);
-      moving = true;
     } else if (Math.abs(player.tx - player.mx) > 0.001 || Math.abs(player.ty - player.my) > 0.001) {
+      // 点击寻路：朝目标格推进
       var dx = player.tx - player.mx, dy = player.ty - player.my;
       var dist = Math.sqrt(dx * dx + dy * dy);
       var stepLen = speed * dt;
       if (dist <= stepLen) { player.mx = player.tx; player.my = player.ty; }
       else { player.mx += dx / dist * stepLen; player.my += dy / dist * stepLen; }
-      moving = true;
     }
-    player.walk = moving ? player.walk + dt : 0;
-    if (moving) {
-      var fdx = player.tx - player.mx, fdy = player.ty - player.my;
-      if (d.dx || d.dy) { fdx = d.dx; fdy = d.dy; }
-      if (Math.abs(fdx) > Math.abs(fdy)) player.face = fdx > 0 ? 'right' : 'left';
-      else player.face = fdy > 0 ? 'down' : 'up';
-    }
+
+    // 行走帧只在**真的挪动了**时才推进：贴着墙按方向键就是「转身站住」，
+    // 不会再出现原地踏空的假动作（旧版把「按了键」当「在走路」，所以只转向不移动）
+    var moved = Math.abs(player.mx - px0) > 1e-5 || Math.abs(player.my - py0) > 1e-5;
+    player.walk = moved ? player.walk + dt : 0;
 
     // —— 传送门检测 ——
     if (portalLock <= 0) {
@@ -486,6 +590,37 @@
   }, { passive: false });
   canvas.addEventListener('touchend', function (e) { if (e.touches.length < 2) pinchD = 0; });
 
+  // ---------------- 主角外形切换 ----------------
+  function setHero(h) {
+    if (!h) return;
+    PLAYER_SRC = h.src;
+    try { localStorage.setItem('isles.hero', String(h.n)); } catch (e) { }
+    var bs = document.querySelectorAll('#heroBtns button');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', +bs[i].dataset.n === h.n);
+    document.getElementById('hint').textContent = '主角已换为免费包第 ' + h.n + ' 号角色';
+  }
+  function buildHeroUI(preferN) {
+    var box = document.getElementById('heroBtns');
+    if (!box) return;
+    box.innerHTML = '';
+    HERO_OPTIONS.forEach(function (h) {
+      var b = document.createElement('button');
+      b.textContent = h.label; b.dataset.n = h.n;
+      b.title = '把主角换成免费包第 ' + h.n + ' 号角色';
+      b.onclick = function () { setHero(h); };
+      box.appendChild(b);
+    });
+    var want = preferN || 0;
+    if (!want) { try { want = +localStorage.getItem('isles.hero') || 0; } catch (e) { } }
+    var pick = HERO_OPTIONS.filter(function (h) { return h.n === want; })[0] || HERO_OPTIONS[0];
+    PLAYER_SRC = pick.src;
+    var bs = document.querySelectorAll('#heroBtns button');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', +bs[i].dataset.n === pick.n);
+    var nowEl = document.getElementById('heroNow');
+    if (nowEl) nowEl.textContent = pick.label;
+    if (preferN) { try { localStorage.setItem('isles.hero', String(pick.n)); } catch (e) { } }
+  }
+
   function buildButtons() {
     var box = document.getElementById('mapBtns');
     box.innerHTML = '';
@@ -516,7 +651,8 @@
       window.__dbg.textContent = JSON.stringify({
         map: CUR.id, fade: +fadeA.toFixed(2), held: held,
         mx: +player.mx.toFixed(2), my: +player.my.toFixed(2),
-        zoom: +Z.toFixed(3), zoomT: +Zt.toFixed(3)
+        zoom: +Z.toFixed(3), zoomT: +Zt.toFixed(3),
+        actors: _draw.actor, npcs: _draw.npc
       });
     }
     requestAnimationFrame(loop);
@@ -529,6 +665,8 @@
     list: function () { return MAPS.map(function (m) { return { id: m.id, name: m.name, w: m.w, h: m.h, objects: m.objects.length, portals: m.portals.map(function (p) { return { x: p.x, y: p.y, to: p.to }; }) }; }); },
     state: function () { return { map: CUR && CUR.id, mx: +player.mx.toFixed(2), my: +player.my.toFixed(2), fade: +fadeA.toFixed(2), zoom: +Z.toFixed(3) }; },
     setZoom: function (z) { setZoom(z, W / 2, H / 2); return Zt; },
+    heroes: function () { return HERO_OPTIONS.map(function (h) { return { n: h.n, src: h.src }; }); },
+    setHero: function (n) { setHero(HERO_OPTIONS.filter(function (h) { return h.n === n; })[0]); return PLAYER_SRC; },
     goto: function (id, x, y) { switchTo(id, x === undefined ? IDX[id].home.x : x, y === undefined ? IDX[id].home.y : y, false); },
     /** 把玩家放到当前地图第 i 个传送门上，下一次 update 即触发切换 */
     stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; portalLock = 0; },

@@ -4,7 +4,7 @@ import os
 import numpy as np
 from PIL import Image
 
-OUT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/immortal-isles/assets/sliced'
+OUT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/assets/sliced'
 CAND = ['building_015_119x75.png', 'building_012_120x77.png', 'building_017_118x75.png',
         'building_016_119x76.png', 'building_014_119x77.png', 'building_018_115x73.png']
 

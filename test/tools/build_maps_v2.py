@@ -12,7 +12,7 @@ ground: '.'草地 ','苔草 '#'石板 ';'青石 '~'水 '-'深水 ' '虚空
 import os, json, random
 from collections import deque
 
-ROOT = r"C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/immortal-isles"
+ROOT = r"C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test"
 SLICED = os.path.join(ROOT, "assets", "sliced")
 man = json.load(open(os.path.join(SLICED, "manifest.json"), encoding="utf-8"))
 HAVE = {m["file"] for m in man["pieces"]}
@@ -481,3 +481,13 @@ for m in maps:
     print(f"{m.id:9s} {m.name:5s} {m.w}x{m.h} 物件={len(m.objs):3d}（贴花{deco:3d}） "
           f"实心格={len(m.solid_cells):3d} 可走格={walk_cells:4d} 传送门={len(m.portals)}")
 print("wrote assets/maps.json")
+
+# ---------------- NPC 注入（必须内联，否则每次重生成 maps.json 都会丢掉 NPC）----------------
+# 早期 NPC 是 add_npcs.py 单独跑的后处理步骤，结果是：只要重跑本脚本，NPC 就静默消失。
+# 现在把这一步并进来，"跑一次 build_maps_v2.py" 就等于完整数据。
+import importlib.util
+_spec = importlib.util.spec_from_file_location(
+    "add_npcs", os.path.join(os.path.dirname(os.path.abspath(__file__)), "add_npcs.py"))
+_add = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_add)
+_add.main()

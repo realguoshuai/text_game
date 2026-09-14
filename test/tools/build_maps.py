@@ -7,7 +7,7 @@
 """
 import os, json
 
-ROOT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/immortal-isles'
+ROOT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test'
 SLICED = os.path.join(ROOT, 'assets', 'sliced')
 man = json.load(open(os.path.join(SLICED, 'manifest.json'), encoding='utf-8'))
 HAVE = {m['file'] for m in man['pieces']}

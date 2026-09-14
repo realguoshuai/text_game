@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 SRC = r"C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/sucai"
-OUT = r"C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/immortal-isles/_analysis"
+OUT = r"C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/_analysis"
 os.makedirs(OUT, exist_ok=True)
 
 files = sorted(f for f in os.listdir(SRC) if f.lower().endswith((".jpg", ".jpeg", ".png")))

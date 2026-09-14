@@ -5,7 +5,7 @@ from collections import Counter
 import numpy as np
 from PIL import Image
 
-OUT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/immortal-isles/assets/sliced'
+OUT = 'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/assets/sliced'
 man = json.load(open(os.path.join(OUT, 'manifest.json'), encoding='utf-8'))
 
 def domi(a, m, topn=3):
