@@ -1356,8 +1356,8 @@
      "x": 32,
      "y": 16,
      "to": "beilin",
-     "spawnX": 4,
-     "spawnY": 14,
+     "spawnX": 15,
+     "spawnY": 22,
      "label": "碑林石阵"
     }
    ],
@@ -2613,8 +2613,8 @@
      "x": 28,
      "y": 24,
      "to": "beilin",
-     "spawnX": 4,
-     "spawnY": 14,
+     "spawnX": 15,
+     "spawnY": 22,
      "label": "碑林石阵"
     }
    ],

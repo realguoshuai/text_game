@@ -81,6 +81,25 @@
   #bottom kbd{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
     border-radius:4px;padding:1px 5px;font-family:inherit;color:#fff;font-size:11.5px}
   #bottom .hl{color:#8bf3ff}
+  /* 屏幕攻击键：键盘之外的第二条出手路径，手机也能按 */
+  #actions{right:14px;bottom:14px;display:flex;gap:8px;pointer-events:auto;z-index:11}
+  #actions .act{pointer-events:auto;cursor:pointer;font-family:inherit;
+    background:linear-gradient(180deg,rgba(158,58,58,.94),rgba(92,28,28,.96));
+    color:#ffeccf;border:1px solid rgba(255,150,120,.65);border-radius:12px;
+    padding:13px 20px;font-size:15px;font-weight:700;letter-spacing:2px;
+    box-shadow:0 6px 18px rgba(0,0,0,.42);transition:.12s;display:flex;align-items:center;gap:7px}
+  #actions .act:hover{background:linear-gradient(180deg,#c04a4a,#7a2828);border-color:#ffd75e;color:#fff}
+  #actions .act:active{transform:translateY(1px)}
+  #actions .act kbd{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+    border-radius:4px;padding:1px 6px;font-family:inherit;font-size:11.5px;font-weight:600}
+  /* 居中事件提示（被击退/折损灵石等） */
+  #toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-6px);z-index:60;
+    padding:10px 20px;border-radius:10px;pointer-events:none;max-width:82vw;text-align:center;
+    background:linear-gradient(180deg,rgba(120,26,26,.94),rgba(70,14,14,.96));
+    border:1px solid rgba(255,150,120,.55);color:#ffe4d6;font-size:14px;letter-spacing:1px;
+    box-shadow:0 8px 26px rgba(0,0,0,.45);opacity:0;transition:opacity .2s,transform .2s}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
   #loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 50% 38%,#16233f,#0a1120 72%);z-index:99}
   .loadbox{width:min(360px,80vw);text-align:center}
@@ -138,7 +157,11 @@
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> 行走　·　
   点击格子移动　·　<span class="hl">滚轮 / +/-</span> 缩放视图（0.62~1.72 倍）　·　
   走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）　·　
-  走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / 空格</span> 或 <span class="hl">点击妖兽</span> 出手（碑林石阵可打怪）
+  走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 或 <span class="hl">点击妖兽</span> 出手（碑林石阵可打怪）
+</div>
+
+<div id="actions" class="hud">
+  <button id="btnAtk" class="act" title="攻击最近的妖兽（J / F / 空格）">攻击 <kbd>J</kbd></button>
 </div>
 
 <div id="loader">

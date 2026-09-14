@@ -47,23 +47,26 @@
   var PAL = {}, WALK = '';
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
     hp: 130, maxhp: 130, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
-    attackCd: 0, targetFoe: null, dead: false, flash: 0 };
+    attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0 };
+  var screenFlash = 0;   // 受重击/被击退时的全屏红闪（避免玩家莫名其妙"换了个地方"）
 
   // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
   // 严格模式下这些必须先用 var 声明，否则 switchTo 里 `foes=…` 会抛 ReferenceError 直接卡死启动。
   var foes = [], floaters = [], particles = [], clickMark = null;
   var MELEE = 1.45, AGGRO = 6.5;   // 近身出手半径 / 妖兽仇恨半径（格）
   var FOE_DEFS = {
-    assassin: { key: 'assassin', name: '刀影飞镖',     hp: 42,  atk: 14, def: 4,  exp: 12, stones: [3, 7],   mv: 3.2,  scale: 1.00 },
-    golem:    { key: 'golem',    name: '九州震击石魔', hp: 130, atk: 16, def: 12, exp: 32, stones: [8, 16],  mv: 1.55, scale: 1.18, elite: true },
-    wraith:   { key: 'wraith',   name: '水墨幽魂',     hp: 74,  atk: 17, def: 7,  exp: 22, stones: [5, 11],  mv: 2.2,  scale: 1.02 }
+    // fh = 目标绘制身高（屏幕像素，Z=1 时）；主角为 128，妖兽略矮，精英石魔接近主角
+    assassin: { key: 'assassin', name: '刀影飞镖',     hp: 42,  atk: 14, def: 4,  exp: 12, stones: [3, 7],   mv: 3.2,  fh: 90 },
+    golem:    { key: 'golem',    name: '九州震击石魔', hp: 130, atk: 16, def: 12, exp: 32, stones: [8, 16],  mv: 1.55, fh: 124, elite: true },
+    wraith:   { key: 'wraith',   name: '水墨幽魂',     hp: 74,  atk: 17, def: 7,  exp: 22, stones: [5, 11],  mv: 2.2,  fh: 104 }
   };
   // 12 只散布在 30×30 碑林；坐标由 snapWalkable 吸附到最近可走格，故可略放宽。
   var BEILIN_SPAWNS = [
     { x: 6,  y: 6,  t: 'assassin' }, { x: 10, y: 4,  t: 'assassin' }, { x: 22, y: 8,  t: 'assassin' },
     { x: 25, y: 18, t: 'assassin' }, { x: 8,  y: 20, t: 'assassin' },
     { x: 14, y: 10, t: 'golem' },    { x: 18, y: 16, t: 'golem' },    { x: 10, y: 22, t: 'golem' },
-    { x: 20, y: 5,  t: 'wraith' },   { x: 24, y: 22, t: 'wraith' },   { x: 5,  y: 15, t: 'wraith' },
+    // 注意：不要挨着传送门刷怪（门在 4,15 与 26,23）——追怪时容易误踩门被传到别的地图
+    { x: 20, y: 5,  t: 'wraith' },   { x: 21, y: 27, t: 'wraith' },   { x: 7,  y: 9,  t: 'wraith' },
     { x: 16, y: 26, t: 'wraith' }
   ];
   var camX = 0, camY = 0, time = 0;
@@ -373,6 +376,30 @@
           var pb = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
           pb.textContent = JSON.stringify({ alive: alive, total: foes.length, exp: player.exp, stones: player.stones, hp: Math.round(player.hp) });
         }
+        if (at === 'foesize') {
+          // ?map=beilin&autotest=foesize —— 校验每只怪每个朝向/状态都能解析到帧，且绘制尺寸已归一化
+          var rows = window.ISLES.foeDebug();
+          var bad = rows.filter(function (r) { return r.w <= 0 || r.h <= 0; });
+          var heights = {};
+          rows.forEach(function (r) { heights[r.base] = r.drawH; });
+          var pb2 = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          pb2.textContent = JSON.stringify({ frames: rows.length, bad: bad.length, drawnH: heights, sample: rows.slice(0, 4) });
+        }
+        if (at === 'down') {
+          // ?map=beilin&autotest=down —— 验证气血耗尽只「原地击退」，不再瞬移回出生点
+          var f0c = foes[0];
+          if (f0c) { player.mx = f0c.x + 0.7; player.my = f0c.y; player.tx = player.mx; player.ty = player.my; }
+          player.targetFoe = null; player.path = null; player.hp = 5; player.invuln = 0;
+          var bx0 = player.mx, by0 = player.my;
+          for (var kk = 0; kk < 60; kk++) window.ISLES.tick(0.5);
+          var sp0 = (CUR && CUR.spawn) ? CUR.spawn : { x: 0, y: 0 };
+          var pb3 = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          pb3.textContent = JSON.stringify({
+            knockMoved: +Math.hypot(player.mx - bx0, player.my - by0).toFixed(2),
+            distToSpawn: +Math.hypot(player.mx - sp0.x, player.my - sp0.y).toFixed(2),
+            hp: Math.round(player.hp)
+          });
+        }
         requestAnimationFrame(loop);
       }
     }).catch(function (e) {
@@ -600,6 +627,12 @@
     vg.addColorStop(1, 'rgba(180,220,240,.16)');
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 
+    // 受重击红闪：给"被击退"一个明确的画面反馈，不再是无声无息地换个位置
+    if (screenFlash > 0) {
+      ctx.fillStyle = 'rgba(190,30,40,' + (screenFlash * 0.55).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+
     if (fadeA > 0) {
       ctx.fillStyle = 'rgba(7,12,26,' + fadeA.toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
@@ -696,6 +729,10 @@
     var k = e.key;
     keys[k.toLowerCase()] = 1;
     if (k.indexOf('Arrow') === 0) e.preventDefault();
+    // 出手：J / F / 空格（空格默认会滚动页面，必须拦截）。此前这里漏了分支，
+    // 所以按 J/空格毫无反应 —— 玩家体感就是「人物没有技能、无法攻击」。
+    if (k === ' ' || k === 'Spacebar') { e.preventDefault(); attackNearest(); return; }
+    if (k === 'j' || k === 'J' || k === 'f' || k === 'F') { e.preventDefault(); attackNearest(); return; }
     // 键盘缩放：+ / - 步进，0 复位
     if (k === '+' || k === '=') zoomBy(ZSTEP, W / 2, H / 2);
     else if (k === '-' || k === '_') zoomBy(1 / ZSTEP, W / 2, H / 2);
@@ -802,8 +839,11 @@
     }
     if (player.attackCd > 0) player.attackCd = Math.max(0, player.attackCd - dt);
     if (player.flash > 0) player.flash = Math.max(0, player.flash - dt);
+    if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
+    if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
     updateCam(dt);
     updateFoes(dt);
+    updateFloaters(dt);   // 此前从未被调用 —— 伤害飘字/击杀粒子不会消失
     var posEl = document.getElementById('pos');
     if (posEl) posEl.textContent = Math.round(player.mx) + ', ' + Math.round(player.my);
   }
@@ -849,6 +889,19 @@
       var a = Math.random() * 6.2832, sp = 1.5 + Math.random() * 2.5;
       particles.push({ mx: mx, my: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5, life: 0.6, max: 0.6, color: '#ffe1a0' });
     }
+  }
+  // 居中提示条：把"被击退/折损灵石"这类事件说清楚，避免玩家只看到画面一跳却没有解释
+  var toastEl = null, toastTimer = 0;
+  function toast(msg) {
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.id = 'toast';
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
   }
   // 玩家出手：范围 MELEE 内最近的妖兽受击；real=max(1,round(atk-def))
   function tryAttack() {
@@ -898,16 +951,33 @@
     var s = snapWalkable(CUR, f.home.x, f.home.y);
     f.x = s.x; f.y = s.y; f.hp = f.maxhp; f.alive = true; f.flash = 0; f.atkCd = 0;
   }
-  function playerDie() {
+  // 把玩家沿「背离凶手」方向推开，最多 tiles 格（每步 0.34 格，遇实体即停）。
+  // 旧版这里直接把玩家瞬移回出生点 —— 玩家体感是「被击飞一下到了别的地方」，
+  // 而且飘字还写着"被击退"，完全对不上。现在改成真的击退：位移小、方向明确、可理解。
+  function knockBackPlayer(fx, fy, tiles) {
+    var dx = player.mx - fx, dy = player.my - fy;
+    var d = Math.hypot(dx, dy);
+    if (d < 1e-4) { dx = 0; dy = 1; d = 1; }   // 与怪完全重叠时，默认往下方推
+    var ux = dx / d, uy = dy / d, step = 0.34, moved = 0;
+    var n = Math.ceil(tiles / step);
+    for (var i = 0; i < n; i++) {
+      if (couldStand(player.mx + ux * step, player.my)) { player.mx += ux * step; moved++; }
+      if (couldStand(player.mx, player.my + uy * step)) { player.my += uy * step; }
+    }
+    return moved;
+  }
+  function playerDown(foe) {
     var lost = Math.floor(player.stones * 0.3);
     player.stones -= lost;
-    var s = (CUR && CUR.spawn) ? CUR.spawn : { x: CUR.home.x, y: CUR.home.y };
-    player.mx = player.tx = s.x; player.my = player.ty = s.y;
+    var pushed = foe ? knockBackPlayer(foe.x, foe.y, 3.0) : 0;
     player.path = null; player.targetFoe = null;
-    player.hp = player.maxhp; player.dead = false; player.flash = 0.3;
+    player.hp = Math.round(player.maxhp * 0.6);   // 留一口气，给撤退的机会
+    player.flash = 0.5; player.invuln = 2.2;      // 短暂无敌，避免被连击秒杀
+    screenFlash = 0.55;
     addFloater(player.mx, player.my - 0.4, '被击退！', '#ff8080');
+    toast('气血耗尽，被击退' + (pushed ? '' : '（退路被阻）') + '，折损灵石 ' + lost);
     var h = document.getElementById('hint');
-    if (h) h.textContent = '力竭遁走，折损灵石 ' + lost + '（已回出生点）';
+    if (h) h.textContent = '气血耗尽被击退，折损灵石 ' + lost + '（2 秒内无敌，可撤或反打）';
   }
   function updateFoes(dt) {
     for (var i = 0; i < foes.length; i++) {
@@ -922,12 +992,13 @@
         if (couldStand(f.x + ux * sp, f.y)) f.x += ux * sp;
         if (couldStand(f.x, f.y + uy * sp)) f.y += uy * sp;
         f.face = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-        if (dist < MELEE + 0.15 && f.atkCd <= 0) {
+        // 复活/被击退后的无敌窗口内不结算伤害，否则刚站起来就被连击再倒
+        if (dist < MELEE + 0.15 && f.atkCd <= 0 && player.invuln <= 0) {
           f.atkCd = 1.0; f.atkAnim = 0.32;
           var real = Math.max(1, Math.round(f.atk - player.def * 0.5));
           player.hp -= real; player.flash = 0.25;
           addFloater(player.mx, player.my - 0.35, '-' + real, '#ff6b6b');
-          if (player.hp <= 0) playerDie();
+          if (player.hp <= 0) playerDown(f);
         }
       }
     }
@@ -963,12 +1034,16 @@
     var p = isoToScreen(f.x, f.y);
     var baseY = p.y + HH * Z;
     ctx.save();
+    var shR = (f.def_.fh || 110) * 0.30 * Z;   // 接地影随体型等比，不再固定大小
     ctx.globalAlpha = 0.3; ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, TILE_W * 0.18 * Z, TILE_H * 0.18 * Z, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, shR, shR * 0.5, 0, 0, 6.2832); ctx.fill();
     ctx.restore();
     if (!pz) return;
-    var sc = f.def_.scale || 1.15;
-    var ow = pz.w * Z * sc, oh = pz.h * Z * sc;
+    // 按「目标身高」归一化：图集各帧原始像素尺寸差很大（如石魔 idle 帧 348px 宽），
+    // 直接 1:1 画会忽大忽小、且整只偏大。这里统一缩放到 fh，再以脚底居中。
+    var th = f.def_.fh || 110;
+    var k = th / pz.h;
+    var ow = pz.w * k * Z, oh = th * Z;
     var dx = p.x - ow / 2, dy = baseY - oh;
     var sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
     ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(dx), Math.round(dy), Math.round(ow), Math.round(oh));
@@ -1070,6 +1145,14 @@
     if (setTargetCell(tx, ty)) clickMark = { mx: tx, my: ty, life: 0.7, max: 0.7 };
   }
   canvas.addEventListener('mousedown', function (e) { if (e.button === 0) onClick(e); });
+
+  // 屏幕「攻击」按钮：键盘之外的第二条出手路径，手机/触屏也能打
+  var atkBtn = document.getElementById('btnAtk');
+  if (atkBtn) {
+    var doAtk = function (ev) { if (ev) ev.preventDefault(); attackNearest(); };
+    atkBtn.addEventListener('click', doAtk);
+    atkBtn.addEventListener('touchstart', doAtk, { passive: false });
+  }
 
   // 鼠标滚轮缩放（以指针为锚点）
   canvas.addEventListener('wheel', function (e) {
@@ -1192,6 +1275,23 @@
     stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; player.path = null; portalLock = 0; },
     tick: function (dt) { update(dt || 0.016); render(); },
     attackNearest: function () { attackNearest(); },
+    /** 逐 (怪 × 状态 × 朝向) 解析帧并算出生效绘制尺寸，供 headless 校验图集与归一化 */
+    foeDebug: function () {
+      var out = [];
+      ['assassin', 'golem', 'wraith'].forEach(function (base) {
+        var fh = FOE_DEFS[base].fh;
+        ['idle', 'attack'].forEach(function (st) {
+          ['down', 'right', 'left', 'up'].forEach(function (d) {
+            var fk = foeFrameKey({ key: base, face: d, atkAnim: st === 'attack' ? 1 : 0 });
+            var pz = foePiece(fk);
+            out.push({ base: base, st: st, dir: d, frame: fk,
+              w: pz ? pz.w : -1, h: pz ? pz.h : -1,
+              drawW: pz ? Math.round(pz.w * (fh / pz.h)) : -1, drawH: fh });
+          });
+        });
+      });
+      return out;
+    },
     foeCount: function () { return (foes || []).filter(function (f) { return f.alive; }).length; },
     _p: player
   };
