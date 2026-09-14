@@ -94,49 +94,60 @@
     gap:8px;pointer-events:auto;z-index:11}
   /* ---------- 技能盘（王者荣耀式）----------
    * 右下角：普攻大键 + 重击 + 三个技能沿弧线排布（越常用离普攻越近，大招最远）。
-   * 半隐藏：静止时 58% 透明不挡视野，手指按上去或鼠标悬停才全亮。
+   * 每键专属配色（普攻红铜 / 重击橙 / 剑青 / 雷紫 / 大招金），图标用内联 SVG 描边，
    * 冷却用 conic-gradient 扇形遮罩 + 中央倒计时，不额外发请求、不占图集。 */
-  #skillpad{position:fixed;right:16px;bottom:16px;width:265px;height:222px;z-index:46;
-    opacity:.58;transition:opacity .22s ease;pointer-events:none}
+  #skillpad{position:fixed;right:16px;bottom:16px;width:252px;height:240px;z-index:46;
+    opacity:.85;transition:opacity .22s ease;pointer-events:none}
   #skillpad:hover,#skillpad.on{opacity:1}
   #skillpad .sk{position:absolute;border-radius:50%;padding:0;cursor:pointer;
     font-family:inherit;pointer-events:auto;overflow:hidden;
     display:flex;align-items:center;justify-content:center;
-    border:2px solid rgba(226,192,110,.82);
-    background:radial-gradient(circle at 36% 26%,rgba(78,102,158,.95),rgba(20,30,56,.95) 68%,rgba(12,18,34,.98));
-    box-shadow:0 4px 14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -7px 14px rgba(0,0,0,.45);
+    border:2px solid var(--rim);color:var(--ic);
+    background:radial-gradient(circle at 35% 25%,var(--hi),var(--mid) 56%,var(--lo) 100%);
+    box-shadow:0 4px 14px rgba(0,0,0,.55),0 0 10px var(--glow),
+      inset 0 1px 0 rgba(255,255,255,.35),inset 0 -7px 14px rgba(0,0,0,.45);
     transition:transform .08s ease,box-shadow .15s ease,filter .15s ease}
-  #skillpad .sk .ic{font-weight:800;line-height:1;letter-spacing:0;
-    background:linear-gradient(180deg,#fff8e2,#e3b768);-webkit-background-clip:text;background-clip:text;
-    color:transparent;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+  /* 图标：白色描边 SVG，带主色微光，浅色描边在深底上远看也清晰 */
+  #skillpad .sk .ic{display:flex;align-items:center;justify-content:center;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.7)) drop-shadow(0 0 5px var(--glow))}
+  #skillpad .sk .ic svg{display:block}
   #skillpad .sk:active{transform:scale(.9);
-    box-shadow:0 0 0 3px rgba(255,215,94,.4),0 2px 8px rgba(0,0,0,.55)}
-  /* 普攻键最大最深，视觉上就是右手拇指的落点 */
-  #skillpad .sk.atk{border-color:rgba(255,190,120,.9);
-    background:radial-gradient(circle at 36% 26%,rgba(168,88,66,.96),rgba(86,34,26,.96) 68%,rgba(48,18,14,.98))}
-  /* 大招：双层金边 + 常亮光晕，一眼看出是压轴技能 */
-  #skillpad .sk.ult{border-color:rgba(255,225,150,.95);
-    box-shadow:0 0 12px rgba(255,200,90,.45),0 4px 14px rgba(0,0,0,.5),
-      inset 0 1px 0 rgba(255,255,255,.32),inset 0 -7px 14px rgba(0,0,0,.45)}
+    box-shadow:0 0 0 3px var(--glow),0 2px 8px rgba(0,0,0,.55)}
+  /* —— 五键配色：一眼分清哪个键是什么 —— */
+  #skillpad .sk.c-atk{--rim:rgba(255,178,122,.95);--hi:rgba(255,126,92,.97);--mid:#7c2d24;
+    --lo:#38120e;--glow:rgba(255,112,80,.5);--ic:#ffddd0}
+  #skillpad .sk.c-heavy{--rim:rgba(255,195,107,.95);--hi:rgba(255,160,62,.97);--mid:#8a4d12;
+    --lo:#3c1f09;--glow:rgba(255,152,52,.48);--ic:#ffe8c2}
+  #skillpad .sk.c-jian{--rim:rgba(127,220,255,.95);--hi:rgba(66,172,232,.97);--mid:#14486e;
+    --lo:#082438;--glow:rgba(84,192,255,.52);--ic:#dcf5ff}
+  #skillpad .sk.c-lei{--rim:rgba(203,170,255,.95);--hi:rgba(152,107,242,.97);--mid:#4c2d8a;
+    --lo:#20103d;--glow:rgba(168,112,255,.58);--ic:#eee0ff}
+  /* 大招：双层金边 + 常亮金晕，一眼看出是压轴技能 */
+  #skillpad .sk.c-ult{--rim:rgba(255,224,138,.98);--hi:rgba(255,202,82,.98);--mid:#8a5c14;
+    --lo:#3a2407;--glow:rgba(255,205,90,.8);--ic:#fff4d0;
+    box-shadow:0 0 16px rgba(255,205,90,.6),0 0 30px rgba(255,180,60,.25),
+      0 4px 14px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.38),inset 0 -7px 14px rgba(0,0,0,.45)}
   /* 冷却遮罩：--p 是剩余百分比，从上一条顺时针扫过 */
   #skillpad .sk .cd{position:absolute;inset:0;border-radius:50%;pointer-events:none;
-    background:conic-gradient(rgba(4,8,18,.7) calc(var(--p,0) * 1%),rgba(0,0,0,0) 0)}
+    background:conic-gradient(rgba(4,8,18,.72) calc(var(--p,0) * 1%),rgba(0,0,0,0) 0)}
   #skillpad .sk .num{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-    font-size:20px;font-weight:800;color:#fff;pointer-events:none;
+    font-size:19px;font-weight:800;color:#fff;pointer-events:none;
     text-shadow:0 2px 6px rgba(0,0,0,.9)}
+  #skillpad .sk.c-atk .num{font-size:24px}
   #skillpad .sk.cooling .num{display:flex}
-  #skillpad .sk.cooling{filter:grayscale(.55) brightness(.85)}
-  #skillpad .sk kbd{position:absolute;right:3px;bottom:1px;font-size:9px;font-weight:700;
-    font-family:inherit;color:rgba(255,240,208,.8);pointer-events:none;
-    text-shadow:0 1px 2px rgba(0,0,0,.8)}
+  #skillpad .sk.cooling{filter:grayscale(.5) brightness(.82)}
+  #skillpad .sk kbd{position:absolute;right:4px;bottom:2px;font-size:10px;font-weight:800;
+    font-family:inherit;color:#fff;pointer-events:none;
+    text-shadow:0 1px 2px rgba(0,0,0,.9)}
   /* 折叠把手：点一下把整个技能盘收成这一个小圆，横屏空间紧张时用 */
-  #skillToggle{position:absolute;right:0;top:0;width:38px;height:38px;border-radius:50%;
-    pointer-events:auto;cursor:pointer;padding:0;font-family:inherit;font-size:16px;
-    color:#ffe9b8;background:rgba(16,26,46,.9);border:2px solid rgba(226,192,110,.7);
+  #skillToggle{position:absolute;right:0;top:0;width:36px;height:36px;border-radius:50%;
+    pointer-events:auto;cursor:pointer;padding:0;font-family:inherit;font-size:15px;
+    color:#ffe9b8;background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
+    border:2px solid rgba(226,192,110,.75);
     box-shadow:0 3px 10px rgba(0,0,0,.45)}
   #skillpad.folded{width:38px;height:38px}
   #skillpad.folded .sk{display:none}
-  body.touch #skillpad{opacity:.72}      /* 触屏不 hover，默认再亮一点，免得看不清 */
+  body.touch #skillpad{opacity:.92}     /* 触屏没有 hover，直接常亮，按键必须看得清 */
   body.touch #skillpad.on{opacity:1}
   /* 动作试演：1~6 六个按钮，没有键盘（手机）也能逐个看动作 */
   #actbar{pointer-events:auto;background:rgba(12,20,34,.84);border:1px solid rgba(120,146,190,.42);
@@ -281,28 +292,28 @@
   </div>
 </div>
 
-<!-- 技能盘（王者荣耀式）：右下角普攻大键 + 弧形排列重击与三个技能，半隐藏、可折叠 -->
+<!-- 技能盘（王者荣耀式）：右下角普攻大键 + 弧形排列重击与三个技能，每键专属配色、可折叠 -->
 <div id="skillpad" class="hud">
   <button id="skillToggle" title="展开 / 收起技能盘">⚔</button>
-  <button class="sk" data-s="0" style="left:85px;top:75px;width:56px;height:56px"
+  <button class="sk c-jian" data-s="0" style="left:60px;top:98px;width:56px;height:56px"
           title="御剑诀（U）：朝面朝方向斩出直线剑气，穿透多个目标">
-    <span class="ic" style="font-size:24px">剑</span><i class="cd"></i><b class="num"></b><kbd>U</kbd>
+    <span class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9"/><path d="M3 12h6"/><path d="M3 16h9"/><path d="m12 18 8-8 1-4-4 1-8 8z"/></svg></span><i class="cd"></i><b class="num"></b><kbd>U</kbd>
   </button>
-  <button class="sk" data-s="1" style="left:136px;top:34px;width:56px;height:56px"
+  <button class="sk c-lei" data-s="1" style="left:116px;top:46px;width:56px;height:56px"
           title="雷罡咒（I）：以自身为中心雷爆，击退周围妖兽">
-    <span class="ic" style="font-size:24px">雷</span><i class="cd"></i><b class="num"></b><kbd>I</kbd>
+    <span class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span><i class="cd"></i><b class="num"></b><kbd>I</kbd>
   </button>
-  <button class="sk ult" data-s="2" style="left:201px;top:28px;width:56px;height:56px"
+  <button class="sk c-ult" data-s="2" style="left:184px;top:28px;width:58px;height:58px"
           title="太虚剑域（O）：锁定最近目标落下剑雨，范围重创">
-    <span class="ic" style="font-size:24px">域</span><i class="cd"></i><b class="num"></b><kbd>O</kbd>
+    <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18"/><path d="M6 6v7"/><path d="m3.6 12.5 2.4 5 2.4-5"/><path d="M12 6v7"/><path d="m9.6 12.5 2.4 5 2.4-5"/><path d="M18 6v7"/><path d="m15.6 12.5 2.4 5 2.4-5"/></svg></span><i class="cd"></i><b class="num"></b><kbd>O</kbd>
   </button>
-  <button class="sk atkb" id="skAtkB" style="left:106px;top:139px;width:48px;height:48px"
+  <button class="sk c-heavy" id="skAtkB" style="left:94px;top:156px;width:56px;height:56px"
           title="重击 B（K）：伤害翻倍、范围更大并击退妖兽">
-    <span class="ic" style="font-size:20px">重</span><i class="cd"></i><b class="num"></b><kbd>K</kbd>
+    <span class="ic"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="M14.5 6.5 18 3h3v3l-3.5 3.5"/><path d="m5 14 4 4"/><path d="m7 17-3 3"/><path d="M3 19l2 2"/></svg></span><i class="cd"></i><b class="num"></b><kbd>K</kbd>
   </button>
-  <button class="sk atk" id="skAtk" style="left:166px;top:126px;width:80px;height:80px"
+  <button class="sk c-atk" id="skAtk" style="left:158px;top:146px;width:84px;height:84px"
           title="攻击 A（J / 空格）：普攻，只打面朝方向 ±60° 内的目标">
-    <span class="ic" style="font-size:32px">攻</span><kbd>J</kbd>
+    <span class="ic"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/></svg></span><kbd>J</kbd>
   </button>
 </div>
 

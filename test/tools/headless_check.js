@@ -54,10 +54,13 @@ function run(label, query, expect, opts) {
   // 是 headless 冷启动没跑完。这种假失败重试，别把结论污染成「回归挂了」。
   let r = readPage(query, opts.budget, opts.size), tries = 1;
   // 弱机上偶发：上一个 Chrome 还没释放 profile 锁，下一个起来就立刻退出（整页空白）。
-  // 退避重试；重试之间等一下，连着起太快会继续撞锁。
+  // 退避重试；重试之间等一下，连着起太快会继续撞锁。重试时 virtual-time-budget 逐次
+  // 翻倍——机器忙起来 14s 也可能不够页面加载完，死守同一个预算会重试 3 次全撞墙。
+  let budget = opts.budget;
   while (!r.dbg && !r.probe && tries < 4) {
     execSync('ping -n 2 127.0.0.1 >nul', { shell: 'cmd.exe' });   // 约 1 秒，且不依赖 sleep
-    r = readPage(query, opts.budget, opts.size); tries++;
+    budget = (budget || 14000) * 1.6;
+    r = readPage(query, budget, opts.size); tries++;
   }
   let dbg = null;
   try { dbg = r.dbg ? JSON.parse(r.dbg) : null; } catch (e) { /* ignore */ }
