@@ -118,6 +118,44 @@
     box-shadow:0 8px 26px rgba(0,0,0,.45);opacity:0;transition:opacity .2s,transform .2s}
   #toast.show{opacity:1;transform:translate(-50%,0)}
 
+  /* ---------- 竖屏旋转引导（触屏竖屏时盖一层；转横屏自动消失，也可点「竖屏也能玩」直接开玩） ---------- */
+  #rotate-hint{position:absolute;inset:0;z-index:70;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;text-align:center;padding:28px;
+    background:rgba(7,10,20,.965);backdrop-filter:blur(3px);color:#e8e6f5}
+  #rotate-hint .icon{font-size:58px;animation:rotphone 2.2s ease-in-out infinite}
+  #rotate-hint h2{font-size:22px;letter-spacing:2px;color:#ffd24a;margin:0}
+  #rotate-hint p{font-size:13px;line-height:1.9;color:#cfcbe8;max-width:300px;margin:0}
+  #rotate-hint .ghost-btn{margin-top:4px;background:transparent;color:#cfcbe8;
+    border:1px solid rgba(180,170,255,.4);border-radius:10px;padding:9px 20px;font-size:14px;
+    cursor:pointer;font-family:inherit}
+  #rotate-hint .ghost-btn:active{background:rgba(120,110,200,.22)}
+  @keyframes rotphone{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+  body.show-rotate #rotate-hint{display:flex}
+
+  /* ---------- 触屏适配：精简操作提示 + 收起调试面板，避免遮挡画面 ---------- */
+  body.touch #actbar{display:none}                 /* 动作试演只是核对素材用，手机游玩不需要，藏掉省空间 */
+  body.touch #bottom{bottom:82px;font-size:11.5px;line-height:1.7;max-width:88vw;padding:6px 13px;
+    background:rgba(12,20,34,.86);border:1px solid rgba(120,146,190,.4);border-radius:10px;
+    transition:opacity .3s,transform .3s;cursor:pointer;pointer-events:auto}
+    /* ↑ .hud 带着 pointer-events:none，这里必须显式打开，否则"点这里收起"根本收不到点击 */
+  body.touch #bottom b{color:#8bf3ff}
+  body.touch #bottom .hl{color:#ffd24a}
+  body.touch #bottom.faded{opacity:0;transform:translate(-50%,12px);pointer-events:none}
+  body.touch #actions .act{padding:11px 16px;font-size:14px}
+
+  /* 右上「地图速切」在手机上会吃掉近半屏（11 个外形按钮 + 缩放条 + 地图按钮），
+     默认折叠成一行标题，点标题展开。桌面端不动。 */
+  body.touch #topright{max-width:46vw;padding:8px 10px}
+  body.touch #topright .t{cursor:pointer;user-select:none;pointer-events:auto;padding:2px 0}
+  body.touch #topright.folded{pointer-events:auto}   /* 折叠后整条都可点，手指不用瞄 */
+  body.touch #topright .t::after{content:' ▾';color:#8bf3ff}
+  body.touch #topright.folded .maps,
+  body.touch #topright.folded #zoombar,
+  body.touch #topright.folded #herobar{display:none}
+  body.touch #topright.folded .t::after{content:' ▸'}
+  body.touch #topright .maps button,
+  body.touch #topright #herobar .heros button{padding:6px 9px;font-size:12px}
+
   #loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 50% 38%,#16233f,#0a1120 72%);z-index:99}
   .loadbox{width:min(360px,80vw);text-align:center}

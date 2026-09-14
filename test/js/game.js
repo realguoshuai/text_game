@@ -29,6 +29,7 @@
   var BEAST_DUR = { atk: 0.42, atk2: 0.58, hurt: 0.3, dead: 1.15 };
   var BEAST_RUN_MV = 2.8;  // 移速达到这个值就用 run 动作追人，否则用 walk（没 run 素材的会自动回退到 walk）
   var BEAST_STOP = 1.35;   // 追到这么近就停住出手，别再往玩家身上挤（否则整只怪会压在主角头上）
+  var FOE_LEASH_PAD = 4;    // 领地半径 = 仇恨半径 + 这个值：怪最多被引到离巢这么远，再远就回巢待命
   // 文件名带版本号：浏览器会缓存同名图片，换精灵时必须换名，否则玩家仍看到旧图
   // 主角外形可切换：1/5/10/14/18/20 取自「武侠修仙免费包」；31~33 取自 CraftPix 免费吸血鬼包；
   // 41~43 取自 CraftPix 免费忍者包（Fighter / Samurai / Shinobi）。
@@ -249,15 +250,15 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
   var LOAD_PLAN = [
-    { url: 'assets/maps.json', json: true, weight: 4, label: '读取地图数据' },
-    { url: 'assets/tiles_atlas.png', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
+    { url: 'assets/maps.json?v=1', json: true, weight: 62, label: '读取地图数据' },
+    { url: 'assets/tiles_atlas.png?v=1', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
     { url: 'assets/chars_atlas.png?v=3', atlas: 'chars', weight: 323, label: '载入人物动作' },
-    { url: 'assets/foes_atlas.png?v=2', atlas: 'foes', weight: 883, label: '载入妖兽图鉴' },
-    { url: 'assets/tiles_atlas.json', json: true, weight: 4, label: '读取地貌索引' },
-    { url: 'assets/chars_atlas.json?v=3', json: true, weight: 4, label: '读取人物索引' },
-    { url: 'assets/foes_atlas.json?v=2', json: true, weight: 8, label: '读取妖兽索引' },
-    { url: 'assets/heroes.json?v=1', json: true, weight: 4, label: '读取角色清单' },
-    { url: 'assets/beasts.json?v=1', json: true, weight: 8, label: '读取怪物图录' }
+    { url: 'assets/foes_atlas.png?v=2', atlas: 'foes', weight: 1167, label: '载入妖兽图鉴' },
+    { url: 'assets/tiles_atlas.json?v=1', json: true, weight: 2, label: '读取地貌索引' },
+    { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
+    { url: 'assets/foes_atlas.json?v=2', json: true, weight: 10, label: '读取妖兽索引' },
+    { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
+    { url: 'assets/beasts.json?v=1', json: true, weight: 11, label: '读取怪物图录' }
   ];
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
@@ -404,6 +405,9 @@
         document.getElementById('loader').style.display = 'none';
         ready = true;
         window.__ready = true;
+        // 手机端 UI 自测要等遮罩隐藏之后再跑，否则 elementFromPoint 只会命中遮罩
+        // （详见 initMobile 末尾 __mobileAudit 的注释）
+        if (window.__mobileAudit) window.__mobileAudit();
         var dbg = document.createElement('div');
         dbg.id = 'dbg'; dbg.style.display = 'none';
         document.body.appendChild(dbg);
@@ -625,6 +629,54 @@
                 r.knightChase = 'no-place';
               }
               player.hp = player.maxhp; player.invuln = 3; player.dead = false;
+            }
+            // 领地（leash）验收：把怪挪到离巢 > leash 的位置，玩家贴到它脸上，
+            // 它必须「放弃追击、回巢」，而不是继续咬人 —— 这才是领地范围真正的意义。
+            var lz = byKey.knight_a;
+            if (lz) {
+              lz.hp = lz.maxhp; lz.alive = true; lz.dying = 0; lz.animHold = 0; lz.atkCd = 0; lz.bpath = null; lz.repath = 0; lz.ret = 0;
+              var lhx = lz.home.x, lhy = lz.home.y, L = lz.leash;
+              var far = null;
+              for (var la = 0; la < 360 && !far; la += 12) {
+                var fx = lhx + Math.round(Math.cos(la * Math.PI / 180) * (L + 2));
+                var fy = lhy + Math.round(Math.sin(la * Math.PI / 180) * (L + 2));
+                if (walkable(fx, fy) && !isSolid(fx, fy)) far = [fx, fy];
+              }
+              if (far) {
+                lz.x = far[0]; lz.y = far[1];
+                player.hp = player.maxhp; player.dead = false; player.invuln = 0;
+                player.mx = player.tx = far[0] + 1; player.my = player.ty = far[1];   // 贴脸
+                var ld0 = Math.hypot(lz.x - lhx, lz.y - lhy);
+                var latk = false;
+                for (var tl = 0; tl < 60 * 20 && !latk; tl++) {
+                  window.ISLES.tick(1 / 60);
+                  if (lz.atkCd > 0.5) latk = true;   // 越界还咬人 = leash 没生效
+                }
+                var ld1 = Math.hypot(lz.x - lhx, lz.y - lhy);
+                r.leash = { name: lz.name, leash: +L.toFixed(2),
+                  distHome0: +ld0.toFixed(2), distHome1: +ld1.toFixed(2),
+                  returnedHome: ld1 < ld0 - 0.5,            // 离巢距离变小 = 真在往回走
+                  withinTerritory: ld1 <= L + 0.5,
+                  attackedWhileLeashed: latk,               // 必须为 false
+                  retCleared: lz.ret === 0,                 // 回到巢内应解除回巢锁定
+                  atkCdFinal: +lz.atkCd.toFixed(2) };
+                // 解锁后再验一次：玩家贴到巢边，它必须能重新被拉起并出手。
+                // 这条是防「回一次家就永久哑火」——滞回标志写错很容易退化成这样，光看"不咬人"是发现不了的。
+                player.invuln = 0; player.hp = player.maxhp; player.dead = false;
+                player.mx = player.tx = lhx + 1.2; player.my = player.ty = lhy;
+                var reatk = false;
+                for (var tr = 0; tr < 60 * 14 && !reatk; tr++) {
+                  player.hp = player.maxhp;   // 每帧回满：只验"会不会重新出手"，别被主角倒下打断
+                  window.ISLES.tick(1 / 60);
+                  if (lz.atkCd > 0.5) reatk = true;
+                }
+                r.leash.reengaged = reatk;
+                player.invuln = 3; player.hp = player.maxhp; player.dead = false;
+              } else {
+                r.leash = 'no-far-spot';
+              }
+            } else {
+              r.leash = 'no-knight';
             }
             // 击杀 -> 倒地 -> 消失 -> 复活
             player.mx = f0.x; player.my = f0.y; player.dead = false; player.invuln = 3;
@@ -1365,13 +1417,19 @@
     return (list || BEILIN_SPAWNS).map(function (s) {
       var d = FOE_DEFS[s.t];
       var cell = snapWalkable(CUR, s.x, s.y);
+      var aggro = d.aggro || AGGRO;
       return {
         def_: d, key: d.key, name: d.name,
         x: cell.x, y: cell.y, home: cell,
         hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, exp: d.exp, stones: d.stones,
         face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0,
+        // —— 领地半径：超出就不再追、走回 home；登记表可写 leash 覆盖默认 aggro+FOE_LEASH_PAD ——
+        leash: d.leash || (aggro + FOE_LEASH_PAD),
         // —— 动作状态机（侧视多动作素材用；老等距妖兽没有 anims，这些字段空转不影响）——
         anim: 'idle', animT: 0, animHold: 0, dying: 0,
+        // —— 领地滞回：一旦越界就锁定「回巢」状态，走回巢内才解除 ——
+        // 少了这个标志会在 leash 边缘来回抽动：追出去→越界回巢→一进界又被仇恨拉起，怪原地扭。
+        ret: 0,
         // —— 绕行寻路（直线被石柱/水面挡住时启用，见 bfsNext）——
         bpath: null, repath: 0
       };
@@ -1572,7 +1630,9 @@
       f.atkCd -= dt;
       var moving = false;
       var radius = f.def_.aggro || AGGRO;      // 每只怪可以用登记表里的 aggro 覆盖默认仇恨半径
-      if (dist < radius && !player.dead) {
+      var hd = Math.hypot(f.x - f.home.x, f.y - f.home.y);   // 离巢距离
+      var leashed = hd > f.leash;              // 被引出了领地：停止追击，回巢待命
+      if (dist < radius && !player.dead && !leashed) {
         var sp = f.def_.mv * dt, ux = dx / (dist || 1), uy = dy / (dist || 1);
         var sx2 = ux, sy2 = uy;
         // 走到出手距离就停住：引擎原本会一路挤进玩家所在格，画面上整只怪压在主角头上。
@@ -1619,6 +1679,35 @@
           addFloater(player.mx, player.my - 0.35, '-' + real, '#ff6b6b');
           if (player.hp <= 0) playerDown(f);
         }
+      } else if (hd > 0.6) {
+        // 失去仇恨 / 越出领地 / 玩家死亡 → 走回巢穴，回到领地内待命（不追、不打）
+        var hxx = f.home.x - f.x, hyy = f.home.y - f.y;
+        var sp2 = f.def_.mv * 0.8 * dt;        // 回巢用 0.8 倍速，不慌不忙
+        var sx2b = hxx, sy2b = hyy;
+        var hlos = losClear(Math.round(f.x), Math.round(f.y), Math.round(f.home.x), Math.round(f.home.y));
+        if (hlos) {
+          f.bpath = null;
+        } else {
+          f.repath = (f.repath || 0) - dt;
+          if (f.repath <= 0 || !f.bpath) {
+            f.repath = PATH_EVERY;
+            f.bpath = bfsNext(f.x, f.y, f.home.x, f.home.y, CUR);
+          }
+          if (f.bpath) {
+            var bx = f.bpath.x - f.x, by = f.bpath.y - f.y;
+            if (Math.abs(bx) + Math.abs(by) < 0.25) { f.bpath = null; f.repath = 0; }
+            else { var bl = Math.hypot(bx, by) || 1; sx2b = bx / bl; sy2b = by / bl; }
+          }
+        }
+        if (couldStand(f.x + sx2b * sp2, f.y)) { f.x += sx2b * sp2; moving = true; }
+        if (couldStand(f.x, f.y + sy2b * sp2)) { f.y += sy2b * sp2; moving = true; }
+        f.face = Math.abs(hxx) > Math.abs(hyy) ? (hxx > 0 ? 'right' : 'left') : (hyy > 0 ? 'down' : 'up');
+        chaseDbg.key = f.key; chaseDbg.los = hlos ? 1 : 0;
+        chaseDbg.sx = +sx2b.toFixed(3); chaseDbg.sy = +sy2b.toFixed(3);
+        chaseDbg.bp = f.bpath ? (f.bpath.x + ',' + f.bpath.y) : '';
+        chaseDbg.path = f.bpath ? 1 : 0;
+      } else {
+        f.bpath = null;   // 已在巢内待命
       }
       // 动作切换只在这几种情形下发生：受击/攻击的锁定期结束后才允许被移动状态改写
       if (f.animHold <= 0) {
@@ -2055,6 +2144,132 @@
     foeCount: function () { return (foes || []).filter(function (f) { return f.alive; }).length; },
     _p: player
   };
+
+  // 手机端适配：① 精简底部操作提示（WASD 长文本没用且挡画面，改成短提示、6 秒自动收起、点按恢复）
+  //            ② 触屏竖屏盖一层「建议横屏」浮层，转横屏自动消失，也可点「竖屏也能玩」直接开玩
+  // 这两件事只在触屏设备做，桌面端完全不动（避免误判触屏把键盘玩家的界面改了）。
+  (function initMobile() {
+    // 判定「手机/平板」只看主输入设备是不是手指（pointer: coarse）。
+    // 千万别用 'ontouchstart' in window 或 maxTouchPoints 单独兜底：Windows 触屏本上这两个也是真，
+    // 会把桌面端玩家的界面一起改掉（动作试演条消失、冒出横屏浮层）。没 matchMedia 才退回老办法。
+    var mq = window.matchMedia;
+    var coarse = !!(mq && mq('(pointer: coarse)').matches);
+    var noHover = !!(mq && mq('(hover: none)').matches);
+    var isTouch = mq ? (coarse && noHover) : (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
+    // ?touch=1 / ?touch=0 强制开关：桌面 Chrome 的 pointer:coarse 永远为假，
+    // 手机端这套 UI 就没法无头验证。给了开关才能截图核对「提示不挡画面 / 竖屏盖浮层」。
+    var tq = new URLSearchParams(location.search).get('touch');
+    if (tq === '1') isTouch = true; else if (tq === '0') isTouch = false;
+    if (window.ISLES) window.ISLES.mobile = { touch: isTouch, coarse: coarse, noHover: noHover, forced: tq || '' };
+    if (!isTouch) return;
+    document.body.classList.add('touch');
+
+    // —— 操作提示精简 + 自动收起 ——
+    // 原文案是给键盘玩家的（WASD / J/K / Shift / 1~6），手机上既没用又长到压住半屏。
+    // 换成真·触屏操作：游戏没有"滑动移动"，移动是点地面寻路，别写成滑动。
+    var bottom = document.getElementById('bottom');
+    if (bottom) {
+      bottom.innerHTML = '点地面移动 · 右下角 <b>攻击A / 重击B</b> 出手 · 靠近妖兽自动开打 · ' +
+        '<span class="hl">点这里收起</span>';
+      var hideTimer = null;
+      function schedule() { clearTimeout(hideTimer); hideTimer = setTimeout(function () { bottom.classList.add('faded'); }, 6000); }
+      bottom.addEventListener('click', function () {
+        bottom.classList.toggle('faded');
+        if (!bottom.classList.contains('faded')) schedule(); else clearTimeout(hideTimer);
+      });
+      schedule();
+    }
+
+    // —— 右上地图速切面板：默认折叠，点标题展开 ——
+    // 11 个外形按钮在 390 高的手机上会把右上角顶满，连玩法都看不清。
+    var tr = document.getElementById('topright');
+    if (tr) {
+      tr.classList.add('folded');
+      var trHead = tr.querySelector('.t');
+      if (trHead) trHead.addEventListener('click', function () { tr.classList.toggle('folded'); });
+    }
+
+    // —— 横屏提醒（竖屏才显示）——
+    var hint = document.getElementById('rotate-hint');
+    if (!hint) {
+      hint = document.createElement('div'); hint.id = 'rotate-hint';
+      hint.innerHTML = '<div class="icon">📱</div><h2>建议横屏游玩</h2>' +
+        '<p>横屏视野更开阔，出招更顺手。<br>竖屏也能直接玩。</p>' +
+        '<button id="rotate-ok" class="ghost-btn">好，竖屏也能玩</button>';
+      document.body.appendChild(hint);
+    }
+    function syncOrient() {
+      if (hint.dataset.dismissed) { document.body.classList.remove('show-rotate'); return; }
+      var portrait = window.innerHeight > window.innerWidth;
+      document.body.classList.toggle('show-rotate', portrait);
+    }
+    var okBtn = document.getElementById('rotate-ok');
+    if (okBtn) okBtn.addEventListener('click', function () {
+      hint.dataset.dismissed = '1'; document.body.classList.remove('show-rotate');
+    });
+    window.addEventListener('resize', syncOrient);
+    window.addEventListener('orientationchange', function () { setTimeout(syncOrient, 260); });
+    syncOrient();
+
+    // —— ?autotest=mobileui：手机端 UI 的程序化验收 ——
+    // 这套界面在桌面 Chrome 里根本跑不到（pointer:coarse 恒假），而它坏起来又全是
+    // 「点了没反应」这种肉眼在电脑上永远发现不了的毛病。三条关键断言：
+    //   ① .hud 带着 pointer-events:none —— 用 elementFromPoint 验证点击真的落在元素上，
+    //      而不是穿透到画布（这个坑真踩过：提示条与折叠标题都收不到点击）；
+    //   ② 点提示条能收起 / 再点能展开；
+    //   ③ 竖屏浮层出现、点按钮后消失（横屏反之）。
+    //
+    // ⚠ 时机：initMobile 在 boot() 之前跑，那时加载遮罩（z-index 99）还盖在最上层，
+    // elementFromPoint 一律返回遮罩 → 三条命中断言全假。所以这里只把函数挂出去，
+    // 由 boot() 在隐藏遮罩之后调用。断言里也顺手验一下遮罩确实已经隐藏。
+    window.__mobileAudit = function () {
+      var r2 = { coarse: coarse, noHover: noHover, touch: isTouch, bodyClass: document.body.className };
+      var ld = document.getElementById('loader');
+      r2.loaderHidden = !!ld && getComputedStyle(ld).display === 'none';
+      function mid(el) {
+        var b = el.getBoundingClientRect();
+        return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), w: Math.round(b.width), h: Math.round(b.height) };
+      }
+      function hits(el) {
+        var m = mid(el), t = document.elementFromPoint(m.x, m.y);
+        return !!t && (t === el || el.contains(t));
+      }
+      var overlayOn = document.body.classList.contains('show-rotate');
+      if (bottom) {
+        // 先把它强制显示出来再测：自动收起是 6 秒定时器，虚拟时钟下自测很可能在它淡出之后
+        // 才跑，那时 pointer-events 已经是 none，命中测试必然为假 —— 那是时序，不是 bug。
+        r2.bottomWasFaded = bottom.classList.contains('faded');
+        bottom.classList.remove('faded');
+        r2.bottomBox = mid(bottom);
+        r2.bottomPE = getComputedStyle(bottom).pointerEvents;
+        // 竖屏时横屏浮层盖在提示条之上，点不到是设计如此
+        r2.bottomHit = overlayOn ? 'skipped-overlay' : hits(bottom);
+        bottom.click(); r2.bottomDismissed = bottom.classList.contains('faded');
+        bottom.click(); r2.bottomRestored = !bottom.classList.contains('faded');
+      }
+      if (tr && trHead) {
+        r2.toprightBox = mid(tr);
+        r2.foldedInit = tr.classList.contains('folded');
+        if (r2.foldedInit) r2.zoombarHidden = getComputedStyle(document.getElementById('zoombar')).display === 'none';
+        // 竖屏时横屏浮层盖在最上层，标题本来就点不到 —— 跳过（浮层自己的命中测试见下）
+        r2.headHit = overlayOn ? 'skipped-overlay' : hits(trHead);
+        trHead.click(); r2.foldedAfterClick = tr.classList.contains('folded');
+        r2.herobarShown = getComputedStyle(document.getElementById('herobar')).display !== 'none';
+        trHead.click(); r2.foldedBack = tr.classList.contains('folded');
+      }
+      if (hint) {
+        r2.rotateShown = document.body.classList.contains('show-rotate');
+        r2.hintPE = getComputedStyle(hint).pointerEvents;
+        if (r2.rotateShown) r2.hintHit = hits(hint);
+        var okb = document.getElementById('rotate-ok');
+        if (okb) { r2.okHit = hits(okb); okb.click(); r2.rotateDismissed = !document.body.classList.contains('show-rotate'); }
+      }
+      var pbt = document.getElementById('probe');
+      if (!pbt) { pbt = document.createElement('div'); pbt.id = 'probe'; pbt.style.display = 'none'; document.body.appendChild(pbt); }
+      pbt.textContent = JSON.stringify(r2);
+    };
+    if (!tq || new URLSearchParams(location.search).get('autotest') !== 'mobileui') delete window.__mobileAudit;
+  })();
 
   boot();
 })();

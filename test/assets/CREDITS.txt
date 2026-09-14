@@ -1,20 +1,39 @@
 素材来源与授权
 ================
 
-1) 地图场景 / 地砖 / 建筑 / 道具（assets/sliced/*.png）
-   —— AI 生成（Gemini）的等距仙岛场景图，经 tools/slice_sheet.py 连通域切图得到。
-   原始大图归档于仓库外的 sucai/（不随仓库发布）。
+1) 地图地貌 / 建筑 / 道具（assets/tiles_atlas.png + tiles_atlas.json）
+   —— AI 生成（Gemini）的等距仙岛场景图，经 tools/slice_sheet.py 连通域切图、
+      tools/build_atlas.py 合并成图集。原始大图归档于仓库外的 sucai/（不随仓库发布）。
 
-2) 玩家角色（assets/char_player.png，384×320 = 6 列 × 5 行 × 64px）
-   —— 来自「FrameRonin 免费角色包 · 武侠修仙」主题（frameronin.com/free-character-library/）
-   源文件：001-1787889793963-frames64-oldfix2.png（384×832，该包 1 号角色，
-   也是官方 Godot 示例的默认角色），由 tools/build_player_atlas.py 重排为游戏行序：
-   行0 正面走 / 行1 右走（左走水平镜像）/ 行2 左走 / 行3 背面走 / 行4 正面站立。
-   本地素材库路径 text_game/AssetLibrary/武侠修仙/（不在本仓库内）。
+2) 主角外形（assets/chars_atlas.png + chars_atlas.json，共 11 套）
+   —— 1 / 5 / 10 / 14 / 18 / 20 号：来自「FrameRonin 免费角色包 · 武侠修仙」主题
+      （frameronin.com/free-character-library/），由 tools/build_player_atlas.py 重排为
+      游戏行序（行0 正面走 / 行1 右走（左走水平镜像）/ 行2 左走 / 行3 背面走 / 行4 正面站立），
+      再由 build_atlas.py 合成基线 chars_base.png。
+      源文件：001-1787889793963-frames64-oldfix2.png（384×832）。
+      本地素材库路径 text_game/AssetLibrary/武侠修仙/（不在本仓库内）。
+      ⚠️ 授权提示：作者称该包为「免费赠送」，但页面与本包内均未写明授权条款。
+         个人学习 / 原型项目可用并注明出处；若要商用到公开产品，请先向作者确认
+         （见 text_game/AssetLibrary/README.md）。
+   —— 31 / 32 / 33 号血族：CraftPix 免费吸血鬼包（素材 id 506778）
+   —— 41 / 42 / 43 号东瀛：CraftPix 免费忍者包（素材 id 453698）
 
-   ⚠️ 授权提示：作者称该包为「免费赠送」，但页面与本包内均未写明授权条款。
-   个人学习 / 原型项目可用并注明出处；若要商用到公开产品，请先向作者确认
-   （见 text_game/AssetLibrary/README.md）。
+3) 怪物（assets/foes_atlas.png + foes_atlas.json + beasts.json，共 11 只）
+   —— 全部来自 CraftPix 免费素材包，五个包：
+      Minotaur（牛魔·褐角/灰角/玄角）
+      Samurai （游方刀客/弓手/统领）
+      Gorgon  （蛇妖·碧鳞/紫鳞/银鳞）
+      Knight  （铠甲卫）
+      Zombie  （小僵尸，逐帧独立 PNG 形态）
 
-3) 替换素材：同名 PNG 覆盖 assets/ 下文件即可，游戏零改动。
+CraftPix 统一授权：https://craftpix.net/file-licenses/
+   可商用、可修改、可随游戏分发、无需署名；禁止再分发素材源文件；禁止用于 AI 训练。
+
+4) 替换素材：同名 PNG 覆盖 assets/ 下文件即可，游戏零改动。
+   但改完要把 js/game.js 的 LOAD_PLAN 里对应 URL 的 ?v= 号加一（否则玩家浏览器吃旧缓存），
+   并把该行 weight 改成文件实际 KB 数（它是加载进度条的分母，不跟着改会出现假卡）。
    换主角：python tools/build_player_atlas.py <编号>   （编号见 --list 生成的 20 人总览）。
+   换怪物：改 tools/beast_packs.json 后跑 python tools/build_beasts_atlas.py。
+
+完整引用清单（运行时真正加载哪 11 个文件、哪些是构建输入不能删、哪些是中间产物）
+见 test/ASSETS.md；复查工具 node test/tools/asset_audit.js。

@@ -21,14 +21,15 @@ const GAME = 'file:///C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/inde
 // 表现成随机几条用例 dbg=-。一次运行共用一个热 profile 最稳，跑完删掉。
 const U_DIR = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
 
-function readPage(query, budget) {
+function readPage(query, budget, size) {
   const out = path.join(os.tmpdir(), 'wb_dom_' + query.replace(/[^a-z0-9]+/gi, '_') + '.html');
   // 顺手掐掉磁盘缓存：素材/JSON 改过之后旧缓存会让页面加载到上一版数据，
   // 症状是「代码明明改了、自测还是老结果」——这类假失败比真 bug 更耗时间。
   execSync(
     `"${CHROME}" --headless=new --disable-gpu --no-sandbox --allow-file-access-from-files ` +
     `--no-first-run --no-default-browser-check --disk-cache-size=1 --hide-scrollbars ` +
-    `--user-data-dir="${U_DIR}" --virtual-time-budget=${budget || 14000} --window-size=1280,800 --dump-dom "${GAME}?${query}" > "${out}" 2>nul`,
+    `--user-data-dir="${U_DIR}" --virtual-time-budget=${budget || 14000} ` +
+    `--window-size=${size || '1280,800'} --dump-dom "${GAME}?${query}" > "${out}" 2>nul`,
     { shell: 'cmd.exe' }
   );
   const dom = fs.readFileSync(out, 'utf8');
@@ -36,19 +37,26 @@ function readPage(query, budget) {
     const m = dom.match(new RegExp('id="' + id + '"[^>]*>([^<]*)<'));
     return m ? m[1] : null;
   };
-  return { dom, dbg: pick('dbg'), probe: pick('probe'), mapName: pick('mapName'), loader: pick('loader') };
+  const bodyClass = (dom.match(/<body[^>]*class="([^"]*)"/) || [, ''])[1];
+  return { dom, bodyClass, dbg: pick('dbg'), probe: pick('probe'), mapName: pick('mapName'), loader: pick('loader') };
 }
 
-function run(label, query, expect) {
+function run(label, query, expect, opts) {
+  opts = opts || {};
   // 页面压根没加载出来（map 还停在「加载中」、dbg/probe 都是空）不是断言失败，
   // 是 headless 冷启动没跑完。这种假失败重试，别把结论污染成「回归挂了」。
-  let r = readPage(query), tries = 1;
-  while (!r.dbg && !r.probe && tries < 3) { r = readPage(query, 14000); tries++; }
+  let r = readPage(query, opts.budget, opts.size), tries = 1;
+  // 弱机上偶发：上一个 Chrome 还没释放 profile 锁，下一个起来就立刻退出（整页空白）。
+  // 退避重试；重试之间等一下，连着起太快会继续撞锁。
+  while (!r.dbg && !r.probe && tries < 4) {
+    execSync('ping -n 2 127.0.0.1 >nul', { shell: 'cmd.exe' });   // 约 1 秒，且不依赖 sleep
+    r = readPage(query, opts.budget, opts.size); tries++;
+  }
   let dbg = null;
   try { dbg = r.dbg ? JSON.parse(r.dbg) : null; } catch (e) { /* ignore */ }
   let probe = null;
   try { probe = r.probe ? JSON.parse(r.probe) : null; } catch (e) { /* ignore */ }
-  const verdict = expect ? expect({ dbg, probe, mapName: r.mapName }) : null;
+  const verdict = expect ? expect({ dbg, probe, mapName: r.mapName, bodyClass: r.bodyClass }) : null;
   console.log(
     (verdict === null ? '  ' : verdict ? 'PASS ' : 'FAIL ') +
     label.padEnd(28) +
@@ -57,6 +65,7 @@ function run(label, query, expect) {
     ' dbg=' + (r.dbg || '-').slice(0, 96)
   );
   if (probe) console.log('      probe=' + JSON.stringify(probe));
+  else if (!dbg) console.log('      （页面没加载完：loader="' + String(r.loader).slice(0, 20) + '" 文件名=' + r.mapName + '）');
   return { ok: verdict, dbg, probe };
 }
 
@@ -106,6 +115,39 @@ results.push(run('碑林 刷怪', 'map=beilin', ({ dbg }) => !!dbg && dbg.foes >
 // 8) 战斗：贴脸反复攻击应击杀并掉落灵石 / 修为增长
 results.push(run('战斗 击杀掉落', 'map=beilin&autotest=fight', ({ probe }) =>
   !!probe && probe.exp > 0 && probe.stones > 0));
+
+// 9) 灵泉妖兽全量：11 只、五族、每只都能被镜像/动作状态机正确驱动；
+//    外加领地（leash）验收 —— 越界不许咬人、必须回巢、回巢后还能被重新拉起。
+//    这条 sim 的时长以「秒」计（20s + 14s），预算要给足。
+results.push(run('灵泉 妖兽领地', 'map=lingquan&autotest=bestiary', ({ probe }) =>
+  !!probe && probe.total === 11 && Array.isArray(probe.err) && probe.err.length === 0 &&
+  probe.zombieHit === true && probe.knightHit === true &&
+  !!probe.leash && probe.leash.attackedWhileLeashed === false &&
+  probe.leash.returnedHome === true && probe.leash.retCleared === true &&
+  probe.leash.reengaged === true,
+{ budget: 30000 }));
+
+// 10) 手机端 UI：桌面 Chrome 里 pointer:coarse 恒假，这套分支平时根本跑不到，
+//     而它坏起来全是「点了没反应」——电脑上盯多久都看不出来。用 ?touch=1 强制打开验：
+//     三条命中测试（elementFromPoint）确认点击真的落在元素上、没有被 .hud 的
+//     pointer-events:none 吃掉，也没被加载遮罩挡着。
+results.push(run('桌面端 不误判触屏', 'map=lingquan&touch=0', ({ bodyClass }) =>
+  bodyClass.indexOf('touch') < 0));
+results.push(run('手机横屏 UI', 'map=lingquan&touch=1&autotest=mobileui', ({ bodyClass, probe }) =>
+  bodyClass === 'touch' && !!probe && probe.loaderHidden === true &&
+  probe.bottomPE === 'auto' && probe.bottomHit === true &&
+  probe.bottomDismissed === true && probe.bottomRestored === true &&
+  probe.foldedInit === true && probe.zoombarHidden === true && probe.headHit === true &&
+  probe.foldedAfterClick === false && probe.herobarShown === true &&
+  probe.rotateShown === false,
+{ size: '844,390', budget: 22000 }));
+// 注意：竖屏这条不能拿 DOM 里的 body.class 断言 —— 自测自己会点「竖屏也能玩」把浮层关掉，
+// dump 到的时候 show-rotate 早就没了。要读自测**开跑时**记下的快照 probe.bodyClass。
+results.push(run('手机竖屏 横屏提醒', 'map=lingquan&touch=1&autotest=mobileui', ({ probe }) =>
+  !!probe && probe.bodyClass === 'touch show-rotate' && probe.loaderHidden === true &&
+  probe.rotateShown === true && probe.hintHit === true && probe.okHit === true &&
+  probe.rotateDismissed === true && probe.headHit === 'skipped-overlay',
+{ size: '390,844', budget: 22000 }));
 
 const failed = results.filter((r) => r.ok === false).length;
 console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + results.length + ' 个用例)'));
