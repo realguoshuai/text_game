@@ -254,9 +254,9 @@
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
   var LOAD_PLAN = [
     { url: 'assets/maps.json?v=2', json: true, weight: 62, label: '读取地图数据' },
-    { url: 'assets/tiles_atlas.png?v=1', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
-    { url: 'assets/chars_atlas.png?v=3', atlas: 'chars', weight: 323, label: '载入人物动作' },
-    { url: 'assets/foes_atlas.png?v=3', atlas: 'foes', weight: 1099, label: '载入妖兽图鉴' },
+    { url: 'assets/tiles_atlas.webp?v=1', atlas: 'tiles', weight: 121, label: '载入地貌与建筑' },
+    { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
+    { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
     { url: 'assets/tiles_atlas.json?v=1', json: true, weight: 2, label: '读取地貌索引' },
     { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
     { url: 'assets/foes_atlas.json?v=2', json: true, weight: 10, label: '读取妖兽索引' },

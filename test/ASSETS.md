@@ -15,12 +15,12 @@
 | 1 | `test/index.html` | 13KB | 页面骨架、HUD、触屏/横屏样式 | — |
 | 2 | `test/js/game.js` | 112KB | 引擎（地图、战斗、怪物 AI、手机适配） | — |
 | 3 | `test/assets/maps.json` | 62KB | 3 张地图：`qingxuan` 青玄山门 / `lingquan` 灵泉灵瀑 / `beilin` 碑林石阵（瓦片、物件摆放、传送门、NPC） | `?v=1` |
-| 4 | `test/assets/tiles_atlas.png` | 617KB | 地图瓦片与物件图集（`deco_*` / `prop_*` / `building_*`） | `?v=1` |
+| 4 | `test/assets/tiles_atlas.webp` | 121KB | 地图瓦片与物件图集（`deco_*` / `prop_*` / `building_*`） | `?v=1` |
 | 5 | `test/assets/tiles_atlas.json` | 2KB | 瓦片图集索引 `{rect}` | `?v=1` |
-| 6 | `test/assets/chars_atlas.png` | 323KB | 主角 11 套外形图集 | `?v=3` |
+| 6 | `test/assets/chars_atlas.webp` | 183KB | 主角 11 套外形图集 | `?v=3` |
 | 7 | `test/assets/chars_atlas.json` | <1KB | 主角帧索引 | `?v=3` |
 | 8 | `test/assets/heroes.json` | 2KB | 主角外形清单 + 素材包授权 | `?v=1` |
-| 9 | `test/assets/foes_atlas.png` | 1167KB | 怪物图集（11 只：牛魔×3 / 游方×3 / 蛇妖×3 / 铠甲卫 / 小僵尸） | `?v=2` |
+| 9 | `test/assets/foes_atlas.webp` | 680KB | 怪物图集（9 只：牛魔×2 / 游方×3 / 蛇妖×2 / 铠甲卫 / 小僵尸），由 PNG 转有损 q90 | `?v=1` |
 | 10 | `test/assets/foes_atlas.json` | 10KB | 怪物帧索引（每只每个动作的帧矩形） | `?v=2` |
 | 11 | `test/assets/beasts.json` | 11KB | 怪物属性 / 刷怪格 / 动作帧率 | `?v=1` |
 
