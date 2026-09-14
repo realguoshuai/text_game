@@ -76,10 +76,16 @@
   #zRange::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;
     background:#ffe6a6;box-shadow:0 0 6px rgba(255,215,94,.7);cursor:pointer}
 
-  #bottom{bottom:14px;left:50%;transform:translateX(-50%);padding:8px 16px;
-    font-size:12.5px;color:#c9bda0;text-align:center;line-height:1.7}
+  /* 底部操作说明：默认折叠成一行小标签，点一下展开/收起（手机端走 touch 的精简+自动收起逻辑） */
+  #bottom{bottom:14px;left:50%;transform:translateX(-50%);padding:5px 13px;
+    font-size:12px;color:#c9bda0;text-align:center;line-height:1.7;max-width:72vw;
+    pointer-events:auto;cursor:pointer}
+  #bottom .bt{font-size:12.5px;color:#8bf3ff;letter-spacing:1px;font-weight:600;white-space:nowrap}
+  #bottom .bd{margin-top:6px}
+  #bottom.folded .bd{display:none}
+  #bottom.folded{padding:5px 12px}
   #bottom kbd{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
-    border-radius:4px;padding:1px 5px;font-family:inherit;color:#fff;font-size:11.5px}
+    border-radius:4px;padding:1px 5px;font-family:inherit;color:#fff;font-size:11px}
   #bottom .hl{color:#8bf3ff}
   /* 屏幕攻击键：键盘之外的第二条出手路径，手机也能按 */
   #actions{right:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-end;
@@ -209,12 +215,15 @@
   </div>
 </div>
 
-<div id="bottom" class="hud panel">
+<div id="bottom" class="hud panel folded">
+  <div class="bt">操作说明 <span id="btArrow">▸</span></div>
+  <div class="bd">
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> 行走　·　
   点击格子移动　·　<span class="hl">滚轮 / +/-</span> 缩放视图（0.62~1.72 倍）　·　
   走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）　·　
   走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
   <span class="hl">Shift</span> 奔跑　·　<span class="hl">1~6</span> 试动作（待机/行走/奔跑/攻击A/攻击B/倒地）
+  </div>
 </div>
 
 <div id="actions" class="hud">

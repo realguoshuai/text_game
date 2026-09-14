@@ -385,6 +385,16 @@
         buildCloudSprite();
         buildButtons();
         buildZoomUI();
+        // 底部操作说明：桌面端默认折叠成一行小标签，点一下展开/收起。
+        // 手机端（body.touch）走 initMobile 里的精简文案 + 6s 自动收起（点按切 faded），
+        // 两套逻辑互斥，这里遇到 touch 直接放手，否则一次点击会同时切 faded 和 folded。
+        var bb = document.getElementById('bottom');
+        if (bb) bb.addEventListener('click', function () {
+          if (document.body.classList.contains('touch')) return;
+          var foldedNow = bb.classList.toggle('folded');
+          var ar = document.getElementById('btArrow');
+          if (ar) ar.textContent = foldedNow ? '▸' : '▾';
+        });
         // 主角外形：?hero=14 指定 > 上次手选记忆 > 默认 1 号
         buildHeroUI(+q.get('hero') || 0);
         // ?z=1.25 可直接以指定缩放打开（同样受 0.62~1.72 限制）
@@ -1826,13 +1836,6 @@
       blitFoe(pz, p.x, ax, dy, ow, oh, flip, Math.min(0.9, f.flash * 4) * alpha, true);
     }
     ctx.imageSmoothingEnabled = sm;
-    if (f.def_.boss || f.def_.elite) {
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = f.def_.boss ? 'rgba(255,90,90,.7)' : 'rgba(255,200,90,.6)';
-      ctx.lineWidth = 2 * Z;
-      ctx.beginPath(); ctx.ellipse(p.x, baseY - oh * 0.5, ow * 0.35, oh * 0.32, 0, 0, 6.2832); ctx.stroke();
-      ctx.restore();
-    }
     var dist = Math.hypot(f.x - player.mx, f.y - player.my);
     if (player.targetFoe === f || dist < 3.0) {
       var ty = dy - 6 * Z;
