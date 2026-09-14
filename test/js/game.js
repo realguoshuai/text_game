@@ -13,16 +13,27 @@
   // 角色 sprite sheet（6列×5行，64×64/格）：行0=正面 行1=右 行2=左 行3=背
   var SHEET = { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, pxScale: 2 };
   // 文件名带版本号：浏览器会缓存同名图片，换精灵时必须换名，否则玩家仍看到旧图
-  // 主角外形可切换：全部取自「武侠修仙免费包」，规格一致（6 列 × 5 行 @64px）。
+  // 主角外形可切换：1/5/10/14/18/20 取自「武侠修仙免费包」；31~33 取自 CraftPix 免费吸血鬼包；
+  // 41~43 取自 CraftPix 免费忍者包（Fighter / Samurai / Shinobi）。
+  // 三套素材统一到同一规格（6 列 × 5 行 @64px），所以能塞进同一张 chars_atlas 直接切换。
   // 1 号是该包官方 Godot 示例的默认角色；其余几个同时兼任 NPC，不重复打包素材。
-  // 直接指定：?hero=14
+  // 外部两包原图都是 128px 横版侧视，已按 50% 降采样对齐（实高 35~42px，与主角同量级）。
+  // 注意：它们只有左右两个朝向，故 down/right/up 复用侧视原图、left 用水平翻转。
+  // 直接指定：?hero=14 / ?hero=31 / ?hero=43
+  // 重新打包：python test/tools/add_craftpix_heroes.py
   var HERO_OPTIONS = [
     { n: 1, file: 'char_hero.png', label: '1 号' },
     { n: 5, file: 'npc_5.png', label: '5 号' },
     { n: 10, file: 'npc_10.png', label: '10 号' },
     { n: 14, file: 'npc_14.png', label: '14 号' },
     { n: 18, file: 'npc_18.png', label: '18 号' },
-    { n: 20, file: 'npc_20.png', label: '20 号' }
+    { n: 20, file: 'npc_20.png', label: '20 号' },
+    { n: 31, file: 'vamp_31.png', label: '31', nick: '31 血族伯爵' },
+    { n: 32, file: 'vamp_32.png', label: '32', nick: '32 血族女伯爵' },
+    { n: 33, file: 'vamp_33.png', label: '33', nick: '33 血族少女' },
+    { n: 41, file: 'ninja_41.png', label: '41', nick: '41 东瀛格斗家' },
+    { n: 42, file: 'ninja_42.png', label: '42', nick: '42 东瀛武士' },
+    { n: 43, file: 'ninja_43.png', label: '43', nick: '43 东瀛忍者' }
   ];
   var PLAYER_CHAR = HERO_OPTIONS[0].file;      // 主角当前用的动作表（chars_atlas 里的 key）
   var PLAYER_SRC = PLAYER_CHAR;                // 主角图集 key（setHero / buildHeroUI 会改写；先给默认值，避免严格模式下未声明报错）
@@ -177,13 +188,15 @@
   // weight 用「预估 KB」当权重：进度是按权重加权的，所以大文件占大头，
   // 进度条看起来才是匀速的。权重全程固定不变 —— 中途改用真实字节会让
   // 分母突然变大、进度条倒退。
+  // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
+  //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
   var LOAD_PLAN = [
     { url: 'assets/maps.json', json: true, weight: 4, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.png', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
-    { url: 'assets/chars_atlas.png', atlas: 'chars', weight: 249, label: '载入人物动作' },
-    { url: 'assets/foes_atlas.png', atlas: 'foes', weight: 155, label: '载入妖兽图鉴' },
+    { url: 'assets/chars_atlas.png?v=2', atlas: 'chars', weight: 314, label: '载入人物动作' },
+    { url: 'assets/foes_atlas.png', atlas: 'foes', weight: 1043, label: '载入妖兽图鉴' },
     { url: 'assets/tiles_atlas.json', json: true, weight: 4, label: '读取地貌索引' },
-    { url: 'assets/chars_atlas.json', json: true, weight: 4, label: '读取人物索引' },
+    { url: 'assets/chars_atlas.json?v=2', json: true, weight: 4, label: '读取人物索引' },
     { url: 'assets/foes_atlas.json', json: true, weight: 4, label: '读取妖兽索引' }
   ];
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
@@ -1196,7 +1209,7 @@
     try { localStorage.setItem('isles.hero', String(h.n)); } catch (e) { }
     var bs = document.querySelectorAll('#heroBtns button');
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', +bs[i].dataset.n === h.n);
-    document.getElementById('hint').textContent = '主角已换为免费包第 ' + h.n + ' 号角色';
+    document.getElementById('hint').textContent = '主角已换为 ' + (h.nick || ('免费包第 ' + h.n + ' 号角色'));
   }
   function buildHeroUI(preferN) {
     var box = document.getElementById('heroBtns');
@@ -1205,7 +1218,7 @@
     HERO_OPTIONS.forEach(function (h) {
       var b = document.createElement('button');
       b.textContent = h.label; b.dataset.n = h.n;
-      b.title = '把主角换成免费包第 ' + h.n + ' 号角色';
+      b.title = h.nick ? ('把主角换成 ' + h.nick) : ('把主角换成免费包第 ' + h.n + ' 号角色');
       b.onclick = function () { setHero(h); };
       box.appendChild(b);
     });
@@ -1216,7 +1229,7 @@
     var bs = document.querySelectorAll('#heroBtns button');
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', +bs[i].dataset.n === pick.n);
     var nowEl = document.getElementById('heroNow');
-    if (nowEl) nowEl.textContent = pick.label;
+    if (nowEl) nowEl.textContent = pick.nick || pick.label;
     if (preferN) { try { localStorage.setItem('isles.hero', String(pick.n)); } catch (e) { } }
   }
 
