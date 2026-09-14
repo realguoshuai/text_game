@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>凡人修仙录 · 坊市（等距视角）</title>
+<link rel="stylesheet" href="css/iso.css">
+</head>
+<body>
+
+<!-- ===== 游戏画布（最底层，接收点击） ===== -->
+<canvas id="game"></canvas>
+
+<!-- ===== UI 覆盖层：整体 pointer-events:none，鼠标穿透到 canvas ===== -->
+<div id="uiLayer">
+
+  <!-- 左上：角色状态栏 -->
+  <div id="statusBar">
+    <div id="avatar"></div>
+    <div id="statusRight">
+      <div class="row1"><span id="pName">逍遥长生</span><span id="pPower">战 1268</span></div>
+      <div class="bar hp"><div id="barHp"></div><span id="txtHp">860 / 860</span></div>
+      <div class="bar mp"><div id="barMp"></div><span id="txtMp">420 / 420</span></div>
+    </div>
+  </div>
+
+  <!-- 右上：小地图 + 时辰 + 任务列表 -->
+  <div id="infoBar">
+    <canvas id="minimap" width="132" height="132"></canvas>
+    <div id="clock">未时二刻</div>
+    <div id="questBox">
+      <div class="qTitle">任 务</div>
+      <div class="qItem"><span class="qName">拜入青玄宗</span></div>
+      <div class="qItem"><span class="qName">与接引弟子对话</span><span id="qTalk" class="qProg">0/1</span></div>
+      <div class="qItem"><span class="qName">采集灵药</span><span id="qHerb" class="qProg">2/3</span></div>
+    </div>
+  </div>
+
+  <!-- 底部：技能栏 + 功能按钮 -->
+  <div id="bottomBar">
+    <div id="skillBar">
+      <div class="skill interactive"><span class="skName">剑诀</span><span class="skKey">1</span></div>
+      <div class="skill interactive"><span class="skName">灵力弹</span><span class="skKey">2</span></div>
+      <div class="skill interactive"><span class="skName">身法</span><span class="skKey">3</span></div>
+      <div class="skill interactive"><span class="skName">护体</span><span class="skKey">4</span></div>
+    </div>
+    <div id="funcBar">
+      <div class="func interactive">境界</div>
+      <div class="func interactive">角色</div>
+      <div class="func interactive">功法</div>
+      <div class="func interactive">背包</div>
+      <div class="func interactive">炼器</div>
+      <div class="func interactive">设置</div>
+    </div>
+  </div>
+
+  <!-- 对话面板（交互元素，单独开启 pointer-events） -->
+  <div id="dialog" class="hidden interactive">
+    <div id="dlgName">NPC</div>
+    <div id="dlgText">……</div>
+    <div id="dlgBtns">
+      <button id="dlgClose">继续</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="js/iso.js"></script>
+</body>
+</html>

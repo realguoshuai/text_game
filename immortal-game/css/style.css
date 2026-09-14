@@ -1,0 +1,93 @@
+/* 凡人修仙录 · 坊市行 —— 样式（暗金修仙风） */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #14100b; }
+body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0; user-select: none; }
+#game { display: block; width: 100vw; height: 100vh; }
+.hidden { display: none !important; }
+.hud { position: absolute; z-index: 10; }
+
+/* ---- 左上状态 ---- */
+#hud-status { top: 14px; left: 14px; display: flex; gap: 10px; align-items: flex-start; }
+#portrait {
+  width: 64px; height: 64px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 30%, #6b5233, #3a2c18 70%);
+  border: 2px solid #a8894e; box-shadow: 0 0 8px rgba(0,0,0,.6);
+}
+#status-bars { min-width: 230px; }
+.name-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; text-shadow: 0 1px 2px #000; }
+#p-name { font-size: 16px; font-weight: bold; color: #ffe9b3; }
+#p-realm { font-size: 12px; color: #9fd48a; }
+.bar { position: relative; height: 14px; background: #241c10; border: 1px solid #5a4826; border-radius: 3px; margin-bottom: 3px; overflow: hidden; }
+.bar > div { height: 100%; width: 100%; transition: width .15s; }
+.bar.hp > div { background: linear-gradient(#c0392b, #7e1e14); }
+.bar.mp > div { background: linear-gradient(#2e86c1, #1b4f72); }
+.bar.exp { height: 8px; }
+.bar.exp > div { background: linear-gradient(#d4ac2b, #8a6d1d); }
+.bar span { position: absolute; inset: 0; text-align: center; font-size: 10px; line-height: 14px; color: #fff; text-shadow: 0 1px 1px #000; }
+.bar.exp span { line-height: 8px; }
+.stone-row { font-size: 13px; color: #ffe9b3; text-shadow: 0 1px 2px #000; display: flex; align-items: center; gap: 4px; }
+.stone-icon { width: 12px; height: 12px; display: inline-block; border-radius: 3px; background: linear-gradient(#8fd3ff, #3d7ea6); border: 1px solid #cdeaff; }
+
+/* ---- 右上小地图 ---- */
+#hud-minimap { top: 14px; right: 14px; text-align: center; }
+#minimap { border: 2px solid #a8894e; border-radius: 4px; background: #0d0a06; display: block; }
+#clock { margin-top: 4px; font-size: 12px; color: #d8c68f; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.45); padding: 2px 6px; border-radius: 3px; display: inline-block; }
+
+/* ---- 任务面板 ---- */
+#hud-quests { top: 170px; right: 14px; width: 210px; max-height: 46vh; overflow: hidden; background: rgba(20,14,6,.72); border: 1px solid #6b5629; border-radius: 6px; padding: 8px 10px; }
+.quest-title { text-align: center; color: #ffe9b3; letter-spacing: 6px; font-size: 14px; border-bottom: 1px solid #6b5629; padding-bottom: 4px; margin-bottom: 6px; }
+.q-item { margin-bottom: 8px; }
+.q-name { font-size: 13px; font-weight: bold; }
+.q-name.main { color: #ffd75e; }
+.q-name.side { color: #7fc4ff; }
+.q-obj { font-size: 11px; color: #cfc3a0; padding-left: 10px; }
+.q-obj.done { color: #8fd48a; }
+
+/* ---- 技能栏 ---- */
+#hud-skills { bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+.skill { position: relative; width: 56px; height: 56px; background: linear-gradient(#3a2e1a, #1f1810); border: 2px solid #8a6f3a; border-radius: 8px; overflow: hidden; cursor: default; }
+.skill .skill-name { text-align: center; margin-top: 14px; font-size: 12px; color: #ffe9b3; text-shadow: 0 1px 2px #000; }
+.skill .skill-key { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 10px; color: #a99767; }
+.skill .skill-cd { position: absolute; inset: 0; background: rgba(0,0,0,.65); transform-origin: bottom; transform: scaleY(0); }
+.skill.locked { filter: grayscale(1) brightness(.5); }
+.skill.locked .skill-name { color: #888; }
+
+/* ---- 菜单按钮 ---- */
+#hud-menu { bottom: 16px; right: 16px; display: flex; gap: 10px; }
+.menu-btn { background: rgba(30,22,10,.85); border: 1px solid #8a6f3a; border-radius: 6px; padding: 8px 14px; font-size: 13px; color: #ffe9b3; cursor: pointer; }
+.menu-btn:hover { background: rgba(60,45,20,.9); }
+.menu-btn .kbd { font-size: 10px; color: #a99767; margin-left: 4px; }
+
+/* ---- 面板（对话框/角色/背包/商店） ---- */
+.panel { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); width: 560px; max-height: 60vh; overflow-y: auto; background: rgba(18,13,6,.94); border: 2px solid #a8894e; border-radius: 8px; padding: 14px 18px; z-index: 20; box-shadow: 0 4px 20px rgba(0,0,0,.7); }
+#panel { bottom: auto; top: 50%; transform: translate(-50%,-50%); }
+#dialog-name { color: #ffd75e; font-size: 16px; font-weight: bold; margin-bottom: 6px; }
+#dialog-text, #panel-body { font-size: 14px; line-height: 1.7; color: #e8dcc0; white-space: pre-wrap; }
+#dialog-options { margin-top: 10px; }
+.opt { padding: 4px 8px; margin: 3px 0; cursor: pointer; border-radius: 4px; color: #9fd48a; }
+.opt:hover { background: rgba(120,90,30,.35); }
+.dialog-hint { margin-top: 10px; font-size: 11px; color: #7d6f4e; text-align: right; }
+#panel-title { color: #ffd75e; font-size: 16px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #6b5629; padding-bottom: 6px; }
+
+/* 面板内表格/按钮 */
+.row { display: flex; justify-content: space-between; align-items: center; padding: 5px 4px; border-bottom: 1px dashed #3d3218; }
+.pbtn { display: inline-block; padding: 4px 12px; margin: 2px; background: linear-gradient(#4a3a1e, #2c2210); border: 1px solid #a8894e; border-radius: 4px; color: #ffe9b3; cursor: pointer; font-size: 13px; }
+.pbtn:hover { background: linear-gradient(#6a5326, #3c2e14); }
+.pbtn.disabled { opacity: .45; cursor: default; }
+.dim { color: #a99767; font-size: 12px; }
+.gold { color: #ffd75e; }
+.green { color: #9fd48a; }
+.red { color: #e07a6a; }
+
+/* ---- Toast ---- */
+#toast { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); z-index: 30; pointer-events: none; text-align: center; }
+.toast-msg { background: rgba(10,8,4,.85); border: 1px solid #a8894e; color: #ffe9b3; font-size: 14px; padding: 8px 20px; border-radius: 6px; margin-top: 6px; animation: fade 2.6s forwards; }
+@keyframes fade { 0% { opacity: 0; transform: translateY(-8px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---- 标题画面 ---- */
+.overlay { position: absolute; inset: 0; z-index: 50; background: radial-gradient(ellipse at center, #2a2010 0%, #0d0a05 80%); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.overlay h1 { font-size: 40px; color: #ffd75e; letter-spacing: 8px; text-shadow: 0 2px 12px rgba(212,172,43,.4); }
+.overlay .sub { color: #a99767; margin: 10px 0 30px; font-size: 14px; letter-spacing: 2px; }
+.title-btns button { display: block; width: 240px; margin: 10px auto; padding: 12px; font-size: 16px; background: linear-gradient(#4a3a1e, #2c2210); border: 2px solid #a8894e; border-radius: 6px; color: #ffe9b3; cursor: pointer; }
+.title-btns button:hover { background: linear-gradient(#6a5326, #3c2e14); }
+.help-box { margin-top: 28px; font-size: 13px; line-height: 2; color: #b8a87c; background: rgba(0,0,0,.35); padding: 14px 22px; border-radius: 6px; border: 1px solid #4a3c20; }

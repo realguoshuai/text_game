@@ -12,7 +12,6 @@
  *   assets/char_blade.png          玩家四向行走帧表（6列×5行，64×64/格）
  *   assets/char_sword.png          商人 NPC 四向行走帧表
  *   assets/char_thunder.png        村民/弟子 NPC 四向行走帧表
- *   assets/char_scholar.png        书生 NPC 四向行走帧表（Godot 样本 32px 近邻放大至 64px）
  *   assets/ui/panel.png            UI 底板（自动铺到状态栏/任务栏/对话框）
  *   assets/ui/icons.png            技能图标：横向 4 格（64×64/格）
  *
@@ -34,24 +33,14 @@
   let W = 0, H = 0;
   let TILE_W = 64, TILE_H = 32;      // 标准 45° 等距：宽高比 2:1
   let HW = TILE_W / 2, HH = TILE_H / 2;
-  let viewZoom = 1.0;                // 双指捏合缩放（0.6~2.0），仅手势/滚轮调节，无 UI 控件
 
   function applyScale() {
     const small = window.innerWidth < 760;
-    // 手机端瓦片更小，同屏可见更多地图；乘 viewZoom 实现捏合缩放
-    const baseW = small ? 44 : 56;
-    const baseH = small ? 22 : 28;
-    TILE_W = baseW * viewZoom;
-    TILE_H = baseH * viewZoom;
+    // 视角略抬高（整体缩小瓦片 ≈ 同屏可见更多地图面积），缓解建筑拥挤感
+    TILE_W = small ? 44 : 56;
+    TILE_H = small ? 22 : 28;
     HW = TILE_W / 2; HH = TILE_H / 2;
   }
-
-  // —— 桌面滚轮缩放（手机端用双指捏合，见触摸事件区）——
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    viewZoom = Math.min(2.0, Math.max(0.6, viewZoom * (e.deltaY < 0 ? 1.12 : 0.89)));
-    applyScale();
-  }, { passive: false });
   function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
@@ -64,9 +53,9 @@
 
   // =====================================================
   // 二、地图数据（二维数组）
-  //   0 = 草地（可走）   1 = 建筑/障碍（不可走）   2 = 石板路/景物（可走）
+  //   0 = 地面（可走）   1 = 建筑/障碍（不可走）   2 = 装饰（石板/景物，可走）
   // =====================================================
-  const MAP_W = 24, MAP_H = 24;     // 再缩一档（26→24）：走路距离变短，建筑更聚拢
+  const MAP_W = 36, MAP_H = 36;     // 扩大地图，给建筑留出开阔间距
   const map = [];
   for (let y = 0; y < MAP_H; y++) map.push(new Array(MAP_W).fill(0));
 
@@ -76,25 +65,19 @@
         if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) map[y][x] = v;
   }
 
-  fill(0, 11, 24, 2, 2);     // 横向石板街（贯穿东西）
-  fill(11, 0, 2, 24, 2);     // 纵向石板街（贯穿南北）
-  fill(9, 9, 6, 6, 2);       // 中央广场（石板）
-  // 各建筑门前石板引道，连到主街 —— 小城镇路网
-  fill(5, 7, 2, 4, 2);       // 接引台前
-  fill(20, 7, 2, 4, 2);      // 聚宝阁前
-  fill(5, 13, 2, 6, 2);      // 丹房前
-  fill(20, 13, 2, 6, 2);     // 器坊前
-  fill(18, 10, 3, 1, 2);     // 临街铺前
+  fill(13, 13, 12, 12, 2);   // 中央广场（石板）
+  fill(0, 17, 36, 2, 2);     // 横向主街（贯穿东西）
+  fill(17, 0, 2, 36, 2);     // 纵向主街（贯穿南北）
 
   // —— 建筑：四角主楼 + 沿街小铺，拉开间距降低密度
   //   frame 对应 buildings.png 横排 6 帧（256×224/帧）：0接引台 1聚宝阁 2丹房 3器坊 4沿街铺 5临街铺
-  const   buildings = [
+  const buildings = [
     { x: 3,  y: 3,  w: 5, h: 4, h3d: 46, frame: 0, name: '接引台', roof: '#4a5a7a' },
-    { x: 19, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
-    { x: 3,  y: 19, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
-    { x: 19, y: 19, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
-    { x: 9,  y: 13, w: 3, h: 2, h3d: 40, frame: 4, name: '沿街铺', roof: '#5a4a38' },
-    { x: 18, y: 8,  w: 3, h: 2, h3d: 40, frame: 5, name: '临街铺', roof: '#5a4a38' },
+    { x: 28, y: 3,  w: 5, h: 4, h3d: 46, frame: 1, name: '聚宝阁', roof: '#7a6a2e' },
+    { x: 3,  y: 28, w: 5, h: 4, h3d: 46, frame: 2, name: '丹  房', roof: '#8a3b2e' },
+    { x: 28, y: 28, w: 5, h: 4, h3d: 46, frame: 3, name: '器  坊', roof: '#4a6a4a' },
+    { x: 9,  y: 15, w: 3, h: 2, h3d: 40, frame: 4, name: '沿街铺', roof: '#5a4a38' },
+    { x: 20, y: 9,  w: 3, h: 2, h3d: 40, frame: 5, name: '临街铺', roof: '#5a4a38' },
   ];
   buildings.forEach(b => fill(b.x, b.y, b.w, b.h, 1));
 
@@ -103,37 +86,34 @@
   const props = [
     // 灯笼（悬挂，可穿行）
     { x: 15, y: 11, kind: 'lantern' }, { x: 21, y: 11, kind: 'lantern' },
-    { x: 15, y: 23, kind: 'lantern' }, { x: 21, y: 23, kind: 'lantern' },
-    { x: 11, y: 18, kind: 'lantern' }, { x: 23, y: 18, kind: 'lantern' },
+    { x: 15, y: 25, kind: 'lantern' }, { x: 21, y: 25, kind: 'lantern' },
+    { x: 11, y: 18, kind: 'lantern' }, { x: 25, y: 18, kind: 'lantern' },
     { x: 14, y: 16, kind: 'lanternY' },{ x: 22, y: 16, kind: 'lanternY' },
-    // 石狮（建筑门前两侧，实心，不挡引道）
-    { x: 3,  y: 8,  kind: 'lion' }, { x: 7,  y: 8,  kind: 'lion' },
-    { x: 18, y: 7,  kind: 'lion' }, { x: 22, y: 7,  kind: 'lion' },
+    // 石狮（建筑前，实心）
+    { x: 5,  y: 8,  kind: 'lion' }, { x: 6,  y: 8,  kind: 'lion' },
+    { x: 29, y: 8,  kind: 'lion' }, { x: 30, y: 8,  kind: 'lion' },
     // 广场火盆 / 武雕像（实心）
-    { x: 9,  y: 9,  kind: 'brazier' }, { x: 14, y: 9,  kind: 'brazier' }, { x: 9,  y: 14, kind: 'brazier' },
-    { x: 12, y: 9,  kind: 'statue' },
+    { x: 17, y: 18, kind: 'brazier' }, { x: 19, y: 18, kind: 'brazier' }, { x: 18, y: 22, kind: 'brazier' },
+    { x: 18, y: 19, kind: 'statue' },
     // 器坊前练功桩（实心）
-    { x: 18, y: 20, kind: 'dummy' }, { x: 18, y: 22, kind: 'dummy' },
+    { x: 27, y: 29, kind: 'dummy' }, { x: 27, y: 31, kind: 'dummy' },
     // 丹房旁水井 / 荷塘（实心）
-    { x: 8,  y: 21, kind: 'well' },
-    { x: 2,  y: 13, kind: 'pond' },
-    // 布棚货摊 / 茶摊（实心，街边草地）
-    { x: 16, y: 10, kind: 'stall' },
-    { x: 9,  y: 20, kind: 'tea' },
+    { x: 8,  y: 30, kind: 'well' },
+    { x: 5,  y: 22, kind: 'pond' },
+    // 布棚货摊 / 茶摊（实心）
+    { x: 26, y: 9,  kind: 'stall' },
+    { x: 9,  y: 29, kind: 'tea' },
     // 灯笼串（沿街，实心）
-    { x: 3,  y: 10, kind: 'string' }, { x: 16, y: 13, kind: 'string' },
-    { x: 10, y: 17, kind: 'string' }, { x: 18, y: 23, kind: 'string' },
+    { x: 10, y: 17, kind: 'string' }, { x: 26, y: 17, kind: 'string' },
+    { x: 18, y: 10, kind: 'string' }, { x: 18, y: 26, kind: 'string' },
     // 货箱 / 灵晶（实心）
-    { x: 16, y: 19, kind: 'crates' }, { x: 17, y: 22, kind: 'crates' },
-    { x: 12, y: 18, kind: 'crystal' },
+    { x: 16, y: 22, kind: 'crates' }, { x: 20, y: 22, kind: 'crates' },
+    { x: 12, y: 18, kind: 'crystal' },{ x: 24, y: 18, kind: 'crystal' },
     // 东街石牌坊（可穿行）
-    { x: 23, y: 12, kind: 'gate' },
+    { x: 34, y: 18, kind: 'gate' },
   ];
   const SOLID_PROPS = new Set(['lion', 'well', 'brazier', 'dummy', 'statue', 'stall', 'tea', 'string', 'crates', 'pond', 'crystal']);
-  props.forEach(p => {
-    if (p.x < 0 || p.y < 0 || p.x >= MAP_W || p.y >= MAP_H) return;   // 越界装饰直接丢弃，防启动崩溃
-    map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2;
-  });
+  props.forEach(p => { map[p.y][p.x] = SOLID_PROPS.has(p.kind) ? 1 : 2; });
 
   // =====================================================
   // 三、NPC 与玩家
@@ -143,25 +123,22 @@
     { id: 'jieyin', name: '接引弟子', mx: 10.5, my: 9.5, color: '#7fc4ff',
       sprite: 'npcVillager', face: 'down', hasQuest: true,
       talk: '可是来拜师的？青玄宗收徒有规矩：先寻引路之人，再过问心阶。\n（任务：与接引弟子对话 0/1 —— 你已完成对话，可去丹房、器坊一带转转。）' },
-    { id: 'shangren', name: '灵石商人', mx: 16.5, my: 11.5, color: '#8fd3ff',
+    { id: 'shangren', name: '灵石商人', mx: 24.5, my: 9.5, color: '#8fd3ff',
       sprite: 'npcMerchant', face: 'left', hasQuest: false,
       talk: '灵石通万物，道友可要换些丹药符箓？\n（此处为商店占位，日后接背包与交易面板。）' },
-    { id: 'zayi', name: '杂役弟子', mx: 6.5, my: 16.5, color: '#9fd48a',
+    { id: 'zayi', name: '杂役弟子', mx: 10.5, my: 30.5, color: '#9fd48a',
       sprite: 'npcVillager', face: 'down', hasQuest: false,
       talk: '（擦汗）丹房今日要三株灵药，我采了两株，还差一株……\n（任务：采集灵药 2/3）' },
-    { id: 'hedaozhang', name: '何道长', mx: 20.5, my: 15.5, color: '#c9a0dc',
+    { id: 'hedaozhang', name: '何道长', mx: 31.5, my: 25.5, color: '#c9a0dc',
       sprite: 'npcVillager', face: 'right', hasQuest: true,
       talk: '贫道观你印堂微暗，近日不宜远行。\n（任务：求得一道护身符，可去找灵石商人。）' },
-    { id: 'baifashi', name: '摆法师', mx: 12.5, my: 14.5, color: '#e0c068',
+    { id: 'baifashi', name: '摆法师', mx: 18.5, my: 15.5, color: '#e0c068',
       sprite: 'npcMerchant', face: 'down', hasQuest: false,
       talk: '占一卦三枚灵石——今日宜静不宜动，宜东南，忌西北。' },
-    { id: 'shusheng', name: '藏书楼书生', mx: 14.5, my: 12.5, color: '#a0c4e8',
-      sprite: 'npcScholar', face: 'up', hasQuest: false,
-      talk: '这本《青玄志异》缺了三页，道友可曾在坊市见过残卷？' },
   ];
 
   const player = {
-    mx: 13, my: 13,
+    mx: 18.5, my: 21.5,
     target: null,           // {mx,my} 目标点；null = 停止
     speed: 3.0,             // 格/秒
     face: 'up', walking: false, walkT: 0,
@@ -174,19 +151,17 @@
     ground:       'assets/tiles/ground.png',
     buildings:    'assets/tiles/buildings.png',
     decorations:  'assets/tiles/decorations.png',
-    player:       'assets/char_thunder.png',      // 雷法真君（男）：割草游戏三角色里选的男性模型
-    npcMerchant:  'assets/char_sword.png',        // 御剑仙（白发老者）：商人/长者感
-    npcVillager:  'assets/char_blade.png',        // 原主角图转为弟子系 NPC
-    npcScholar:   'assets/char_scholar.png',
+    player:       'assets/char_blade.png',
+    npcMerchant:  'assets/char_sword.png',
+    npcVillager:  'assets/char_thunder.png',
     uiIcons:      'assets/ui/icons.png',
     uiAvatar:     'assets/ui/avatar.png',
   };
   const SPR = {};                       // 只放「加载成功」的图片
   const SHEETS = {                        // 角色 sprite sheet 布局（6列×5行，64×64/格）
-    player:      { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, idle: { down: 0, right: 0, left: 4, up: 0 } },
-    npcMerchant: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, idle: { down: 0, right: 0, left: 2, up: 0 } },
-    npcVillager: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, idle: { down: 0, right: 0, left: 4, up: 0 } },
-    npcScholar:  { cols: 4, rows: 4, cellW: 64, cellH: 64, frames: 4, dir: { down: 0, right: 1, left: 2, up: 3 }, scale: 0.62 },
+    player:      { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
+    npcMerchant: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
+    npcVillager: { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 } },
   };
   const missing = [];
   Object.keys(ASSETS).forEach(key => {
@@ -241,16 +216,8 @@
     return { mx: (a + b) / 2, my: (b - a) / 2 };
   }
 
-  /** 摄像机：拖动视角期间自由（带惯性衰减），其余时候平滑跟随玩家（指数插值，帧率无关） */
+  /** 摄像机平滑跟随：目标 = 玩家保持在画面中心，指数插值（帧率无关） */
   function updateCamera(dt) {
-    if (camFree) {
-      cameraX += camVX; cameraY += camVY;
-      const decay = Math.exp(-5 * dt);
-      camVX *= decay; camVY *= decay;
-      if (Math.abs(camVX) < 0.05) camVX = 0;
-      if (Math.abs(camVY) < 0.05) camVY = 0;
-      return;
-    }
     const px = (player.mx - player.my) * (TILE_W / 2);
     const py = (player.mx + player.my) * (TILE_H / 2);
     const k = 1 - Math.exp(-6 * dt);
@@ -302,7 +269,8 @@
     ctx.lineTo(p.x - HW, p.y + HH);
     ctx.closePath();
     ctx.fillStyle = v === 2 ? ((tx + ty) % 2 ? '#7f7868' : '#8a8272')
-                            : ((tx + ty) % 2 ? '#5c7c3c' : '#648442');   // 石板 / 草地
+                            : v === 1 ? '#5a4a38'
+                            : ((tx + ty) % 2 ? '#63543d' : '#6a5a42');
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,.12)';
     ctx.lineWidth = 1;
@@ -410,13 +378,11 @@
     ctx.beginPath(); ctx.ellipse(s.x, s.y, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
 
     if (img && cfg) {
-      const sc = cfg.scale || 1;
-      const dh = TILE_H * 2.4 * sc;
+      const dh = TILE_H * 2.4;
       const dw = dh * (cfg.cellW / cfg.cellH);
       const dirRow = cfg.dir[o.face] ?? 0;
-      // 静止时用该朝向的「站立帧」（部分贴图侧向第 0 帧是迈步，需按朝向指定）
-      const idleF = (cfg.idle && cfg.idle[o.face]) || 0;
-      const frame = moving ? Math.floor(o.walkT * 6) % cfg.frames : idleF;
+      // 静止时固定用第 0 帧（站立姿势），避免 NPC/玩家原地踏步
+      const frame = moving ? Math.floor(o.walkT * 6) % cfg.frames : 0;
       const sx = frame * cfg.cellW;
       const sy = dirRow * cfg.cellH;
       ctx.drawImage(img, sx, sy, cfg.cellW, cfg.cellH, s.x - dw / 2, baseY - dh + 4, dw, dh);
@@ -493,26 +459,18 @@
     ctx.fillRect(0, 0, W, H);
     if (glowCv) {
       ctx.globalCompositeOperation = 'lighter';
-      const drawn = [];   // 本帧已绘制光斑的屏幕位置（限密用）
-      const minGap = 40 * viewZoom;   // 光斑最小间距：随缩放变化，缩得越小越稀疏
       for (const L of lights) {
         const s = isoToScreen(L.mx, L.my);
         if (s.x < -160 || s.x > W + 160 || s.y < -160 || s.y > H + 160) continue;
-        let crowded = false;
-        for (const d of drawn) {
-          const dx = d.x - s.x, dy = d.y - s.y;
-          if (dx * dx + dy * dy < minGap * minGap) { crowded = true; break; }
-        }
-        if (crowded) continue;               // 低倍率下灯光扎堆 → 只保留一个，防止叠成一片白
-        drawn.push(s);
-        const R = 80 * L.r * viewZoom;       // 光斑半径跟随缩放，与地物保持同比例
-        // 强度随缩放衰减：1.0 倍与原版一致，0.6 倍时约衰减到 78%，避免缩小后过曝
-        ctx.globalAlpha = Math.min(1, (0.62 + 0.14 * Math.sin(time * 6 + L.mx * 3.1)) * (0.45 + 0.55 * Math.min(viewZoom, 1.2)));
-        ctx.drawImage(glowCv, s.x - R, s.y - R - 10 * viewZoom, R * 2, R * 2);
+        const R = 80 * L.r;
+        ctx.globalAlpha = 0.62 + 0.14 * Math.sin(time * 6 + L.mx * 3.1);   // 烛光轻微闪烁
+        ctx.drawImage(glowCv, s.x - R, s.y - R - 10, R * 2, R * 2);
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
+
+    drawMinimap();
   }
 
   // 光源表：灯笼/火盆 + 各建筑窗光（一次性构建）
@@ -551,7 +509,7 @@
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const v = map[y][x];
-        mctx.fillStyle = v === 1 ? '#6a5a42' : v === 2 ? '#8a8272' : '#4d6b33';
+        mctx.fillStyle = v === 1 ? '#6a5a42' : v === 2 ? '#8a8272' : '#4a4230';
         mctx.fillRect(x * CELL, y * CELL, CELL, CELL);
       }
     }
@@ -588,91 +546,30 @@
     const tx = Math.floor(t.mx), ty = Math.floor(t.my);
     if (tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H && tileAt(tx + 0.5, ty + 0.5) !== 1) {
       player.target = { mx: tx + 0.5, my: ty + 0.5 };
-      camFree = false;                               // 角色一动 → 镜头恢复跟随
     } else {
       toast('那里过不去。');
     }
   }
 
-  // —— 视角自由：拖动后暂停跟随，点地行走即恢复 ——
-  let camFree = false;
-  let camVX = 0, camVY = 0;                          // 松手后惯性（px/帧）
-
-  // —— 桌面：左键点按行走，按住拖动拉视角 ——
-  let mDown = null, mDrag = false;
-  canvas.style.cursor = 'grab';
-  canvas.addEventListener('mousedown', e => {
-    if (e.button !== 0) return;
-    mDown = { x: e.clientX, y: e.clientY };
-    mDrag = false; camVX = camVY = 0;
+  canvas.addEventListener('mousedown', e => { if (e.button === 0) handleTap(e.clientX, e.clientY); });
+  canvas.addEventListener('mousemove', e => {
+    hoverNpc = hitNpc(e.clientX, e.clientY);
+    canvas.style.cursor = hoverNpc ? 'pointer' : 'default';
   });
-  window.addEventListener('mousemove', e => {
-    if (!mDown) {
-      hoverNpc = hitNpc(e.clientX, e.clientY);
-      canvas.style.cursor = hoverNpc ? 'pointer' : 'grab';
-      return;
-    }
-    const dx = e.clientX - mDown.x, dy = e.clientY - mDown.y;
-    if (!mDrag && Math.hypot(dx, dy) > 6) { mDrag = true; canvas.style.cursor = 'grabbing'; }
-    if (mDrag) {
-      cameraX += dx; cameraY += dy;
-      camVX = dx; camVY = dy;
-      camFree = true;
-      mDown = { x: e.clientX, y: e.clientY };
-    }
-  });
-  window.addEventListener('mouseup', () => {
-    if (mDown && !mDrag) handleTap(mDown.x, mDown.y);
-    mDown = null; mDrag = false;
-    canvas.style.cursor = 'grab';
-  });
-
-  // —— 手机：单指短按行走 / 单指拖动拉视角 / 双指捏合缩放 ——
-  let touchStart = null, touchLast = null, touchDrag = false;
-  let pinch = null;                 // { dist0, zoom0 }
-  function pinchDist(e) {
-    const t = e.touches;
-    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  }
+  // —— 手机端触摸：短按（位移 <16px、时长 <700ms）视为点按 ——
+  let touchStart = null;
   canvas.addEventListener('touchstart', e => {
-    if (e.touches.length === 1) {
-      const t = e.changedTouches[0];
-      touchStart = { x: t.clientX, y: t.clientY, t: Date.now() };
-      touchLast = { x: t.clientX, y: t.clientY };
-      touchDrag = false; camVX = camVY = 0;
-    } else if (e.touches.length === 2) {
-      pinch = { dist0: pinchDist(e), zoom0: viewZoom };
-      touchStart = null; touchDrag = false;
-    }
+    const t = e.changedTouches[0];
+    touchStart = { x: t.clientX, y: t.clientY, t: Date.now() };
   }, { passive: true });
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (pinch && e.touches.length >= 2) {
-      const z = pinch.zoom0 * (pinchDist(e) / pinch.dist0);
-      viewZoom = Math.min(2.0, Math.max(0.6, z));
-      applyScale();
-      return;
-    }
-    if (e.touches.length === 1 && touchStart) {
-      const t = e.touches[0];
-      if (!touchDrag && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) > 10) touchDrag = true;
-      if (touchDrag) {
-        cameraX += t.clientX - touchLast.x;
-        cameraY += t.clientY - touchLast.y;
-        camVX = t.clientX - touchLast.x; camVY = t.clientY - touchLast.y;
-        camFree = true;
-        touchLast = { x: t.clientX, y: t.clientY };
-      }
-    }
-  }, { passive: false });
   canvas.addEventListener('touchend', e => {
-    if (pinch && e.touches.length < 2) pinch = null;   // 抬起一指 → 结束本次捏合
-    if (touchStart && !touchDrag && e.touches.length === 0) {
-      const t = e.changedTouches[0];
-      if (Date.now() - touchStart.t < 700) handleTap(t.clientX, t.clientY);
-    }
-    if (e.touches.length === 0) { touchStart = null; touchDrag = false; }
+    if (!touchStart) return;
+    const t = e.changedTouches[0];
+    const moved = Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y);
+    if (moved < 16 && Date.now() - touchStart.t < 700) handleTap(t.clientX, t.clientY);
+    touchStart = null;
   });
+  canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
   // =====================================================
   // 十一、对话面板
@@ -778,7 +675,6 @@
     frames++;
     update(dt);
     render();
-    if (frames % 8 === 0) drawMinimap();   // 小地图降频重绘（每 8 帧），省 CPU 保流畅
   }
   requestAnimationFrame(loop);
 

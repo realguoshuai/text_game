@@ -1,0 +1,14 @@
+# ===== 2D 等距游戏：素材与原始生成物本地保留，不传 GitHub =====
+immortal-game/assets/
+immortal-game/AssetLibrary/AI原始图/
+immortal-game/_ai_raw/
+immortal-game/_oga_drop/
+immortal-game/_godot_drop/
+
+# 临时 scratch / 截图 / 日志
+immortal-game/_*.png
+immortal-game/_*.txt
+immortal-game/_*.html
+_*.png
+_*.txt
+_*.html

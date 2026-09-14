@@ -159,16 +159,13 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8dcc0
   #dlgClose { padding: 5px 18px; font-size: 13px; }
 }
 
-/* ===== 缩放手势提示（仅触屏设备显示，5 秒后淡出）===== */
+/* ===== 竖屏手机：提示横屏 ===== */
 #rotateHint { display: none; position: absolute; top: 46%; left: 50%; transform: translate(-50%,-50%);
   z-index: 40; pointer-events: none; text-align: center;
   background: rgba(10,8,4,.88); border: 1px solid #a8894e; border-radius: 8px;
   color: #ffe9b3; font-size: 15px; letter-spacing: 2px; padding: 14px 26px; line-height: 2; }
-@media (pointer: coarse) {
-  #rotateHint { display: block; animation: rotFade 5s forwards; }
+#rotateHint .rot { font-size: 30px; display: block; animation: rotHint 1.6s ease-in-out infinite; }
+@keyframes rotHint { 0%,100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
+@media (orientation: portrait) and (max-width: 760px) {
+  #rotateHint { display: block; }
 }
-#rotateHint .rot { font-size: 30px; display: block; animation: rotPulse 1.8s ease-in-out infinite; }
-@keyframes rotPulse { 0%,100% { transform: scale(1); opacity: .8; } 50% { transform: scale(1.22); opacity: 1; } }
-@keyframes rotFade { 0%, 62% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
-
-/* ===== 屏幕缩放控制（右下）已移除：固定视角保证移动端操作流畅 ===== */
