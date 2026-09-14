@@ -1,9 +1,12 @@
-# ===== 2D 等距游戏：素材与原始生成物本地保留，不传 GitHub =====
-immortal-game/assets/
+# ===== 2D 等距游戏：运行时素材入仓（GitHub Pages 需加载），仅原始生成物/草稿排除 =====
+# 运行时精灵/瓦片/UI 保持跟踪；以下原始 AI 图与生成丢弃目录不传 GitHub
 immortal-game/AssetLibrary/AI原始图/
 immortal-game/_ai_raw/
 immortal-game/_oga_drop/
 immortal-game/_godot_drop/
+immortal-game/assets/_ai_raw/
+immortal-game/assets/_oga_drop/
+immortal-game/assets/_godot_drop/
 
 # 临时 scratch / 截图 / 日志
 immortal-game/_*.png
