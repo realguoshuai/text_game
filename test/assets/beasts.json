@@ -4,13 +4,11 @@
  "keys": [
   "minotaur_a",
   "minotaur_b",
-  "minotaur_c",
   "ronin_a",
   "ronin_b",
   "ronin_c",
   "gorgon_a",
   "gorgon_b",
-  "gorgon_c",
   "knight_a",
   "zombie_a"
  ],
@@ -125,66 +123,6 @@
     "idle": 7,
     "walk": 10,
     "atk": 15,
-    "hurt": 12,
-    "dead": 9
-   }
-  },
-  {
-   "pack": "craftpix-minotaur",
-   "src": "Minotaur_3",
-   "key": "minotaur_c",
-   "cn": "牛魔·玄角",
-   "dir": "sucai/怪物",
-   "license": "CraftPix free asset (Minotaur pack)",
-   "fh": 114,
-   "bodyH": 93,
-   "hp": 175,
-   "atk": 19,
-   "def": 12,
-   "exp": 48,
-   "stones": [
-    12,
-    22
-   ],
-   "mv": 1.7,
-   "elite": true,
-   "spawn": [
-    20,
-    27
-   ],
-   "aggro": null,
-   "srcFace": "right",
-   "mode": "sheet",
-   "ax": 0.4962,
-   "box": [
-    -1,
-    33,
-    131,
-    95
-   ],
-   "contentH": 94,
-   "contentCX": 64.0,
-   "acts": {
-    "idle": 5,
-    "walk": 7,
-    "atk": 4,
-    "atk2": 4,
-    "hurt": 2,
-    "dead": 4
-   },
-   "srcActs": {
-    "idle": 10,
-    "walk": 12,
-    "atk": 4,
-    "atk2": 4,
-    "hurt": 3,
-    "dead": 5
-   },
-   "fps": {
-    "idle": 7,
-    "walk": 10,
-    "atk": 15,
-    "atk2": 15,
     "hurt": 12,
     "dead": 9
    }
@@ -476,69 +414,6 @@
    ],
    "contentH": 93,
    "contentCX": 64.5,
-   "acts": {
-    "idle": 5,
-    "walk": 7,
-    "run": 7,
-    "atk": 6,
-    "atk2": 5,
-    "hurt": 2,
-    "dead": 3
-   },
-   "srcActs": {
-    "idle": 7,
-    "walk": 13,
-    "run": 7,
-    "atk": 7,
-    "atk2": 5,
-    "hurt": 3,
-    "dead": 3
-   },
-   "fps": {
-    "idle": 7,
-    "walk": 10,
-    "run": 13,
-    "atk": 15,
-    "atk2": 15,
-    "hurt": 12,
-    "dead": 9
-   }
-  },
-  {
-   "pack": "craftpix-gorgon",
-   "src": "Gorgon_3",
-   "key": "gorgon_c",
-   "cn": "蛇妖·银鳞",
-   "dir": "sucai/蛇妖",
-   "license": "CraftPix free asset (Gorgon pack)",
-   "fh": 130,
-   "bodyH": 85,
-   "hp": 165,
-   "atk": 21,
-   "def": 13,
-   "exp": 50,
-   "stones": [
-    13,
-    24
-   ],
-   "mv": 2.1,
-   "elite": true,
-   "spawn": [
-    23,
-    9
-   ],
-   "aggro": null,
-   "srcFace": "right",
-   "mode": "sheet",
-   "ax": 0.4676,
-   "box": [
-    -1,
-    34,
-    139,
-    94
-   ],
-   "contentH": 93,
-   "contentCX": 55.5,
    "acts": {
     "idle": 5,
     "walk": 7,

@@ -34,10 +34,7 @@
         { "src": "Minotaur_1", "key": "minotaur_a", "cn": "牛魔·褐角", "body": 112,
           "hp": 120, "atk": 15, "def": 9,  "exp": 30, "stones": [7, 14], "mv": 1.9,  "spawn": [12, 13] },
         { "src": "Minotaur_2", "key": "minotaur_b", "cn": "牛魔·灰角", "body": 102,
-          "hp": 96,  "atk": 13, "def": 7,  "exp": 24, "stones": [6, 12], "mv": 2.3,  "spawn": [25, 21] },
-        { "src": "Minotaur_3", "key": "minotaur_c", "cn": "牛魔·玄角", "body": 112, "elite": true,
-          "hp": 175, "atk": 19, "def": 12, "exp": 48, "stones": [12, 22], "mv": 1.7, "spawn": [20, 27],
-          "acts": { "atk": ["Attack.png"], "atk2": ["Attack.png"] } }
+          "hp": 96,  "atk": 13, "def": 7,  "exp": 24, "stones": [6, 12], "mv": 2.3,  "spawn": [25, 21] }
       ]
     },
     {
@@ -66,10 +63,7 @@
           "acts": { "atk": ["Attack_2.png", "Attack_1.png"], "atk2": ["Special.png"] } },
         { "src": "Gorgon_2", "key": "gorgon_b", "cn": "蛇妖·紫鳞", "body": 100,
           "hp": 82, "atk": 18, "def": 7,  "exp": 26, "stones": [6, 13], "mv": 2.8, "spawn": [24, 20],
-          "acts": { "atk": ["Attack_2.png", "Attack_1.png"], "atk2": ["Special.png"] } },
-        { "src": "Gorgon_3", "key": "gorgon_c", "cn": "蛇妖·银鳞", "body": 118, "elite": true,
-          "hp": 165, "atk": 21, "def": 13, "exp": 50, "stones": [13, 24], "mv": 2.1, "spawn": [23, 9],
-          "acts": { "atk": ["Attack_3.png", "Attack_2.png"], "atk2": ["Special.png"] } }
+          "acts": { "atk": ["Attack_2.png", "Attack_1.png"], "atk2": ["Special.png"] } }
       ]
     },
     {

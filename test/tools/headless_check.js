@@ -116,11 +116,11 @@ results.push(run('碑林 刷怪', 'map=beilin', ({ dbg }) => !!dbg && dbg.foes >
 results.push(run('战斗 击杀掉落', 'map=beilin&autotest=fight', ({ probe }) =>
   !!probe && probe.exp > 0 && probe.stones > 0));
 
-// 9) 灵泉妖兽全量：11 只、五族、每只都能被镜像/动作状态机正确驱动；
+// 9) 灵泉妖兽全量：9 只、五族、每只都能被镜像/动作状态机正确驱动；
 //    外加领地（leash）验收 —— 越界不许咬人、必须回巢、回巢后还能被重新拉起。
 //    这条 sim 的时长以「秒」计（20s + 14s），预算要给足。
 results.push(run('灵泉 妖兽领地', 'map=lingquan&autotest=bestiary', ({ probe }) =>
-  !!probe && probe.total === 11 && Array.isArray(probe.err) && probe.err.length === 0 &&
+  !!probe && probe.total === 9 && Array.isArray(probe.err) && probe.err.length === 0 &&
   probe.zombieHit === true && probe.knightHit === true &&
   !!probe.leash && probe.leash.attackedWhileLeashed === false &&
   probe.leash.returnedHome === true && probe.leash.retCleared === true &&

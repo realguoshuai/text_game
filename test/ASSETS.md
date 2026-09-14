@@ -91,9 +91,9 @@ vamp_31.png  vamp_32.png  vamp_33.png     ninja_41.png  ninja_42.png  ninja_43.p
 |---|---|---|---|---|
 | `craftpix-vampire` | `sucai/craftpix-net-506778-free-vampire-pixel-art-sprite-sheets` | 31 / 32 / 33 血族 | sheet | CraftPix 免费吸血鬼包，素材 id **506778** |
 | `craftpix-shinobi` | `sucai/craftpix-net-453698-free-shinobi-sprites-pixel-art` | 41 格斗家 / 42 武士 / 43 忍者 | sheet | CraftPix 免费忍者包，素材 id **453698** |
-| `craftpix-minotaur` | `sucai/怪物` | 牛魔·褐角 / 灰角 / 玄角(精英) | sheet | CraftPix Minotaur |
+| `craftpix-minotaur` | `sucai/怪物` | 牛魔·褐角 / 灰角 | sheet | CraftPix Minotaur |
 | `craftpix-humanoid` | `sucai/人形怪` | 游方刀客 / 弓手 / 统领(精英) | sheet | CraftPix Samurai |
-| `craftpix-gorgon` | `sucai/蛇妖` | 蛇妖·碧鳞 / 紫鳞 / 银鳞(精英) | sheet | CraftPix Gorgon |
+| `craftpix-gorgon` | `sucai/蛇妖` | 蛇妖·碧鳞 / 紫鳞 | sheet | CraftPix Gorgon |
 | `craftpix-knight` | `sucai/人形铠甲怪` | 铠甲卫 | sheet | CraftPix Knight |
 | `craftpix-zombie` | `sucai/小僵尸/PNG` | 小僵尸 | **frames**（逐帧独立 PNG） | CraftPix Zombie |
 
@@ -119,5 +119,5 @@ vamp_31.png  vamp_32.png  vamp_33.png     ninja_41.png  ninja_42.png  ninja_43.p
 3. 跑对应构建器：主角 `add_craftpix_heroes.py` / 怪物 `build_beasts_atlas.py`。
 4. 把 `game.js` 的 `LOAD_PLAN` 里对应 `?v=` 加一、`weight` 改成实际 KB。
 5. `node test/tools/asset_audit.js` —— 看引用全部命中、运行时文件均已入库。
-6. `node test/tools/headless_check.js` —— 14 个用例回归。
+6. `node test/tools/headless_check.js` —— 18 个用例回归。
 7. 最后拿服务访问日志核一次**真实请求**（浏览器请求过什么，才算数）。

@@ -114,7 +114,7 @@
     { x: 10, y: 20, t: 'dummy' }, { x: 16, y: 19, t: 'dummy' }, { x: 22, y: 20, t: 'dummy' },
     { x: 13, y: 25, t: 'dummy' }, { x: 21, y: 25, t: 'dummy' }
   ];
-  /* 灵泉灵瀑的怪：牛魔 / 游方 / 蛇妖 三族共 9 只，来自 sucai 下三个 CraftPix 怪物包。
+  /* 灵泉灵瀑的怪：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 9 只，来自 sucai 下 CraftPix 怪物包。
    * 属性、刷怪格、动作帧率全部写在 tools/beast_packs.json，由 build_beasts_atlas.py 生成
    * assets/beasts.json，启动时灌进 FOE_DEFS 与 LINGQUAN_SPAWNS ——
    * 以后加怪物包只改登记表 + 跑脚本，不用再动 game.js。
@@ -253,12 +253,12 @@
     { url: 'assets/maps.json?v=1', json: true, weight: 62, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.png?v=1', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
     { url: 'assets/chars_atlas.png?v=3', atlas: 'chars', weight: 323, label: '载入人物动作' },
-    { url: 'assets/foes_atlas.png?v=2', atlas: 'foes', weight: 1167, label: '载入妖兽图鉴' },
+    { url: 'assets/foes_atlas.png?v=3', atlas: 'foes', weight: 1099, label: '载入妖兽图鉴' },
     { url: 'assets/tiles_atlas.json?v=1', json: true, weight: 2, label: '读取地貌索引' },
     { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
     { url: 'assets/foes_atlas.json?v=2', json: true, weight: 10, label: '读取妖兽索引' },
     { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
-    { url: 'assets/beasts.json?v=1', json: true, weight: 11, label: '读取怪物图录' }
+    { url: 'assets/beasts.json?v=2', json: true, weight: 11, label: '读取怪物图录' }
   ];
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
