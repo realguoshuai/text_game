@@ -365,14 +365,13 @@
         }
         if (at === 'fight') {
           // ?map=beilin&autotest=fight —— 贴脸反复攻击，验证击杀掉落与修为增长
-          setTimeout(function () {
-            var f0 = foes[0];
-            if (f0) { player.mx = f0.x; player.my = f0.y; player.tx = f0.x; player.ty = f0.y; }
-            for (var i = 0; i < 120; i++) { window.ISLES.attackNearest(); window.ISLES.tick(0.5); }
-            var alive = foes.filter(function (x) { return x.alive; }).length;
-            var pb = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
-            pb.textContent = JSON.stringify({ alive: alive, total: foes.length, exp: player.exp, stones: player.stones, hp: Math.round(player.hp) });
-          }, 60);
+          // 注意：headless 下 setTimeout 未必在 dump 前触发，故同步执行（boot 成功时 foes 已就绪）
+          var f0 = foes[0];
+          if (f0) { player.mx = f0.x; player.my = f0.y; player.tx = f0.x; player.ty = f0.y; }
+          for (var i = 0; i < 120; i++) { window.ISLES.attackNearest(); window.ISLES.tick(0.5); }
+          var alive = foes.filter(function (x) { return x.alive; }).length;
+          var pb = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          pb.textContent = JSON.stringify({ alive: alive, total: foes.length, exp: player.exp, stones: player.stones, hp: Math.round(player.hp) });
         }
         requestAnimationFrame(loop);
       }
@@ -573,12 +572,14 @@
       list.push({ k: (o.x + (o.fw || 1) - 1) + (o.y + (o.fh || 1) - 1) + 0.5, i: i, o: o });
     });
     (CUR.npcs || []).forEach(function (n) { list.push({ k: n.x + n.y + 0.01, i: -2, o: n }); });
+    foes.forEach(function (f) { list.push({ k: f.x + f.y, i: -3, o: f }); });
     list.push({ k: player.mx + player.my, i: -1, o: null });
     list.sort(function (a, b) { return a.k - b.k; });
 
     list.forEach(function (it) {
-      // 注意顺序：NPC 用 i=-2、玩家用 i=-1，两者都 <0。
-      // 必须先判 -2 再判 <0，否则 NPC 会全部被当成玩家画出来（地图上到处是主角的复制品）。
+      // 注意顺序：妖兽 i=-3、NPC i=-2、玩家 i=-1，三者都 <0。
+      // 必须先判 -3/-2 再判 -1，否则会被当成玩家/物件错画。
+      if (it.i === -3) { drawFoe(it.o); return; }
       if (it.i === -2) { drawNPC(it.o); return; }
       if (it.i === -1) { drawCharacter(); return; }
       var o = it.o;
@@ -799,7 +800,10 @@
         if (onCell) { pending = pt; fadeDir = 1; player.path = null; player.tx = player.mx; player.ty = player.my; break; }
       }
     }
+    if (player.attackCd > 0) player.attackCd = Math.max(0, player.attackCd - dt);
+    if (player.flash > 0) player.flash = Math.max(0, player.flash - dt);
     updateCam(dt);
+    updateFoes(dt);
     var posEl = document.getElementById('pos');
     if (posEl) posEl.textContent = Math.round(player.mx) + ', ' + Math.round(player.my);
   }
@@ -863,6 +867,22 @@
     best.hp -= real; best.flash = 0.22;
     addFloater(best.x, best.y - 0.3, '-' + real, '#ffd36b');
     if (best.hp <= 0) killFoe(best);
+  }
+  // 玩家主动出手（J/空格/点击妖兽）：锁定仇恨内最近的妖兽并打一下
+  function attackNearest() {
+    if (player.dead) return;
+    if (player.targetFoe && player.targetFoe.alive) {
+      var td = Math.hypot(player.targetFoe.x - player.mx, player.targetFoe.y - player.my);
+      if (td <= AGGRO) { tryAttack(); return; }
+    }
+    var best = null, bd = AGGRO;
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i]; if (!f.alive) continue;
+      var d = Math.hypot(f.x - player.mx, f.y - player.my);
+      if (d < bd) { bd = d; best = f; }
+    }
+    if (best) player.targetFoe = best;
+    tryAttack();
   }
   function killFoe(f) {
     f.alive = false; f.hp = 0;
