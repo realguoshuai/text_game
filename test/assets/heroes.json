@@ -1,0 +1,102 @@
+{
+ "acts": [
+  "idle",
+  "walk",
+  "run",
+  "atkA",
+  "atkB",
+  "dead"
+ ],
+ "heroes": [
+  {
+   "n": 1,
+   "file": "char_hero.png",
+   "label": "1 号"
+  },
+  {
+   "n": 5,
+   "file": "npc_5.png",
+   "label": "5 号"
+  },
+  {
+   "n": 10,
+   "file": "npc_10.png",
+   "label": "10 号"
+  },
+  {
+   "n": 14,
+   "file": "npc_14.png",
+   "label": "14 号"
+  },
+  {
+   "n": 18,
+   "file": "npc_18.png",
+   "label": "18 号"
+  },
+  {
+   "n": 20,
+   "file": "npc_20.png",
+   "label": "20 号"
+  },
+  {
+   "n": 31,
+   "file": "vamp_31.png",
+   "label": "31",
+   "nick": "31 血族伯爵",
+   "side": true,
+   "pack": "craftpix-vampire"
+  },
+  {
+   "n": 32,
+   "file": "vamp_32.png",
+   "label": "32",
+   "nick": "32 血族女伯爵",
+   "side": true,
+   "pack": "craftpix-vampire"
+  },
+  {
+   "n": 33,
+   "file": "vamp_33.png",
+   "label": "33",
+   "nick": "33 血族少女",
+   "side": true,
+   "pack": "craftpix-vampire"
+  },
+  {
+   "n": 41,
+   "file": "ninja_41.png",
+   "label": "41",
+   "nick": "41 东瀛格斗家",
+   "side": true,
+   "pack": "craftpix-shinobi"
+  },
+  {
+   "n": 42,
+   "file": "ninja_42.png",
+   "label": "42",
+   "nick": "42 东瀛武士",
+   "side": true,
+   "pack": "craftpix-shinobi"
+  },
+  {
+   "n": 43,
+   "file": "ninja_43.png",
+   "label": "43",
+   "nick": "43 东瀛忍者",
+   "side": true,
+   "pack": "craftpix-shinobi"
+  }
+ ],
+ "packs": [
+  {
+   "id": "craftpix-vampire",
+   "name": "CraftPix 免费吸血鬼包 #506778",
+   "license": "CraftPix Freebie：可商用/可修改/可随游戏分发、无需署名；禁止再分发素材源文件；禁止用于 AI 训练"
+  },
+  {
+   "id": "craftpix-shinobi",
+   "name": "CraftPix 免费忍者包 #453698",
+   "license": "CraftPix Freebie：可商用/可修改/可随游戏分发、无需署名；禁止再分发素材源文件；禁止用于 AI 训练"
+  }
+ ]
+}

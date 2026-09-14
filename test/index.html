@@ -82,7 +82,9 @@
     border-radius:4px;padding:1px 5px;font-family:inherit;color:#fff;font-size:11.5px}
   #bottom .hl{color:#8bf3ff}
   /* 屏幕攻击键：键盘之外的第二条出手路径，手机也能按 */
-  #actions{right:14px;bottom:14px;display:flex;gap:8px;pointer-events:auto;z-index:11}
+  #actions{right:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-end;
+    gap:8px;pointer-events:auto;z-index:11}
+  #actions .row{display:flex;gap:8px}
   #actions .act{pointer-events:auto;cursor:pointer;font-family:inherit;
     background:linear-gradient(180deg,rgba(158,58,58,.94),rgba(92,28,28,.96));
     color:#ffeccf;border:1px solid rgba(255,150,120,.65);border-radius:12px;
@@ -92,6 +94,22 @@
   #actions .act:active{transform:translateY(1px)}
   #actions .act kbd{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
     border-radius:4px;padding:1px 6px;font-family:inherit;font-size:11.5px;font-weight:600}
+  /* 攻击 B（重击）：和普攻区分成金色，避免两个红按钮看起来一样 */
+  #actions .act.b{background:linear-gradient(180deg,rgba(154,110,34,.94),rgba(88,60,16,.96));
+    color:#ffeec6;border-color:rgba(255,214,140,.7)}
+  #actions .act.b:hover{background:linear-gradient(180deg,#bb8a2e,#6d4a14);border-color:#ffd75e;color:#fff}
+  /* 动作试演：1~6 六个按钮，没有键盘（手机）也能逐个看动作 */
+  #actbar{pointer-events:auto;background:rgba(12,20,34,.84);border:1px solid rgba(120,146,190,.42);
+    border-radius:12px;padding:8px 10px;display:flex;align-items:center;gap:9px;
+    box-shadow:0 6px 18px rgba(0,0,0,.36)}
+  #actbar .t{font-size:11.5px;color:#9fb3d0;letter-spacing:1px;white-space:nowrap}
+  #actbar .acts{display:flex;gap:6px;flex-wrap:wrap}
+  #actbar button{pointer-events:auto;cursor:pointer;font-family:inherit;background:rgba(30,44,70,.9);
+    color:#dfe9f6;border:1px solid rgba(120,146,190,.5);border-radius:8px;padding:7px 10px;
+    font-size:12.5px;font-weight:600;transition:.12s;white-space:nowrap}
+  #actbar button:hover{background:rgba(52,78,124,.95);border-color:#8bf3ff;color:#fff}
+  #actbar button:active{transform:translateY(1px)}
+  #actbar button.on{background:linear-gradient(180deg,#2f5f86,#1d3d5c);border-color:#8bf3ff;color:#fff}
   /* 居中事件提示（被击退/折损灵石等） */
   #toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-6px);z-index:60;
     padding:10px 20px;border-radius:10px;pointer-events:none;max-width:82vw;text-align:center;
@@ -157,11 +175,19 @@
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> 行走　·　
   点击格子移动　·　<span class="hl">滚轮 / +/-</span> 缩放视图（0.62~1.72 倍）　·　
   走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）　·　
-  走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 或 <span class="hl">点击妖兽</span> 出手（碑林石阵可打怪）
+  走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
+  <span class="hl">Shift</span> 奔跑　·　<span class="hl">1~6</span> 试动作（待机/行走/奔跑/攻击A/攻击B/倒地）
 </div>
 
 <div id="actions" class="hud">
-  <button id="btnAtk" class="act" title="攻击最近的妖兽（J / F / 空格）">攻击 <kbd>J</kbd></button>
+  <div class="row">
+    <button id="btnAtk" class="act" title="攻击 A：普攻，伤害 = 攻击 - 防御（J / F / 空格）">攻击A <kbd>J</kbd></button>
+    <button id="btnAtkB" class="act b" title="攻击 B：重击，伤害翻倍、范围更大并击退妖兽（K）">重击B <kbd>K</kbd></button>
+  </div>
+  <div id="actbar">
+    <span class="t">动作试演</span>
+    <div class="acts" id="actBtns"></div>
+  </div>
 </div>
 
 <div id="loader">

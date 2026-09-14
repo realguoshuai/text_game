@@ -1,0 +1,47 @@
+{
+  "_note": "角色包登记表。新增一个素材包 = ①把解压后的包放进 ImmortalGame/sucai/ ②在下方 packs 里加一条 ③跑 test/tools/build_chars_atlas.py。",
+  "_spec": {
+    "素材格式": "横版侧视 sprite sheet，透明底 PNG，一行动作横向排列；单格边长由 cell 指定（通常是 128）",
+    "每角色必须的文件": "Idle.png / Walk.png",
+    "建议齐全的文件": "Idle / Walk / Run / Attack_1 / Attack_2 / Dead（分别对应 待机/行走/奔跑/攻击A/攻击B/倒地）",
+    "缺失处理": "Run/Attack_1/Attack_2/Dead 缺失时会回退到 Walk.png 并打印 WARN，不阻断集成",
+    "会阻断集成的问题": "目录不存在、单格尺寸与声明不符、宽度不是单格整数倍、各帧底边未对齐（说明素材本身没做动画对齐）",
+    "脚本做的事": "整格缩放到 64px 单格（不裁内容、不居中，保留美术对齐）→ 每个动作一行 6 帧 → 追加到 chars_atlas.png 底部，并输出 assets/heroes.json"
+  },
+  "packs": [
+    {
+      "id": "craftpix-vampire",
+      "name": "CraftPix 免费吸血鬼包 #506778",
+      "dir": "craftpix-net-506778-free-vampire-pixel-art-sprite-sheets",
+      "license": "CraftPix Freebie：可商用/可修改/可随游戏分发、无需署名；禁止再分发素材源文件；禁止用于 AI 训练",
+      "cell": 128,
+      "prefix": "vamp",
+      "heroes": [
+        { "n": 31, "folder": "Converted_Vampire", "label": "31", "nick": "31 血族伯爵" },
+        { "n": 32, "folder": "Countess_Vampire", "label": "32", "nick": "32 血族女伯爵" },
+        { "n": 33, "folder": "Vampire_Girl", "label": "33", "nick": "33 血族少女" }
+      ]
+    },
+    {
+      "id": "craftpix-shinobi",
+      "name": "CraftPix 免费忍者包 #453698",
+      "dir": "craftpix-net-453698-free-shinobi-sprites-pixel-art",
+      "license": "CraftPix Freebie：可商用/可修改/可随游戏分发、无需署名；禁止再分发素材源文件；禁止用于 AI 训练",
+      "cell": 128,
+      "prefix": "ninja",
+      "heroes": [
+        { "n": 41, "folder": "Fighter", "label": "41", "nick": "41 东瀛格斗家" },
+        { "n": 42, "folder": "Samurai", "label": "42", "nick": "42 东瀛武士" },
+        { "n": 43, "folder": "Shinobi", "label": "43", "nick": "43 东瀛忍者" }
+      ]
+    }
+  ],
+  "builtin": [
+    { "n": 1, "file": "char_hero.png", "label": "1 号" },
+    { "n": 5, "file": "npc_5.png", "label": "5 号" },
+    { "n": 10, "file": "npc_10.png", "label": "10 号" },
+    { "n": 14, "file": "npc_14.png", "label": "14 号" },
+    { "n": 18, "file": "npc_18.png", "label": "18 号" },
+    { "n": 20, "file": "npc_20.png", "label": "20 号" }
+  ]
+}

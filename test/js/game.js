@@ -12,6 +12,19 @@
 
   // 角色 sprite sheet（6列×5行，64×64/格）：行0=正面 行1=右 行2=左 行3=背
   var SHEET = { cols: 6, rows: 5, cellW: 64, cellH: 64, frames: 6, dir: { down: 0, right: 1, left: 2, up: 3 }, pxScale: 2 };
+
+  /* ---------------- 动作行 ----------------
+   * 两种角色的动作表结构不同：
+   *  · 等距素材（1/5/10/14/18/20 号）：5 行 = 4 个朝向 + 1 行备用，行是「朝向」。
+   *  · CraftPix 侧视素材（31/32/33/41/42/43 号）：6 行 = 6 个动作，行是「动作」，
+   *    只有一个朝向（右边），左边由引擎水平翻转得到。
+   * SIDE_ACT 的取值必须与 test/tools/add_craftpix_heroes.py 里 ACTS 的顺序一致。
+   */
+  var SIDE_ACT = { idle: 0, walk: 1, run: 2, atkA: 3, atkB: 4, dead: 5 };
+  var ACT_DUR = { atkA: 0.45, atkB: 0.75, dead: 1.5 };   // 一次性动作的播放时长（秒）
+  var ACT_CN = { idle: '待机', walk: '行走', run: '奔跑', atkA: '攻击 A', atkB: '攻击 B', dead: '倒地' };
+  var RUN_MUL = 1.75;      // 奔跑速度倍率
+  var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
   // 文件名带版本号：浏览器会缓存同名图片，换精灵时必须换名，否则玩家仍看到旧图
   // 主角外形可切换：1/5/10/14/18/20 取自「武侠修仙免费包」；31~33 取自 CraftPix 免费吸血鬼包；
   // 41~43 取自 CraftPix 免费忍者包（Fighter / Samurai / Shinobi）。
@@ -21,6 +34,8 @@
   // 注意：它们只有左右两个朝向，故 down/right/up 复用侧视原图、left 用水平翻转。
   // 直接指定：?hero=14 / ?hero=31 / ?hero=43
   // 重新打包：python test/tools/add_craftpix_heroes.py
+  // side:true 表示这张表来自 CraftPix 侧视素材 —— 行是「动作」而不是「朝向」，
+  // 6 个动作（待机/行走/奔跑/攻击A/攻击B/倒地）齐全；侧视只有右边一个朝向，左边靠翻转。
   var HERO_OPTIONS = [
     { n: 1, file: 'char_hero.png', label: '1 号' },
     { n: 5, file: 'npc_5.png', label: '5 号' },
@@ -28,12 +43,12 @@
     { n: 14, file: 'npc_14.png', label: '14 号' },
     { n: 18, file: 'npc_18.png', label: '18 号' },
     { n: 20, file: 'npc_20.png', label: '20 号' },
-    { n: 31, file: 'vamp_31.png', label: '31', nick: '31 血族伯爵' },
-    { n: 32, file: 'vamp_32.png', label: '32', nick: '32 血族女伯爵' },
-    { n: 33, file: 'vamp_33.png', label: '33', nick: '33 血族少女' },
-    { n: 41, file: 'ninja_41.png', label: '41', nick: '41 东瀛格斗家' },
-    { n: 42, file: 'ninja_42.png', label: '42', nick: '42 东瀛武士' },
-    { n: 43, file: 'ninja_43.png', label: '43', nick: '43 东瀛忍者' }
+    { n: 31, file: 'vamp_31.png', label: '31', nick: '31 血族伯爵', side: true },
+    { n: 32, file: 'vamp_32.png', label: '32', nick: '32 血族女伯爵', side: true },
+    { n: 33, file: 'vamp_33.png', label: '33', nick: '33 血族少女', side: true },
+    { n: 41, file: 'ninja_41.png', label: '41', nick: '41 东瀛格斗家', side: true },
+    { n: 42, file: 'ninja_42.png', label: '42', nick: '42 东瀛武士', side: true },
+    { n: 43, file: 'ninja_43.png', label: '43', nick: '43 东瀛忍者', side: true }
   ];
   var PLAYER_CHAR = HERO_OPTIONS[0].file;      // 主角当前用的动作表（chars_atlas 里的 key）
   var PLAYER_SRC = PLAYER_CHAR;                // 主角图集 key（setHero / buildHeroUI 会改写；先给默认值，避免严格模式下未声明报错）
@@ -58,7 +73,12 @@
   var PAL = {}, WALK = '';
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
     hp: 130, maxhp: 130, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
-    attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0 };
+    attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0,
+    // —— 动作状态机 ——
+    act: 'idle',      // idle / walk / run / atkA / atkB / dead
+    actT: 0,          // 当前动作已播放时间（秒），用于一次性动作按进度取帧
+    actHold: 0,       // >0 表示动作被锁定（攻击、倒地），期间不接受移动输入
+    atkBCd: 0 };      // 重击冷却
   var screenFlash = 0;   // 受重击/被击退时的全屏红闪（避免玩家莫名其妙"换了个地方"）
 
   // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
@@ -69,7 +89,9 @@
     // fh = 目标绘制身高（屏幕像素，Z=1 时）；主角为 128，妖兽略矮，精英石魔接近主角
     assassin: { key: 'assassin', name: '刀影飞镖',     hp: 42,  atk: 14, def: 4,  exp: 12, stones: [3, 7],   mv: 3.2,  fh: 90 },
     golem:    { key: 'golem',    name: '九州震击石魔', hp: 130, atk: 16, def: 12, exp: 32, stones: [8, 16],  mv: 1.55, fh: 124, elite: true },
-    wraith:   { key: 'wraith',   name: '水墨幽魂',     hp: 74,  atk: 17, def: 7,  exp: 22, stones: [5, 11],  mv: 2.2,  fh: 104 }
+    wraith:   { key: 'wraith',   name: '水墨幽魂',     hp: 74,  atk: 17, def: 7,  exp: 22, stones: [5, 11],  mv: 2.2,  fh: 104 },
+    // 训练靶（青玄山门调试场专供）：不移动、不还手、打不死 —— 只用来试攻击与技能
+    dummy:    { key: 'golem',    name: '练功石傀',     hp: 99999, atk: 0, def: 0, exp: 0, stones: [0, 0],  mv: 0,    fh: 116, dummy: true }
   };
   // 12 只散布在 30×30 碑林；坐标由 snapWalkable 吸附到最近可走格，故可略放宽。
   var BEILIN_SPAWNS = [
@@ -80,7 +102,14 @@
     { x: 20, y: 5,  t: 'wraith' },   { x: 21, y: 27, t: 'wraith' },   { x: 7,  y: 9,  t: 'wraith' },
     { x: 16, y: 26, t: 'wraith' }
   ];
+  // 青玄山门 = 人物调试场：5 个训练靶摆在开阔场地，东西南北都有，方便核对攻击朝向
+  var QINGXUAN_SPAWNS = [
+    { x: 10, y: 20, t: 'dummy' }, { x: 16, y: 19, t: 'dummy' }, { x: 22, y: 20, t: 'dummy' },
+    { x: 13, y: 25, t: 'dummy' }, { x: 21, y: 25, t: 'dummy' }
+  ];
   var camX = 0, camY = 0, time = 0;
+  var lastActShown = null;   // 动作试演面板的高亮同步（变化时才碰 DOM）
+  var poseLock = null;       // ?pose=atkA 之类：把主角锁在某个动作上，用于核对素材/截图
   // 上一帧的绘制计数（QA 用）：确认 NPC 真的走了 drawNPC 分支，
   // 而不是被 <0 的兜底分支当成玩家画出来
   var _draw = { actor: 0, npc: 0 };
@@ -193,11 +222,12 @@
   var LOAD_PLAN = [
     { url: 'assets/maps.json', json: true, weight: 4, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.png', atlas: 'tiles', weight: 617, label: '载入地貌与建筑' },
-    { url: 'assets/chars_atlas.png?v=2', atlas: 'chars', weight: 314, label: '载入人物动作' },
+    { url: 'assets/chars_atlas.png?v=3', atlas: 'chars', weight: 323, label: '载入人物动作' },
     { url: 'assets/foes_atlas.png', atlas: 'foes', weight: 1043, label: '载入妖兽图鉴' },
     { url: 'assets/tiles_atlas.json', json: true, weight: 4, label: '读取地貌索引' },
-    { url: 'assets/chars_atlas.json?v=2', json: true, weight: 4, label: '读取人物索引' },
-    { url: 'assets/foes_atlas.json', json: true, weight: 4, label: '读取妖兽索引' }
+    { url: 'assets/chars_atlas.json?v=3', json: true, weight: 4, label: '读取人物索引' },
+    { url: 'assets/foes_atlas.json', json: true, weight: 4, label: '读取妖兽索引' },
+    { url: 'assets/heroes.json?v=1', json: true, weight: 4, label: '读取角色清单' }
   ];
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
@@ -297,10 +327,14 @@
     report('读取地图数据', '');
     return next().then(function () {
       setProgress(1, '就绪', '');
-      var data = LOAD_PLAN[0].value;
-      ATLAS.tiles.img = LOAD_PLAN[1].value; ATLAS.tiles.rect = LOAD_PLAN[4].value;
-      ATLAS.chars.img = LOAD_PLAN[2].value; ATLAS.chars.rect = LOAD_PLAN[5].value;
-      ATLAS.foes.img = LOAD_PLAN[3].value; ATLAS.foes.rect = LOAD_PLAN[6].value;
+        var data = LOAD_PLAN[0].value;
+        ATLAS.tiles.img = LOAD_PLAN[1].value; ATLAS.tiles.rect = LOAD_PLAN[4].value;
+        ATLAS.chars.img = LOAD_PLAN[2].value; ATLAS.chars.rect = LOAD_PLAN[5].value;
+        ATLAS.foes.img = LOAD_PLAN[3].value; ATLAS.foes.rect = LOAD_PLAN[6].value;
+        // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
+        // 不影响启动 —— 只是少了新角色，不会白屏。
+        var hj = LOAD_PLAN[7].value;
+        if (hj && hj.heroes && hj.heroes.length) HERO_OPTIONS = hj.heroes;
 
       TILE_W = data.tileW; TILE_H = data.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
       PAL = data.tilePalette; WALK = data.walkable;
@@ -338,6 +372,9 @@
         window.__dbg = dbg;
         var at = q.get('autotest');
         HOLD = q.get('hold') === '1';
+        // ?pose=run —— 把主角锁在某个动作上（核对素材/截图用），取值见 ACT_CN
+        var pq = q.get('pose');
+        if (pq && ACT_CN[pq]) { poseLock = pq; player.act = pq; player.actT = 0.05; }
         // 无头浏览器里 rAF 的 dt 常常接近 0（虚拟时钟只推进定时器、不推进帧），
         // 过渡动画就会卡在 fade≈0.08 永远走不完 —— 这是抓取环境的假象，不是引擎 bug。
         // 所以自测一律用 ISLES.tick(1/60) 手动推进固定步长，结果可复现。
@@ -348,10 +385,57 @@
         if (at && at.indexOf('portal') === 0) {
           setTimeout(function () { window.ISLES.stepOnPortal(0); sim(3); }, 60);
         }
+        if (at === 'state') {
+          // ?autotest=state —— 把玩家/相机/缩放状态写进 #dbg，用于核对截图之间是否同源
+          setTimeout(function () {
+            var s = window.ISLES.state();
+            s.cam = { x: +camX.toFixed(1), y: +camY.toFixed(1) };
+            s.hero = PLAYER_SRC;
+            s.foes = foes.length;
+            var g = document.getElementById('dbg');
+            if (g) g.textContent = JSON.stringify(s);
+          }, 80);
+        }
+        if (at === 'train') {
+          // ?map=qingxuan&autotest=train —— 人物调试场自测：
+          // 断言训练靶已生成、攻击A/重击B 都能造成伤害、训练靶打不死、六个动作能逐个切换
+          setTimeout(function () {
+            var r = { map: CUR.id, foes: foes.length, dummy: 0 };
+            for (var i = 0; i < foes.length; i++) if (foes[i].def_.dummy) r.dummy++;
+            var f0 = foes[0];
+            if (f0) {
+              player.mx = f0.x; player.my = f0.y; player.tx = f0.x; player.ty = f0.y;
+              player.actHold = 0; player.attackCd = 0; player.atkBCd = 0; player.dead = false;
+              var h0 = f0.hp;
+              attackNearest(); sim(0.1);
+              r.dmgA = h0 - f0.hp;
+              var h1 = f0.hp;
+              player.atkBCd = 0;
+              powerAttack(); sim(0.1);
+              r.dmgB = h1 - f0.hp;
+              r.targetAlive = f0.alive;      // 训练靶必须打不死
+              r.hpRestored = f0.hp === f0.maxhp || f0.hp > 0;
+            }
+            var seq = [];
+            ['idle', 'walk', 'run', 'atkA', 'atkB', 'dead'].forEach(function (a) {
+              playAct(a); sim(0.02);
+              seq.push(a + '=' + player.act);
+            });
+            r.acts = seq.join(' ');
+            r.actBtns = document.querySelectorAll('#actBtns button').length;
+            r.heroBtns = document.querySelectorAll('#heroBtns button').length;
+            r.hero = PLAYER_SRC;
+            var pb = document.getElementById('probe');
+            if (!pb) { pb = document.createElement('div'); pb.id = 'probe'; pb.style.display = 'none'; document.body.appendChild(pb); }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
         if (at === 'walk') {
-          // 程序化按住「右」1.2 秒：读 #dbg 的 mx 有没有变大，即可确认键盘行走真的生效
+          // 程序化按住「右」1.2 秒：读 #dbg 的 mx 有没有变大，即可确认键盘行走真的生效。
+          // 加 &shift=1 则同时按住 Shift，用来对比奔跑是否真的更快。
           keys['d'] = 1;
-          setTimeout(function () { sim(1.2); keys['d'] = 0; sim(0.1); }, 60);
+          if (q.get('shift') === '1') keys['shift'] = 1;
+          setTimeout(function () { sim(1.2); keys['d'] = 0; keys['shift'] = 0; sim(0.1); }, 60);
         }
         if (at && at.indexOf('click') === 0) {
           // 点击移动朝向自测： ?autotest=click&cdx=3&cdy=0 （目标格 = 当前格 + 偏移）
@@ -537,9 +621,14 @@
     ctx.fillText(label, cx, cy - 46 * Z);
   }
 
-  /** 画一个角色（影子 + 按朝向/帧取图）。玩家与 NPC 共用同一套绘制，规格完全一致 */
-  function drawActor(img, mx, my, face, frame, bob, ox, oy) {
+  /** 画一个角色（影子 + 按朝向/帧取图）。玩家与 NPC 共用同一套绘制，规格完全一致。
+   *  opts.row  覆盖行号（侧视素材的行是「动作」而非「朝向」）
+   *  opts.flip 水平翻转（侧视素材只有右边一个朝向，左边靠翻转）
+   *  opts.spin 绕脚底旋转，弧度（等距素材没有倒地帧，用旋转近似倒下）
+   */
+  function drawActor(img, mx, my, face, frame, bob, ox, oy, opts) {
     _draw.actor++;
+    opts = opts || {};
     var p = isoToScreen(mx, my);
     var dh = SHEET.cellH * SHEET.pxScale * Z, dw = dh * (SHEET.cellW / SHEET.cellH);
     var baseY = p.y + HH * Z;
@@ -552,20 +641,90 @@
     ctx.fill();
     ctx.restore();
     if (!img) return null;
-    var row = SHEET.dir[face] || 0;
+    var row = (opts.row != null) ? opts.row : (SHEET.dir[face] || 0);
     var sx = (ox || 0) + frame * SHEET.cellW, sy = (oy || 0) + row * SHEET.cellH;
+    var top = baseY - dh + 4 + (bob || 0) * Z;
     var sm = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, sx, sy, SHEET.cellW, SHEET.cellH,
-      p.x - dw / 2, baseY - dh + 4 + (bob || 0) * Z, dw, dh);
+    if (opts.spin) {
+      ctx.save();
+      ctx.translate(p.x, baseY);
+      ctx.rotate(opts.spin);
+      ctx.drawImage(img, sx, sy, SHEET.cellW, SHEET.cellH, -dw / 2, -dh + 4 + (bob || 0) * Z, dw, dh);
+      ctx.restore();
+    } else if (opts.flip) {
+      ctx.save();
+      ctx.translate(p.x, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, sy, SHEET.cellW, SHEET.cellH, -dw / 2, top, dw, dh);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, sx, sy, SHEET.cellW, SHEET.cellH, p.x - dw / 2, top, dw, dh);
+    }
     ctx.imageSmoothingEnabled = sm;
     return { x: p.x, top: baseY - dh + 4 };
   }
 
+  function heroOf(file) {
+    for (var i = 0; i < HERO_OPTIONS.length; i++) {
+      if (HERO_OPTIONS[i].file === file) return HERO_OPTIONS[i];
+    }
+    return null;
+  }
+  /** 侧视素材的取帧：循环动作按时间/步频推进，一次性动作按播放进度推进（停在末帧）。
+   *  walk/run 优先跟位移同步（避免"滑步"）；没有位移时（数字键试演）退回用 actT 计时，
+   *  否则站着试演会是一张死图。 */
+  function sideFrame(act) {
+    if (act === 'idle') return Math.floor(time * 4) % SHEET.frames;
+    if (act === 'walk') return Math.floor((player.walk > 0 ? player.walk * 7 : player.actT * 7)) % SHEET.frames;
+    if (act === 'run')  return Math.floor((player.walk > 0 ? player.walk * 11 : player.actT * 11)) % SHEET.frames;
+    var dur = ACT_DUR[act] || 0.5;
+    var k = Math.min(0.999, player.actT / dur);
+    return Math.min(SHEET.frames - 1, Math.floor(k * SHEET.frames));
+  }
   function drawCharacter() {
     var pz = charPiece(PLAYER_SRC); if (!pz) return;
-    var frame = (player.walk > 0 ? Math.floor(player.walk * 6) % SHEET.frames : 0);
-    drawActor(pz.img, player.mx, player.my, player.face, frame, 0, pz.sx, pz.sy);
+    var h = heroOf(PLAYER_SRC);
+    var act = player.act || 'idle';
+    var opts = {}, frame;
+    if (h && h.side) {
+      opts.row = SIDE_ACT[act] || 0;
+      opts.flip = (player.face === 'left');    // 侧视只有右边一版，左边翻转
+      frame = sideFrame(act);
+    } else {
+      // 等距素材只有 4 个朝向行、没有独立动作行，只能近似：
+      // 奔跑 = 步频加快 + 轻微起伏；攻击 = 站定第 0 帧 + 挥击弧；倒地 = 绕脚底旋转倒下。
+      frame = (player.walk > 0 ? Math.floor(player.walk * (act === 'run' ? 9 : 6)) % SHEET.frames : 0);
+      if (act === 'atkA' || act === 'atkB') frame = 0;
+      if (act === 'dead') opts.spin = -1.35;
+    }
+    var bobb = (act === 'run' && !(h && h.side)) ? Math.sin(time * 18) * 1.1 : 0;
+    drawActor(pz.img, player.mx, player.my, player.face, frame, bobb, pz.sx, pz.sy, opts);
+    if (act === 'atkA' || act === 'atkB') drawSlash(act);
+  }
+  /** 挥击弧：两种角色都用，让"这一下打出去了"看得见 */
+  function drawSlash(act) {
+    var dur = ACT_DUR[act] || 0.5;
+    var k = Math.min(1, player.actT / dur);
+    var a = Math.sin(k * Math.PI);            // 0 -> 1 -> 0
+    if (a <= 0.03) return;
+    var big = (act === 'atkB');
+    var dir = (player.face === 'left') ? -1 : 1;
+    var p = isoToScreen(player.mx, player.my);
+    var cx = p.x + dir * 13 * Z, cy = p.y + HH * Z - 32 * Z;
+    var r = (big ? 40 : 28) * Z;
+    var sweep = big ? 1.9 : 1.4;
+    var a0 = -1.15 + (k - 0.5) * sweep;
+    ctx.save();
+    ctx.globalAlpha = 0.8 * a;
+    ctx.strokeStyle = big ? '#ffd36b' : '#d6ecff';
+    ctx.lineWidth = (big ? 5.5 : 3.2) * Z;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (dir > 0) ctx.arc(cx, cy, r, a0, a0 + 0.95, false);
+    else ctx.arc(cx, cy, r, Math.PI - a0, Math.PI - a0 - 0.95, true);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** NPC：站立取第 0 帧（图集已把最中性那帧旋到 0），叠一点极轻的呼吸起伏，不再是死图 */
@@ -668,11 +827,17 @@
     document.getElementById('mapName').textContent = CUR.name;
     var btns = document.querySelectorAll('#mapBtns button');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.id === CUR.id);
-    document.getElementById('hint').textContent = silent ? '踩上青色光门即可切换地图'
-      : '已传送至「' + CUR.name + '」 · ' + CUR.note;
-    // 只有碑林石阵刷妖兽（猎场）；其它图清空战斗状态，避免切回去还残留怪物
-    if (CUR.id === 'beilin') { foes = makeFoes(); }
+    var hintEl = document.getElementById('hint');
+    if (silent) hintEl.textContent = '踩上青色光门即可切换地图';
+    else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试攻击（J 攻击A / K 重击B / 1~6 试动作）';
+    else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
+    // 只有碑林石阵刷妖兽（猎场）；青玄山门刷训练靶（调试场）；其它图清空战斗状态，避免切回去还残留怪物
+    if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：真猎场
+    else if (CUR.id === 'qingxuan') { foes = makeFoes(QINGXUAN_SPAWNS); }  // 青玄山门：调试场
     else { foes = []; floaters = []; particles = []; player.targetFoe = null; }
+    // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
+    player.act = 'idle'; player.actT = 0; player.actHold = 0;
+    player.dead = false;
   }
 
   function couldStand(x, y) {
@@ -742,10 +907,13 @@
     var k = e.key;
     keys[k.toLowerCase()] = 1;
     if (k.indexOf('Arrow') === 0) e.preventDefault();
-    // 出手：J / F / 空格（空格默认会滚动页面，必须拦截）。此前这里漏了分支，
-    // 所以按 J/空格毫无反应 —— 玩家体感就是「人物没有技能、无法攻击」。
+    // 出手：J / F / 空格 = 攻击 A（普攻）；K = 攻击 B（重击）
     if (k === ' ' || k === 'Spacebar') { e.preventDefault(); attackNearest(); return; }
     if (k === 'j' || k === 'J' || k === 'f' || k === 'F') { e.preventDefault(); attackNearest(); return; }
+    if (k === 'k' || k === 'K') { e.preventDefault(); powerAttack(); return; }
+    // 动作试演：1~6 直接切到对应动作，方便逐个核对素材（待机/行走/奔跑/攻击A/攻击B/倒地）
+    var demo = { '1': 'idle', '2': 'walk', '3': 'run', '4': 'atkA', '5': 'atkB', '6': 'dead' }[k];
+    if (demo) { e.preventDefault(); playAct(demo); return; }
     // 键盘缩放：+ / - 步进，0 复位
     if (k === '+' || k === '=') zoomBy(ZSTEP, W / 2, H / 2);
     else if (k === '-' || k === '_') zoomBy(1 / ZSTEP, W / 2, H / 2);
@@ -787,8 +955,29 @@
     }
     if (fadeDir !== 0) { updateCam(dt); return; }
 
+    // —— 动作状态机 ——
+    // actHold > 0 表示正在播一次性动作（攻击/倒地），期间不被行走状态覆盖；
+    // 播完自动回 idle。倒地结束时在这里起身（保留一口气 + 短暂无敌）。
+    if (player.actHold > 0) {
+      player.actHold -= dt;
+      player.actT += dt;
+      if (player.actHold <= 0) {
+        player.actHold = 0;
+        if (player.dead) {
+          player.dead = false;
+          player.hp = Math.round(player.maxhp * 0.6);   // 留一口气，给撤退的机会
+          player.invuln = 2.2;
+          toast('起身！2 秒内无敌，可撤或反打');
+        }
+        player.act = 'idle'; player.actT = 0;
+      }
+    }
+    if (player.atkBCd > 0) player.atkBCd = Math.max(0, player.atkBCd - dt);
+
     var d = inputDir();
-    var speed = 5.2;
+    if (player.dead) d = { dx: 0, dy: 0 };              // 倒地期间不接受移动输入
+    var running = !!(keys['shift'] && (d.dx || d.dy));  // 按住 Shift = 奔跑
+    var speed = 5.2 * (running ? RUN_MUL : 1);
     var px0 = player.mx, py0 = player.my;
 
     if (d.dx || d.dy) {
@@ -841,6 +1030,16 @@
     var moved = Math.abs(player.mx - px0) > 1e-5 || Math.abs(player.my - py0) > 1e-5;
     player.walk = moved ? player.walk + dt : 0;
 
+    // 循环动作（待机/行走/奔跑）由这里自动切换；一次性动作期间（actHold>0）不覆盖
+    if (poseLock) { player.act = poseLock; player.actT += dt; }   // 调试场：锁死动作不参与状态机
+    else if (player.actHold <= 0) {
+      var nextAct = moved ? (running ? 'run' : 'walk') : 'idle';
+      if (player.act !== nextAct) { player.act = nextAct; player.actT = 0; }
+      player.actT += dt;
+    }
+    // 试演面板高亮跟随当前动作（只在变化时改 DOM，避免每帧重排）
+    if (player.act !== lastActShown) { lastActShown = player.act; markAct(player.act); }
+
     // —— 传送门检测 ——
     if (portalLock <= 0) {
       var pcx = Math.round(player.mx), pcy = Math.round(player.my);
@@ -882,8 +1081,8 @@
   }
 
   // ---------------- 妖兽战斗逻辑 ----------------
-  function makeFoes() {
-    return BEILIN_SPAWNS.map(function (s) {
+  function makeFoes(list) {
+    return (list || BEILIN_SPAWNS).map(function (s) {
       var d = FOE_DEFS[s.t];
       var cell = snapWalkable(CUR, s.x, s.y);
       return {
@@ -921,6 +1120,7 @@
     if (player.dead) return;
     if (player.attackCd > 0) return;
     player.attackCd = 0.45;
+    player.act = 'atkA'; player.actT = 0; player.actHold = ACT_DUR.atkA;   // 挥空也播，打不到也有反馈
     var best = null, bd = MELEE;
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i]; if (!f.alive) continue;
@@ -950,7 +1150,59 @@
     if (best) player.targetFoe = best;
     tryAttack();
   }
+  /** 攻击 B（重击，K）：伤害翻倍、范围更大、把妖兽推开一段，代价是长冷却 */
+  function powerAttack() {
+    if (player.dead) return;
+    var h0 = document.getElementById('hint');
+    if (player.atkBCd > 0) {
+      if (h0) h0.textContent = '重击冷却中（剩 ' + player.atkBCd.toFixed(1) + ' 秒）';
+      return;
+    }
+    player.atkBCd = ATK_B_CD;
+    player.act = 'atkB'; player.actT = 0; player.actHold = ACT_DUR.atkB;
+    var reach = MELEE + 0.55, hit = [];
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i]; if (!f.alive) continue;
+      if (Math.hypot(f.x - player.mx, f.y - player.my) <= reach) hit.push(f);
+    }
+    if (!hit.length) {
+      toast('重击落空（冷却 ' + ATK_B_CD + ' 秒）');
+      if (h0) h0.textContent = '重击落空，' + ATK_B_CD + ' 秒后可再放';
+      return;
+    }
+    setFaceFromDelta(hit[0].x - player.mx, hit[0].y - player.my);
+    for (var j = 0; j < hit.length; j++) {
+      var g = hit[j];
+      var real = Math.max(1, Math.round(player.atk * 2 - g.def));
+      g.hp -= real; g.flash = 0.3;
+      addFloater(g.x, g.y - 0.3, '-' + real, '#ffd36b');
+      var dx = g.x - player.mx, dy = g.y - player.my, dd = Math.hypot(dx, dy) || 1;
+      for (var s = 0; s < 3; s++) {                       // 把妖兽推开
+        if (couldStand(g.x + dx / dd * 0.3, g.y)) g.x += dx / dd * 0.3;
+        if (couldStand(g.x, g.y + dy / dd * 0.3)) g.y += dy / dd * 0.3;
+      }
+      if (g.hp <= 0) killFoe(g);
+    }
+    toast('重击命中 ' + hit.length + ' 只（冷却 ' + ATK_B_CD + ' 秒）');
+    if (h0) h0.textContent = '重击命中 ' + hit.length + ' 只，' + ATK_B_CD + ' 秒后可再放';
+  }
+  /** 动作试演（数字键 1~6）：直接切到指定动作，用来逐个核对素材效果 */
+  function playAct(act) {
+    if (player.dead && act !== 'dead') return;
+    player.act = act; player.actT = 0;
+    if (act === 'atkA') player.actHold = ACT_DUR.atkA;
+    else if (act === 'atkB') player.actHold = ACT_DUR.atkB;
+    else if (act === 'dead') { player.actHold = ACT_DUR.dead; player.dead = true; }
+    else player.actHold = 0.9;        // 循环动作也临时锁一下，否则下一帧就被状态机改回 idle
+    var h = document.getElementById('hint');
+    if (h) h.textContent = '动作试演：' + (ACT_CN[act] || act) + '（' + (player.actHold) + ' 秒）';
+  }
   function killFoe(f) {
+    if (f.def_.dummy) {                 // 训练靶打不死：立刻满血重置，方便反复试
+      f.hp = f.maxhp; f.flash = 0.25;
+      addFloater(f.x, f.y - 0.4, '靶子已重置', '#8bf3ff');
+      return;
+    }
     f.alive = false; f.hp = 0;
     player.exp += f.exp;
     var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
@@ -982,15 +1234,16 @@
   function playerDown(foe) {
     var lost = Math.floor(player.stones * 0.3);
     player.stones -= lost;
-    var pushed = foe ? knockBackPlayer(foe.x, foe.y, 3.0) : 0;
+    var pushed = foe ? knockBackPlayer(foe.x, foe.y, 0.6) : 0;   // 只轻推半步，不再大幅位移
     player.path = null; player.targetFoe = null;
-    player.hp = Math.round(player.maxhp * 0.6);   // 留一口气，给撤退的机会
-    player.flash = 0.5; player.invuln = 2.2;      // 短暂无敌，避免被连击秒杀
+    player.dead = true;
+    player.act = 'dead'; player.actT = 0; player.actHold = ACT_DUR.dead;   // 播倒地动作
+    player.flash = 0.5;
     screenFlash = 0.55;
-    addFloater(player.mx, player.my - 0.4, '被击退！', '#ff8080');
-    toast('气血耗尽，被击退' + (pushed ? '' : '（退路被阻）') + '，折损灵石 ' + lost);
+    addFloater(player.mx, player.my - 0.4, '倒地！', '#ff8080');
+    toast('气血耗尽倒地，折损灵石 ' + lost + (pushed ? '' : '（退路被阻）'));
     var h = document.getElementById('hint');
-    if (h) h.textContent = '气血耗尽被击退，折损灵石 ' + lost + '（2 秒内无敌，可撤或反打）';
+    if (h) h.textContent = '倒地中，' + ACT_DUR.dead + ' 秒后起身（起身有 2 秒无敌）';
   }
   function updateFoes(dt) {
     for (var i = 0; i < foes.length; i++) {
@@ -998,6 +1251,7 @@
       if (!f.alive) { f.respawn -= dt; if (f.respawn <= 0) respawnFoe(f); continue; }
       if (f.flash > 0) f.flash = Math.max(0, f.flash - dt);
       if (f.atkAnim > 0) f.atkAnim = Math.max(0, f.atkAnim - dt);
+      if (f.def_.dummy) continue;        // 训练靶：不追、不打、不移动，站着挨揍
       var dx = player.mx - f.x, dy = player.my - f.y, dist = Math.hypot(dx, dy);
       f.atkCd -= dt;
       if (dist < AGGRO && !player.dead) {
@@ -1166,6 +1420,35 @@
     atkBtn.addEventListener('click', doAtk);
     atkBtn.addEventListener('touchstart', doAtk, { passive: false });
   }
+  var atkBBtn = document.getElementById('btnAtkB');
+  if (atkBBtn) {
+    var doAtkB = function (ev) { if (ev) ev.preventDefault(); powerAttack(); };
+    atkBBtn.addEventListener('click', doAtkB);
+    atkBBtn.addEventListener('touchstart', doAtkB, { passive: false });
+  }
+
+  // 动作试演面板：六个动作一个按钮，点它等同于按数字键 1~6。
+  // 手机没有键盘，这块是唯一能逐个核对素材动作的入口。
+  var ACT_ORDER = ['idle', 'walk', 'run', 'atkA', 'atkB', 'dead'];
+  function markAct(a) {
+    var bs = document.querySelectorAll('#actBtns button');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].dataset.act === a);
+  }
+  (function buildActUI() {
+    var box = document.getElementById('actBtns');
+    if (!box) return;
+    box.innerHTML = '';
+    ACT_ORDER.forEach(function (a, i) {
+      var b = document.createElement('button');
+      b.textContent = (i + 1) + ' ' + ACT_CN[a];
+      b.title = '试演「' + ACT_CN[a] + '」（键盘 ' + (i + 1) + '）';
+      b.dataset.act = a;
+      var fire = function (ev) { if (ev) ev.preventDefault(); playAct(a); markAct(a); };
+      b.addEventListener('click', fire);
+      b.addEventListener('touchstart', fire, { passive: false });
+      box.appendChild(b);
+    });
+  })();
 
   // 鼠标滚轮缩放（以指针为锚点）
   canvas.addEventListener('wheel', function (e) {
@@ -1248,6 +1531,13 @@
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
     ctx.imageSmoothingEnabled = false;
+    // 视口尺寸一变就立刻把相机对准主角。只改 W/H 的话，相机要等 updateCam 平滑
+    // 几帧才归位 —— 拖拽窗口时会看到画面滑动，首屏（boot 时拿到的是默认窗口尺寸）
+    // 更会停在一个错位状态：无头截图里表现为"同一 URL 两次截图背景不一样"。
+    if (CUR) {
+      camX = W / 2 - (player.mx - player.my) * HW * Z;
+      camY = H / 2 - (player.mx + player.my) * HH * Z;
+    }
   }
   window.addEventListener('resize', resize);
   resize();
@@ -1288,6 +1578,18 @@
     stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; player.path = null; portalLock = 0; },
     tick: function (dt) { update(dt || 0.016); render(); },
     attackNearest: function () { attackNearest(); },
+    powerAttack: function () { powerAttack(); },
+    playAct: function (a) { playAct(a); return player.act; },
+    act: function () {
+      return { act: player.act, actT: +player.actT.toFixed(2), actHold: +player.actHold.toFixed(2),
+        dead: player.dead, atkBCd: +player.atkBCd.toFixed(2), face: player.face };
+    },
+    foeInfo: function () {
+      return foes.map(function (f) {
+        return { name: f.name, x: +f.x.toFixed(1), y: +f.y.toFixed(1), hp: f.hp,
+          dummy: !!f.def_.dummy, alive: f.alive };
+      });
+    },
     /** 逐 (怪 × 状态 × 朝向) 解析帧并算出生效绘制尺寸，供 headless 校验图集与归一化 */
     foeDebug: function () {
       var out = [];
