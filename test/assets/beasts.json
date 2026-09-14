@@ -10,7 +10,9 @@
   "ronin_c",
   "gorgon_a",
   "gorgon_b",
-  "gorgon_c"
+  "gorgon_c",
+  "knight_a",
+  "zombie_a"
  ],
  "monsters": [
   {
@@ -36,6 +38,9 @@
     12,
     13
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4779,
    "box": [
     -1,
@@ -90,6 +95,9 @@
     25,
     21
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4514,
    "box": [
     -1,
@@ -144,6 +152,9 @@
     20,
     27
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4962,
    "box": [
     -1,
@@ -201,6 +212,9 @@
     7,
     15
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.3892,
    "box": [
     -1,
@@ -261,6 +275,9 @@
     28,
     17
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4779,
    "box": [
     -1,
@@ -321,6 +338,9 @@
     26,
     26
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4887,
    "box": [
     -1,
@@ -381,6 +401,9 @@
     8,
     20
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4545,
    "box": [
     -1,
@@ -441,6 +464,9 @@
     24,
     20
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4962,
    "box": [
     -1,
@@ -501,6 +527,9 @@
     23,
     9
    ],
+   "aggro": null,
+   "srcFace": "right",
+   "mode": "sheet",
    "ax": 0.4676,
    "box": [
     -1,
@@ -537,6 +566,131 @@
     "hurt": 12,
     "dead": 9
    }
+  },
+  {
+   "pack": "craftpix-knight",
+   "src": "Knight_1",
+   "key": "knight_a",
+   "cn": "铠甲卫",
+   "dir": "sucai/人形铠甲怪",
+   "license": "CraftPix free asset (Knight pack)",
+   "fh": 119,
+   "bodyH": 64,
+   "hp": 130,
+   "atk": 17,
+   "def": 11,
+   "exp": 34,
+   "stones": [
+    8,
+    15
+   ],
+   "mv": 1.8,
+   "elite": false,
+   "spawn": [
+    15,
+    4
+   ],
+   "aggro": 9,
+   "srcFace": "right",
+   "mode": "sheet",
+   "ax": 0.4194,
+   "box": [
+    -1,
+    52,
+    155,
+    76
+   ],
+   "contentH": 75,
+   "contentCX": 33.5,
+   "acts": {
+    "idle": 4,
+    "walk": 7,
+    "run": 7,
+    "atk": 5,
+    "atk2": 4,
+    "hurt": 2,
+    "dead": 5
+   },
+   "srcActs": {
+    "idle": 4,
+    "walk": 8,
+    "run": 7,
+    "atk": 5,
+    "atk2": 4,
+    "hurt": 2,
+    "dead": 6
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "atk2": 15,
+    "hurt": 12,
+    "dead": 9
+   }
+  },
+  {
+   "pack": "craftpix-zombie",
+   "src": "Zombie1/animation",
+   "key": "zombie_a",
+   "cn": "小僵尸",
+   "dir": "sucai/小僵尸/PNG",
+   "license": "CraftPix free asset (Zombie pack)",
+   "fh": 86,
+   "bodyH": 82,
+   "hp": 60,
+   "atk": 14,
+   "def": 4,
+   "exp": 16,
+   "stones": [
+    3,
+    8
+   ],
+   "mv": 2.9,
+   "elite": false,
+   "spawn": [
+    11,
+    23
+   ],
+   "aggro": 10,
+   "srcFace": "left",
+   "mode": "frames",
+   "ax": 0.547,
+   "box": [
+    0,
+    0,
+    99,
+    86
+   ],
+   "contentH": 86,
+   "contentCX": 54.0,
+   "acts": {
+    "idle": 4,
+    "walk": 6,
+    "run": 8,
+    "atk": 6,
+    "hurt": 4,
+    "dead": 5
+   },
+   "srcActs": {
+    "idle": 4,
+    "walk": 6,
+    "run": 10,
+    "atk": 6,
+    "hurt": 5,
+    "dead": 8
+   },
+   "fps": {
+    "idle": 7,
+    "walk": 10,
+    "run": 13,
+    "atk": 15,
+    "hurt": 12,
+    "dead": 9
+   },
+   "prescale": 0.2158,
+   "prescaleSrc": 380
   }
  ]
 }

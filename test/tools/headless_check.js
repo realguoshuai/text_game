@@ -15,12 +15,20 @@ const path = require('path');
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const GAME = 'file:///C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/index.html';
+// 用户数据目录：本次运行独占一个（按 pid 命名），不要跟正在跑的普通 Chrome 抢 Default 配置
+// （singleton 锁会让 headless 直接报错退出）。但也不要「每个用例都新建」——
+// 冷 profile 的首次启动开销在这台弱机上经常顶满 virtual-time-budget，页面停在「加载中」，
+// 表现成随机几条用例 dbg=-。一次运行共用一个热 profile 最稳，跑完删掉。
+const U_DIR = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
 
-function readPage(query) {
+function readPage(query, budget) {
   const out = path.join(os.tmpdir(), 'wb_dom_' + query.replace(/[^a-z0-9]+/gi, '_') + '.html');
+  // 顺手掐掉磁盘缓存：素材/JSON 改过之后旧缓存会让页面加载到上一版数据，
+  // 症状是「代码明明改了、自测还是老结果」——这类假失败比真 bug 更耗时间。
   execSync(
     `"${CHROME}" --headless=new --disable-gpu --no-sandbox --allow-file-access-from-files ` +
-    `--virtual-time-budget=9000 --window-size=1280,800 --dump-dom "${GAME}?${query}" > "${out}" 2>nul`,
+    `--no-first-run --no-default-browser-check --disk-cache-size=1 --hide-scrollbars ` +
+    `--user-data-dir="${U_DIR}" --virtual-time-budget=${budget || 14000} --window-size=1280,800 --dump-dom "${GAME}?${query}" > "${out}" 2>nul`,
     { shell: 'cmd.exe' }
   );
   const dom = fs.readFileSync(out, 'utf8');
@@ -32,7 +40,10 @@ function readPage(query) {
 }
 
 function run(label, query, expect) {
-  const r = readPage(query);
+  // 页面压根没加载出来（map 还停在「加载中」、dbg/probe 都是空）不是断言失败，
+  // 是 headless 冷启动没跑完。这种假失败重试，别把结论污染成「回归挂了」。
+  let r = readPage(query), tries = 1;
+  while (!r.dbg && !r.probe && tries < 3) { r = readPage(query, 14000); tries++; }
   let dbg = null;
   try { dbg = r.dbg ? JSON.parse(r.dbg) : null; } catch (e) { /* ignore */ }
   let probe = null;
@@ -42,6 +53,7 @@ function run(label, query, expect) {
     (verdict === null ? '  ' : verdict ? 'PASS ' : 'FAIL ') +
     label.padEnd(28) +
     ' map=' + String(r.mapName).padEnd(10) +
+    (tries > 1 ? '(重试' + (tries - 1) + ') ' : '') +
     ' dbg=' + (r.dbg || '-').slice(0, 96)
   );
   if (probe) console.log('      probe=' + JSON.stringify(probe));
@@ -88,6 +100,14 @@ results.push(run('传送 碑林→青玄', 'map=beilin&autotest=portal', ({ dbg 
 // 6) NPC 绘制分支可达
 results.push(run('NPC 渲染计数', 'autotest=walk', ({ dbg }) => !!dbg && dbg.npcs > 0));
 
+// 7) 碑林石阵刷怪（就地取材的打怪场）
+results.push(run('碑林 刷怪', 'map=beilin', ({ dbg }) => !!dbg && dbg.foes > 0));
+
+// 8) 战斗：贴脸反复攻击应击杀并掉落灵石 / 修为增长
+results.push(run('战斗 击杀掉落', 'map=beilin&autotest=fight', ({ probe }) =>
+  !!probe && probe.exp > 0 && probe.stones > 0));
+
 const failed = results.filter((r) => r.ok === false).length;
 console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + results.length + ' 个用例)'));
+try { fs.rmSync(U_DIR, { recursive: true, force: true }); } catch (e) { /* 目录偶尔被占用，留着不影响结果 */ }
 process.exit(failed ? 1 : 0);

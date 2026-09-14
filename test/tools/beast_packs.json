@@ -1,9 +1,13 @@
 {
   "_spec": {
     "purpose": "怪物包登记表 —— 新下一个包，只要把目录丢进 ImmortalGame/sucai/、在 packs[] 补一条、跑 build_beasts_atlas.py，就完成接入。",
-    "cell": "所有帧图必须是「单行」精灵表：高 = 格高，宽 = 格宽 × 帧数（本轮三包统一 128×128/格）。",
-    "acts": "动作名 -> 候选文件名列表，按序取第一个存在的文件。包级 acts 覆盖全局 acts。",
-    "caps": "每个动作最多保留的帧数：超出就等距抽样（一次性动作永远保留首末帧）。",
+    "mode": "包的素材形态，两种：\n    · 缺省/sheet —— 「单行」精灵表：高 = 格高 128，宽 = 128 × 帧数，每帧内容底边落在格底。\n    · frames —— 每个动作导出成一串独立 PNG（canvas 紧贴内容、尺寸各异），没有格子也没有锚点。\n      frames 模式下 src 指向装 PNG 的目录，acts 写 glob（如 \"Idle*.png\"），脚本会：\n      ① 按目标体格 body 用 LANCZOS 预缩放（矢量素材原图 ~370px 高、游戏里只画 80px，\n         交给引擎最近邻缩 4 倍会把轮廓缩碎）；② 逐帧重建水平锚点；③ 底部对齐后统一装箱。",
+    "cell": "sheet 模式的格尺寸：本轮统一 128×128/格（铠甲怪内容只占格底 64px，脚本按框高/基准高换算，不影响成品身高）。",
+    "acts": "动作名 -> 候选文件名列表（sheet）或 glob 列表（frames），按序取第一组命中的。包级 acts 覆盖全局 acts，怪物级 acts 覆盖包级。",
+    "caps": "每个动作最多保留的帧数：超出就等距抽样（一次性动作永远保留首末帧）。包级/怪物级可覆盖。",
+    "anchor": "sheet 模式：整只怪统一水平锚点 —— 把 idle 第 0 帧的内容中心平移到格中心，全动作共用同一位移。\nframes 模式：帧被紧裁过、没有锚点，需逐帧重建。默认用内容整体重心；\n    对四肢大幅伸展的角色（僵尸伸手/踢腿）整体重心会被拉偏，故支持颜色地标：\n    { \"rgb\": [168,124,79], \"tol\": 46 } = 上衣（躯干）色块的重心，实测帧间抖动最小。",
+    "srcFace": "素材原生朝向，缺省 right。侧视包只有一版朝向，引擎靠镜像补另一侧：\n    铠甲怪/牛魔/蛇妖等朝右，写 right；小僵尸原画朝左，写 left（镜像判定要反过来）。",
+    "aggro": "该怪的仇恨半径（格），缺省跟引擎的全局值 6.5。调大 = 会主动扑过来打人，不填就走默认。",
     "fps": "各动作播放帧率；攻击/受击/倒地的实际时长还会被引擎的一次性动作时长夹住。",
     "anchor": "整只怪统一水平锚点：把 idle 第 0 帧的内容中心平移到格中心，全动作共用同一位移 —— 绝不逐帧裁包围盒居中（那会让攻击帧/倒地帧之间抽搐）。",
     "box": "纵向取该怪所有动作的内容并集上边界，统一裁到格底（素材各帧内容底边都落在格底 y=127/128）。",
@@ -66,6 +70,32 @@
         { "src": "Gorgon_3", "key": "gorgon_c", "cn": "蛇妖·银鳞", "body": 118, "elite": true,
           "hp": 165, "atk": 21, "def": 13, "exp": 50, "stones": [13, 24], "mv": 2.1, "spawn": [23, 9],
           "acts": { "atk": ["Attack_3.png", "Attack_2.png"], "atk2": ["Special.png"] } }
+      ]
+    },
+    {
+      "id": "craftpix-knight",
+      "dir": "sucai/人形铠甲怪",
+      "license": "CraftPix free asset (Knight pack)",
+      "monsters": [
+        { "src": "Knight_1", "key": "knight_a", "cn": "铠甲卫", "body": 100,
+          "hp": 130, "atk": 17, "def": 11, "exp": 34, "stones": [8, 15], "mv": 1.8, "aggro": 9,
+          "spawn": [15, 4],
+          "acts": { "atk": ["Attack 1.png"], "atk2": ["Attack 2.png"] } }
+      ]
+    },
+    {
+      "id": "craftpix-zombie",
+      "dir": "sucai/小僵尸/PNG",
+      "mode": "frames",
+      "license": "CraftPix free asset (Zombie pack)",
+      "anchor": { "rgb": [168, 124, 79], "tol": 46 },
+      "monsters": [
+        { "src": "Zombie1/animation", "key": "zombie_a", "cn": "小僵尸", "body": 82, "srcFace": "left",
+          "hp": 60, "atk": 14, "def": 4, "exp": 16, "stones": [3, 8], "mv": 2.9, "aggro": 10,
+          "spawn": [11, 23],
+          "acts": { "idle": ["Idle*.png"], "walk": ["Walk*.png"], "run": ["Run*.png"],
+                    "atk": ["Attack*.png"], "atk2": [], "hurt": ["Hurt*.png"], "dead": ["Dead*.png"] },
+          "caps": { "idle": 4, "walk": 6, "run": 8, "atk": 6, "atk2": 0, "hurt": 4, "dead": 5 } }
       ]
     }
   ]
