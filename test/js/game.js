@@ -23,7 +23,7 @@
   var SIDE_ACT = { idle: 0, walk: 1, run: 2, atkA: 3, atkB: 4, dead: 5 };
   var ACT_DUR = { atkA: 0.65, atkB: 1.0, dead: 1.5 };   // 一次性动作的播放时长（秒）；攻击放慢才看得清
   var ACT_CN = { idle: '待机', walk: '行走', run: '奔跑', atkA: '攻击 A', atkB: '攻击 B', dead: '倒地' };
-  var RUN_MUL = 1.75;      // 奔跑速度倍率
+  var RUN_MUL = 1.0;       // 取消冲刺加速（Shift/摇杆推满不再提速）
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
   // 怪物（侧视多动作素材）一次性动作的播放时长（秒）；循环动作 idle/walk/run 按 fps 推进
   var BEAST_DUR = { atk: 0.42, atk2: 0.58, hurt: 0.3, dead: 1.15 };
