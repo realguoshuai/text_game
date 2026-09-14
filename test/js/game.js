@@ -203,6 +203,9 @@
       rg.oninput = function () { setZoom(this.value / 100, W / 2, H / 2); };
     }
     updateZoomUI();
+    // 左上面板折叠开关：默认收成迷你条，点一下展开详情
+    var tl = document.getElementById('topleft');
+    if (tl) tl.onclick = function () { tl.classList.toggle('open'); };
   }
   // 每帧平滑逼近目标缩放；按锚点做比例换算，使锚点下的画面不位移
   function stepZoom(dt) {

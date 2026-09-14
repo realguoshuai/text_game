@@ -15,22 +15,24 @@
     border:1px solid rgba(214,178,96,.55);border-radius:10px;
     box-shadow:0 6px 22px rgba(0,0,0,.35),inset 0 0 24px rgba(214,178,96,.08);
     color:#f0e3c2}
-  #topleft{top:14px;left:14px;padding:10px 14px;min-width:210px}
-  #topleft .name{font-size:19px;font-weight:700;color:#ffe6a6;letter-spacing:2px}
-  #topleft .row{font-size:12.5px;color:#c9bda0;margin-top:5px;line-height:1.6}
+  /* 左上面板：默认折叠成一条迷你条（地图名+血条），点开才显示详情 */
+  #topleft{top:10px;left:10px;padding:6px 10px;pointer-events:auto;cursor:pointer}
+  #topleft .tlmini{display:flex;align-items:center;gap:8px;min-width:170px}
+  #topleft .tlmini .name{font-size:14px;font-weight:700;color:#ffe6a6;letter-spacing:1px;white-space:nowrap}
+  #topleft .tlmini .hpbar{flex:1;height:7px;min-width:44px;border-radius:4px;background:rgba(0,0,0,.4);
+    overflow:hidden;border:1px solid rgba(214,178,96,.35)}
+  #topleft .tlmini .hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff5a5a,#ff9a6a);transition:width .18s}
+  #topleft .tlmini .hpv{font-size:11px;color:#ffb9b9;font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+  #topleft .tlmini .tg{font-size:10px;color:#c9bda0;transition:transform .15s}
+  #topleft.open .tlmini .tg{transform:rotate(180deg)}
+  #topleft .tlfold{display:none}
+  #topleft.open .tlfold{display:block;margin-top:7px;padding-top:7px;border-top:1px solid rgba(214,178,96,.3)}
+  #topleft .row{font-size:11.5px;color:#c9bda0;margin-top:4px;line-height:1.55}
   #topleft .row b{color:#8bf3ff;font-weight:600}
-  #topleft .hr{height:1px;background:rgba(214,178,96,.3);margin:9px 0 8px}
-  #topleft .hpwrap{margin-top:6px}
-  #topleft .hplabel{display:flex;justify-content:space-between;font-size:12.5px;
-    color:#c9bda0;margin-bottom:4px}
-  #topleft .hplabel b{color:#ff9a9a;font-weight:600;font-family:ui-monospace,Consolas,monospace}
-  #topleft .hpbar{height:9px;border-radius:5px;background:rgba(0,0,0,.4);overflow:hidden;
-    border:1px solid rgba(214,178,96,.35)}
-  #topleft .hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff5a5a,#ff9a6a);
-    transition:width .18s}
-  #topleft #foetarget{margin-top:10px;display:none}
-  #topleft #foetarget .ftname{font-size:12.5px;color:#ffd9a6;margin-bottom:4px;font-weight:600}
-  #topleft #foetarget .ftbar{height:8px;border-radius:5px;background:rgba(0,0,0,.4);overflow:hidden;
+  #topleft .row b.hpnum{color:#ff9a9a}
+  #topleft #foetarget{margin-top:6px;display:none}
+  #topleft #foetarget .ftname{font-size:11.5px;color:#ffd9a6;margin-bottom:3px;font-weight:600}
+  #topleft #foetarget .ftbar{height:7px;border-radius:4px;background:rgba(0,0,0,.4);overflow:hidden;
     border:1px solid rgba(255,120,120,.4)}
   #topleft #foetarget .ftfill{height:100%;width:100%;background:linear-gradient(90deg,#ff3b3b,#ff7a4a)}
 
@@ -191,19 +193,21 @@
 <canvas id="game"></canvas>
 
 <div id="topleft" class="hud panel">
-  <div class="name" id="mapName">加载中…</div>
-  <div class="row">坐标 <b id="pos">—</b></div>
-  <div class="row" id="hint">踩上青色光门即可切换地图</div>
-  <div class="hr"></div>
-  <div class="hpwrap">
-    <div class="hplabel"><span>气血</span><b id="hpv">130/130</b></div>
+  <div class="tlmini" id="tlMini">
+    <span class="name" id="mapName">加载中…</span>
     <div class="hpbar"><div class="hpfill" id="hpfill"></div></div>
+    <span class="hpv" id="hpv">130/130</span>
+    <span class="tg">▾</span>
   </div>
-  <div class="row" id="expv">炼气期 · 修为 0</div>
-  <div class="row">灵石 <b id="stonev">0</b></div>
   <div id="foetarget">
     <div class="ftname"></div>
     <div class="ftbar"><div class="ftfill"></div></div>
+  </div>
+  <div class="tlfold">
+    <div class="row">坐标 <b id="pos">—</b></div>
+    <div class="row" id="hint">踩上青色光门即可切换地图</div>
+    <div class="row" id="expv">炼气期 · 修为 0</div>
+    <div class="row">灵石 <b id="stonev">0</b></div>
   </div>
 </div>
 
