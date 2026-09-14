@@ -22,16 +22,23 @@ const GAME = 'file:///C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/inde
 const U_DIR = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
 
 function readPage(query, budget, size) {
-  const out = path.join(os.tmpdir(), 'wb_dom_' + query.replace(/[^a-z0-9]+/gi, '_') + '.html');
+  // 输出文件每次都用唯一名：同名重定向会被「另一个程序正在使用此文件」的偶发占用炸掉整个跑批
+  const out = path.join(os.tmpdir(), 'wb_dom_' + process.pid + '_' + Date.now() + '_' +
+    Math.floor(Math.random() * 1e6) + '.html');
   // 顺手掐掉磁盘缓存：素材/JSON 改过之后旧缓存会让页面加载到上一版数据，
   // 症状是「代码明明改了、自测还是老结果」——这类假失败比真 bug 更耗时间。
-  execSync(
-    `"${CHROME}" --headless=new --disable-gpu --no-sandbox --allow-file-access-from-files ` +
-    `--no-first-run --no-default-browser-check --disk-cache-size=1 --hide-scrollbars ` +
-    `--user-data-dir="${U_DIR}" --virtual-time-budget=${budget || 14000} ` +
-    `--window-size=${size || '1280,800'} --dump-dom "${GAME}?${query}" > "${out}" 2>nul`,
-    { shell: 'cmd.exe' }
-  );
+  // execSync 偶发失败（profile 锁/临时文件占用）不要炸跑批：返回空，交给 run() 的重试逻辑。
+  try {
+    execSync(
+      `"${CHROME}" --headless=new --disable-gpu --no-sandbox --allow-file-access-from-files ` +
+      `--no-first-run --no-default-browser-check --disk-cache-size=1 --hide-scrollbars ` +
+      `--user-data-dir="${U_DIR}" --virtual-time-budget=${budget || 14000} ` +
+      `--window-size=${size || '1280,800'} --dump-dom "${GAME}?${query}" > "${out}" 2>nul`,
+      { shell: 'cmd.exe' }
+    );
+  } catch (e) {
+    return { dom: '', bodyClass: '', dbg: null, probe: null, mapName: null, loader: null };
+  }
   const dom = fs.readFileSync(out, 'utf8');
   const pick = (id) => {
     const m = dom.match(new RegExp('id="' + id + '"[^>]*>([^<]*)<'));
@@ -129,7 +136,14 @@ results.push(run('战斗 手感三件套', 'map=qingxuan&autotest=combat', ({ pr
   && probe.dmgMax > probe.dmgMin, { budget: 22000 }
 ));
 
-// 9) 灵泉妖兽全量：9 只、五族、每只都能被镜像/动作状态机正确驱动；
+// 8.6) 技能盘：三个技能（御剑诀/雷罡咒/太虚剑域）各自要能命中掉血、冷却期间放不出来、
+//      冷却清零后能再放，且每次释放都产生一个特效对象。
+results.push(run('技能 三招与冷却', 'map=qingxuan&autotest=skill', ({ probe }) => {
+  if (!probe || !probe.skills || probe.skills.length !== 3) return false;
+  return probe.skills.every((s) => s.cast === true && s.dmg > 0 && s.blocked === true
+    && s.recast === true && s.dmg2 > 0 && s.fx >= 1 && s.cd > 0);
+}, { budget: 20000 }
+));
 //    外加领地（leash）验收 —— 越界不许咬人、必须回巢、回巢后还能被重新拉起。
 //    这条 sim 的时长以「秒」计（20s + 14s），预算要给足。
 results.push(run('灵泉 妖兽领地', 'map=lingquan&autotest=bestiary', ({ probe }) =>

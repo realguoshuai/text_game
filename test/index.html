@@ -89,23 +89,55 @@
   #bottom kbd{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
     border-radius:4px;padding:1px 5px;font-family:inherit;color:#fff;font-size:11px}
   #bottom .hl{color:#8bf3ff}
-  /* 屏幕攻击键：键盘之外的第二条出手路径，手机也能按 */
-  #actions{right:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-end;
+  /* 动作试演面板：桌面对齐素材用，挪到左下角把右下角让给技能盘（触屏整块隐藏） */
+  #actions{left:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-start;
     gap:8px;pointer-events:auto;z-index:11}
-  #actions .row{display:flex;gap:8px}
-  #actions .act{pointer-events:auto;cursor:pointer;font-family:inherit;
-    background:linear-gradient(180deg,rgba(158,58,58,.94),rgba(92,28,28,.96));
-    color:#ffeccf;border:1px solid rgba(255,150,120,.65);border-radius:12px;
-    padding:13px 20px;font-size:15px;font-weight:700;letter-spacing:2px;
-    box-shadow:0 6px 18px rgba(0,0,0,.42);transition:.12s;display:flex;align-items:center;gap:7px}
-  #actions .act:hover{background:linear-gradient(180deg,#c04a4a,#7a2828);border-color:#ffd75e;color:#fff}
-  #actions .act:active{transform:translateY(1px)}
-  #actions .act kbd{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
-    border-radius:4px;padding:1px 6px;font-family:inherit;font-size:11.5px;font-weight:600}
-  /* 攻击 B（重击）：和普攻区分成金色，避免两个红按钮看起来一样 */
-  #actions .act.b{background:linear-gradient(180deg,rgba(154,110,34,.94),rgba(88,60,16,.96));
-    color:#ffeec6;border-color:rgba(255,214,140,.7)}
-  #actions .act.b:hover{background:linear-gradient(180deg,#bb8a2e,#6d4a14);border-color:#ffd75e;color:#fff}
+  /* ---------- 技能盘（王者荣耀式）----------
+   * 右下角：普攻大键 + 重击 + 三个技能沿弧线排布（越常用离普攻越近，大招最远）。
+   * 半隐藏：静止时 58% 透明不挡视野，手指按上去或鼠标悬停才全亮。
+   * 冷却用 conic-gradient 扇形遮罩 + 中央倒计时，不额外发请求、不占图集。 */
+  #skillpad{position:fixed;right:16px;bottom:16px;width:265px;height:222px;z-index:46;
+    opacity:.58;transition:opacity .22s ease;pointer-events:none}
+  #skillpad:hover,#skillpad.on{opacity:1}
+  #skillpad .sk{position:absolute;border-radius:50%;padding:0;cursor:pointer;
+    font-family:inherit;pointer-events:auto;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid rgba(226,192,110,.82);
+    background:radial-gradient(circle at 36% 26%,rgba(78,102,158,.95),rgba(20,30,56,.95) 68%,rgba(12,18,34,.98));
+    box-shadow:0 4px 14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.3),inset 0 -7px 14px rgba(0,0,0,.45);
+    transition:transform .08s ease,box-shadow .15s ease,filter .15s ease}
+  #skillpad .sk .ic{font-weight:800;line-height:1;letter-spacing:0;
+    background:linear-gradient(180deg,#fff8e2,#e3b768);-webkit-background-clip:text;background-clip:text;
+    color:transparent;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+  #skillpad .sk:active{transform:scale(.9);
+    box-shadow:0 0 0 3px rgba(255,215,94,.4),0 2px 8px rgba(0,0,0,.55)}
+  /* 普攻键最大最深，视觉上就是右手拇指的落点 */
+  #skillpad .sk.atk{border-color:rgba(255,190,120,.9);
+    background:radial-gradient(circle at 36% 26%,rgba(168,88,66,.96),rgba(86,34,26,.96) 68%,rgba(48,18,14,.98))}
+  /* 大招：双层金边 + 常亮光晕，一眼看出是压轴技能 */
+  #skillpad .sk.ult{border-color:rgba(255,225,150,.95);
+    box-shadow:0 0 12px rgba(255,200,90,.45),0 4px 14px rgba(0,0,0,.5),
+      inset 0 1px 0 rgba(255,255,255,.32),inset 0 -7px 14px rgba(0,0,0,.45)}
+  /* 冷却遮罩：--p 是剩余百分比，从上一条顺时针扫过 */
+  #skillpad .sk .cd{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+    background:conic-gradient(rgba(4,8,18,.7) calc(var(--p,0) * 1%),rgba(0,0,0,0) 0)}
+  #skillpad .sk .num{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    font-size:20px;font-weight:800;color:#fff;pointer-events:none;
+    text-shadow:0 2px 6px rgba(0,0,0,.9)}
+  #skillpad .sk.cooling .num{display:flex}
+  #skillpad .sk.cooling{filter:grayscale(.55) brightness(.85)}
+  #skillpad .sk kbd{position:absolute;right:3px;bottom:1px;font-size:9px;font-weight:700;
+    font-family:inherit;color:rgba(255,240,208,.8);pointer-events:none;
+    text-shadow:0 1px 2px rgba(0,0,0,.8)}
+  /* 折叠把手：点一下把整个技能盘收成这一个小圆，横屏空间紧张时用 */
+  #skillToggle{position:absolute;right:0;top:0;width:38px;height:38px;border-radius:50%;
+    pointer-events:auto;cursor:pointer;padding:0;font-family:inherit;font-size:16px;
+    color:#ffe9b8;background:rgba(16,26,46,.9);border:2px solid rgba(226,192,110,.7);
+    box-shadow:0 3px 10px rgba(0,0,0,.45)}
+  #skillpad.folded{width:38px;height:38px}
+  #skillpad.folded .sk{display:none}
+  body.touch #skillpad{opacity:.72}      /* 触屏不 hover，默认再亮一点，免得看不清 */
+  body.touch #skillpad.on{opacity:1}
   /* 动作试演：1~6 六个按钮，没有键盘（手机）也能逐个看动作 */
   #actbar{pointer-events:auto;background:rgba(12,20,34,.84);border:1px solid rgba(120,146,190,.42);
     border-radius:12px;padding:8px 10px;display:flex;align-items:center;gap:9px;
@@ -142,6 +174,7 @@
 
   /* ---------- 触屏适配：精简操作提示 + 收起调试面板，避免遮挡画面 ---------- */
   body.touch #actbar{display:none}                 /* 动作试演只是核对素材用，手机游玩不需要，藏掉省空间 */
+  body.touch #actions{display:none}                /* 触屏只留右下技能盘，左下这块整块让给摇杆 */
   body.touch #bottom{bottom:82px;font-size:11.5px;line-height:1.7;max-width:88vw;padding:6px 13px;
     background:rgba(12,20,34,.86);border:1px solid rgba(120,146,190,.4);border-radius:10px;
     transition:opacity .3s,transform .3s;cursor:pointer;pointer-events:auto}
@@ -240,15 +273,37 @@
   </div>
 </div>
 
+<!-- 动作试演：桌面对齐素材用，移到左下角，把右下角让给技能盘 -->
 <div id="actions" class="hud">
-  <div class="row">
-    <button id="btnAtk" class="act" title="攻击 A：普攻，伤害 = 攻击 - 防御（J / F / 空格）">攻击A <kbd>J</kbd></button>
-    <button id="btnAtkB" class="act b" title="攻击 B：重击，伤害翻倍、范围更大并击退妖兽（K）">重击B <kbd>K</kbd></button>
-  </div>
   <div id="actbar">
     <span class="t">动作试演</span>
     <div class="acts" id="actBtns"></div>
   </div>
+</div>
+
+<!-- 技能盘（王者荣耀式）：右下角普攻大键 + 弧形排列重击与三个技能，半隐藏、可折叠 -->
+<div id="skillpad" class="hud">
+  <button id="skillToggle" title="展开 / 收起技能盘">⚔</button>
+  <button class="sk" data-s="0" style="left:85px;top:75px;width:56px;height:56px"
+          title="御剑诀（U）：朝面朝方向斩出直线剑气，穿透多个目标">
+    <span class="ic" style="font-size:24px">剑</span><i class="cd"></i><b class="num"></b><kbd>U</kbd>
+  </button>
+  <button class="sk" data-s="1" style="left:136px;top:34px;width:56px;height:56px"
+          title="雷罡咒（I）：以自身为中心雷爆，击退周围妖兽">
+    <span class="ic" style="font-size:24px">雷</span><i class="cd"></i><b class="num"></b><kbd>I</kbd>
+  </button>
+  <button class="sk ult" data-s="2" style="left:201px;top:28px;width:56px;height:56px"
+          title="太虚剑域（O）：锁定最近目标落下剑雨，范围重创">
+    <span class="ic" style="font-size:24px">域</span><i class="cd"></i><b class="num"></b><kbd>O</kbd>
+  </button>
+  <button class="sk atkb" id="skAtkB" style="left:106px;top:139px;width:48px;height:48px"
+          title="重击 B（K）：伤害翻倍、范围更大并击退妖兽">
+    <span class="ic" style="font-size:20px">重</span><i class="cd"></i><b class="num"></b><kbd>K</kbd>
+  </button>
+  <button class="sk atk" id="skAtk" style="left:166px;top:126px;width:80px;height:80px"
+          title="攻击 A（J / 空格）：普攻，只打面朝方向 ±60° 内的目标">
+    <span class="ic" style="font-size:32px">攻</span><kbd>J</kbd>
+  </button>
 </div>
 
 <div id="joystick"><div id="joy-base"></div><div id="joy-knob"></div></div>

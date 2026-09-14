@@ -39,6 +39,18 @@
   // 旧版只算距离不算朝向，背对怪物也能砍中，锁定感为零。
   var FACE_ARC = 0.5;
   var FACE_VEC = { right: { x: 1, y: 0 }, left: { x: -1, y: 0 }, down: { x: 0, y: 1 }, up: { x: 0, y: -1 } };
+  /* ---------------- 技能表（右下角技能盘，U / I / O） ----------------
+   * kind：line = 朝面朝方向的直线剑气（穿透）；aoe = 以自身为中心；target = 锁定最近目标落点。
+   * mul 是攻击力倍率，伤害仍统一走 rollDamage，所以浮动/暴击/连击一样生效。
+   * act 指定施法动作（素材只有 6 个动作，技能复用攻击动作）。 */
+  var SKILLS = [
+    { id: 'sword', name: '御剑诀', key: 'u', cd: 4.0, mul: 1.35, reach: 4.2, wide: 0.95,
+      kind: 'line', color: '#9fe8ff', act: 'atkA', tip: '前方直线剑气，穿透多个目标' },
+    { id: 'thunder', name: '雷罡咒', key: 'i', cd: 9.0, mul: 1.05, reach: 3.0,
+      kind: 'aoe', color: '#ffd24a', act: 'atkA', knock: 1.1, tip: '以自身为中心雷爆，击退周围妖兽' },
+    { id: 'swordfield', name: '太虚剑域', key: 'o', cd: 20.0, mul: 2.4, reach: 2.8,
+      kind: 'target', color: '#ff9ad8', act: 'atkB', tip: '锁定最近目标落下剑雨，范围重创' }
+  ];
   var RUN_MUL = 1.0;       // 取消冲刺加速（Shift/摇杆推满不再提速）
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
   // 怪物（侧视多动作素材）一次性动作的播放时长（秒）；循环动作 idle/walk/run 按 fps 推进
@@ -106,7 +118,8 @@
     combo: 0,         // 当前连击层数
     comboT: 0,        // 连击剩余窗口（秒），归零即断连
     comboFoe: null,   // 连击锁定的对象；换目标就断连
-    critT: 0 };       // 刚打出暴击的余晖计时，用于连击数放大特效
+    critT: 0,         // 刚打出暴击的余晖计时，用于连击数放大特效
+    skillCd: [0, 0, 0] };  // 三个技能各自的剩余冷却（秒），顺序同 SKILLS
   var screenFlash = 0;   // 受重击/被击退时的全屏红闪（避免玩家莫名其妙"换了个地方"）
 
   // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
@@ -857,6 +870,34 @@
             backDmg: backDmg, faceAfterBack: faceBack
           });
         }
+        if (at === 'skill') {
+          // ?map=qingxuan&autotest=skill —— 三个技能各自验收：命中掉血、冷却拦截、冷却清零后可再放
+          var pbs = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          var tg3 = foes[0], res = [];
+          if (tg3) {
+            player.path = null; player.targetFoe = null; player.invuln = 999;
+            var setup = function () {                 // 站到靶子下方，脸朝上正对它
+              player.mx = tg3.x; player.my = tg3.y + 1.2;
+              player.tx = player.mx; player.ty = player.my; player.face = 'up';
+              player.actHold = 0; player.attackCd = 0;
+            };
+            for (var si3 = 0; si3 < SKILLS.length; si3++) {
+              setup(); player.skillCd[si3] = 0;
+              var ha = tg3.hp, fxA = skillFx.length;
+              var ok1 = castSkill(si3);
+              res.push({ id: SKILLS[si3].id, cast: !!ok1, dmg: ha - tg3.hp,
+                cd: +player.skillCd[si3].toFixed(2), fx: skillFx.length - fxA });
+              setup();
+              res[si3].blocked = (castSkill(si3) === false);   // 冷却没走完必须放不出来
+              setup(); player.skillCd[si3] = 0;
+              var hb2 = tg3.hp;
+              res[si3].recast = !!castSkill(si3);
+              res[si3].dmg2 = hb2 - tg3.hp;
+              for (var sfi = 0; sfi < 90; sfi++) { window.ISLES.tick(1 / 60); if (player.actHold <= 0) break; }
+            }
+          }
+          pbs.textContent = JSON.stringify({ n: SKILLS.length, skills: res });
+        }
         requestAnimationFrame(loop);
       }
     }).catch(function (e) {
@@ -1160,6 +1201,7 @@
       if (bx < -ow || bx > W + ow || by < -oh * 1.4 || by > H + oh * 1.6) return;
       ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(bx - ow / 2), Math.round(by - oh), Math.round(ow), Math.round(oh));
     });
+    drawSkillFx();    // 技能特效（剑气/雷爆/剑雨）画在飘字下面，别盖住伤害数字
     drawFloaters();   // 伤害飘字 + 击杀粒子（猎场用）
 
     // 洞外虚空柔化（地图边缘渐隐到天空）
@@ -1179,6 +1221,7 @@
       ctx.fillRect(0, 0, W, H);
     }
     updateHUD();
+    updateSkillUI();   // 技能冷却遮罩与倒计时
   }
 
   // ---------------- 逻辑 ----------------
@@ -1198,8 +1241,8 @@
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.id === CUR.id);
     var hintEl = document.getElementById('hint');
     if (silent) hintEl.textContent = '踩上青色光门即可切换地图';
-    else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试攻击（J 攻击A / K 重击B / 1~6 试动作）';
-    else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 ' + LINGQUAN_SPAWNS.length + ' 只（J/K 出手，Shift 奔跑，1~6 试动作）';
+    else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试招（J 攻击A / K 重击B / U 御剑诀 / I 雷罡咒 / O 太虚剑域 / 1~6 试动作）';
+    else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 ' + LINGQUAN_SPAWNS.length + ' 只（J 普攻 / K 重击 / U·I·O 三招技能，Shift 奔跑）';
     else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
     // 只有碑林石阵刷妖兽（猎场）；青玄山门刷训练靶（调试场）；灵泉灵瀑刷五族怪物；其它图清空战斗状态
     if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：老猎场
@@ -1343,6 +1386,9 @@
     if (k === ' ' || k === 'Spacebar') { e.preventDefault(); attackNearest(); return; }
     if (k === 'j' || k === 'J' || k === 'f' || k === 'F') { e.preventDefault(); attackNearest(); return; }
     if (k === 'k' || k === 'K') { e.preventDefault(); powerAttack(); return; }
+    // 技能：U / I / O —— 与右下角技能盘上三个键一一对应
+    var ski = { u: 0, i: 1, o: 2 }[k];
+    if (ski !== undefined) { e.preventDefault(); castSkill(ski); return; }
     // 动作试演：1~6 直接切到对应动作，方便逐个核对素材（待机/行走/奔跑/攻击A/攻击B/倒地）
     var demo = { '1': 'idle', '2': 'walk', '3': 'run', '4': 'atkA', '5': 'atkB', '6': 'dead' }[k];
     if (demo) { e.preventDefault(); playAct(demo); return; }
@@ -1410,6 +1456,10 @@
       }
     }
     if (player.atkBCd > 0) player.atkBCd = Math.max(0, player.atkBCd - dt);
+    for (var sk = 0; sk < player.skillCd.length; sk++) {
+      if (player.skillCd[sk] > 0) player.skillCd[sk] = Math.max(0, player.skillCd[sk] - dt);
+    }
+    updateSkillFx(dt);
 
     var d = inputDir();
     if (player.dead) d = { dx: 0, dy: 0 };              // 倒地期间不接受移动输入
@@ -1686,6 +1736,153 @@
     if (crits > 0) player.critT = 0.45;
     toast('重击命中 ' + hit.length + ' 只' + (crits ? '（' + crits + ' 记暴击）' : '') + '（冷却 ' + ATK_B_CD + ' 秒）');
     if (h0) h0.textContent = '重击命中 ' + hit.length + ' 只，' + ATK_B_CD + ' 秒后可再放';
+  }
+  /* ---------------- 技能 ----------------
+   * 三个技能共用一套流程：定落点 → 取目标 → 播动作 + 特效 → 逐目标 rollDamage。
+   * 落点规则：自身为中心的技能用玩家格；锁定技优先打最近目标，没目标就落在身前 2.2 格。 */
+  var skillFx = [];                      // 技能特效队列（剑气/雷爆/剑雨）
+  function nearestFoe(range) {
+    var best = null, bd = (range === undefined) ? AGGRO : range;
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i]; if (!f.alive) continue;
+      var d = Math.hypot(f.x - player.mx, f.y - player.my);
+      if (d < bd) { bd = d; best = f; }
+    }
+    return best;
+  }
+  /** 取技能命中范围内的目标：line 沿朝向做「投影 + 侧向偏移」判定，其余按圆形半径 */
+  function skillTargets(s, cx, cy) {
+    var out = [], i, f, dx, dy;
+    if (s.kind === 'line') {
+      var v = FACE_VEC[player.face] || FACE_VEC.down;
+      for (i = 0; i < foes.length; i++) {
+        f = foes[i]; if (!f.alive) continue;
+        dx = f.x - player.mx; dy = f.y - player.my;
+        var along = dx * v.x + dy * v.y;                       // 沿朝向的投影距离
+        var side = Math.abs(dx * (-v.y) + dy * v.x);           // 垂直于朝向的偏移
+        if (along >= -0.35 && along <= s.reach && side <= (s.wide || 0.9)) out.push(f);
+      }
+      return out;
+    }
+    for (i = 0; i < foes.length; i++) {
+      f = foes[i]; if (!f.alive) continue;
+      if (Math.hypot(f.x - cx, f.y - cy) <= s.reach) out.push(f);
+    }
+    return out;
+  }
+  function castSkill(i) {
+    var s = SKILLS[i];
+    if (!s || player.dead) return false;
+    var h0 = document.getElementById('hint');
+    if (player.skillCd[i] > 0) {
+      if (h0) h0.textContent = s.name + ' 冷却中（剩 ' + player.skillCd[i].toFixed(1) + ' 秒）';
+      return false;
+    }
+    if (player.actHold > 0 || player.attackCd > 0) return false;   // 上一刀没播完，别掐断
+    // 自动转向锁定目标，避免面朝空地放空招
+    var t = nearestFoe(AGGRO * 1.8);
+    if (t) setFaceFromDelta(t.x - player.mx, t.y - player.my);
+    var v = FACE_VEC[player.face] || FACE_VEC.down;
+    var cx = player.mx, cy = player.my;
+    if (s.kind === 'target') {
+      if (t) { cx = t.x; cy = t.y; }
+      else { cx = player.mx + v.x * 2.2; cy = player.my + v.y * 2.2; }
+    }
+    var hits = skillTargets(s, cx, cy);
+    player.skillCd[i] = s.cd;
+    player.act = s.act; player.actT = 0; player.actHold = ACT_DUR[s.act];
+    var dur = s.kind === 'target' ? 0.8 : 0.5;
+    skillFx.push({ kind: s.kind, x: cx, y: cy, r: s.reach, color: s.color, dir: v, life: dur, max: dur });
+    if (!hits.length) {
+      toast(s.name + ' 落空');
+      if (h0) h0.textContent = s.name + ' 落空，' + s.cd + ' 秒后可再放';
+      return true;
+    }
+    var crits = 0, sum = 0;
+    for (var j = 0; j < hits.length; j++) {
+      var g = hits[j];
+      var r = rollDamage(player.atk * s.mul, g.def, { heavy: true });
+      if (r.crit) crits++;
+      sum += r.dmg;
+      g.hp -= r.dmg; g.flash = r.crit ? 0.5 : 0.3;
+      addFloater(g.x, g.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
+        r.crit ? '#ffe66b' : (s.color || '#ffd36b'), { crit: r.crit });
+      if (s.knock) {                                   // 雷罡咒：把周围妖兽炸开
+        var dx = g.x - player.mx, dy = g.y - player.my, dd = Math.hypot(dx, dy) || 1;
+        for (var st = 0; st < 4; st++) {
+          if (couldStand(g.x + dx / dd * 0.32, g.y)) g.x += dx / dd * 0.32;
+          if (couldStand(g.x, g.y + dy / dd * 0.32)) g.y += dy / dd * 0.32;
+        }
+      }
+      if (g.hp <= 0) killFoe(g); else hurtFoe(g);
+    }
+    bumpCombo(hits[0]);
+    if (crits > 0) player.critT = 0.45;
+    toast(s.name + ' 命中 ' + hits.length + ' 只，合计 ' + sum + (crits ? '（' + crits + ' 记暴击）' : ''));
+    if (h0) h0.textContent = s.name + ' 命中 ' + hits.length + ' 只，' + s.cd + ' 秒后可再放';
+    return true;
+  }
+  function updateSkillFx(dt) {
+    for (var i = skillFx.length - 1; i >= 0; i--) {
+      skillFx[i].life -= dt;
+      if (skillFx[i].life <= 0) skillFx.splice(i, 1);
+    }
+  }
+  /** 技能特效：剑气 / 雷爆 / 剑雨，都在等距地面上画，随进度淡出 */
+  function drawSkillFx() {
+    for (var i = 0; i < skillFx.length; i++) {
+      var o = skillFx[i], k = Math.min(1, 1 - o.life / o.max);
+      var p = isoToScreen(o.x, o.y), gy = p.y + HH * Z;
+      ctx.save();
+      if (o.kind === 'line') {
+        // 剑气：从脚下沿朝向拉出一条楔形光带，中段最亮、两头收
+        var p1 = isoToScreen(o.x + o.dir.x * o.r, o.y + o.dir.y * o.r);
+        var ly = p1.y + HH * Z, a = 1 - k;
+        var g = ctx.createLinearGradient(p.x, gy - 26 * Z, p1.x, ly - 26 * Z);
+        g.addColorStop(0, 'rgba(255,255,255,0)');
+        g.addColorStop(0.5, o.color);
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.globalAlpha = a * 0.8; ctx.strokeStyle = g;
+        ctx.lineWidth = (14 + 24 * Math.sin(k * Math.PI)) * Z; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(p.x, gy - 26 * Z); ctx.lineTo(p1.x, ly - 26 * Z); ctx.stroke();
+        ctx.globalAlpha = a; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5 * Z;
+        ctx.beginPath(); ctx.moveTo(p.x, gy - 26 * Z); ctx.lineTo(p1.x, ly - 26 * Z); ctx.stroke();
+      } else if (o.kind === 'aoe') {
+        // 雷爆：地面扩散双环 + 内圈填充 + 五道闪电
+        var rr = o.r * TILE_W * 0.5 * Z * (0.3 + k * 0.8);
+        ctx.globalAlpha = (1 - k) * 0.22; ctx.fillStyle = o.color;
+        ctx.beginPath(); ctx.ellipse(p.x, gy, rr, rr * 0.5, 0, 0, 6.2832); ctx.fill();
+        ctx.globalAlpha = (1 - k) * 0.95; ctx.strokeStyle = o.color; ctx.lineWidth = (8 - 6 * k) * Z;
+        ctx.beginPath(); ctx.ellipse(p.x, gy, rr, rr * 0.5, 0, 0, 6.2832); ctx.stroke();
+        ctx.globalAlpha = (1 - k) * 0.9; ctx.strokeStyle = '#fff8d8'; ctx.lineWidth = 2.5 * Z;
+        for (var b = 0; b < 5; b++) {
+          var an = (b / 5) * 6.2832 + k * 0.7;
+          ctx.beginPath(); ctx.moveTo(p.x, gy - 34 * Z);
+          ctx.lineTo(p.x + Math.cos(an) * rr * 0.55, gy - 34 * Z - Math.sin(an) * rr * 0.28);
+          ctx.lineTo(p.x + Math.cos(an) * rr, gy - Math.sin(an) * rr * 0.5);
+          ctx.stroke();
+        }
+      } else {
+        // 剑雨：先一道自天而降的光柱，落地后再炸开一圈
+        if (k < 0.45) {
+          var hgt = (1 - k / 0.45) * 300 * Z;
+          var gg = ctx.createLinearGradient(p.x, gy - hgt - 150 * Z, p.x, gy);
+          gg.addColorStop(0, 'rgba(255,255,255,0)'); gg.addColorStop(1, o.color);
+          ctx.globalAlpha = 0.7; ctx.fillStyle = gg;
+          ctx.beginPath();
+          ctx.moveTo(p.x - 30 * Z, gy - hgt - 150 * Z); ctx.lineTo(p.x + 30 * Z, gy - hgt - 150 * Z);
+          ctx.lineTo(p.x + 13 * Z, gy); ctx.lineTo(p.x - 13 * Z, gy);
+          ctx.closePath(); ctx.fill();
+        }
+        var kk = Math.max(0, (k - 0.4) / 0.6), rr3 = o.r * TILE_W * 0.5 * Z * (0.3 + kk * 0.95);
+        ctx.globalAlpha = (1 - kk) * 0.28; ctx.fillStyle = o.color;
+        ctx.beginPath(); ctx.ellipse(p.x, gy, rr3, rr3 * 0.5, 0, 0, 6.2832); ctx.fill();
+        ctx.globalAlpha = (1 - kk) * 0.95; ctx.strokeStyle = o.color; ctx.lineWidth = (10 - 8 * kk) * Z;
+        ctx.beginPath(); ctx.ellipse(p.x, gy, rr3, rr3 * 0.5, 0, 0, 6.2832); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
   }
   /** 动作试演（数字键 1~6）：直接切到指定动作，用来逐个核对素材效果 */
   function playAct(act) {
@@ -2116,18 +2313,66 @@
   }
   canvas.addEventListener('mousedown', function (e) { if (e.button === 0) onClick(e); });
 
-  // 屏幕「攻击」按钮：键盘之外的第二条出手路径，手机/触屏也能打
-  var atkBtn = document.getElementById('btnAtk');
-  if (atkBtn) {
-    var doAtk = function (ev) { if (ev) ev.preventDefault(); attackNearest(); };
-    atkBtn.addEventListener('click', doAtk);
-    atkBtn.addEventListener('touchstart', doAtk, { passive: false });
+  /* ---------------- 技能盘 ----------------
+   * 右下角 5 键：普攻 / 重击 / 三个技能，走的是和键盘完全相同的入口
+   * （attackNearest、powerAttack、castSkill），所以自测点按钮等价于按键。 */
+  var padEl = document.getElementById('skillpad');
+  function padFire(el, fn) {
+    if (!el) return;
+    var fire = function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      if (padEl) padEl.classList.add('on');                 // 按下去整盘提亮，手指离开再暗回去
+      fn();
+    };
+    el.addEventListener('click', fire);
+    el.addEventListener('touchstart', fire, { passive: false });
+    el.addEventListener('touchmove', function (ev) { ev.preventDefault(); }, { passive: false });
   }
-  var atkBBtn = document.getElementById('btnAtkB');
-  if (atkBBtn) {
-    var doAtkB = function (ev) { if (ev) ev.preventDefault(); powerAttack(); };
-    atkBBtn.addEventListener('click', doAtkB);
-    atkBBtn.addEventListener('touchstart', doAtkB, { passive: false });
+  padFire(document.getElementById('skAtk'), function () { attackNearest(); });
+  padFire(document.getElementById('skAtkB'), function () { powerAttack(); });
+  var skillBtns = padEl ? padEl.querySelectorAll('.sk[data-s]') : [];
+  for (var sbi = 0; sbi < skillBtns.length; sbi++) {
+    (function (b) {
+      padFire(b, function () { castSkill(+b.dataset.s); });
+    })(skillBtns[sbi]);
+  }
+  /* 技能盘冷却 UI：--p 驱动 conic-gradient 遮罩；倒计时数字只在显示值变化时才写 DOM，
+     免得每帧重排。冷却归零时清一次就停手，不再反复写。 */
+  var skillUI = [];
+  (function buildSkillUI() {
+    if (!padEl) return;
+    var bs = padEl.querySelectorAll('.sk[data-s]');
+    for (var i = 0; i < bs.length; i++) {
+      skillUI.push({ el: bs[i], cd: bs[i].querySelector('.cd'), num: bs[i].querySelector('.num'), last: '' });
+    }
+  })();
+  function updateSkillUI() {
+    for (var i = 0; i < skillUI.length; i++) {
+      var u = skillUI[i], left = player.skillCd[i] || 0, s = SKILLS[i];
+      if (!s) continue;
+      if (left > 0) {
+        u.el.classList.add('cooling');
+        u.cd.style.setProperty('--p', ((left / s.cd) * 100).toFixed(1));
+        var txt = left >= 10 ? String(Math.ceil(left)) : left.toFixed(1);
+        if (u.last !== txt) { u.num.textContent = txt; u.last = txt; }
+      } else if (u.last !== '') {
+        u.el.classList.remove('cooling');
+        u.cd.style.setProperty('--p', '0');
+        u.num.textContent = ''; u.last = '';
+      }
+    }
+  }
+  // 折叠把手：横屏空间紧张时把整盘收成一个小圆
+  var padTg = document.getElementById('skillToggle');
+  if (padTg) {
+    var togFn = function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      if (!padEl) return;
+      padEl.classList.toggle('folded');
+      padEl.classList.add('on');
+    };
+    padTg.addEventListener('click', togFn);
+    padTg.addEventListener('touchstart', togFn, { passive: false });
   }
 
   // 动作试演面板：六个动作一个按钮，点它等同于按数字键 1~6。
@@ -2284,6 +2529,8 @@
     tick: function (dt) { update(dt || 0.016); render(); },
     attackNearest: function () { attackNearest(); },
     powerAttack: function () { powerAttack(); },
+    castSkill: function (i) { return castSkill(i); },
+    skillCd: function () { return player.skillCd.slice(); },
     playAct: function (a) { playAct(a); return player.act; },
     act: function () {
       return { act: player.act, actT: +player.actT.toFixed(2), actHold: +player.actHold.toFixed(2),
@@ -2415,7 +2662,7 @@
     // 换成真·触屏操作：游戏没有"滑动移动"，移动是点地面寻路，别写成滑动。
     var bottom = document.getElementById('bottom');
     if (bottom) {
-      bottom.innerHTML = '左半屏按住摇杆移动（推满奔跑）· 右下角 <b>攻击A / 重击B</b> 出手 · ' +
+      bottom.innerHTML = '左半屏按住摇杆移动（推满奔跑）· 右下角 <b>技能盘</b>：普攻 / 重击 / <b>剑 · 雷 · 域</b> 三招 · ' +
         '右半屏点地也能走 · <span class="hl">点这里收起</span>';
       var hideTimer = null;
       function schedule() { clearTimeout(hideTimer); hideTimer = setTimeout(function () { bottom.classList.add('faded'); }, 6000); }
