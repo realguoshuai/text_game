@@ -30,7 +30,7 @@
   var IMG = {};              // file -> Image
   var MAPS = [], IDX = {}, CUR = null;
   var PAL = {}, WALK = '';
-  var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0 };
+  var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null };
   var camX = 0, camY = 0, time = 0;
   // 上一帧的绘制计数（QA 用）：确认 NPC 真的走了 drawNPC 分支，
   // 而不是被 <0 的兜底分支当成玩家画出来
@@ -206,6 +206,32 @@
           // 程序化按住「右」1.2 秒：读 #dbg 的 mx 有没有变大，即可确认键盘行走真的生效
           keys['d'] = 1;
           setTimeout(function () { sim(1.2); keys['d'] = 0; sim(0.1); }, 60);
+        }
+        if (at && at.indexOf('click') === 0) {
+          // 点击移动朝向自测： ?autotest=click&cdx=3&cdy=0 （目标格 = 当前格 + 偏移）
+          // 断言：点击走路后 player.face 必须变成行进方向，而不是一直停在初始的 down
+          var cdx = +(q.get('cdx') || 0), cdy = +(q.get('cdy') || 0);
+          var csecs = +(q.get('secs') || 1.6);
+          setTimeout(function () {
+            var fb = player.face;
+            var ok = window.ISLES.clickCell(Math.round(player.mx) + cdx, Math.round(player.my) + cdy);
+            sim(csecs);
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            var rx = Math.round(player.mx), ry = Math.round(player.my);
+            pb.textContent = JSON.stringify({
+              faceBefore: fb, targetAccepted: ok, faceAfter: player.face,
+              mx: +player.mx.toFixed(2), my: +player.my.toFixed(2),
+              walk: +player.walk.toFixed(2),
+              // 落点必须始终是合法可走格：点击寻路加了碰撞+绕路后，这条性质不能被破坏
+              cellOk: walkable(rx, ry) && !isSolid(rx, ry),
+              reached: Math.abs(player.mx - player.tx) < 0.02 && Math.abs(player.my - player.ty) < 0.02,
+              pathLen: player.path ? player.path.length : 0
+            });
+          }, 60);
         }
         requestAnimationFrame(loop);
       });
@@ -420,7 +446,7 @@
     var sp = snapWalkable(CUR, x, y);
     x = sp.x; y = sp.y;
     player.mx = player.tx = x; player.my = player.ty = y;
-    player.face = 'down'; player.walk = 0;
+    player.face = 'down'; player.walk = 0; player.path = null;
     portalLock = 0.5;
     camX = W / 2 - (x - y) * HW * Z;
     camY = H / 2 - (x + y) * HH * Z;
@@ -437,6 +463,41 @@
     // 取到 undefined，walkable 恒为 false —— 表现就是「WASD 只能转向、走不动」。
     // 现在：目标格可走即可（配合横纵分轴推进，天然获得贴墙滑行手感）。
     return walkable(Math.round(x), Math.round(y));
+  }
+
+  // 点击寻路的 BFS：返回从 (sx,sy) 到 (tx,ty) 的逐格路径（不含起点），不可达返回 null。
+  // 地图最大 34×34＝1156 格，四邻搜索开销可忽略，不需要 A*。
+  // 为什么需要它：点击移动原本是「朝目标直线推进」且不做碰撞，会穿墙；
+  // 只加碰撞不加绕路，遇到建筑就会卡在半路，反而不如从前的「总能走到」。
+  function findPath(sx, sy, tx, ty) {
+    if (sx === tx && sy === ty) return null;
+    if (!walkable(tx, ty)) return null;
+    var N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    var seen = {}, prev = {};
+    var sk = sx + ',' + sy;
+    seen[sk] = 1;
+    var queue = [[sx, sy]], head = 0;
+    while (head < queue.length) {
+      var cx = queue[head][0], cy = queue[head][1];
+      head++;
+      if (cx === tx && cy === ty) {
+        var path = [], kx = tx, ky = ty;
+        while (!(kx === sx && ky === sy)) {
+          path.push([kx, ky]);
+          var pk = prev[kx + ',' + ky];
+          kx = pk[0]; ky = pk[1];
+        }
+        path.reverse();
+        return path;
+      }
+      for (var n = 0; n < 4; n++) {
+        var ax = cx + N4[n][0], ay = cy + N4[n][1], ak = ax + ',' + ay;
+        if (seen[ak] || !walkable(ax, ay)) continue;
+        seen[ak] = 1; prev[ak] = [cx, cy];
+        queue.push([ax, ay]);
+      }
+    }
+    return null;
   }
   /** 把一个可能落在实体/虚空上的坐标吸附到最近的合法可走格（BFS 同心圈） */
   function snapWalkable(mp, x, y) {
@@ -479,6 +540,15 @@
     return { dx: dx, dy: dy };
   }
 
+  // 四向朝向：统一按「行进方向」判定，键盘与点击移动共用这一处。
+  // 旧版把这段内联在键盘分支里，点击移动压根没更新朝向 ——
+  // 表现就是点地面走路时角色永远保持初始的正面(down)。
+  function setFaceFromDelta(dx, dy) {
+    if (!dx && !dy) return;
+    if (Math.abs(dx) > Math.abs(dy)) player.face = dx > 0 ? 'right' : 'left';
+    else player.face = dy > 0 ? 'down' : 'up';
+  }
+
   function update(dt) {
     time += dt;
     stepZoom(dt);
@@ -499,25 +569,36 @@
     var speed = 5.2;
     var px0 = player.mx, py0 = player.my;
 
-    // 朝向：按下方向键立刻转身（哪怕前面被挡，也该先转过来）
-    if (d.dx || d.dy) {
-      if (Math.abs(d.dx) > Math.abs(d.dy)) player.face = d.dx > 0 ? 'right' : 'left';
-      else player.face = d.dy > 0 ? 'down' : 'up';
-    }
-
     if (d.dx || d.dy) {
       // 键盘直推：x/y 分轴推进，撞到实体时自动沿墙滑行
       var nx = player.mx + d.dx * speed * dt, ny = player.my + d.dy * speed * dt;
       if (couldStand(nx, player.my)) player.mx = nx;
       if (couldStand(player.mx, ny)) player.my = ny;
-      player.tx = Math.round(player.mx); player.ty = Math.round(player.my);
-    } else if (Math.abs(player.tx - player.mx) > 0.001 || Math.abs(player.ty - player.my) > 0.001) {
-      // 点击寻路：朝目标格推进
-      var dx = player.tx - player.mx, dy = player.ty - player.my;
+      // 键盘操作即取消点击寻路：tx/ty 直接对齐当前坐标而不是四舍五入 ——
+      // 取整会留下 0.0~0.5 格的残差，松手后会被点击分支当成「还有目标」，
+      // 于是角色一边往回挪一点点、一边把朝向翻成反方向（test: keyboard d 抓到的回归）
+      player.path = null;
+      player.tx = player.mx; player.ty = player.my;
+      // 按下方向键立刻转身（哪怕前面被挡，也该先转过来）
+      setFaceFromDelta(d.dx, d.dy);
+    } else if (player.path && player.path.length) {
+      // 点击寻路：沿 BFS 路径逐格跟随。路径点都是四邻相邻格，
+      // 两点之间直线只经过这两格，所以不需要再做碰撞检测，也不会穿墙。
+      var wp = player.path[0];
+      var dx = wp[0] - player.mx, dy = wp[1] - player.my;
       var dist = Math.sqrt(dx * dx + dy * dy);
       var stepLen = speed * dt;
-      if (dist <= stepLen) { player.mx = player.tx; player.my = player.ty; }
-      else { player.mx += dx / dist * stepLen; player.my += dy / dist * stepLen; }
+      if (dist <= stepLen) {
+        player.mx = wp[0]; player.my = wp[1];
+        player.path.shift();
+        if (!player.path.length) { player.path = null; player.tx = player.mx; player.ty = player.my; }
+      } else {
+        var ux = dx / dist, uy = dy / dist;
+        player.mx += ux * stepLen;
+        player.my += uy * stepLen;
+      }
+      // ★ 这里原来什么都没有 —— 点击移动全程不更新朝向，所以角色永远正对镜头
+      setFaceFromDelta(dx, dy);
     }
 
     // 行走帧只在**真的挪动了**时才推进：贴着墙按方向键就是「转身站住」，
@@ -531,7 +612,7 @@
       for (var i = 0; i < CUR.portals.length; i++) {
         var pt = CUR.portals[i];
         var onCell = (Math.abs(player.mx - pt.x) < 0.34 && Math.abs(player.my - pt.y) < 0.34);
-        if (onCell) { pending = pt; fadeDir = 1; player.tx = player.mx; player.ty = player.my; break; }
+        if (onCell) { pending = pt; fadeDir = 1; player.path = null; player.tx = player.mx; player.ty = player.my; break; }
       }
     }
     updateCam(dt);
@@ -546,12 +627,24 @@
     camY += (H / 2 - py - camY) * k;
   }
 
+  // 设置移动目标格：鼠标点击与自测钩子 ISLES.clickCell 共用同一个入口，
+  // 保证自测跑的确实是点击移动这条真实路径，而不是另写一份逻辑
+  function setTargetCell(cx, cy) {
+    if (!walkable(cx, cy)) return false;
+    // 用 BFS 找一条绕开建筑/水面的路；不可达就整个忽略这次点击，
+    // 而不是让角色朝墙一路撞过去
+    var path = findPath(Math.round(player.mx), Math.round(player.my), cx, cy);
+    if (!path || !path.length) return false;
+    player.path = path;
+    player.tx = cx; player.ty = cy;
+    return true;
+  }
+
   // 点击移动
   function onClick(e) {
     var r = canvas.getBoundingClientRect();
     var iso = screenToIso(e.clientX - r.left, e.clientY - r.top);
-    var cx = Math.round(iso.mx), cy = Math.round(iso.my);
-    if (walkable(cx, cy) && !isSolid(cx, cy)) { player.tx = cx; player.ty = cy; }
+    setTargetCell(Math.round(iso.mx), Math.round(iso.my));
   }
   canvas.addEventListener('mousedown', function (e) { if (e.button === 0) onClick(e); });
 
@@ -651,6 +744,7 @@
       window.__dbg.textContent = JSON.stringify({
         map: CUR.id, fade: +fadeA.toFixed(2), held: held,
         mx: +player.mx.toFixed(2), my: +player.my.toFixed(2),
+        face: player.face, walk: +player.walk.toFixed(2),
         zoom: +Z.toFixed(3), zoomT: +Zt.toFixed(3),
         actors: _draw.actor, npcs: _draw.npc
       });
@@ -663,13 +757,15 @@
     get ready() { return ready; },
     get map() { return CUR ? CUR.id : null; },
     list: function () { return MAPS.map(function (m) { return { id: m.id, name: m.name, w: m.w, h: m.h, objects: m.objects.length, portals: m.portals.map(function (p) { return { x: p.x, y: p.y, to: p.to }; }) }; }); },
-    state: function () { return { map: CUR && CUR.id, mx: +player.mx.toFixed(2), my: +player.my.toFixed(2), fade: +fadeA.toFixed(2), zoom: +Z.toFixed(3) }; },
+    state: function () { return { map: CUR && CUR.id, mx: +player.mx.toFixed(2), my: +player.my.toFixed(2), face: player.face, fade: +fadeA.toFixed(2), zoom: +Z.toFixed(3) }; },
+    /** 等价于鼠标点击第 (x,y) 格：走的是 onClick 同一条设置目标格的路径 */
+    clickCell: function (x, y) { return setTargetCell(x, y); },
     setZoom: function (z) { setZoom(z, W / 2, H / 2); return Zt; },
     heroes: function () { return HERO_OPTIONS.map(function (h) { return { n: h.n, src: h.src }; }); },
     setHero: function (n) { setHero(HERO_OPTIONS.filter(function (h) { return h.n === n; })[0]); return PLAYER_SRC; },
     goto: function (id, x, y) { switchTo(id, x === undefined ? IDX[id].home.x : x, y === undefined ? IDX[id].home.y : y, false); },
     /** 把玩家放到当前地图第 i 个传送门上，下一次 update 即触发切换 */
-    stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; portalLock = 0; },
+    stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; player.path = null; portalLock = 0; },
     tick: function (dt) { update(dt || 0.016); render(); },
     _p: player
   };
