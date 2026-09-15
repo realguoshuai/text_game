@@ -173,6 +173,18 @@ results.push(run('外来地图 远航之岸', 'map=flare_arrival&autotest=import
   probe.reached === true && probe.moved === true,
 { budget: 22000 }));
 
+// 9.6) 第二张外来图。两张**共用同一套图集**（导入器 --append 把瓦并进同一个目录）。
+//      追加导入最容易出的错是「后导入的瓦静默覆盖先导入的瓦」——图集照样加载、不报错，
+//      但前一张图整片错乱。所以这一条必须和上一条**同时**通过，才算图集没串。
+results.push(run('外来地图 殒落港湾', 'map=flare_harbor&autotest=importmap', ({ probe }) =>
+  !!probe && probe.map === 'flare_harbor' &&
+  probe.w === 39 && probe.h === 38 &&
+  probe.walk > 300 && probe.obj > 1000 &&
+  probe.spawnOnWalkable === true && probe.atSpawn === true &&
+  probe.targetFound === true && probe.clickAccepted === true &&
+  probe.reached === true && probe.moved === true,
+{ budget: 22000 }));
+
 // 10) 手机端 UI：桌面 Chrome 里 pointer:coarse 恒假，这套分支平时根本跑不到，
 //     而它坏起来全是「点了没反应」——电脑上盯多久都看不出来。用 ?touch=1 强制打开验：
 //     三条命中测试（elementFromPoint）确认点击真的落在元素上、没有被 .hud 的

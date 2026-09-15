@@ -23,7 +23,9 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAPS = os.path.join(ROOT, 'assets', 'maps.json')
 # 要挂进来的图（顺序 = 地图速切按钮里的顺序）
-WANT = ['flare_map.json']
+#   两张 Flare 图共用同一套图集（flare_atlas）—— import_tmx.py 第一次导 arrival 时
+#   清空重建，之后每张都带 --append 把瓦并进去。加第三张照做即可。
+WANT = ['flare_arrival_map.json', 'flare_harbor_map.json']
 # 要下掉的图：
 #   kenney_hall 只有 7x7 —— 本游戏地图都是 28~36 格，差了一个数量级，一张小房间挂在虚空里；
 #   grasstest 虽 25x25，但 625 个物件全是地面瓦，没有建筑/道具/NPC，像底图不像"一个地方"。

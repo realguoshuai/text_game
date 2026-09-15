@@ -45,7 +45,7 @@
 | 规格 | 原图 40×40 格，导进去裁成 36×38；等距 192×96 → ×0.625 缩到引擎的 120×60 |
 | 图层 | `background` 地面 / `object` 物件 / `collision` 碰撞标记 |
 | 转换参数 | `--walk-layer=background --skip-layer=collision --solid-layer=collision --block-tileset=water` |
-| 转出来的 | `assets/flare_atlas.webp` 689KB / `flare_map.json` 124KB / 1370 物件 / 583 可行走格 |
+| 转化出来 | `assets/flare_arrival_map.json` 130KB / 1370 物件 / 583 可行走格（瓦并进公用图集，见 §2） |
 | 出生点 | (19,19)，由导入器自动挑（四邻皆可走、离图心最近） |
 
 内容是一整个**崖壁围合的山谷**：岩石崖壁有厚度（立方瓦做出立体感）、
@@ -63,6 +63,59 @@
 **结论**：自己玩、学习、内部看 —— 没问题。
 **打算对外发布或商业化 —— 先换成 CC0 素材**（Kenney 全系 CC0），
 或联系作者单独授权。别闷头用。
+
+---
+
+## 2. `flare_harbor` 殒落港湾 — 39×38
+
+| | |
+|---|---|
+| 出处 | **Flare** 战役关卡 `perdition_harbor` |
+| 原文件 | `tiled/empyrean_campaign/perdition_harbor.tmx`（瓦表与 arrival 是同一批） |
+| 授权 | **CC-BY-SA 3.0** ⚠️ 同上 |
+| 规格 | 原图 40×40 格，导进去裁成 39×38；等距 192×96 → ×0.625 |
+| 转换参数 | 同 §1，另加 **`--append`**（瓦并进 arrival 那套图集） |
+| 转化出来 | `assets/flare_harbor_map.json` 129KB / 1329 物件 / 438 可行走格 |
+| 出生点 | (18,21)，同样是导入器自动挑的 |
+
+内容是一处**有人居住的渔村小港**：两座木屋、两座木栈桥、圆石台、木栅栏、
+齐整的花圃、水塘，以及崖壁围出来的半岛。与「远航之岸」的无人荒野正好互照 ——
+同一位美术、同一套瓦，摆出来却是"聚落"而不是"野外"，观感重复度很低。
+
+> 挑图时先看了 `perdition_harbor` 的原始统计：`background` 层有 389 格是水瓦，
+> 一度以为"可走区只剩 90 格，太小"。**实测后是 438 格** —— 那 389 格里
+> 有 348 格本来就带 `collision`，只有 41 格是"水但没标碰撞"。
+> 教训：算可走区别只数"某一层有多少瓦"，要按 `有地面瓦 且 collision 为空` 算。
+
+---
+
+## ★ 一套图集服务多张图（`--append`）
+
+Flare 的瓦表是**整项目共用的大图**（`grassland.png` 被几十个 gid 共用），
+所以第二张图九成的瓦和第一张重叠。再挂一整套图集 = 首屏白多下几百 KB。
+
+用法：**第一张不带 `--append`（清空重建），之后每张都带。**
+
+```bash
+# 1) 第一张：重建图集目录
+python tools/import_tmx.py <arrival.tmx> --prefix flare --id flare_arrival ...
+# 2) 第二张起：把本图的瓦并进同一个目录
+python tools/import_tmx.py <perdition_harbor.tmx> --prefix flare --id flare_harbor ... --append
+```
+
+结果：`assets/flare/` 188 张瓦（102 + 86 新增），`flare_atlas.webp` 910KB
+—— 只多 86 张瓦（+205KB），而不是多一整套图集。
+
+**⚠ 前提：瓦文件名必须带裁剪坐标。** 原先名字只取源图文件名（`grassland.png`），
+靠"同名加序号"区分不同 gid，而序号取决于该次导入的 dict 迭代顺序 ——
+两次导入必然错位，**后导入的瓦会静默覆盖先导入的瓦**：图集照常加载、不报错、
+不白屏，但前一张图整片错乱。现在名字是 `grassland_0_384.png`
+（源图名 + 裁剪左上角），同名 == 同一张瓦，追加才安全。
+
+**改了命名规则就得把老图重新导一遍**（键名全变了），并重跑 `attach_imported.py`。
+
+两张图的验收都在跑批里（`外来地图 远航之岸` + `外来地图 殒落港湾`），
+**必须同时通过**才算图集没串。
 
 ---
 
@@ -203,13 +256,16 @@ node tools/_one.js "map=<id>&autotest=importmap" 30000
 1. 量尺寸：看 `.tmx` 的 `<map width= height=>`（或跑 `sucai/_dl/_flare_scan.py`）
 2. 下 `.tmx` → `sucai/_dl/flare/tiled/<mod>/`，把 `../tilesheets/*.png` 放到
    `sucai/_dl/flare/tiled/tilesheets/` —— **必须保持相对层级**（tmx 里写的是 `../tilesheets/xxx.png`）
-3. 导入：
-   `python tools/import_tmx.py <tmx> --id=<id> --name=<中文名> --prefix=<前缀> --walk-layer=background --skip-layer=collision --solid-layer=collision --block-tileset=water`
+3. 导入（`--prefix` = 图集名，多张图共用一个；`--id` = 地图名）：
+   - **第一张**（重建图集目录）：
+     `python tools/import_tmx.py <tmx> --id=<id> --name=<中文名> --prefix=<前缀> --walk-layer=background --skip-layer=collision --solid-layer=collision --block-tileset=water`
+   - **之后每张**：同上，末尾加 **`--append`**（瓦并进已有图集，见上文「一套图集服务多张图」）
    - `--solid-layer=collision`：Flare 的 collision 层**语义相反**（有瓦 = 不可走），且不能画出来
    - `--block-tileset=water`：把整个 water tileset 判为不可走（collision 层没盖全时会漏水）
    - 出生点、虚空底色、复合瓦锚点都是自动的，看它打印的「出生点 / 虚空底色」两行确认
-4. 离线核对几何：`python tools/render_map_json.py <前缀> 0.4 _r_<前缀>.png`（秒级）
-5. 挂载：`tools/attach_imported.py` 的 `WANT` 加上 `<前缀>_map.json`，跑一遍
+4. 离线核对几何：`python tools/render_map_json.py <地图 id> 0.4 _r_<id>.png`（秒级；
+   图集前缀脚本自己从地图档的 piece 名反推，不用手填）
+5. 挂载：`tools/attach_imported.py` 的 `WANT` 加上 `<id>_map.json`，跑一遍
    （别手写 maps.json：`'k'` 与 `homeFromMap` 都由它带进去）
 6. 引擎：`js/game.js` 的 `LOAD_PLAN` push 图集两项 + `ATLAS` 声明加一项 +
    `boot()` 里按引用取值（`piece()` 已是通用查表，不用改）

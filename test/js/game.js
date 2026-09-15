@@ -334,7 +334,7 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=11', json: true, weight: 186, label: '读取地图数据' },
+      { url: 'assets/maps.json?v=12', json: true, weight: 322, label: '读取地图数据' },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -350,13 +350,16 @@
   var dmJson = { url: 'assets/dungeon_atlas.json?v=2', json: true, weight: 2, label: '读取地宫索引' };
   LOAD_PLAN.push(dmImg, dmJson);
   // 外来地图：由 tools/import_tmx.py 把别人的 Tiled 工程（.tmx）原样转进来的。
-  // 这张不是自己摆的 —— Flare（开源 ARPG，flareteam/flare-game，CC-BY-SA）的战役开场
-  // 关卡 arrival，等距 192x96（与本引擎 TILE_W/TILE_H = 120/60 同为 2:1）。
-  // 加图集走的就是 dmImg/dmJson 那套，新增一张图 = 这里 push 两项 + maps.json 里加条目。
+  // 这些不是自己摆的 —— Flare（开源 ARPG，flareteam/flare-game，CC-BY-SA）的战役关卡，
+  // 等距 192:96（与本引擎 TILE_W/TILE_H = 120/60 同为 2:1）。
+  // 两张图（远航之岸 / 殒落港湾）**共用这一套图集**：导入第二张时给导入器加 --append，
+  // 瓦并进同一个目录、图集按目录全量重打包，所以加图不增加图集资源数。
+  // 注意瓦文件名带裁剪坐标（grassland_0_384.png），两次导入同名 = 同一张瓦，
+  // 否则后导入的会静默覆盖先导入的，前一张图整体错乱。
   // weight 填**真实体积 KB**：加载进度条按它预估总量，填小了会在最后一段卡住不动。
   // ⚠ 图集内容一变就要升 ?v=，否则浏览器缓存会把旧 webp 喂回来（Pages 的 max-age=600）。
-  var flImg = { url: 'assets/flare_atlas.webp?v=2', atlas: 'flare', weight: 689, label: '载入外来地图·远航之岸' };
-  var flJson = { url: 'assets/flare_atlas.json?v=2', json: true, weight: 5, label: '读取远航之岸索引' };
+  var flImg = { url: 'assets/flare_atlas.webp?v=3', atlas: 'flare', weight: 910, label: '载入外来地图图集' };
+  var flJson = { url: 'assets/flare_atlas.json?v=3', json: true, weight: 10, label: '读取外来地图索引' };
   LOAD_PLAN.push(flImg, flJson);
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 

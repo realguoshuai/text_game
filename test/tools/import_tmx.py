@@ -140,6 +140,10 @@ def main():
                     help='出生点 x,y（引擎格，相对裁剪后的图）。默认自动取"四邻皆可走、离图心最近"的格 —— '
                          '导入图的可走区常是岛屿/半岛，硬编码 (W//2,H-1) 会掉进海里')
     ap.add_argument('--note', default='')
+    ap.add_argument('--append', action='store_true',
+                    help='保留图集目录里已有的瓦，把本图的瓦并进去 —— '
+                         '多张外来图共用一套图集时用（先导第一张，之后每张都加 --append）。'
+                         '默认清空目录，只留本图的瓦')
     ap.add_argument('--dry', action='store_true', help='只解析不写文件')
     a = ap.parse_args()
 
@@ -202,8 +206,16 @@ def main():
 
     # 收集要用的贴图
     need = {}     # (src_path, crop) -> 输出文件名
-    def imgname(path):
-        return re.sub(r'[^A-Za-z0-9_.-]', '_', os.path.basename(path))
+    def imgname(path, crop):
+        # 名字必须「跨次导入稳定」——多张外来图共用一套图集时（--append），
+        # 同名就意味着同一张瓦。若只取源图文件名（Flare 的 grassland.png 会被几十个
+        # gid 共用），两次导入的同名瓦内容不同，后一次会静默覆盖前一次，
+        # 前一张图整体错乱。故把裁剪左上角编进名字：grassland_0_384.png。
+        base = re.sub(r'[^A-Za-z0-9_.-]', '_', os.path.basename(path))
+        if not crop:
+            return base
+        stem, ext = os.path.splitext(base)
+        return '%s_%d_%d%s' % (stem, crop[0], crop[1], ext)
 
     for _, g in drawn:
         for v in g:
@@ -211,31 +223,36 @@ def main():
                 continue
             s = [t for t in sets if t['first'] <= v][-1]
             p, crop = resolve(s, v)
-            need[(p, crop)] = imgname(p)
-    # 同名不同源时加序号
-    seen = {}
-    for (p, crop), nm in list(need.items()):
-        if nm in seen and seen[nm] != (p, crop):
-            stem, ext = os.path.splitext(nm)
-            k = 2
-            while '%s_%d%s' % (stem, k, ext) in seen:
-                k += 1
-            need[(p, crop)] = '%s_%d%s' % (stem, k, ext)
-        seen[need[(p, crop)]] = (p, crop)
+            need[(p, crop)] = imgname(p, crop)
+    # 仍撞名 = 两张不同目录的源图重名。按 (路径, 裁剪) 排序后补序号，保证确定性
+    # （不排序的话，序号跟着 dict 迭代顺序跑，两次导入会给出不同的名字）。
+    byname = {}
+    for k, nm in need.items():
+        byname.setdefault(nm, []).append(k)
+    for nm, keys in byname.items():
+        if len(keys) < 2:
+            continue
+        stem, ext = os.path.splitext(nm)
+        for i, k in enumerate(sorted(keys, key=lambda kk: (kk[0], kk[1] or (0, 0))), start=2):
+            need[k] = '%s_%d%s' % (stem, i, ext)
     print('  需要 %d 张贴图' % len(need))
 
     outdir = os.path.join(ASSETS, a.prefix)
     atlas_img = os.path.join(ASSETS, '%s_atlas.webp' % a.prefix)
     atlas_json = os.path.join(ASSETS, '%s_atlas.json' % a.prefix)
-    map_json = os.path.join(ASSETS, '%s_map.json' % a.prefix)
+    # 地图条目按 id 命名，不按 prefix —— 一个 prefix（图集）服务多张图。
+    map_json = os.path.join(ASSETS, '%s_map.json' % a.id)
 
     if a.dry:
         print('\n--dry：不写文件')
         return
 
-    if os.path.exists(outdir):
+    if os.path.exists(outdir) and not a.append:
         shutil.rmtree(outdir)
-    os.makedirs(outdir)
+    os.makedirs(outdir, exist_ok=True)
+    if a.append:
+        print('  --append：保留 %s 里已有的 %d 张瓦，本图的瓦并进去'
+              % (os.path.basename(outdir), len(os.listdir(outdir))))
 
     # 每张源图用哪个 tileset 的透明色键
     trans_of = {}

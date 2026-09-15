@@ -20,11 +20,19 @@ TILE_W, TILE_H = 120, 60
 
 
 def main():
-    prefix = sys.argv[1] if len(sys.argv) > 1 else 'imported'
+    key = sys.argv[1] if len(sys.argv) > 1 else 'imported'
     Z = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0
-    out = sys.argv[3] if len(sys.argv) > 3 else '_render_%s.png' % prefix
+    out = sys.argv[3] if len(sys.argv) > 3 else '_render_%s.png' % key
 
-    mp = json.load(open(os.path.join(ASSETS, '%s_map.json' % prefix), encoding='utf-8'))
+    # 地图档按「地图 id」命名（一套图集服务多张图），图集按 prefix 命名。
+    # prefix 从 map json 的 piece 名（'flare/xxx.png'）反推，免得调用方记两个名字。
+    mp = json.load(open(os.path.join(ASSETS, '%s_map.json' % key), encoding='utf-8'))
+    prefix = key
+    for o in mp['objects']:
+        if '/' in (o.get('piece') or ''):
+            prefix = o['piece'].split('/')[0]
+            break
+    print('  图集前缀 %r' % prefix)
     atlas_img = os.path.join(ASSETS, '%s_atlas.webp' % prefix)
     if not os.path.exists(atlas_img):
         atlas_img = atlas_img.replace('.webp', '.png')
