@@ -97,11 +97,24 @@
    * 新增：piece() 支持从 IMG 回退加载独立 PNG（用于测试新素材而不重建 tiles_atlas）。
    */
   var DUNGEON_IMGS = [
-    'dungeon/stoneTile_N.png', 'dungeon/dirtTiles_N.png', 'dungeon/planks_N.png',
-    'dungeon/stoneWall_N.png', 'dungeon/stoneWallAged_N.png', 'dungeon/stoneWallCorner_N.png',
-    'dungeon/stoneWallDoorClosed_N.png', 'dungeon/stoneWallArchway_N.png',
-    'dungeon/barrel_N.png', 'dungeon/barrels_N.png', 'dungeon/chestClosed_N.png',
-    'dungeon/stoneColumn_N.png', 'dungeon/tableRound_N.png', 'dungeon/chair_N.png', 'dungeon/bridge_N.png'
+    // 地面
+    'dungeon/stoneTile_N.png', 'dungeon/dirtTiles_N.png', 'dungeon/planks_N.png', 'dungeon/stoneMissingTiles_N.png',
+    // 墙四向 + 变化
+    'dungeon/stoneWall_N.png', 'dungeon/stoneWall_E.png', 'dungeon/stoneWall_S.png', 'dungeon/stoneWall_W.png',
+    'dungeon/stoneWallAged_N.png', 'dungeon/stoneWallAged_E.png', 'dungeon/stoneWallAged_S.png', 'dungeon/stoneWallAged_W.png',
+    'dungeon/stoneWallWindow_N.png', 'dungeon/stoneWallWindow_E.png', 'dungeon/stoneWallWindow_S.png', 'dungeon/stoneWallWindow_W.png',
+    'dungeon/stoneWallHole_N.png', 'dungeon/stoneWallHole_E.png', 'dungeon/stoneWallHole_S.png', 'dungeon/stoneWallHole_W.png',
+    // 墙角四向
+    'dungeon/stoneWallCorner_N.png', 'dungeon/stoneWallCorner_E.png', 'dungeon/stoneWallCorner_S.png', 'dungeon/stoneWallCorner_W.png',
+    // 门四向
+    'dungeon/stoneWallArchway_N.png', 'dungeon/stoneWallArchway_E.png', 'dungeon/stoneWallArchway_S.png', 'dungeon/stoneWallArchway_W.png',
+    // 柱/支撑
+    'dungeon/stoneColumn_N.png', 'dungeon/woodenSupports_N.png', 'dungeon/woodenSupportBeams_N.png',
+    // 家具
+    'dungeon/barrel_N.png', 'dungeon/barrels_N.png', 'dungeon/barrelsStacked_N.png',
+    'dungeon/chestClosed_N.png', 'dungeon/chestOpen_N.png',
+    'dungeon/tableRound_N.png', 'dungeon/tableRoundChairs_N.png', 'dungeon/tableShort_N.png', 'dungeon/tableShortChairs_N.png',
+    'dungeon/chair_N.png', 'dungeon/woodenCrate_N.png', 'dungeon/woodenCrates_N.png'
   ];
   var ATLAS = {
     tiles: { img: null, rect: null },
