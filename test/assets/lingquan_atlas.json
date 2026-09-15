@@ -1,0 +1,74 @@
+{
+  "ling/grass.png": [
+    2,
+    0,
+    120,
+    76
+  ],
+  "ling/grass2.png": [
+    124,
+    0,
+    120,
+    76
+  ],
+  "ling/moss.png": [
+    246,
+    0,
+    120,
+    76
+  ],
+  "ling/dirt.png": [
+    368,
+    0,
+    120,
+    76
+  ],
+  "ling/stone.png": [
+    490,
+    0,
+    120,
+    76
+  ],
+  "ling/shore.png": [
+    612,
+    0,
+    120,
+    76
+  ],
+  "ling/water.png": [
+    734,
+    0,
+    120,
+    76
+  ],
+  "ling/water2.png": [
+    856,
+    0,
+    120,
+    76
+  ],
+  "ling/waterfall.png": [
+    978,
+    0,
+    120,
+    220
+  ],
+  "ling/lotus.png": [
+    1100,
+    0,
+    52,
+    34
+  ],
+  "ling/spirit_stone.png": [
+    1154,
+    0,
+    44,
+    52
+  ],
+  "ling/rock.png": [
+    1200,
+    0,
+    28,
+    22
+  ]
+}

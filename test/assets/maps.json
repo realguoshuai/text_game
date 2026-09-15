@@ -2613,6 +2613,71 @@
      "y": 14,
      "fw": 1,
      "fh": 1
+    },
+    {
+     "piece": "ling/waterfall.png",
+     "x": 16,
+     "y": 11,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "ling/lotus.png",
+     "x": 22,
+     "y": 18,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/lotus.png",
+     "x": 23,
+     "y": 18,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/lotus.png",
+     "x": 25,
+     "y": 15,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/spirit_stone.png",
+     "x": 14,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/spirit_stone.png",
+     "x": 25,
+     "y": 16,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/spirit_stone.png",
+     "x": 24,
+     "y": 20,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/rock.png",
+     "x": 11,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
     }
    ],
    "portals": [
@@ -2646,7 +2711,16 @@
     "y": 26
    },
    "note": "灵泉湖泊：竹海、松林、水岸栈桥、瀑布石阶",
-   "npcs": []
+   "npcs": [],
+   "tilePalette": {
+    ".": "ling/grass.png",
+    ",": "ling/dirt.png",
+    "#": "ling/moss.png",
+    ";": "ling/stone.png",
+    "~": "ling/water.png",
+    "-": "ling/shore.png"
+   },
+   "solid": {}
   },
   {
    "id": "beilin",
