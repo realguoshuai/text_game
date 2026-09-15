@@ -334,7 +334,10 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=12', json: true, weight: 322, label: '读取地图数据' },
+      // ⚠ weight 填**真实体积 KB**：进度条按它加权，填小了会在最后一段卡住不动。
+      //   maps.json 现在只放「游戏自带的 5 张图」+ 外来图的轻条目（地形数据另有文件），
+      //   所以从 322KB 掉到 65KB —— 首屏少背 260KB。
+      { url: 'assets/maps.json?v=13', json: true, weight: 65, label: '读取地图数据', _expand: true },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -344,23 +347,230 @@
     { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
     { url: 'assets/beasts.json?v=2', json: true, weight: 11, label: '读取怪物图录' }
   ];
-  // 地宫素材：228 张独立 PNG 已打包成单张 dungeon_atlas.webp（见 tools/build_dungeon_atlas.py），
-  // 从 228 次请求压到 2 次（图集 + 索引）。DUNGEON_IMGS 仅作素材清单参考，不再逐个加载。
-  var dmImg = { url: 'assets/dungeon_atlas.webp?v=2', atlas: 'dungeon', weight: 547, label: '载入地宫图集' };
-  var dmJson = { url: 'assets/dungeon_atlas.json?v=2', json: true, weight: 2, label: '读取地宫索引' };
-  LOAD_PLAN.push(dmImg, dmJson);
-  // 外来地图：由 tools/import_tmx.py 把别人的 Tiled 工程（.tmx）原样转进来的。
-  // 这些不是自己摆的 —— Flare（开源 ARPG，flareteam/flare-game，CC-BY-SA）的战役关卡，
-  // 等距 192:96（与本引擎 TILE_W/TILE_H = 120/60 同为 2:1）。
-  // 两张图（远航之岸 / 殒落港湾）**共用这一套图集**：导入第二张时给导入器加 --append，
-  // 瓦并进同一个目录、图集按目录全量重打包，所以加图不增加图集资源数。
-  // 注意瓦文件名带裁剪坐标（grassland_0_384.png），两次导入同名 = 同一张瓦，
-  // 否则后导入的会静默覆盖先导入的，前一张图整体错乱。
-  // weight 填**真实体积 KB**：加载进度条按它预估总量，填小了会在最后一段卡住不动。
-  // ⚠ 图集内容一变就要升 ?v=，否则浏览器缓存会把旧 webp 喂回来（Pages 的 max-age=600）。
-  var flImg = { url: 'assets/flare_atlas.webp?v=3', atlas: 'flare', weight: 910, label: '载入外来地图图集' };
-  var flJson = { url: 'assets/flare_atlas.json?v=3', json: true, weight: 10, label: '读取外来地图索引' };
-  LOAD_PLAN.push(flImg, flJson);
+
+  /* ── 按需图集（懒加载）────────────────────────────────────────────────
+   * 地宫 547KB、外来地图 940KB —— 这两套只有切到对应地图才用得上。
+   * 塞进首屏等于让「只想在山门走两步」的人先等 1.5MB：
+   * 首屏从 3.02MB 降到 1.21MB（-60%）。三条路径覆盖全部情况：
+   *   ① ?map= 直接指向该图 → 计入首屏（见 expandPlan，进度条照走）
+   *   ② 进游戏后空闲预取（见 preloadExtras）—— 用户点按钮时通常已就绪
+   *   ③ 手比预取快 → 现场载，屏幕下方给一条小提示（见 goTo）
+   * 键名必须与 ATLAS 的键一致：加载完按 item.atlas 直接填进去。
+   * · 地宫素材：228 张独立 PNG 已打包成单张（见 tools/build_dungeon_atlas.py）
+   * · 外来地图：Flare 开源 ARPG 战役关卡，tools/import_tmx.py 转出，两张共用一套图集
+   * ⚠ 图集内容一变就要升 ?v=，否则浏览器缓存会把旧 webp 喂回来（Pages 的 max-age=600）。
+   */
+  var EXTRA = {
+    dungeon: {
+      loaded: false, loading: null, queued: false,
+      items: [
+        { url: 'assets/dungeon_atlas.webp?v=2', atlas: 'dungeon', weight: 547, label: '载入地宫图集' },
+        { url: 'assets/dungeon_atlas.json?v=2', atlas: 'dungeon', json: true, weight: 2, label: '读取地宫索引' }
+      ]
+    },
+    flare: {
+      loaded: false, loading: null, queued: false,
+      items: [
+        { url: 'assets/flare_atlas.webp?v=3', atlas: 'flare', weight: 910, label: '载入外来地图图集' },
+        { url: 'assets/flare_atlas.json?v=3', atlas: 'flare', json: true, weight: 10, label: '读取外来地图索引' }
+      ]
+    }
+  };
+  /* ── 按需资源的取用口 ─────────────────────────────────────────────── */
+
+  /** 按需图集项的值 → ATLAS。首屏池与运行时补载共用这一套填充逻辑：
+   *  按 item.atlas 定位 ATLAS 键，json 项填 rect、图项填 img；两样齐了才算 loaded。 */
+  function fillAtlas(nm) {
+    var e = EXTRA[nm];
+    if (!e) return false;
+    e.items.forEach(function (p) {
+      if (!p.value) return;
+      if (p.json) ATLAS[nm].rect = p.value; else ATLAS[nm].img = p.value;
+    });
+    var ok = !!(ATLAS[nm].img && ATLAS[nm].rect);
+    if (ok) e.loaded = true;
+    return ok;
+  }
+
+  /** 这张图要用哪套「按需图集」（没有就返回 ''）。
+   *  外来图的轻条目自带 atlas 字段；**自带图没有** —— 得从物件的瓦片前缀找：
+   *  地宫的瓦在 'dungeon/' 下，其它图的前缀是主图集内部的键名（ground/、scene/…），
+   *  前缀命中 EXTRA 才算数。结果缓存在 m._atlas 上（goTo 每点一次都会问）。 */
+  function mapAtlas(m) {
+    if (!m) return '';
+    if (m._atlas !== undefined) return m._atlas;
+    var an = (m.atlas && EXTRA[m.atlas]) ? m.atlas : '';
+    if (!an) {
+      var o = m.objects || [];
+      for (var i = 0; i < o.length; i++) {
+        var pr = String(o[i].piece || '').split('/')[0];
+        if (EXTRA[pr]) { an = pr; break; }
+      }
+    }
+    m._atlas = an;
+    return an;
+  }
+
+  function extrasReady(names) {
+    return (names || []).every(function (n) { return EXTRA[n] && EXTRA[n].loaded; });
+  }
+
+  /** 运行时补载若干套按需图集（同一套被并发请求只会真的下一次）。
+   *  首屏那份在 boot 里（要精确进度条）；这份是给「用户手比预取快」兜底的。 */
+  function ensureExtras(names, onPct) {
+    var seq = Promise.resolve();
+    (names || []).forEach(function (nm) {
+      var e = EXTRA[nm];
+      if (!e) return;
+      if (!e.loaded && !e.loading) {
+        e.loading = loadItems(e.items, onPct).then(function () {
+          fillAtlas(nm); e.loading = null; return true;
+        });
+      }
+      if (e.loading) seq = seq.then(function () { return e.loading; });
+    });
+    return seq;
+  }
+
+  /** 通用加载器（并发 2）：值统一写回 item.value ——
+   *  上层只认 item.value，不必关心是哪条路径（首屏池 / 补载）拉下来的。 */
+  function loadItems(items, onPct) {
+    var per = {}, idx = 0;
+    function bump() {
+      if (!onPct) return;
+      var s = 0, t = 0;
+      items.forEach(function (p) { s += Math.min(1, per[p.url] || 0) * p.weight; t += p.weight; });
+      onPct(t ? s / t : 1);
+    }
+    function one() {
+      if (idx >= items.length) return Promise.resolve();
+      var p = items[idx++];
+      return xhrBlob(p.url, function (w, loaded, tot) {
+        if (p.json) return;
+        per[p.url] = loaded / (tot || p.weight);
+        bump();
+      }).then(function (blob) {
+        per[p.url] = 1;
+        return p.json ? blobJson(blob) : blobImage(blob);
+      }).then(function (v) { p.value = v; bump(); return one(); });
+    }
+    var ws = [];
+    for (var c = 0; c < Math.min(2, items.length); c++) ws.push(one());
+    return Promise.all(ws);
+  }
+
+  /** 把 <id>_map.json 的地形并回地图条目，并补上引擎要的派生数据。
+   *  外来地图的 ground+objects 占 265KB —— 不塞 maps.json，否则等于逼所有人首屏背它。 */
+  function applyMapData(m, d) {
+    m.ground = d.ground; m.objects = d.objects;
+    if (d.npcs) m.npcs = d.npcs;
+    if (d.portals) m.portals = d.portals;
+    if (d.spawn) m.spawn = d.spawn;
+    if (d.home) m.home = d.home;
+    if (d.homeFromMap) m.homeFromMap = true;
+    if (d.voidColor) m.voidColor = d.voidColor;
+    finishMap(m);
+    m._data = true;
+    return m;
+  }
+
+  /** 地图条目的派生数据：实心格表 + 出生点。
+   *  出生点默认由引擎自己算（离图心最近的可走格）—— 游戏自带的图都是「中间是空地」，
+   *  这个启发式够用。但**外来地图**（带 homeFromMap 标记）不行：别人的图可走区常是
+   *  岛/半岛/环形，图心很可能落在湖里或贴着崖边 —— 那种位置「能站」但一开局就面壁。
+   *  所以外来图自带施工方挑好的出生点（四邻皆可走的格），只要它确实合法就直接采用。 */
+  function finishMap(m) {
+    m.solid = solidFrom(m);
+    var h = m.home, okH = false;
+    if (m.homeFromMap && h && h.y >= 0 && h.y < m.h && h.x >= 0 && h.x < m.w) {
+      okH = WALK.indexOf(m.ground[h.y][h.x]) >= 0 && !m.solid['' + h.x + ',' + h.y];
+    }
+    m.home = okH ? h : nearWalkable(m);
+    return m;
+  }
+
+  /** 把 maps.json 里的全局常量装上。**必须早于任何 applyMapData**：
+   *  finishMap 靠 WALK 判断可走、nearWalkable 靠它兜底找出生点，而按需加载的外来图
+   *  地形可能比「全部加载结束」更早到位 —— 那时 WALK 还是空的，于是整张图都算「不可走」，
+   *  出生点退化成 {0,0}，玩家被吸附到地图角落（实测落在 5,2，而不是施工方的 19,19）。
+   *  幂等，重复调用无副作用。 */
+  function initCore(d) {
+    TILE_W = d.tileW; TILE_H = d.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
+    PAL = d.tilePalette; WALK = d.walkable; WATER = d.water || '';
+    MAPS = d.maps;
+    MAPS.forEach(function (m) { IDX[m.id] = m; });
+    return d;
+  }
+
+  /** 地图数据（外来图才有 src）按需取；同一张图被并发请求只下一次。 */
+  function ensureMapData(m, onPct) {
+    if (!m || !m.src || m._data) return Promise.resolve(m);
+    if (m._dataLoading) return m._dataLoading;
+    m._dataLoading = xhrBlob(m.src, function (w, loaded, tot) {
+      if (onPct) onPct(Math.min(1, loaded / (tot || 133)));
+    }).then(blobJson).then(function (d) {
+      applyMapData(m, d); m._dataLoading = null; return m;
+    });
+    return m._dataLoading;
+  }
+
+  /** 屏幕下方「正在载入地图」小提示：不挡操作，只说明为什么还没切过去 */
+  function mapLoadTip(text, pct) {
+    var el = document.getElementById('mapLoading');
+    if (text === null) {
+      if (el) { el.style.display = 'none'; el.textContent = ''; }
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mapLoading';
+      el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;' +
+        'z-index:60;padding:8px 16px;border-radius:999px;background:rgba(12,18,30,.86);' +
+        'color:#dff0ff;font:14px/1.4 system-ui,-apple-system,"Microsoft YaHei",sans-serif;' +
+        'border:1px solid rgba(120,190,255,.35);pointer-events:none;white-space:nowrap';
+      document.body.appendChild(el);
+    }
+    el.style.display = '';
+    el.textContent = text + (pct === undefined ? '' : ' ' + Math.round(pct * 100) + '%');
+  }
+
+  /** 切图守卫：目标图的数据/图集没就绪就先补，再走原来的同步 switchTo。
+   *  已就绪时（绝大多数情况：首屏就是它，或后台预取已完成）等于零开销直接切 ——
+   *  所以按钮、传送门、调试 API 都可以无脑走它。 */
+  function goTo(id, x, y, silent) {
+    var m = IDX[id] || MAPS[0];
+    var an = mapAtlas(m);
+    var names = an ? [an] : [];
+    if (!(m.src && !m._data) && extrasReady(names)) {
+      switchTo(m.id, x, y, silent);
+      return Promise.resolve();
+    }
+    var base = 0, span = 1;
+    function tick(f) { mapLoadTip('正在载入「' + m.name + '」…', Math.min(0.99, base + f * span)); }
+    mapLoadTip('正在载入「' + m.name + '」…', 0);
+    return ensureMapData(m, tick)
+      .then(function () {
+        // 两段进度：地形数据 0~35%，图集 35~100%（140KB 对 950KB 的量级差）
+        base = 0.35; span = 0.65;
+        return ensureExtras(names, tick);
+      })
+      .then(function () {
+        mapLoadTip(null);
+        switchTo(m.id, x === undefined ? m.home.x : x, y === undefined ? m.home.y : y, silent);
+      });
+  }
+
+  /** 进游戏后空闲预取按需图集 —— 用户点按钮时就不用等了。
+   *  延迟 2.5s 起跑：避开首屏收尾与首帧渲染；串行执行，弱机也不会被压满。 */
+  function preloadExtras() {
+    var names = Object.keys(EXTRA), i = 0;
+    function step() {
+      if (i >= names.length) return;
+      ensureExtras([names[i++]], null).then(function () { setTimeout(step, 400); });
+    }
+    setTimeout(step, 2500);
+  }
+
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
   function fmtBytes(n) {
@@ -427,20 +637,47 @@
 
     // 进度权重：JSON 给小权重、图集按实际字节数分配，这样进度条不会在
     // 「几个 JSON 秒过、图集卡住」的落差里骗人。
-    var W_TOTAL = LOAD_PLAN.reduce(function (a, p) { return a + p.weight; }, 0);
+    // 计划池：LOAD_PLAN 是「一定会用到」的；expandPlan 会把「这张图额外要的」也推进来。
+    // 池化 + 并发跑，是为了让首屏那 1.2MB 不再一个接一个地排队等。
+    var POOL = LOAD_PLAN.slice();
+    var W_TOTAL = POOL.reduce(function (a, p) { return a + p.weight; }, 0);
     var got = {};
     function report(label, sub) {
       var acc = 0;
-      LOAD_PLAN.forEach(function (p) {
+      POOL.forEach(function (p) {
         acc += Math.min(1, got[p.url] || 0) * p.weight;
       });
       setProgress(acc / W_TOTAL, label, sub);
     }
 
+    /** 把「首屏要进的那张图」额外需要的资源推进池子。
+     *  ⚠ 必须在 maps.json 解析完的那一刻**同步**做完：next() 是靠「step 追上池长」
+     *  判断收工的，晚一步追加就没人回来取新任务了（next 末尾还有一次兜底）。 */
+    function expandPlan(data) {
+      var q0 = new URLSearchParams(location.search);
+      var want = q0.get('map'), sm = null;
+      (data.maps || []).forEach(function (x) { if (x.id === want) sm = x; });
+      if (!sm) return;                      // 没指定 / 指定的是自带图 → 无需额外资源
+      var an = mapAtlas(sm);
+      if (an && !EXTRA[an].queued) {
+        EXTRA[an].queued = true;
+        EXTRA[an].items.forEach(function (it) {
+          if (POOL.indexOf(it) < 0) { POOL.push(it); W_TOTAL += it.weight; }
+        });
+      }
+      if (sm.src) {
+        POOL.push({ url: sm.src, json: true, weight: 133, label: '读取「' + sm.name + '」地形', _map: sm });
+        W_TOTAL += 133;
+      }
+    }
+
+    // 并发路数：原先 11 个文件严格串行，最慢的那个决定首屏；现在三条流水并行。
+    // 不设更高是照顾弱机/移动网络 —— 再高收益很小，反而挤掉首帧渲染的带宽。
+    var CONC = 3;
     var step = 0;
-    function next() {
-      if (step >= LOAD_PLAN.length) return Promise.resolve();
-      var p = LOAD_PLAN[step++];
+    function worker() {
+      if (step >= POOL.length) return Promise.resolve();
+      var p = POOL[step++];
       report(p.label, '');
       return xhrBlob(p.url, function (w, loaded, tot) {
         if (p.json) return;
@@ -451,8 +688,22 @@
         return p.json ? blobJson(blob).then(function (v) { p.value = v; })
                       : blobImage(blob).then(function (im) { p.value = im; });
       }).then(function () {
+        // maps.json 一到手：① 先把全局常量装上（finishMap 要靠 WALK 判断可走、
+        // nearWalkable 要靠它兜底找出生点，按需地形可能比 ready 更早到位 —— 时序坑），
+        // ② 再决定「还要多载什么」把池子补全。
+        if (p._expand && p.value) { initCore(p.value); expandPlan(p.value); }
+        // 外来地图的地形数据：并回地图条目（轻条目 → 完整图）
+        if (p._map && p.value) applyMapData(p._map, p.value);
         report(p.label, '');
-        return next();
+        return worker();
+      });
+    }
+    function next() {
+      var ws = [];
+      for (var c = 0; c < CONC; c++) ws.push(worker());
+      return Promise.all(ws).then(function () {
+        // 池子可能刚被 expandPlan 追加过（maps.json 比别的项晚到时），兜一次
+        if (step < POOL.length) return next();
       });
     }
 
@@ -468,12 +719,9 @@
         var fj = LOAD_PLAN[6].value || {};
         ATLAS.foes.rect = fj.rect || fj;
         ATLAS.foes.anim = fj.anims || {};
-        // 地宫图集（按引用查找，不依赖下标，顺序变动也不怕）
-        ATLAS.dungeon.img = LOAD_PLAN[LOAD_PLAN.indexOf(dmImg)].value;
-        ATLAS.dungeon.rect = LOAD_PLAN[LOAD_PLAN.indexOf(dmJson)].value;
-        // 外来地图图集（import_tmx.py 产出），同样按引用查找
-        ATLAS.flare.img = LOAD_PLAN[LOAD_PLAN.indexOf(flImg)].value;
-        ATLAS.flare.rect = LOAD_PLAN[LOAD_PLAN.indexOf(flJson)].value;
+        // 按需图集（地宫 / 外来地图）：只有当 ?map= 指到了那张图，它才会出现在首屏
+        // 池子里。fillAtlas 顺手把 loaded 标上，后台预取就不会再拉一遍。
+        fillAtlas('dungeon'); fillAtlas('flare');
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;
@@ -485,22 +733,14 @@
         // 独立 PNG 素材入 IMG 缓存，供 piece() 回退使用
         LOAD_PLAN.forEach(function (p) { if (p.imgKey && p.value) IMG[p.imgKey] = p.value; });
 
-      TILE_W = data.tileW; TILE_H = data.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
-      PAL = data.tilePalette; WALK = data.walkable; WATER = data.water || '';
-      MAPS = data.maps;
+      // 全局常量此刻通常已由 initCore 装好（maps.json 到手那一刻）—— 再装一次是幂等的保险。
+      initCore(data);
       MAPS.forEach(function (m) {
-        m.solid = solidFrom(m);
-        // 出生点：默认由引擎自己算（离图心最近的可走格）—— 游戏自带的图都是"中间是空地"，
-        // 这个启发式够用。但**外来地图**（import_tmx.py 产出，带 homeFromMap 标记）不行：
-        // 别人的图可走区常是岛/半岛/环形，图心很可能落在湖里或贴着崖边，
-        // 那种位置"能站"但一开局就面壁。所以外来图自带施工方挑好的出生点
-        // （四邻皆可走的格），只要它确实合法就直接采用。
-        var h = m.home, okH = false;
-        if (m.homeFromMap && h && h.y >= 0 && h.y < m.h && h.x >= 0 && h.x < m.w) {
-          okH = WALK.indexOf(m.ground[h.y][h.x]) >= 0 && !m.solid['' + h.x + ',' + h.y];
-        }
-        m.home = okH ? h : nearWalkable(m);
         IDX[m.id] = m;
+        // 懒加载图（带 src 的外来地图）：地形已到位的在 applyMapData 里算过了；
+        // 还没到位的（?map= 没指到它）等它到手再说。
+        if (m.src || m._data) return;
+        finishMap(m);
       });
 
       var q = new URLSearchParams(location.search);
@@ -538,6 +778,10 @@
         document.getElementById('loader').style.display = 'none';
         ready = true;
         window.__ready = true;
+        // 首屏只载了「这一张图要用的」；其余按需图集趁空闲在后台补上，
+        // 用户点地图按钮时通常已经就绪（见 preloadExtras 注释）。
+        // ?preload=0 关掉按需图集的后台预取（省流量/弱网，也让 lazygoto 自测能测到真·按需）
+        if (q.get('preload') !== '0') preloadExtras();
         // 手机端 UI 自测要等遮罩隐藏之后再跑，否则 elementFromPoint 只会命中遮罩
         // （详见 initMobile 末尾 __mobileAudit 的注释）
         if (window.__mobileAudit) window.__mobileAudit();
@@ -602,6 +846,47 @@
             var g = document.getElementById('dbg');
             if (g) g.textContent = JSON.stringify(s);
           }, 80);
+        }
+        if (at === 'bootstats') {
+          // ?autotest=bootstats —— 首屏实际下载量。用来证明「按需图集」真的没进首屏：
+          // got[url] 有值 = 这一项真下载过；汇总权重即可（weight 就是各项的真实 KB）。
+          setTimeout(function () {
+            var r = { map: CUR.id, total: 0, items: [], extras: {} };
+            POOL.forEach(function (p) {
+              if (got[p.url]) { r.total += p.weight; r.items.push(p.label + ' ' + p.weight); }
+            });
+            Object.keys(EXTRA).forEach(function (k) {
+              r.extras[k] = { loaded: !!EXTRA[k].loaded, queued: !!EXTRA[k].queued };
+            });
+            var pb = document.getElementById('probe');
+            if (!pb) { pb = document.createElement('div'); pb.id = 'probe'; pb.style.display = 'none'; document.body.appendChild(pb); }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
+        if (at === 'lazygoto') {
+          // ?autotest=lazygoto&preload=0&goto=<id> —— 「运行时按需加载」验收
+          // （配合 preload=0 关掉预取，否则预取会先把图集拉下来，测不出"当场补载"）。
+          // 模拟用户点地图按钮切过去：图集与地形要当场补上、玩家落在可走的出生点上、
+          // 加载提示要收掉。默认目标 = 远航之岸（外来图，带地形外置）。
+          setTimeout(function () {
+            var gid = q.get('goto') || 'flare_arrival';
+            var r = { from: CUR.id, gid: gid, before: !!ATLAS[(IDX[gid] && mapAtlas(IDX[gid])) || 'flare'].img };
+            window.ISLES.goto(gid).then(function () {
+              var an2 = mapAtlas(CUR);
+              r.map = CUR.id;
+              r.obj = CUR.objects ? CUR.objects.length : 0;
+              r.atlasName = an2 || '(主图集)';
+              r.atlas = !an2 || (!!ATLAS[an2].img && !!ATLAS[an2].rect);
+              r.spawn = CUR.home.x + ',' + CUR.home.y;
+              r.spawnOnWalkable = walkable(CUR.home.x, CUR.home.y);
+              r.atSpawn = Math.round(player.mx) === CUR.home.x && Math.round(player.my) === CUR.home.y;
+              var tip = document.getElementById('mapLoading');
+              r.tipGone = !tip || tip.style.display === 'none';
+              var pb = document.getElementById('probe');
+              if (!pb) { pb = document.createElement('div'); pb.id = 'probe'; pb.style.display = 'none'; document.body.appendChild(pb); }
+              pb.textContent = JSON.stringify(r);
+            });
+          }, 60);
         }
         if (at === 'importmap') {
           // ?map=<外来图>&autotest=importmap —— 外来地图（tools/import_tmx.py 产出）的接入验收。
@@ -1735,7 +2020,7 @@
     if (fadeDir === 1) {
       fadeA += dt / 0.42;
       if (HOLD && fadeA >= 0.55) { fadeA = 0.55; held = true; }
-      if (fadeA >= 1) { fadeA = 1; var pt = pending; pending = null; switchTo(pt.to, pt.spawnX, pt.spawnY, false); fadeDir = -1; }
+      if (fadeA >= 1) { fadeA = 1; var pt = pending; pending = null; goTo(pt.to, pt.spawnX, pt.spawnY, false); fadeDir = -1; }
     } else if (fadeDir === -1) {
       fadeA -= dt / 0.42;
       if (fadeA <= 0) { fadeA = 0; fadeDir = 0; }
@@ -2928,7 +3213,7 @@
     MAPS.forEach(function (m) {
       var b = document.createElement('button');
       b.textContent = m.name; b.dataset.id = m.id;
-      b.onclick = function () { if (CUR.id !== m.id) switchTo(m.id, m.home.x, m.home.y, false); };
+      b.onclick = function () { if (CUR.id !== m.id) goTo(m.id); };
       box.appendChild(b);
     });
   }
@@ -2979,7 +3264,7 @@
     setZoom: function (z) { setZoom(z, W / 2, H / 2); return Zt; },
     heroes: function () { return HERO_OPTIONS.map(function (h) { return { n: h.n, src: h.file }; }); },
     setHero: function (n) { setHero(HERO_OPTIONS.filter(function (h) { return h.n === n; })[0]); return PLAYER_SRC; },
-    goto: function (id, x, y) { switchTo(id, x === undefined ? IDX[id].home.x : x, y === undefined ? IDX[id].home.y : y, false); },
+    goto: function (id, x, y) { return goTo(id, x, y, false); },
     bfsNext: bfsNext,
     chaseDbg: function () { return chaseDbg; },
     /** 把玩家放到当前地图第 i 个传送门上，下一次 update 即触发切换 */

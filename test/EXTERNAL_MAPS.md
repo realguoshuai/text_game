@@ -119,6 +119,44 @@ python tools/import_tmx.py <perdition_harbor.tmx> --prefix flare --id flare_harb
 
 ---
 
+## ★ 按需加载：大图集与外来地形都不进首屏（2026-09-15 晚）
+
+加图加爽了会撞上一件事：**每加一张图，所有人的开屏都更慢一点**。
+实测（改之前）：首屏串行加载 11 个文件共 **3.02MB**，其中 `flare_atlas.webp` 940KB
++ `dungeon_atlas.webp` 547KB —— 这两套只有切到对应地图才用得上，却让
+「只想在山门走两步」的人先等 1.5MB。
+
+改法（全在 `js/game.js`）：
+
+| 机制 | 在哪 | 干什么 |
+|---|---|---|
+| `EXTRA` 表 | 文件顶部 | 声明「按需图集」：一套 = 图 + 索引两项，键名对齐 `ATLAS` 的键 |
+| `expandPlan(data)` | boot 里、`maps.json` 到位那一刻 | `?map=` 直接指向该图 → 把它的图集与地形**推进首屏池**（进度条照走） |
+| `preloadExtras()` | `ready` 之后 2.5 秒 | 空闲串行预取 —— 用户点按钮时通常已就绪；`?preload=0` 可关 |
+| `goTo(id,…)` | 所有切图入口（按钮/传送门/调试 API） | 切图守卫：目标图资源没就绪就当场补载（屏幕下方小胶囊带百分比），就绪时零开销 |
+| `initCore()` / `applyMapData()` | 同上 | 常量提前装；外置地形并回地图条目 |
+
+地形也一并外置了：`maps.json` 里的外来图只剩**轻条目**
+（id/name/note/w/h/spawn/home/voidColor/homeFromMap/atlas/src），
+`ground`/`objects` 留在 `<id>_map.json`，`src` 后面挂**内容 md5 前 8 位**当版本号
+（地形一改缓存键自动变，比手改 `?v=` 靠谱）。`attach_imported.py` 负责这个转换。
+于是 `maps.json` 从 **329KB → 63KB**。
+
+**结果：首屏 3.02MB → 1.19MB（-61%）。** `?map=dungeon` 这种"首屏就要进那张图"的情况
+是 1.73MB（该载的照载）。
+
+⚠️ **时序坑（踩过）**：`finishMap` 靠全局 `WALK` 判断可走、`nearWalkable` 靠它兜底找出生点。
+原来这些常量在「全部加载结束」时才赋值，而按需地形可能**更早**到位 —— 于是整张图被算成
+「全不可走」，出生点退化成 `{0,0}`，玩家被吸附到地图角落（实测落在 **5,2**，而不是施工方
+挑的 19,19）。所以 `maps.json` 一到手就先 `initCore()` 装常量，再 `expandPlan()`。
+
+验收三条（都在跑批里）：
+- `首屏体积 不含大图集` —— 自带图首屏 1000~1400KB，且 dungeon/flare 都**未载**
+- `首屏含目标图图集` —— `?map=dungeon` 必须 >1600KB 且 dungeon 已载
+- `按需切图 外来图` / `按需切图 地宫` —— 首屏之后当场补载：图集到位、出生点站得住、提示收掉
+
+---
+
 ## ⚠️ 修正：Flare 才是真富矿（早先的结论是错的）
 
 2026-09-15 早些时候本文件写过「Flare 的 `tiled/` 下只有一个模板，真关卡是
@@ -266,12 +304,16 @@ node tools/_one.js "map=<id>&autotest=importmap" 30000
 4. 离线核对几何：`python tools/render_map_json.py <地图 id> 0.4 _r_<id>.png`（秒级；
    图集前缀脚本自己从地图档的 piece 名反推，不用手填）
 5. 挂载：`tools/attach_imported.py` 的 `WANT` 加上 `<id>_map.json`，跑一遍
-   （别手写 maps.json：`'k'` 与 `homeFromMap` 都由它带进去）
-6. 引擎：`js/game.js` 的 `LOAD_PLAN` push 图集两项 + `ATLAS` 声明加一项 +
-   `boot()` 里按引用取值（`piece()` 已是通用查表，不用改）
-7. 版本号：升 `maps.json?v=`、`index.html` 的 `game.js?v=`，LOAD_PLAN 权重按真实 KB 改
+   （别手写 maps.json：`'k'`、`homeFromMap`、`atlas`、`src` 都由它带进去。
+   它写的是**轻条目** —— 地形留在 `<id>_map.json` 里按需取，见上面「按需加载」那节）
+6. 引擎：在 `js/game.js` 的 `EXTRA` 里声明这套新图集（照 `flare` 那条抄，键名对齐
+   `ATLAS`），**不要** push 进 `LOAD_PLAN` —— 那等于让所有人首屏等它。
+   若这张图和已有的图共用一套图集（导入时带了 `--append`），则什么都不用加。
+7. 版本号：升 `index.html` 的 `game.js?v=`；`maps.json?v=` 也要升（内容变了）。
+   图集 `?v=` 只在**图集内容**变了时才升；外来地形的版本号是自动的（内容 md5）。
 8. 验收：`node tools/_one.js "map=<id>&autotest=importmap" 30000` 先单条看 `#probe`，
-   再 `node tools/headless_check.js` 跑全套
+   再 `node tools/headless_check.js` 跑全套；改过加载链路就顺带跑
+   `?autotest=bootstats` 与 `?autotest=lazygoto&goto=<id>` 确认首屏没变胖、按需能补上。
 
 > **截图别用「离线渲染就够了」当借口**：`render_map_json.py` 只验几何，
 > 看不出出生点掉水、走不动、虚空底色这些"引擎侧"的问题。

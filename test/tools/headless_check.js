@@ -185,6 +185,39 @@ results.push(run('外来地图 殒落港湾', 'map=flare_harbor&autotest=importm
   probe.reached === true && probe.moved === true,
 { budget: 22000 }));
 
+// 9.7) 首屏体积：地宫（547KB）与外来图（940KB）都**不在首屏**——它们只在该图要被用到时
+//      才载（?map= 指到它 / 用户点按钮 / 后台空闲预取）。这条把「首屏到底背了多少」钉住：
+//      一旦有人把大图集挪回 LOAD_PLAN，这里立刻红。这种回归的体感是"开屏越来越慢"，
+//      没人会去翻代码，只能靠数字。
+//      自带图首屏 = maps.json 65 + 主图集 1091 + 几个 JSON 29 ≈ 1185KB。
+results.push(run('首屏体积 不含大图集', 'map=qingxuan&autotest=bootstats&preload=0', ({ probe }) =>
+  !!probe && probe.map === 'qingxuan' &&
+  probe.total > 1000 && probe.total < 1400 &&
+  probe.extras && probe.extras.dungeon.loaded === false && probe.extras.flare.loaded === false,
+{ budget: 20000 }));
+
+//      反过来：?map= 直接指到那张图时，它**必须**算进首屏 —— 否则进图那一刻才开始下载，
+//      玩家看到的是"进去了但一片空白"。
+results.push(run('首屏含目标图图集', 'map=dungeon&autotest=bootstats&preload=0', ({ probe }) =>
+  !!probe && probe.map === 'dungeon' &&
+  probe.total > 1600 && probe.extras.dungeon.loaded === true,
+{ budget: 26000 }));
+
+// 9.8) 运行时按需补载：首屏只载自带图，然后模拟用户点地图按钮切过去 ——
+//      图集与地形要当场补上、玩家落在可走格上、载入提示要收掉。
+//      这条覆盖最容易漏的路径：?map= 没指到它，goTo 的补载分支才第一次被执行。
+results.push(run('按需切图 外来图', 'map=qingxuan&autotest=lazygoto&preload=0&goto=flare_arrival', ({ probe }) =>
+  !!probe && probe.map === 'flare_arrival' && probe.before === false &&
+  probe.obj > 1000 && probe.atlas === true &&
+  probe.spawnOnWalkable === true && probe.atSpawn === true && probe.tipGone === true,
+{ budget: 30000 }));
+
+results.push(run('按需切图 地宫', 'map=qingxuan&autotest=lazygoto&preload=0&goto=dungeon', ({ probe }) =>
+  !!probe && probe.map === 'dungeon' && probe.before === false &&
+  probe.obj > 100 && probe.atlas === true &&
+  probe.spawnOnWalkable === true && probe.atSpawn === true && probe.tipGone === true,
+{ budget: 30000 }));
+
 // 10) 手机端 UI：桌面 Chrome 里 pointer:coarse 恒假，这套分支平时根本跑不到，
 //     而它坏起来全是「点了没反应」——电脑上盯多久都看不出来。用 ?touch=1 强制打开验：
 //     三条命中测试（elementFromPoint）确认点击真的落在元素上、没有被 .hud 的

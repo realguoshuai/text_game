@@ -16,6 +16,7 @@
   python tools/attach_imported.py                 # 挂 imported_map.json + gr_iso_map.json
   python tools/attach_imported.py --check         # 只看现状，不写
 """
+import hashlib
 import json
 import os
 import sys
@@ -57,22 +58,32 @@ def main():
             gone = maps.pop(old)
             print('[下架] %-12s %s  %dx%d' % (gone['id'], gone.get('name', ''), gone['w'], gone['h']))
 
-    # 3) 逐张挂载
+    # 3) 逐张挂载（写轻条目：地形数据留在 <id>_map.json 里，由引擎按需取）
     for fn in WANT:
         src = os.path.join(ROOT, 'assets', fn)
         if not os.path.exists(src):
             print('[skip] 缺少 %s' % fn)
             continue
         mp = json.load(open(src, encoding='utf-8'))
-        # import_tmx.py 给的字段直接可用；补两个引擎需要的默认值
         mp.setdefault('npcs', [])
+        # 去掉 ground/objects（占这张图 99% 的体积），其余元信息全留 ——
+        # 引擎要 name/note/w/h 建按钮，要 spawn/home/voidColor/homeFromMap 定初始站位与底色。
+        light = {k: v for k, v in mp.items() if k not in ('ground', 'objects')}
+        # 图集名 = 瓦片键的前缀（'flare/xxx.png' -> 'flare'），引擎按它决定进图前补载哪套图集
+        pre = (mp.get('objects') or [{}])[0].get('piece', '')
+        light['atlas'] = pre.split('/')[0] if '/' in pre else 'flare'
+        # 内容 md5 前 8 位当版本号：地形一改缓存键自动变，比手改 ?v= 靠谱
+        light['src'] = 'assets/%s?v=%s' % (fn, hashlib.md5(open(src, 'rb').read()).hexdigest()[:8])
         old = next((i for i, m in enumerate(maps) if m['id'] == mp['id']), -1)
+        tag = '更新' if old >= 0 else '新增'
         if old >= 0:
-            maps[old] = mp
-            print('[更新] %-12s %s  %dx%d' % (mp['id'], mp['name'], mp['w'], mp['h']))
+            maps[old] = light
         else:
-            maps.append(mp)
-            print('[新增] %-12s %s  %dx%d' % (mp['id'], mp['name'], mp['w'], mp['h']))
+            maps.append(light)
+        print('[%s] %-12s %-8s %dx%d  物件 %-5d  轻条目 %.1fKB（地形外置 %s）'
+              % (tag, light['id'], light['name'], light['w'], light['h'],
+                 len(mp.get('objects') or []),
+                 len(json.dumps(light, ensure_ascii=False, separators=(',', ':'))) / 1024, fn))
 
     if check:
         print('\n--check：未写盘')
