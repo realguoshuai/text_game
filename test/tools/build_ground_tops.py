@@ -56,7 +56,8 @@ KS_LAND = 0.90     # 陆地：只抹最外圈描边（实测暗边在 k>0.95，�
 FADE_K = 0.78      # 变体差异的生效边界：k<=FADE_K 全量，到 k=1 衰减为 0
 VARIANTS = 4       # 陆地每个字符派生几个变体
 JITTER = 0.016     # 明度微扰幅度（必须小：整格 3% 在绿色上就是肉眼可见的色块）
-WATER_WAVE = 0.030 # 水面的低频起伏幅度
+WATER_WAVE = 0.013 # 水面的低频起伏幅度（必须很小：水面是全图最大的亮色块，
+                   # 幅度一大，逐格不同的起伏就拼成马赛克）
 MIN_ALPHA = 128    # 只动实体像素，边缘半透明像素原样保留
 
 
@@ -73,22 +74,79 @@ def edge_fade(k):
     return np.clip((1.0 - k) / (1.0 - FADE_K), 0.0, 1.0)
 
 
+def solid_fill(arr):
+    """透明像素的 RGB 用最近的不透明像素填上。
+
+    菱形被膨胀到画布边缘后，多出来的那圈像素若 RGB 还是 0，就会画出一圈黑边。
+    """
+    if arr.shape[2] < 4:
+        return arr
+    al = arr[:, :, 3]
+    if bool((al > 8).all()) or not bool((al > 8).any()):
+        return arr
+    try:
+        from scipy.ndimage import distance_transform_edt
+    except ImportError:
+        return arr
+    idx = distance_transform_edt(al <= 8, return_distances=False, return_indices=True)
+    return arr[idx[0], idx[1]]
+
+
+def dilate(m, it=1):
+    """3x3 膨胀。菱形是尖角，最上/最下一行像素的中心必然落在菱形外，
+    不膨胀的话顶角与底角就会各留一个像素的缝。"""
+    out = m.copy()
+    for _ in range(it):
+        p = out.copy()
+        out[1:, :] |= p[:-1, :]
+        out[:-1, :] |= p[1:, :]
+        out[:, 1:] |= p[:, :-1]
+        out[:, :-1] |= p[:, 1:]
+    return out
+
+
 def load(path, tile_h):
     arr = np.asarray(Image.open(path).convert('RGBA')).astype(np.float32)
     arr = arr[:min(arr.shape[0], tile_h)]
     return arr
 
 
+def fit_diamond(arr, tile_h):
+    """把原图的菱形放大到画布边界 —— 密铺无缝的前提。
+
+    原素材是「独立地块」，菱形画的时候四周留了边：实测 building_017 的
+    118x60 画布里菱形只占 116x58。而引擎是按「画布尺寸 = 格子尺寸」贴图的，
+    于是每格差 2px、1px 地漏出背景，整片水铺出来就是一张细网格。
+    这里按实测的菱形外接框把内容径向放大，使菱形正好顶到画布边缘。
+    """
+    hh, w = arr.shape[0], arr.shape[1]
+    al = arr[:, :, 3]
+    rs = np.where(al.max(axis=1) > 8)[0]
+    cs = np.where(al.max(axis=0) > 8)[0]
+    cx, cy = (w - 1) / 2.0, (tile_h - 1) / 2.0
+    if len(rs) < 2 or len(cs) < 2 or cx <= 0 or cy <= 0:
+        return arr
+    sh = ((cs.max() - cs.min()) / 2.0) / cx
+    sv = ((rs.max() - rs.min()) / 2.0) / cy
+    if sh >= 0.999 and sv >= 0.999:
+        return arr
+    ys, xs = np.mgrid[0:hh, 0:w]
+    sx = np.clip(np.round(cx + (xs - cx) * sh), 0, w - 1).astype(np.int32)
+    sy = np.clip(np.round(cy + (ys - cy) * sv), 0, hh - 1).astype(np.int32)
+    return arr[sy, sx]
+
+
 def top_face(path, tile_h, ks):
     """陆地：取菱形顶面 + 三角波镜像延展。返回 (rgb, alpha, k, fade)"""
-    arr = load(path, tile_h)
+    arr = fit_diamond(solid_fill(load(path, tile_h)), tile_h)
     hh, w = arr.shape[0], arr.shape[1]
     xs, ys, cx, cy, k = diamond(hh, w, tile_h)
 
     rgb = arr[:, :, :3].copy()
     alpha = arr[:, :, 3].copy()
-    alpha[k > 1.0] = 0.0                      # 菱形之外是侧壁，整块丢弃
-    alpha[k <= 1.0] = 255.0                   # 菱形内拉满：留半透明会在密铺时叠出浅色缝
+    inside = dilate(k <= 1.0, 1)              # 顶角那一行/一列像素中心必然落在菱形外，
+    alpha[~inside] = 0.0                      # 不膨胀就每格漏一个像素，密铺成细网格
+    alpha[inside] = 255.0                     # 菱形内拉满：留半透明会在密铺时叠出浅色缝
 
     kr = k / ks
     kr = 1.0 - np.abs(np.mod(kr, 2.0) - 1.0)  # 三角波：超出 ks 后向回折返
@@ -101,25 +159,37 @@ def top_face(path, tile_h, ks):
     return rgb, alpha, k, edge_fade(k)
 
 
-def water_face(path, tile_h):
-    """水：丢掉原水纹，改取核心区中位色 + 极缓的低频起伏"""
-    arr = load(path, tile_h)
+def water_face(path, tile_h, variant=0, shade=1.0):
+    """水：丢掉原水纹，改取核心区中位色 + 极缓的低频起伏。
+
+    必须出多个变体：低频起伏若每格一模一样，密铺后就是规整的「每格同一朵浪花」，
+    格感比不做还重。变体之间只有格心的起伏图案不同（边界都回归中位色），所以无缝。
+
+    shade：整个字符统一乘一个明度系数，用来区分「浅水 / 深水」。
+        按字符给、不按格给 —— 逐格明度差会拼成马赛克，逐字符不会。
+        原素材的浅水瓦和深水瓦取完中位色后几乎是同一个青（70,216,216 与
+        69,217,218），不做这一步，「湖缘浅水」的意图在密铺后完全看不出来，
+        整片湖就是一块平板。
+    """
+    arr = fit_diamond(solid_fill(load(path, tile_h)), tile_h)
     hh, w = arr.shape[0], arr.shape[1]
     _, _, _, _, k = diamond(hh, w, tile_h)
 
     alpha = arr[:, :, 3].copy()
-    alpha[k > 1.0] = 0.0
-    alpha[k <= 1.0] = 255.0                   # 同上：菱形内拉满，密铺才不留浅色缝
+    inside = dilate(k <= 1.0, 1)              # 同 top_face：顶角行/列必须补上
+    alpha[~inside] = 0.0
+    alpha[inside] = 255.0                     # 同上：菱形内拉满，密铺才不留浅色缝
     core = (k < 0.35) & (arr[:, :, 3] > 200)
     base = np.median(arr[:, :, :3][core], axis=0) if core.any() else arr[:, :, :3].reshape(-1, 3).mean(0)
 
-    rng = np.random.default_rng(zlib.crc32(os.path.basename(path).encode()) & 0x7FFFFFFF)
+    rng = np.random.default_rng(
+        zlib.crc32(('%s#%d' % (os.path.basename(path), variant)).encode()) & 0x7FFFFFFF)
     low = (rng.random((7, 14)).astype(np.float32) * 2.0 - 1.0)
     big = np.asarray(Image.fromarray(((low * 0.5 + 0.5) * 255).astype(np.uint8))
                      .resize((w, hh), Image.BICUBIC)).astype(np.float32) / 255.0 * 2.0 - 1.0
 
     f = edge_fade(k)
-    rgb = np.clip(base[None, None, :] * (1.0 + big[:, :, None] * WATER_WAVE * f[:, :, None]), 0, 255)
+    rgb = np.clip(base[None, None, :] * shade * (1.0 + big[:, :, None] * WATER_WAVE * f[:, :, None]), 0, 255)
     return rgb, alpha, k, f
 
 
@@ -202,12 +272,11 @@ def main():
             continue
 
         is_water = ch in water
-        if is_water:
-            rgb, alpha, k, fade = water_face(src, tile_h)
-            n_var = 1
-        else:
-            rgb, alpha, k, fade = top_face(src, tile_h, KS_LAND)
-            n_var = args.variants
+        n_var = args.variants
+        # 逐字符的水体明度：深水压暗、浅水提亮。浅水瓦和深水瓦取完中位色
+        # 几乎是同一个青（见 water_face 的 shade 注释），不按字符拉开明度，
+        # 「湖缘浅、湖心深」的层次在密铺后完全看不出来。
+        WATER_SHADE = {'~': 0.86, '-': 1.04}
 
         base = os.path.splitext(os.path.basename(fn))[0]
         # 先清掉上一轮的旧变体：变体数调小（比如水从 4 张减到 1 张）时，
@@ -217,11 +286,18 @@ def main():
                 os.remove(os.path.join(args.outdir, f))
         names = []
         for i in range(n_var):
-            if i == 0:
+            if is_water:
+                rgb, alpha, k, fade = water_face(src, tile_h, i, WATER_SHADE.get(ch, 1.0))
+                # 水面只让「起伏图案」不同，不动整体明度：水是全图最亮的大色块，
+                # 逐格明度差会直接变成方格拼图。
                 tint, spots = 1.0, 0
             else:
-                tint = 1.0 + (JITTER if i % 2 else -JITTER) * (1.0 if i == 1 else 0.7)
-                spots = 6
+                rgb, alpha, k, fade = top_face(src, tile_h, KS_LAND)
+                if i == 0:
+                    tint, spots = 1.0, 0
+                else:
+                    tint = 1.0 + (JITTER if i % 2 else -JITTER) * (1.0 if i == 1 else 0.7)
+                    spots = 6
             im = make_variant(rgb, alpha, k, fade, tint,
                               seed=zlib.crc32(('%s|%d' % (fn, i)).encode()) & 0x7FFFFFFF,
                               spots=spots)

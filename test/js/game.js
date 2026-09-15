@@ -332,11 +332,11 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=5', json: true, weight: 62, label: '读取地图数据' },
-      { url: 'assets/tiles_atlas.webp?v=2', atlas: 'tiles', weight: 105, label: '载入地貌与建筑' },
+      { url: 'assets/maps.json?v=7', json: true, weight: 64, label: '读取地图数据' },
+      { url: 'assets/tiles_atlas.webp?v=4', atlas: 'tiles', weight: 176, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
-      { url: 'assets/tiles_atlas.json?v=2', json: true, weight: 2, label: '读取地貌索引' },
+      { url: 'assets/tiles_atlas.json?v=4', json: true, weight: 4, label: '读取地貌索引' },
     { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
     { url: 'assets/foes_atlas.json?v=2', json: true, weight: 10, label: '读取妖兽索引' },
     { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
@@ -1054,7 +1054,10 @@
      * 没有 groundTop —— 沿用旧的整块铺法，行为与改造前完全一致。
      *   （lingquan / beilin / dungeon 尚未生成顶面瓦，靠这条回退路径不受影响。）
      */
-    var TOP_OVER = 1.03;      // 顶面瓦绘制放大比例（见 drawGround 内的说明）
+    var TOP_OVER = 1.06;      // 顶面瓦绘制放大比例（见 drawGround 内的说明）
+    // 水面单独用更大的重叠：水是近乎纯色的大色块，放大带来的相互覆盖看不出来，
+    // 而 2:1 菱形在非整数缩放下边缘抗锯齿必留半像素缝，水面上这条缝最扎眼。
+    var TOP_OVER_WATER = 1.14;
     var NT4X = [1, -1, 0, 0], NT4Y = [0, 0, 1, -1];
     /** 确定性伪随机：同一坐标永远得到同一个数，刷新/换机都不变 */
     function tileHash(x, y) {
@@ -1102,8 +1105,9 @@
           // 顶面瓦再放大 3%：缩放比不是整数（120/119），密铺时边缘会差半像素露缝，
           // 略微重叠就盖住了；相邻格重叠区颜色一致，看不出来。
           var s = tw / pz.w;
-          var dw = top ? tw * TOP_OVER : tw;
-          var dh = pz.h * s * (top ? TOP_OVER : 1);
+          var over = (top && WATER.indexOf(ch) >= 0) ? TOP_OVER_WATER : TOP_OVER;
+          var dw = top ? tw * over : tw;
+          var dh = pz.h * s * (top ? over : 1);
           ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
             p.x - dw / 2, p.y - (dh - pz.h * s) / 2, dw, dh);
         }

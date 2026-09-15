@@ -156,6 +156,7 @@
     npcVillager:  'assets/char_thunder.png',
     uiIcons:      'assets/ui/icons.png',
     uiAvatar:     'assets/ui/avatar.png',
+    backdrop:      'assets/backdrop.png',
   };
   const SPR = {};                       // 只放「加载成功」的图片
   const SHEETS = {                        // 角色 sprite sheet 布局（6列×5行，64×64/格）
@@ -442,6 +443,18 @@
     const gy1 = Math.ceil(Math.max(cA.my, cB.my, cC.my, cD.my)) + 1;
     for (let y = gy0; y <= gy1; y++)
       for (let x = gx0; x <= gx1; x++) drawGroundTile(x, y);
+
+    // 1.5) 地图底图（地面之上、建筑/角色之下）：AI 场景铺作地形
+    //      世界坐标锁定：以地图中心为锚点 cover 铺满地图屏占范围，随镜头一起滚动；
+    //      素材缺失时不绘制，自动回退到原石砖地面。
+    if (SPR.backdrop) {
+      const bw = SPR.backdrop.width, bh = SPR.backdrop.height;
+      const mapW = (MAP_W + MAP_H) * HW, mapH = (MAP_W + MAP_H) * HH;
+      const bscale = Math.max(mapW / bw, mapH / bh);
+      const bdw = bw * bscale, bdh = bh * bscale;
+      const ctr = isoToScreen(MAP_W / 2, MAP_H / 2);
+      ctx.drawImage(SPR.backdrop, ctr.x - bdw / 2, ctr.y - bdh / 2, bdw, bdh);
+    }
 
     const draws = [];
     buildings.forEach(b => draws.push({
