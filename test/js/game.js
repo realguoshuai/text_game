@@ -45,11 +45,11 @@
    * act 指定施法动作（素材只有 6 个动作，技能复用攻击动作）。 */
   var SKILLS = [
     { id: 'sword', name: '御剑诀', key: 'u', cd: 4.0, mul: 1.35, reach: 4.2, wide: 0.95,
-      kind: 'line', color: '#9fe8ff', act: 'atkA', tip: '前方直线剑气，穿透多个目标' },
+      kind: 'line', color: '#6fd8ff', act: 'atkA', tip: '前方直线剑气，穿透多个目标' },
     { id: 'thunder', name: '雷罡咒', key: 'i', cd: 9.0, mul: 1.05, reach: 3.0,
-      kind: 'aoe', color: '#ffd24a', act: 'atkA', knock: 1.1, tip: '以自身为中心雷爆，击退周围妖兽' },
+      kind: 'aoe', color: '#ffcf3a', act: 'atkB', knock: 1.1, tip: '以自身为中心雷爆，击退周围妖兽' },
     { id: 'swordfield', name: '太虚剑域', key: 'o', cd: 20.0, mul: 2.4, reach: 2.8,
-      kind: 'target', color: '#ff9ad8', act: 'atkB', tip: '锁定最近目标落下剑雨，范围重创' }
+      kind: 'target', color: '#ff8ad0', act: 'atkB', tip: '锁定最近目标落下剑雨，范围重创' }
   ];
   var RUN_MUL = 1.0;       // 取消冲刺加速（Shift/摇杆推满不再提速）
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
@@ -535,6 +535,28 @@
         // 想看「怪已经追上来开打」的画面就得先手动把时间推过去。
         var wq = +q.get('warm') || 0;
         if (wq > 0) sim(Math.min(60, wq));
+        // ?cast=0&ck=0.45 —— 释放第 0 号技能，并把技能表现**定格**在进度 ck（0~1）。
+        //   · 无头环境没法交互式按技能键，也就没法核对"技能放出来长什么样"；
+        //   · fxFreeze 让 updateSkillFx 停摆（特效不再淡出），世界照常推进 ——
+        //     所以先用 warm 把怪引到身边，再 cast 定格，一张图里就能同时看到
+        //     「怪被击中 + 特效中段 + 主角施法姿态」。
+        //   · 主角动作也一并定在同一进度，否则角色早做完动作回 idle 了。
+        var cq = q.get('cast');
+        if (cq !== null) {
+          var ci = Math.max(0, Math.min(SKILLS.length - 1, parseInt(cq, 10) || 0));
+          var ck = q.get('ck') === null ? 0.45 : Math.max(0, Math.min(0.98, parseFloat(q.get('ck')) || 0));
+          player.skillCd[ci] = 0;
+          castSkill(ci);
+          fxFreeze = true;
+          if (skillFx.length) {
+            var fxLast = skillFx[skillFx.length - 1];
+            fxLast.life = fxLast.max * (1 - ck);
+          }
+          if (player.actHold > 0) {
+            player.actT = ACT_DUR[player.act] * ck;
+            player.actHold = ACT_DUR[player.act];
+          }
+        }
         if (at && at.indexOf('portal') === 0) {
           // 同步执行：headless 里 setTimeout(60) 未必能在 dump-dom 之前触发，
           // 用例就会读到「还没传送」的 dbg，表现成随机失败（处理方式同 autotest=fight）。
@@ -1895,6 +1917,14 @@
    * 三个技能共用一套流程：定落点 → 取目标 → 播动作 + 特效 → 逐目标 rollDamage。
    * 落点规则：自身为中心的技能用玩家格；锁定技优先打最近目标，没目标就落在身前 2.2 格。 */
   var skillFx = [];                      // 技能特效队列（剑气/雷爆/剑雨）
+  var fxFreeze = false;                  // ?cast= 调试用：把特效冻在某一帧，方便截图核对
+  /** 特效专用伪随机：同一个特效每次重绘必须得到同一批子元素。
+   *  用 Math.random() 的话，剑雨那几把剑会逐帧乱跳（看起来像噪点）。 */
+  function fxRnd(seed, i) {
+    var h = Math.imul((seed + i * 0x85EB) | 0, 0x27D4EB2D);
+    h = Math.imul(h ^ (h >>> 15), 0x2545F491);
+    return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
+  }
   function nearestFoe(range) {
     var best = null, bd = (range === undefined) ? AGGRO : range;
     for (var i = 0; i < foes.length; i++) {
@@ -1946,7 +1976,8 @@
     player.skillCd[i] = s.cd;
     player.act = s.act; player.actT = 0; player.actHold = ACT_DUR[s.act];
     var dur = s.kind === 'target' ? 0.8 : 0.5;
-    skillFx.push({ kind: s.kind, x: cx, y: cy, r: s.reach, color: s.color, dir: v, life: dur, max: dur });
+    skillFx.push({ kind: s.kind, x: cx, y: cy, r: s.reach, color: s.color, dir: v, life: dur, max: dur,
+      seed: (Math.random() * 0x7fffffff) | 0 });
     if (!hits.length) {
       toast(s.name + ' 落空');
       if (h0) h0.textContent = s.name + ' 落空，' + s.cd + ' 秒后可再放';
@@ -1977,6 +2008,7 @@
     return true;
   }
   function updateSkillFx(dt) {
+    if (fxFreeze) return;
     for (var i = skillFx.length - 1; i >= 0; i--) {
       skillFx[i].life -= dt;
       if (skillFx[i].life <= 0) skillFx.splice(i, 1);
@@ -1989,50 +2021,194 @@
       var p = isoToScreen(o.x, o.y), gy = p.y + HH * Z;
       ctx.save();
       if (o.kind === 'line') {
-        // 剑气：从脚下沿朝向拉出一条楔形光带，中段最亮、两头收
-        var p1 = isoToScreen(o.x + o.dir.x * o.r, o.y + o.dir.y * o.r);
-        var ly = p1.y + HH * Z, a = 1 - k;
-        var g = ctx.createLinearGradient(p.x, gy - 26 * Z, p1.x, ly - 26 * Z);
-        g.addColorStop(0, 'rgba(255,255,255,0)');
-        g.addColorStop(0.5, o.color);
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.globalAlpha = a * 0.8; ctx.strokeStyle = g;
-        ctx.lineWidth = (14 + 24 * Math.sin(k * Math.PI)) * Z; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(p.x, gy - 26 * Z); ctx.lineTo(p1.x, ly - 26 * Z); ctx.stroke();
-        ctx.globalAlpha = a; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5 * Z;
-        ctx.beginPath(); ctx.moveTo(p.x, gy - 26 * Z); ctx.lineTo(p1.x, ly - 26 * Z); ctx.stroke();
-      } else if (o.kind === 'aoe') {
-        // 雷爆：地面扩散双环 + 内圈填充 + 五道闪电
-        var rr = o.r * TILE_W * 0.5 * Z * (0.3 + k * 0.8);
-        ctx.globalAlpha = (1 - k) * 0.22; ctx.fillStyle = o.color;
-        ctx.beginPath(); ctx.ellipse(p.x, gy, rr, rr * 0.5, 0, 0, 6.2832); ctx.fill();
-        ctx.globalAlpha = (1 - k) * 0.95; ctx.strokeStyle = o.color; ctx.lineWidth = (8 - 6 * k) * Z;
-        ctx.beginPath(); ctx.ellipse(p.x, gy, rr, rr * 0.5, 0, 0, 6.2832); ctx.stroke();
-        ctx.globalAlpha = (1 - k) * 0.9; ctx.strokeStyle = '#fff8d8'; ctx.lineWidth = 2.5 * Z;
-        for (var b = 0; b < 5; b++) {
-          var an = (b / 5) * 6.2832 + k * 0.7;
-          ctx.beginPath(); ctx.moveTo(p.x, gy - 34 * Z);
-          ctx.lineTo(p.x + Math.cos(an) * rr * 0.55, gy - 34 * Z - Math.sin(an) * rr * 0.28);
-          ctx.lineTo(p.x + Math.cos(an) * rr, gy - Math.sin(an) * rr * 0.5);
+        /* 御剑诀 —— 剑气「飞出去」。
+         * 旧版是沿朝向拉一条**等宽直线**：读起来像激光笔，而且全长只在原地做 alpha 呼吸，
+         * 完全没有"出手"的过程。现在按 k 推进「起点 → 剑尖」，刃身用梭形（柳叶）而不是
+         * 等宽线，尾部再叠速度线；三层叠画（外发光 / 主体 / 白芯）保证在亮草地上也有对比。 */
+        var v = o.dir, reach = o.r;
+        var fly = Math.max(0, Math.min(1, (k - 0.14) / 0.62));   // 前 0.14 贴手蓄势，不放出去
+        var fe = 1 - Math.pow(1 - fly, 3);                       // easeOutCubic：出手快、末段收
+        var a0 = isoToScreen(o.x + v.x * reach * 0.16, o.y + v.y * reach * 0.16);
+        var a1 = isoToScreen(o.x + v.x * reach * fe, o.y + v.y * reach * fe);
+        var y0 = a0.y + HH * Z - 18 * Z, y1 = a1.y + HH * Z - 18 * Z;
+        var fade = k < 0.14 ? k / 0.14 : 1 - Math.max(0, (k - 0.72) / 0.28);
+        var len = Math.hypot(a1.x - a0.x, y1 - y0);
+        ctx.save();
+        ctx.translate(a1.x, y1);
+        ctx.rotate(Math.atan2(y1 - y0, a1.x - a0.x));
+        // 梭形刃：尾 (-len,0) → 剑尖 (0,0)，上下缘各用一条二次曲线收成柳叶
+        var carve = function (w) {
+          ctx.beginPath();
+          ctx.moveTo(-len, 0);
+          ctx.quadraticCurveTo(-len * 0.42, -w, 0, 0);
+          ctx.quadraticCurveTo(-len * 0.42, w, -len, 0);
+          ctx.closePath();
+        };
+        ctx.fillStyle = o.color;
+        ctx.globalAlpha = fade * 0.40; carve(34 * Z); ctx.fill();    // 外发光
+        ctx.globalAlpha = fade * 0.85; carve(17 * Z); ctx.fill();    // 主体
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = fade;        carve(6 * Z); ctx.fill();     // 白芯
+        // 拖尾速度线（seed 固定 → 不会逐帧乱跳）
+        ctx.strokeStyle = o.color; ctx.lineCap = 'round';
+        for (var sl = 0; sl < 3; sl++) {
+          var sr1 = fxRnd(o.seed, sl), sr2 = fxRnd(o.seed, sl + 20);
+          var ly2 = (sr1 - 0.5) * 34 * Z;
+          ctx.globalAlpha = fade * 0.42;
+          ctx.lineWidth = (1.3 + sr1 * 1.7) * Z;
+          ctx.beginPath();
+          ctx.moveTo(-len * (1.02 + sr2 * 0.7), ly2);
+          ctx.lineTo(-len * (0.72 + sr2 * 0.35), ly2 * 0.55);
           ctx.stroke();
         }
-      } else {
-        // 剑雨：先一道自天而降的光柱，落地后再炸开一圈
-        if (k < 0.45) {
-          var hgt = (1 - k / 0.45) * 300 * Z;
-          var gg = ctx.createLinearGradient(p.x, gy - hgt - 150 * Z, p.x, gy);
-          gg.addColorStop(0, 'rgba(255,255,255,0)'); gg.addColorStop(1, o.color);
-          ctx.globalAlpha = 0.7; ctx.fillStyle = gg;
-          ctx.beginPath();
-          ctx.moveTo(p.x - 30 * Z, gy - hgt - 150 * Z); ctx.lineTo(p.x + 30 * Z, gy - hgt - 150 * Z);
-          ctx.lineTo(p.x + 13 * Z, gy); ctx.lineTo(p.x - 13 * Z, gy);
-          ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (o.kind === 'aoe') {
+        /* 雷罡咒 —— 落雷 → 爆闪 → 冲击波，三段先后。
+         * 旧版是「一圈淡黄椭圆 + 五道几乎看不见的细闪电」，在亮草地上彻底读不出来；
+         * 现在先铺一层暗色焦痕给亮色特效做底，落雷走「暗描边 + 主色 + 白芯」三遍描线。 */
+        var RR = o.r * TILE_W * 0.5 * Z;
+        var die = 1 - Math.max(0, (k - 0.7) / 0.3);
+        // ① 地面焦痕（最底层，压住明亮底色）。两层叠出深浅，单层会读成"地上一滩泥"。
+        var burnA = 0.40 * Math.min(1, k / 0.2) * die;
+        ctx.globalAlpha = burnA * 0.95;
+        ctx.fillStyle = '#1d1206';
+        ctx.beginPath(); ctx.ellipse(p.x, gy, RR * 0.95, RR * 0.475, 0, 0, 6.2832); ctx.fill();
+        ctx.globalAlpha = burnA * 0.55;
+        ctx.beginPath(); ctx.ellipse(p.x, gy, RR * 0.6, RR * 0.3, 0, 0, 6.2832); ctx.fill();
+        // ② 中心爆闪（前 42%）
+        if (k < 0.42) {
+          var fk2 = 1 - k / 0.42;
+          var rg = ctx.createRadialGradient(p.x, gy - 12 * Z, 0, p.x, gy - 12 * Z, RR * 0.85);
+          rg.addColorStop(0, 'rgba(255,255,255,0.95)');
+          rg.addColorStop(0.4, o.color);
+          rg.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.globalAlpha = fk2;
+          ctx.fillStyle = rg;
+          ctx.beginPath(); ctx.ellipse(p.x, gy - 12 * Z, RR * 0.85, RR * 0.53, 0, 0, 6.2832); ctx.fill();
         }
-        var kk = Math.max(0, (k - 0.4) / 0.6), rr3 = o.r * TILE_W * 0.5 * Z * (0.3 + kk * 0.95);
-        ctx.globalAlpha = (1 - kk) * 0.28; ctx.fillStyle = o.color;
-        ctx.beginPath(); ctx.ellipse(p.x, gy, rr3, rr3 * 0.5, 0, 0, 6.2832); ctx.fill();
-        ctx.globalAlpha = (1 - kk) * 0.95; ctx.strokeStyle = o.color; ctx.lineWidth = (10 - 8 * kk) * Z;
-        ctx.beginPath(); ctx.ellipse(p.x, gy, rr3, rr3 * 0.5, 0, 0, 6.2832); ctx.stroke();
+        // ③ 三道落雷：从高空劈下。生长只占前 22%，但**闪电要一直亮到 62%** ——
+        //    旧版闪电 24% 就消失，整段雷咒里最"雷"的部分反而最短，定格一看只剩光圈。
+        //    后半段用 seed 驱动的阶跃闪烁冒充余雷（阶跃而不是 sin，才像电不像呼吸）。
+        var bolt = Math.min(1, k / 0.22);
+        if (k < 0.62) {
+          var ba = 0.95 * (1 - Math.max(0, (k - 0.3) / 0.32)) *
+            (0.6 + 0.4 * fxRnd(o.seed, Math.floor(k * 34) + 3));
+          for (var bb = 0; bb < 3; bb++) {
+            var br1 = fxRnd(o.seed, bb), br2 = fxRnd(o.seed, bb + 9);
+            var box = (br1 - 0.5) * RR * 1.1, boy = (br2 - 0.5) * RR * 0.5;
+            var bTop = gy - 340 * Z, bBot = gy + boy * 0.35;
+            var bCur = bTop + (bBot - bTop) * bolt;
+            var pts = [[p.x + box * 0.3, bTop]];
+            for (var q = 1; q <= 5; q++) {
+              var tq = q / 5;
+              var jx = (fxRnd(o.seed, bb * 31 + q) - 0.5) * 58 * Z * (1 - Math.abs(tq - 0.5) * 1.1);
+              pts.push([p.x + box * (0.3 + tq * 0.7) + jx, bTop + (bCur - bTop) * tq]);
+            }
+            ctx.lineJoin = 'round';
+            for (var pass = 0; pass < 3; pass++) {
+              ctx.globalAlpha = ba * (pass === 0 ? 0.5 : 1);
+              ctx.strokeStyle = pass === 0 ? '#3a2400' : (pass === 1 ? o.color : '#ffffff');
+              ctx.lineWidth = (pass === 0 ? 13 : pass === 1 ? 7 : 2.8) * Z;
+              ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+              for (var q2 = 1; q2 < pts.length; q2++) ctx.lineTo(pts[q2][0], pts[q2][1]);
+              ctx.stroke();
+            }
+          }
+        }
+        // ④ 冲击波：三道错时扩张环
+        for (var wv = 0; wv < 3; wv++) {
+          var wk = (k - 0.2 - wv * 0.12) / 0.62;
+          if (wk <= 0 || wk >= 1) continue;
+          var we = 1 - Math.pow(1 - wk, 2);
+          ctx.globalAlpha = (1 - wk) * 0.92;
+          ctx.strokeStyle = wv === 0 ? '#ffffff' : o.color;
+          ctx.lineWidth = (8 - 6 * wk) * Z * (wv === 0 ? 1 : 0.62);
+          ctx.beginPath();
+          ctx.ellipse(p.x, gy, RR * (0.14 + we * 1.02), RR * (0.07 + we * 0.51), 0, 0, 6.2832);
+          ctx.stroke();
+        }
+        // ⑤ 地面裂纹：八条自中心射出的暗线，炸开后浮现
+        var ck2 = Math.max(0, (k - 0.28) / 0.5);
+        if (ck2 > 0 && ck2 < 1) {
+          ctx.globalAlpha = 0.55 * (1 - ck2);
+          ctx.strokeStyle = '#241608'; ctx.lineWidth = 2.2 * Z;
+          for (var cr = 0; cr < 8; cr++) {
+            // 角度加一点抖动：均分八条会读成"车轮辐条"
+            var ccr = fxRnd(o.seed, cr + 50);
+            var can = (cr / 8 + (fxRnd(o.seed, cr + 70) - 0.5) * 0.09) * 6.2832;
+            ctx.beginPath();
+            ctx.moveTo(p.x + Math.cos(can) * RR * 0.2, gy + Math.sin(can) * RR * 0.1);
+            ctx.lineTo(p.x + Math.cos(can) * RR * (0.55 + ccr * 0.4),
+              gy + Math.sin(can) * RR * (0.28 + ccr * 0.2));
+            ctx.stroke();
+          }
+        }
+      } else {
+        /* 太虚剑域 —— 剑雨：六把剑错时落下 + 落地尘环 + 地面旋转法阵。
+         * 旧版是「一根梯形光柱 + 落地一个环」。N 把剑由 seed 派生，不往 skillFx 堆对象
+         * （?autotest=skill 记录的是"一次施法入队几个特效"，堆对象会让自测读数变味）。 */
+        var R3 = o.r * TILE_W * 0.5 * Z;
+        // ① 地面法阵：双环 + 八刻度，缓慢旋转 + 脉动
+        var pu = 0.55 + 0.35 * Math.sin(k * Math.PI * 4);
+        ctx.globalAlpha = 0.26 * pu; ctx.fillStyle = o.color;
+        ctx.beginPath(); ctx.ellipse(p.x, gy, R3, R3 * 0.5, 0, 0, 6.2832); ctx.fill();
+        ctx.globalAlpha = 0.8 * pu; ctx.strokeStyle = o.color; ctx.lineWidth = 2.6 * Z;
+        for (var rg2 = 0; rg2 < 2; rg2++) {
+          var rr2 = R3 * (rg2 ? 0.6 : 1.0);
+          ctx.beginPath(); ctx.ellipse(p.x, gy, rr2, rr2 * 0.5, 0, 0, 6.2832); ctx.stroke();
+        }
+        for (var tk = 0; tk < 6; tk++) {
+          var tan = tk / 6 * 6.2832 + k * 2.4;
+          ctx.beginPath();
+          ctx.moveTo(p.x + Math.cos(tan) * R3 * 0.9, gy + Math.sin(tan) * R3 * 0.45);
+          ctx.lineTo(p.x + Math.cos(tan) * R3, gy + Math.sin(tan) * R3 * 0.5);
+          ctx.stroke();
+        }
+        // ② 五把剑错时落下（旧版试过 6 把 + 300px 拖尾：画面上是一排粉色栅栏）
+        var NS = 5;
+        for (var si = 0; si < NS; si++) {
+          var soff = (si / NS) * 0.5;
+          var ki = Math.min(1, Math.max(0, (k - soff) / (1 - soff)));
+          if (ki <= 0) continue;
+          var qr1 = fxRnd(o.seed, si), qr2 = fxRnd(o.seed, si + 40);
+          var qx = p.x + (qr1 - 0.5) * R3 * 1.35, qy = gy + (qr2 - 0.5) * R3 * 0.68;
+          var drop = Math.min(1, ki / 0.35);            // 前 35% 下落
+          var dk = Math.max(0, (ki - 0.35) / 0.65);     // 落地后扩散、淡出
+          var lenS = 58 * Z, tailH = (1 - drop) * 140 * Z;
+          ctx.save();
+          ctx.translate(qx, qy);
+          ctx.globalAlpha = (1 - dk) * 0.95;
+          // 剑体：剑尖朝下 (0,0)，剑身向上，渐变从尾部的透明到剑尖的亮白
+          var gg2 = ctx.createLinearGradient(0, -lenS - tailH, 0, 0);
+          gg2.addColorStop(0, 'rgba(255,255,255,0)');
+          gg2.addColorStop(0.6, o.color);
+          gg2.addColorStop(1, '#ffffff');
+          ctx.fillStyle = gg2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-5.5 * Z, -lenS * 0.72);
+          ctx.lineTo(-5.5 * Z, -lenS);
+          ctx.lineTo(5.5 * Z, -lenS);
+          ctx.lineTo(5.5 * Z, -lenS * 0.72);
+          ctx.closePath(); ctx.fill();
+          // 拖尾：从剑尾继续往上的渐隐细线（表现"从天而降"）
+          if (tailH > 1) {
+            ctx.globalAlpha = (1 - dk) * 0.5;
+            var gg3 = ctx.createLinearGradient(0, -lenS - tailH, 0, -lenS);
+            gg3.addColorStop(0, 'rgba(255,255,255,0)'); gg3.addColorStop(1, o.color);
+            ctx.strokeStyle = gg3; ctx.lineWidth = 3.2 * Z;
+            ctx.beginPath(); ctx.moveTo(0, -lenS); ctx.lineTo(0, -lenS - tailH); ctx.stroke();
+          }
+          ctx.restore();
+          // 落地尘环
+          if (dk > 0) {
+            ctx.globalAlpha = (1 - dk) * 0.9;
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = (5 - 4 * dk) * Z;
+            ctx.beginPath();
+            ctx.ellipse(qx, qy, 10 * Z + dk * 52 * Z, (10 * Z + dk * 52 * Z) * 0.5, 0, 0, 6.2832);
+            ctx.stroke();
+          }
+        }
       }
       ctx.restore();
     }
