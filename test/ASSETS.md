@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | 1 | `test/index.html` | 13KB | 页面骨架、HUD、触屏/横屏样式 | — |
 | 2 | `test/js/game.js` | 112KB | 引擎（地图、战斗、怪物 AI、手机适配） | — |
-| 3 | `test/assets/maps.json` | 62KB | 3 张地图：`qingxuan` 青玄山门 / `lingquan` 灵泉灵瀑 / `beilin` 碑林石阵（瓦片、物件摆放、传送门、NPC） | `?v=1` |
+| 3 | `test/assets/maps.json` | 62KB | 4 张地图：`qingxuan` 青玄山门 / `lingquan` 灵泉灵瀑 / `beilin` 碑林石阵 / `dungeon` 幽冥地宫（Kenney 地牢素材测试） | `?v=1` |
 | 4 | `test/assets/tiles_atlas.webp` | 121KB | 地图瓦片与物件图集（`deco_*` / `prop_*` / `building_*`） | `?v=1` |
 | 5 | `test/assets/tiles_atlas.json` | 2KB | 瓦片图集索引 `{rect}` | `?v=1` |
 | 6 | `test/assets/chars_atlas.webp` | 183KB | 主角 11 套外形图集 | `?v=3` |
@@ -31,6 +31,16 @@
 2. 把 `weight` 改成文件实际 KB 数 —— 这些权重是进度条分母，不跟着改会出现"在下大图、进度条却几乎不动"的假卡。**本次已同步**（`foes_atlas.png` 从 883 涨到 1167 却没同步，另一个是 `maps.json` 标 4KB 实际 62KB）。
 
 > 历史坑：`tiles_atlas.png` / `maps.json` 原本**没有**版本号，换图后没法做缓存失效。本次一并补上 `?v=1`。
+
+### 1.1 新增：幽冥地宫（Kenney 等距微缩地牢）
+
+第四张地图 `dungeon` 使用了 **Kenney Isometric Mini Dungeon**（CC0）素材。为了保持实验性接入的灵活性，这些素材未打入 `tiles_atlas`，而是作为独立 PNG 由 `game.js` 的 `piece()` 回退加载，并在 `LOAD_PLAN` 中预加载。
+
+| 路径 | 体积 | 用途 |
+|---|---|---|
+| `test/assets/dungeon/stoneTile_N.png` 等 15 张 | 约 130KB 合计 | 地宫地面、石墙、拱门、柱子、木桶、宝箱、桌椅、木桥 |
+
+授权：`ImmortalGame/地形包/等距微缩地牢/License.txt` —— CC0，可商用，建议署名 Kenney。
 
 ---
 

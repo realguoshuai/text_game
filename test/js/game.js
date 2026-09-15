@@ -93,7 +93,16 @@
    * 浏览器的同域并发只有 6 个左右，排队本身就要好几秒 —— 首屏慢主要慢在这里，
    * 不是慢在字节数。现在打成 3 张图集，请求数 61 -> 3。
    * 代价是每次绘制都要多传一个源矩形（sx/sy/sw/sh），见 drawPiece/drawActor。
+   *
+   * 新增：piece() 支持从 IMG 回退加载独立 PNG（用于测试新素材而不重建 tiles_atlas）。
    */
+  var DUNGEON_IMGS = [
+    'dungeon/stoneTile_N.png', 'dungeon/dirtTiles_N.png', 'dungeon/planks_N.png',
+    'dungeon/stoneWall_N.png', 'dungeon/stoneWallAged_N.png', 'dungeon/stoneWallCorner_N.png',
+    'dungeon/stoneWallDoorClosed_N.png', 'dungeon/stoneWallArchway_N.png',
+    'dungeon/barrel_N.png', 'dungeon/barrels_N.png', 'dungeon/chestClosed_N.png',
+    'dungeon/stoneColumn_N.png', 'dungeon/tableRound_N.png', 'dungeon/chair_N.png', 'dungeon/bridge_N.png'
+  ];
   var ATLAS = {
     tiles: { img: null, rect: null },
     chars: { img: null, rect: null },
@@ -297,6 +306,9 @@
     { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
     { url: 'assets/beasts.json?v=2', json: true, weight: 11, label: '读取怪物图录' }
   ];
+  DUNGEON_IMGS.forEach(function (n) {
+    LOAD_PLAN.push({ url: 'assets/' + n, imgKey: n, weight: 5, label: '地牢素材' });
+  });
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
   function fmtBytes(n) {
@@ -411,6 +423,9 @@
         // 怪物图录由 test/tools/build_beasts_atlas.py 生成：属性 + 刷怪格 + 动作帧率
         var bj = LOAD_PLAN[8].value;
         if (bj && bj.monsters && bj.monsters.length) absorbBeasts(bj.monsters);
+
+        // 独立 PNG 素材入 IMG 缓存，供 piece() 回退使用
+        LOAD_PLAN.forEach(function (p) { if (p.imgKey && p.value) IMG[p.imgKey] = p.value; });
 
       TILE_W = data.tileW; TILE_H = data.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
       PAL = data.tilePalette; WALK = data.walkable;
@@ -957,8 +972,13 @@
    */
   function piece(name) {
     var a = ATLAS.tiles, r = a.rect && a.rect[name];
-    if (!a.img || !r) return null;
-    return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
+    if (a.img && r) return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
+    // 独立 PNG 回退：用于测试/接入未入 tiles_atlas 的新素材（如 Kenney 地牢包）
+    if (IMG[name]) {
+      var im = IMG[name];
+      if (im.complete && im.width) return { img: im, sx: 0, sy: 0, w: im.width, h: im.height };
+    }
+    return null;
   }
   function charPiece(file) {
     var a = ATLAS.chars, r = a.rect && a.rect[file];
