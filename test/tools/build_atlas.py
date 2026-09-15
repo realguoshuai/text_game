@@ -83,10 +83,15 @@ def build_tiles():
         for vs in (m.get('groundTop') or {}).values():
             names.update(vs)
     items, missing, total = [], [], 0
+    # 有自己独立图集的来源，不受主图集管辖 —— 这里跳过，否则同一张图会同时进
+    # 两个图集、首屏体积白涨。新增「自带图集的素材来源」时把前缀加进来即可。
+    OWN_ATLAS = ('dungeon/', 'imported/', 'gr_iso/')
     for n in sorted(names):
         # 地宫素材有独立的 dungeon_atlas（build_dungeon_atlas.py），这里跳过，
         # 否则 55 张墙/家具会白白塞进 tiles 图集、把首屏体积抬上去。
-        if n.startswith('dungeon/'):
+        # imported/ gr_iso/ 是 import_tmx.py 导出的外来地图，各自有
+        # imported_atlas / gr_iso_atlas（见该脚本），同理跳过。
+        if n.startswith(OWN_ATLAS):
             continue
         p = os.path.join(SLICED, n)
         if not os.path.exists(p):

@@ -132,14 +132,20 @@ const unregistered = sucaiDirs.filter((d) => !registeredDirs.has(normDir(d)));
 //   ① ?v=N 缓存版本号 —— 换素材后不加一，玩家浏览器继续吃旧图；
 //   ② weight 权重 —— 它是进度条分母，不跟实际体积同步就会出现"在下大图、进度条不动"的假卡。
 // 这里直接把 LOAD_PLAN 解析出来跟磁盘对账。
+// ⚠ 扫描区间必须是「var LOAD_PLAN」到「var loadUI」整段，不能只抓 `var LOAD_PLAN = [...];`
+//   那个数组字面量：后加的图集（地宫 / 外来地图）都是先 `var dmImg = {...}` 再
+//   `LOAD_PLAN.push(dmImg, dmJson)`，字面量正则看不到它们。踩过：13 条清单只体检了 9 条，
+//   还照样打印"通过"—— 越是漏检越会给出虚假的安全感。
 const loadPlan = (() => {
   const txt = readIf(path.join(GAME, 'js/game.js'));
-  const m = txt.match(/var LOAD_PLAN = \[([\s\S]*?)\];/);
-  if (!m) return null;
+  const s = txt.indexOf('var LOAD_PLAN');
+  if (s < 0) return null;
+  const e = txt.indexOf('var loadUI', s);
+  const region = txt.slice(s, e < 0 ? s + 4000 : e);
   const rows = [];
   const re = /\{\s*url:\s*'([^']+)'[^}]*?weight:\s*(\d+)/g;
   let x;
-  while ((x = re.exec(m[1]))) rows.push({ url: x[1], weight: +x[2] });
+  while ((x = re.exec(region))) rows.push({ url: x[1], weight: +x[2] });
   return rows;
 })();
 const planIssues = [];
@@ -215,7 +221,8 @@ P('  sucai/ 下未接入登记表的目录：' + (unregistered.length ? unregist
 P('');
 P('=== 五、LOAD_PLAN 体检（缓存版本号 / 进度权重）===');
 if (!loadPlan) P('  没解析到 LOAD_PLAN');
-else if (!planIssues.length) P('  通过：9 条都有版本号，权重与实际体积相符');
+else P('  清单 ' + loadPlan.length + ' 条');
+if (loadPlan && !planIssues.length) P('  通过：都有版本号，权重与实际体积相符');
 else planIssues.forEach((s) => P('  ! ' + s));
 
 // ---------- 可选 Markdown ----------

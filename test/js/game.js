@@ -136,9 +136,13 @@
     // foes: rect = 老式「逐帧独立矩形」扁平表（等距妖兽，只有 idle/attack/death 三态）；
     //       anim = 新式「每怪一组动作帧序列」（侧视多动作素材，见 assets/beasts.json）
     foes: { img: null, rect: null, anim: null },
-    // dungeon: 地宫素材图集（原 228 张独立 PNG 打包成 1 张，见 tools/build_dungeon_atlas.py）
-    dungeon: { img: null, rect: null }
-  };
+      // dungeon: 地宫素材图集（原 228 张独立 PNG 打包成 1 张，见 tools/build_dungeon_atlas.py）
+      // imported / gr_iso: 外来地图图集，都由 tools/import_tmx.py 从别人的 Tiled 工程转出
+      //   （imported = Kenney 官方 Tiled 样例；gr_iso = Clint Bellanger 等距草地水池）
+      dungeon: { img: null, rect: null },
+      imported: { img: null, rect: null },
+      gr_iso: { img: null, rect: null }
+    };
   function atlasReady(a) { return !!(a.img && a.rect); }
 
   var IMG = {};              // file -> Image（只留给非图集的小图，例如云）
@@ -332,7 +336,7 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=8', json: true, weight: 64, label: '读取地图数据' },
+      { url: 'assets/maps.json?v=9', json: true, weight: 129, label: '读取地图数据' },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -347,6 +351,15 @@
   var dmImg = { url: 'assets/dungeon_atlas.webp?v=2', atlas: 'dungeon', weight: 547, label: '载入地宫图集' };
   var dmJson = { url: 'assets/dungeon_atlas.json?v=2', json: true, weight: 2, label: '读取地宫索引' };
   LOAD_PLAN.push(dmImg, dmJson);
+  // 外来地图：由 tools/import_tmx.py 把别人的 Tiled 工程（.tmx）原样转进来的。
+  // 这两张不是自己摆的 —— imported 是 Kenney 官方 Tiled 样例，gr_iso 是 Clint Bellanger
+  // 的等距草地/水池（Tiled 官方示例图）。加图集走的就是 dmImg/dmJson 那套，
+  // 新增一张图 = 这里 push 两项 + maps.json 里加条目，引擎其它地方不用动。
+  var imImg = { url: 'assets/imported_atlas.webp?v=1', atlas: 'imported', weight: 26, label: '载入外来地图·玄石回廊' };
+  var imJson = { url: 'assets/imported_atlas.json?v=1', json: true, weight: 1, label: '读取玄石回廊索引' };
+  var grImg = { url: 'assets/gr_iso_atlas.webp?v=1', atlas: 'gr_iso', weight: 105, label: '载入外来地图·草地水池' };
+  var grJson = { url: 'assets/gr_iso_atlas.json?v=1', json: true, weight: 1, label: '读取草地水池索引' };
+  LOAD_PLAN.push(imImg, imJson, grImg, grJson);
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
   function fmtBytes(n) {
@@ -457,6 +470,11 @@
         // 地宫图集（按引用查找，不依赖下标，顺序变动也不怕）
         ATLAS.dungeon.img = LOAD_PLAN[LOAD_PLAN.indexOf(dmImg)].value;
         ATLAS.dungeon.rect = LOAD_PLAN[LOAD_PLAN.indexOf(dmJson)].value;
+        // 外来地图图集（import_tmx.py 产出），同样按引用查找
+        ATLAS.imported.img = LOAD_PLAN[LOAD_PLAN.indexOf(imImg)].value;
+        ATLAS.imported.rect = LOAD_PLAN[LOAD_PLAN.indexOf(imJson)].value;
+        ATLAS.gr_iso.img = LOAD_PLAN[LOAD_PLAN.indexOf(grImg)].value;
+        ATLAS.gr_iso.rect = LOAD_PLAN[LOAD_PLAN.indexOf(grJson)].value;
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;
@@ -1040,19 +1058,20 @@
    * 打包成图集后，每个绘制点除了目标矩形，还必须给出源矩形（sx/sy/sw/sh）。
    * 抽成一个函数是为了只在这里处理「找不到」的情况 —— 少一个图块不该让整帧崩掉。
    */
-  function piece(name) {
-    var a = ATLAS.tiles, r = a.rect && a.rect[name];
-    if (a.img && r) return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
-    // 地宫图集：原 228 张独立 PNG 打包成单张，键名同为 dungeon/xxx.png
-    var d = ATLAS.dungeon, dr = d.rect && d.rect[name];
-    if (d.img && dr) return { img: d.img, sx: dr[0], sy: dr[1], w: dr[2], h: dr[3] };
-    // 独立 PNG 回退：用于测试/接入未入 tiles_atlas 的新素材（如 Kenney 地牢包）
-    if (IMG[name]) {
-      var im = IMG[name];
-      if (im.complete && im.width) return { img: im, sx: 0, sy: 0, w: im.width, h: im.height };
+    function piece(name) {
+      // 遍历所有图集，不写死顺序 —— 接第一张外来地图（dungeon）时这里是按名字硬写的，
+      // 再加第二、三张就会变成一坨 if。以后新增图集只要在 LOAD_PLAN 里 push 两项。
+      for (var k in ATLAS) {
+        var a = ATLAS[k], r = a.rect && a.rect[name];
+        if (a.img && r) return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
+      }
+      // 独立 PNG 回退：用于测试/接入未入图集的新素材（如 Kenney 地牢包）
+      if (IMG[name]) {
+        var im = IMG[name];
+        if (im.complete && im.width) return { img: im, sx: 0, sy: 0, w: im.width, h: im.height };
+      }
+      return null;
     }
-    return null;
-  }
   function charPiece(file) {
     var a = ATLAS.chars, r = a.rect && a.rect[file];
     if (!a.img || !r) return null;

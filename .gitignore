@@ -8,13 +8,26 @@ immortal-game/assets/_ai_raw/
 immortal-game/assets/_oga_drop/
 immortal-game/assets/_godot_drop/
 
-# 临时 scratch / 截图 / 日志
+# 临时 scratch / 截图 / 日志 / 缩略图集
 immortal-game/_*.png
 immortal-game/_*.txt
 immortal-game/_*.html
 _*.png
 _*.txt
 _*.html
+_*.webp
+_*.err
+_*.out
+# `_` 前缀的一次性分析脚本（正式工具无下划线前缀）
+test/tools/_*.py
+test/tools/_*.js
+# Windows 重定向残留（cmd 的 NUL 在 bash 下落成实体文件）
+nul
+test/nul
+
+# 用户提供的原始素材包（源材料，供派生脚本读取；非运行时资源，29.7MB 不入库）
+人物角色/
+地形包/
 
 # 临时分析目录（切片草稿、量测输出、预览图），不属于运行时资源
 _analysis/
@@ -22,5 +35,13 @@ test/_analysis/
 # 妖兽单帧裁切源（策展中间物；运行时只用 assets/foes_atlas.png/.json）
 test/assets/foes/
 
+# 外来地图的中间瓦片（tools/import_tmx.py 产物；运行时只用 <prefix>_atlas.webp/.json，
+# 引擎的 piece() 会先去图集里按 'imported/xxx.png' 这种键名查，不读这些散图）
+test/assets/imported/
+test/assets/gr_iso/
+
 # 用户提供的原始 AI 场景素材（大体积 JPEG，源材料非运行时资源，不入库）
 sucai/
+
+# 第三方 CC0 素材源缓存（Screaming Brain Studios 等，10.7MB；派生结果都已在 assets/ 下）
+test/_cc0/
