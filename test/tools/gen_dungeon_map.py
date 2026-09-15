@@ -9,278 +9,303 @@ W, H = 28, 28
 
 # 读取现有 maps.json
 data = json.load(open(MAPS_PATH, 'r', encoding='utf-8'))
-
-# 移除旧的 dungeon 地图（如果存在）
 data['maps'] = [m for m in data['maps'] if m['id'] != 'dungeon']
 
-# tilePalette 扩展：保留原有字符，新增地牢字符
-# 原有：. , # ; ~ - D P
+# tilePalette 扩展
 PAL = data.get('tilePalette', {})
 PAL.update({
-    'D': 'dungeon/stoneTile_N.png',       # 石砖地面
-    'P': 'dungeon/planks_N.png',          # 木板地面
-    'R': 'dungeon/dirtTiles_N.png',       # 泥土地面
-    'M': 'dungeon/stoneMissingTiles_N.png',  # 破损地面
+    'D': 'dungeon/stoneTile_N.png',           # 石砖地面（主厅/室内）
+    'P': 'dungeon/planks_N.png',              # 木板地面（高台/餐厅/桥）
+    'R': 'dungeon/dirtTiles_N.png',           # 泥土（废墟外围）
+    'M': 'dungeon/stoneMissingTiles_N.png',   # 破损地面（废墟）
+    'S': 'dungeon/stoneSteps_N.png',          # 石阶（可行走）
 })
 data['tilePalette'] = PAL
-data['walkable'] = '.,#;DPRM'   # 这些地面可行走
+data['walkable'] = '.,#;DPRMS'   # S 也允许走
 
-# 构建地面网格：默认石砖
-GND = [['D' for _ in range(W)] for _ in range(H)]
-
-# 对象列表
+# 地面网格
+GND = [['R' for _ in range(W)] for _ in range(H)]
 OBJS = []
+
 
 def add_obj(piece, x, y, fw=1, fh=1, solid=False, dy=0):
     OBJS.append({
-        'piece': piece,
-        'x': x, 'y': y,
-        'fw': fw, 'fh': fh,
-        'solid': solid,
-        'dy': dy
+        'piece': piece, 'x': x, 'y': y,
+        'fw': fw, 'fh': fh, 'solid': solid, 'dy': dy
     })
 
-# ------------------------------------------------------------------
-# 房间定义 (x0,y0,x1,y1) 为闭区间
-# ------------------------------------------------------------------
-rooms = [
-    # 入口大厅，左下近屏幕
-    {'id': 'hall', 'rect': (3, 18, 11, 25), 'floor': 'D'},
-    # 走廊：从大厅北门向东上延伸
-    {'id': 'corridor', 'rect': (11, 12, 15, 18), 'floor': 'P'},
-    # 餐厅/休息区，右侧
-    {'id': 'dining', 'rect': (15, 10, 23, 18), 'floor': 'D'},
-    # 储藏室，右上
-    {'id': 'storage', 'rect': (17, 2, 23, 9), 'floor': 'D'},
-    # 侧厅/书房，左上
-    {'id': 'study', 'rect': (3, 8, 11, 15), 'floor': 'D'},
-]
 
-# 门洞：((x,y), 'N/E/S/W')
-doors = [
-    ((7, 18), 'N'),   # 大厅北门 -> 走廊
-    ((15, 15), 'E'),  # 走廊东门 -> 餐厅
-    ((19, 9), 'N'),   # 餐厅北门 -> 储藏室
-    ((7, 15), 'E'),   # 侧厅东门 -> 大厅
-]
-
-# 地面填充：按房间铺不同地面，走廊木板
-for r in rooms:
-    x0, y0, x1, y1 = r['rect']
+def set_floor_rect(x0, y0, x1, y1, ch):
     for y in range(y0, y1 + 1):
         for x in range(x0, x1 + 1):
-            GND[y][x] = r['floor']
+            GND[y][x] = ch
 
-# 辅助：检查一个边界格是否是门洞
-def is_door(x, y):
-    for (dx, dy), d in doors:
-        if dx == x and dy == y:
-            return d
-    return None
 
-# 围房间墙
-for r in rooms:
-    x0, y0, x1, y1 = r['rect']
-    # 北墙 y=y0, x=x0..x1
-    for x in range(x0, x1 + 1):
-        d = is_door(x, y0)
-        if d == 'N':
-            add_obj('dungeon/stoneWallArchway_N.png', x, y0, solid=False)
-        elif d == 'S':
-            add_obj('dungeon/stoneWallArchway_S.png', x, y0, solid=False)
-        elif d == 'E':
-            add_obj('dungeon/stoneWallArchway_E.png', x, y0, solid=False)
-        elif d == 'W':
-            add_obj('dungeon/stoneWallArchway_W.png', x, y0, solid=False)
-        else:
-            add_obj('dungeon/stoneWall_N.png', x, y0, solid=True)
-    # 南墙 y=y1, x=x0..x1
-    for x in range(x0, x1 + 1):
-        d = is_door(x, y1)
-        if d == 'N':
-            add_obj('dungeon/stoneWallArchway_N.png', x, y1, solid=False)
-        elif d == 'S':
-            add_obj('dungeon/stoneWallArchway_S.png', x, y1, solid=False)
-        elif d == 'E':
-            add_obj('dungeon/stoneWallArchway_E.png', x, y1, solid=False)
-        elif d == 'W':
-            add_obj('dungeon/stoneWallArchway_W.png', x, y1, solid=False)
-        else:
-            add_obj('dungeon/stoneWall_S.png', x, y1, solid=True)
-    # 西墙 x=x0, y=y0..y1
-    for y in range(y0, y1 + 1):
-        d = is_door(x0, y)
-        if d:
-            add_obj(f'dungeon/stoneWallArchway_{d}.png', x0, y, solid=False)
-        else:
-            add_obj('dungeon/stoneWall_W.png', x0, y, solid=True)
-    # 东墙 x=x1, y=y0..y1
-    for y in range(y0, y1 + 1):
-        d = is_door(x1, y)
-        if d:
-            add_obj(f'dungeon/stoneWallArchway_{d}.png', x1, y, solid=False)
-        else:
-            add_obj('dungeon/stoneWall_E.png', x1, y, solid=True)
-    # 四个墙角：先移除同格直墙，再用 corner 覆盖
-    corners = [
-        (x0, y0, 'dungeon/stoneWallCorner_N.png'),
-        (x1, y0, 'dungeon/stoneWallCorner_E.png'),
-        (x0, y1, 'dungeon/stoneWallCorner_W.png'),
-        (x1, y1, 'dungeon/stoneWallCorner_S.png'),
-    ]
-    for cx, cy, _ in corners:
-        OBJS[:] = [o for o in OBJS if not (o['x'] == cx and o['y'] == cy)]
-    for cx, cy, piece in corners:
-        add_obj(piece, cx, cy, solid=True)
+def in_rect(x, y, x0, y0, x1, y1):
+    return x0 <= x <= x1 and y0 <= y <= y1
 
-# 装饰：在一些直墙段替换为窗/破墙/ aged 墙，增加变化
-wall_positions = [(o['x'], o['y']) for o in OBJS if o['piece'] == 'dungeon/stoneWall_N.png']
-random.seed(42)
-# 随机把部分北墙换成窗或 aged 墙
-for x, y in random.sample(wall_positions, min(4, len(wall_positions))):
-    o = next(o for o in OBJS if o['x'] == x and o['y'] == y and o['piece'] == 'dungeon/stoneWall_N.png')
-    o['piece'] = random.choice(['dungeon/stoneWallAged_N.png', 'dungeon/stoneWallWindow_N.png', 'dungeon/stoneWallHole_N.png'])
 
 # ------------------------------------------------------------------
-# 家具摆放（只在房间内、非墙、非门洞位置）
+# 区域划分：外层是泥土废墟，内部是完整石砖地宫
 # ------------------------------------------------------------------
-def in_room(x, y, r):
-    x0, y0, x1, y1 = r['rect']
-    return x0 < x < x1 and y0 < y < y1
+# 主地宫范围：外墙围成的大空间
+DUNGEON_X0, DUNGEON_Y0 = 2, 2
+DUNGEON_X1, DUNGEON_Y1 = 25, 25
+set_floor_rect(DUNGEON_X0, DUNGEON_Y0, DUNGEON_X1, DUNGEON_Y1, 'D')
 
-# 收集所有 solid 位置
-solid_set = set((o['x'], o['y']) for o in OBJS if o.get('solid'))
-door_set = set((x, y) for (x, y), d in doors)
+# 废墟角：西南角（x=2..7, y=19..25）崩塌成泥土/破损地面
+set_floor_rect(2, 19, 7, 25, 'R')
+set_floor_rect(3, 22, 6, 24, 'M')
+set_floor_rect(2, 20, 4, 21, 'M')
 
-def free_spots(r):
-    x0, y0, x1, y1 = r['rect']
-    spots = []
-    for y in range(y0 + 1, y1):
-        for x in range(x0 + 1, x1):
-            if (x, y) not in solid_set and (x, y) not in door_set:
-                spots.append((x, y))
-    return spots
+# 入口大厅：南部居中，y=18..24, x=8..19
+set_floor_rect(8, 18, 19, 24, 'D')
 
-rng = random.Random(123)
+# 中央大厅：y=10..17, x=8..19
+set_floor_rect(8, 10, 19, 17, 'D')
 
-# 大厅：放几根石柱 + 木梁架 + 宝箱
-hall = rooms[0]
-spots = free_spots(hall)
-rng.shuffle(spots)
-# 中央木梁架（需要 2x2 空间，放 4 根柱子 + 梁）
-for x, y in spots[:]:
-    if x in (6, 8) and y in (20, 22):
-        add_obj('dungeon/woodenSupports_N.png', x, y, solid=False)
-# 横梁：视觉上跨在大厅上方，放在稍远处（y 更小）
-for x in range(5, 10):
-    add_obj('dungeon/woodenSupportBeams_N.png', x, 18, solid=False)
-# 宝箱靠南墙
-add_obj('dungeon/chestClosed_N.png', 5, 24, solid=False)
-add_obj('dungeon/chestOpen_N.png', 9, 24, solid=False)
+# 祭坛高台：北部居中，y=4..9, x=10..15，木板地面
+set_floor_rect(10, 4, 15, 9, 'P')
+# 高台前的台阶：y=10, x=11..14
+for x in range(11, 15):
+    GND[10][x] = 'S'
 
-# 走廊：放些木桶
-for x, y in [(12, 14), (13, 16), (14, 13)]:
-    add_obj('dungeon/barrel_N.png', x, y, solid=False)
+# 餐厅：东南角，x=20..24, y=18..24，木板地面
+set_floor_rect(20, 18, 24, 24, 'P')
+# 储藏室：东北角，x=20..24, y=4..13
+set_floor_rect(20, 4, 24, 13, 'D')
 
-# 餐厅：圆桌 + 椅子 + 长桌
-dining = rooms[1]
-dspots = free_spots(dining)
-rng.shuffle(dspots)
-for i, (x, y) in enumerate(dspots):
-    if i == 0:
-        add_obj('dungeon/tableRoundChairs_N.png', x, y, solid=False)
-    elif i == 1:
-        add_obj('dungeon/tableShortChairs_N.png', x, y, solid=False)
-    elif i == 2:
-        add_obj('dungeon/barrelsStacked_N.png', x, y, solid=False)
-    elif i == 3:
-        add_obj('dungeon/woodenCrates_N.png', x, y, solid=False)
-    elif i == 4:
-        add_obj('dungeon/chair_N.png', x, y, solid=False)
-    elif i == 5:
-        add_obj('dungeon/chestClosed_N.png', x, y, solid=False)
-    elif i < 9:
-        add_obj('dungeon/woodenCrate_N.png', x, y, solid=False)
-    else:
-        break
+# 连接储藏室和餐厅的走廊：x=20..24, y=14..16，木板
+set_floor_rect(20, 14, 24, 16, 'P')
 
-# 储藏室：大量箱子 + 木桶
-storage = rooms[2]
-sspots = free_spots(storage)
-rng.shuffle(sspots)
-for i, (x, y) in enumerate(sspots):
-    if i < 4:
-        add_obj('dungeon/barrels_N.png', x, y, solid=False)
-    elif i < 8:
-        add_obj('dungeon/woodenCrates_N.png', x, y, solid=False)
-    elif i < 11:
-        add_obj('dungeon/chestClosed_N.png', x, y, solid=False)
-    elif i < 14:
-        add_obj('dungeon/barrel_N.png', x, y, solid=False)
-    else:
-        break
+# 碎石过渡：在泥土废墟与主厅交界处撒一些破损石砖
+rng = random.Random(2026)
+for y in range(H):
+    for x in range(W):
+        if GND[y][x] == 'R' and rng.random() < 0.15:
+            GND[y][x] = 'M'
 
-# 书房：书桌 + 椅子 + 书架感（用石柱代替书架）
-study = rooms[3]
-stspots = free_spots(study)
-rng.shuffle(stspots)
-for i, (x, y) in enumerate(stspots):
-    if i == 0:
-        add_obj('dungeon/tableShort_N.png', x, y, solid=False)
-    elif i == 1:
-        add_obj('dungeon/chair_N.png', x, y, solid=False)
-    elif i == 2:
-        add_obj('dungeon/chestClosed_N.png', x, y, solid=False)
-    elif i < 6:
-        add_obj('dungeon/stoneColumn_N.png', x, y, solid=False)
-    else:
-        break
-
-# 外部区域：加些碎石/破损地面/石阶，营造废弃感
-for _ in range(12):
-    x, y = rng.randint(0, W - 1), rng.randint(0, H - 1)
-    if (x, y) in solid_set:
-        continue
-    # 只在房间外部
-    inside = any(in_room(x, y, r) for r in rooms)
-    if inside:
-        continue
-    # 避免堵门/堵走廊
-    if (x, y) in door_set:
-        continue
-    GND[y][x] = rng.choice(['R', 'M'])
 
 # ------------------------------------------------------------------
-# 传送门：放在大厅中央偏南，返回青玄山门
+# 墙体贴片辅助函数
+# ------------------------------------------------------------------
+def wall_n(x, y, kind='stoneWall', solid=True):
+    add_obj(f'dungeon/{kind}_N.png', x, y, solid=solid)
+
+
+def wall_s(x, y, kind='stoneWall', solid=True):
+    add_obj(f'dungeon/{kind}_S.png', x, y, solid=solid)
+
+
+def wall_w(x, y, kind='stoneWall', solid=True):
+    add_obj(f'dungeon/{kind}_W.png', x, y, solid=solid)
+
+
+def wall_e(x, y, kind='stoneWall', solid=True):
+    add_obj(f'dungeon/{kind}_E.png', x, y, solid=solid)
+
+
+def corner_nw(x, y):
+    add_obj('dungeon/stoneWallCorner_N.png', x, y, solid=True)
+
+
+def corner_ne(x, y):
+    add_obj('dungeon/stoneWallCorner_E.png', x, y, solid=True)
+
+
+def corner_sw(x, y):
+    add_obj('dungeon/stoneWallCorner_W.png', x, y, solid=True)
+
+
+def corner_se(x, y):
+    add_obj('dungeon/stoneWallCorner_S.png', x, y, solid=True)
+
+
+def arch_n(x, y):
+    add_obj('dungeon/stoneWallArchway_N.png', x, y, solid=False)
+
+
+def arch_s(x, y):
+    add_obj('dungeon/stoneWallArchway_S.png', x, y, solid=False)
+
+
+def arch_e(x, y):
+    add_obj('dungeon/stoneWallArchway_E.png', x, y, solid=False)
+
+
+def arch_w(x, y):
+    add_obj('dungeon/stoneWallArchway_W.png', x, y, solid=False)
+
+
+# ------------------------------------------------------------------
+# 外墙：围合主地宫，带拱门 + 破损段
+# ------------------------------------------------------------------
+# 北墙 y=2
+for x in range(3, 25):
+    if x == 13:
+        arch_n(x, 2)
+    else:
+        wall_n(x, 2)
+# 南墙 y=25
+for x in range(3, 25):
+    if x == 14:
+        arch_s(x, 25)
+    else:
+        wall_s(x, 25)
+# 西墙 x=2
+for y in range(3, 25):
+    if y == 14:
+        arch_w(2, y)
+    elif 18 <= y <= 22:
+        wall_w(2, y, kind='stoneWallBroken')
+    else:
+        wall_w(2, y)
+# 东墙 x=25
+for y in range(3, 25):
+    if y == 17:
+        arch_e(25, y)
+    else:
+        wall_e(25, y)
+
+# 外墙角
+corner_nw(2, 2)
+corner_ne(25, 2)
+corner_sw(2, 25)
+corner_se(25, 25)
+
+
+# ------------------------------------------------------------------
+# 内部隔断：半墙/拱门/残破墙，让空间连通又有层次
+# ------------------------------------------------------------------
+# 中央大厅与入口大厅之间：只在东侧留半墙分隔，留出通透感
+for x in range(8, 12):
+    wall_n(x, 17, kind='stoneWallHalf', solid=True)
+# 中央大厅北侧通往祭坛的拱门两侧：短柱 + 半墙
+for x in range(9, 11):
+    wall_n(x, 9, kind='stoneWallHalf', solid=True)
+for x in range(15, 17):
+    wall_n(x, 9, kind='stoneWallHalf', solid=True)
+
+# 入口大厅东侧通往餐厅的大门：y=20..22 处用栅栏门
+for y in range(20, 23):
+    wall_e(19, y, kind='stoneWallGateOpen')
+
+# 中央大厅东侧通往储藏室/餐厅的拱门：y=15
+arch_e(19, 15)
+# 拱门两侧小柱
+wall_e(19, 14, kind='stoneWallColumnIn')
+wall_e(19, 16, kind='stoneWallColumnIn')
+
+# 储藏室与餐厅之间：半墙隔断
+for x in range(20, 24):
+    wall_s(x, 13, kind='stoneWallHalf', solid=True)
+
+# 祭坛高台四周：矮护栏（半墙）
+for x in range(10, 16):
+    wall_n(x, 3, kind='stoneWallHalf', solid=True)
+for y in range(4, 10):
+    wall_w(9, y, kind='stoneWallHalf', solid=True)
+    wall_e(16, y, kind='stoneWallHalf', solid=True)
+# 祭坛高台南侧用台阶连接，两侧半墙收口
+wall_e(9, 10, kind='stoneWallHalf')
+wall_w(16, 10, kind='stoneWallHalf')
+
+# 废墟角的残破内墙，营造崩塌感
+for y in range(19, 25):
+    wall_e(7, y, kind='stoneWallBroken')
+for x in range(2, 7):
+    wall_n(x, 19, kind='stoneWallBroken')
+
+
+# ------------------------------------------------------------------
+# 立柱：中央大厅 + 入口大厅，撑起"殿堂感"
+# ------------------------------------------------------------------
+columns = [
+    (10, 13), (17, 13),
+    (10, 21), (17, 21),
+    (22, 6), (22, 21),
+]
+for x, y in columns:
+    add_obj('dungeon/stoneColumn_N.png', x, y, solid=False)
+
+
+# ------------------------------------------------------------------
+# 家具：成簇摆放，避免填格子
+# ------------------------------------------------------------------
+def cluster(objs, cx, cy):
+    """objs: list of (piece, dx, dy)"""
+    for piece, dx, dy in objs:
+        add_obj(piece, cx + dx, cy + dy, solid=False)
+
+
+# 祭坛：中央长桌 + 椅子 + 宝箱
+cluster([
+    ('dungeon/tableShort_N.png', 0, 0),
+    ('dungeon/chair_N.png', 0, 1),
+    ('dungeon/chestClosed_N.png', 2, 0),
+    ('dungeon/woodenCrate_N.png', -1, 1),
+], 13, 6)
+
+# 餐厅：圆桌 + 桌椅 + 木桶组
+cluster([
+    ('dungeon/tableRoundChairs_N.png', 0, 0),
+    ('dungeon/tableShortChairs_N.png', 2, 1),
+    ('dungeon/barrels_N.png', -1, 2),
+    ('dungeon/barrel_N.png', 1, 2),
+    ('dungeon/chair_N.png', 3, 0),
+], 22, 20)
+
+# 储藏室：角落堆箱 + 木桶
+cluster([
+    ('dungeon/woodenCrates_N.png', 0, 0),
+    ('dungeon/chestClosed_N.png', 1, 1),
+    ('dungeon/barrelsStacked_N.png', 3, 0),
+    ('dungeon/woodenCrate_N.png', 2, 2),
+], 22, 6)
+
+# 入口大厅：迎客几张椅 + 宝箱
+cluster([
+    ('dungeon/chair_N.png', 0, 0),
+    ('dungeon/chair_N.png', 2, 0),
+    ('dungeon/chestOpen_N.png', 1, 1),
+    ('dungeon/barrel_N.png', -1, 2),
+], 13, 22)
+
+# 废墟角：倒塌的木梁 + 宝箱
+cluster([
+    ('dungeon/woodenSupportBeams_N.png', 0, 0),
+    ('dungeon/woodenSupports_N.png', 1, 0),
+    ('dungeon/chestClosed_N.png', 0, 1),
+    ('dungeon/barrel_N.png', 2, 1),
+], 4, 22)
+
+
+# ------------------------------------------------------------------
+# 传送门 + 玩家起点
 # ------------------------------------------------------------------
 portals = [{
-    'x': 7, 'y': 22,
+    'x': 14, 'y': 24,
     'to': 'qingxuan',
     'tx': 17, 'ty': 27,
     'label': '返回青玄山门'
 }]
+start_x, start_y = 14, 23
 
-# 玩家初始位置：大厅入口
-start_x, start_y = 7, 23
 
-# 转换为字符串行
-ground_str = [''.join(row) for row in GND]
-
+# ------------------------------------------------------------------
 # 构建地图对象
+# ------------------------------------------------------------------
 new_map = {
     'id': 'dungeon',
     'name': '幽冥地宫',
-    'note': 'Kenney 等距地牢素材重制：围合房间、走廊、拱门与室内家具',
-    'w': W,
-    'h': H,
-    'ground': ground_str,
+    'note': 'Kenney 风格重制：连续外墙围合、半墙分隔、立柱支撑、祭坛高台与废墟角',
+    'w': W, 'h': H,
+    'ground': [''.join(row) for row in GND],
     'objects': OBJS,
-    'portals': portals,
-    'npcs': []
+    'portals': portals
 }
 
 data['maps'].append(new_map)
-
-# 写回（保留缩进，减少 diff 噪音）
 json.dump(data, open(MAPS_PATH, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-print('dungeon map regenerated: %dx%d, %d objects, %d portals, start=(%d,%d)' % (W, H, len(OBJS), len(portals), start_x, start_y))
+print('dungeon map regenerated: %dx%d, %d objects, %d portals, start=(%d,%d)' % (
+    W, H, len(OBJS), len(portals), start_x, start_y))

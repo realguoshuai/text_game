@@ -11,9 +11,10 @@
   "D": "dungeon/stoneTile_N.png",
   "P": "dungeon/planks_N.png",
   "R": "dungeon/dirtTiles_N.png",
-  "M": "dungeon/stoneMissingTiles_N.png"
+  "M": "dungeon/stoneMissingTiles_N.png",
+  "S": "dungeon/stoneSteps_N.png"
  },
- "walkable": ".,#;DPRM",
+ "walkable": ".,#;DPRMS",
  "water": "~-",
  "start": {
   "map": "qingxuan",
@@ -3661,44 +3662,53 @@
   {
    "id": "dungeon",
    "name": "幽冥地宫",
-   "note": "Kenney 等距地牢素材重制：围合房间、走廊、拱门与室内家具",
+   "note": "Kenney 风格重制：连续外墙围合、半墙分隔、立柱支撑、祭坛高台与废墟角",
    "w": 28,
    "h": 28,
    "ground": [
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDMDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDRDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "MDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDRDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDPPPDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDPPPDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDPPPDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDPPPDDDDDDDDDDDDD",
-    "DDDDDDDDDDDPPPPDDDDDDDDDMDDD",
-    "DDMDDDDDDDDPPPPDDDDDDDDDDDDD",
-    "DDDDDDDDDDDPPPPDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDRDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDRDDDDDDDDDDDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDDDDDDDDDDDDDD"
+    "MRRRMRRRRRRRRRRRMRRRRRRRRRRR",
+    "RMRRRRRRRMRRRRRRMRRRRRRRRRRM",
+    "RMDDDDDDDDDDDDDDDDDDDDDDDDMR",
+    "RMDDDDDDDDDDDDDDDDDDDDDDDDRR",
+    "RRDDDDDDDDPPPPPPDDDDDDDDDDRR",
+    "RRDDDDDDDDPPPPPPDDDDDDDDDDRR",
+    "RRDDDDDDDDPPPPPPDDDDDDDDDDRR",
+    "RRDDDDDDDDPPPPPPDDDDDDDDDDRR",
+    "RRDDDDDDDDPPPPPPDDDDDDDDDDRM",
+    "RRDDDDDDDDPPPPPPDDDDDDDDDDRR",
+    "RRDDDDDDDDDSSSSDDDDDDDDDDDRR",
+    "RRDDDDDDDDDDDDDDDDDDDDDDDDRR",
+    "RRDDDDDDDDDDDDDDDDDDDDDDDDRR",
+    "MRDDDDDDDDDDDDDDDDDDDDDDDDRR",
+    "RRDDDDDDDDDDDDDDDDDDPPPPPDRR",
+    "RMDDDDDDDDDDDDDDDDDDPPPPPDRR",
+    "MRDDDDDDDDDDDDDDDDDDPPPPPDRR",
+    "MMDDDDDDDDDDDDDDDDDDDDDDDDRR",
+    "MRDDDDDDDDDDDDDDDDDDPPPPPDRR",
+    "RRRRRRRRDDDDDDDDDDDDPPPPPDRR",
+    "RMMMMRRRDDDDDDDDDDDDPPPPPDRR",
+    "MRMMMRRRDDDDDDDDDDDDPPPPPDRR",
+    "RRRMMMMMDDDDDDDDDDDDPPPPPDMR",
+    "MRRMMMMRDDDDDDDDDDDDPPPPPDMR",
+    "RRRMMMMMDDDDDDDDDDDDPPPPPDRR",
+    "RRRRRRRMDDDDDDDDDDDDDDDDDDRR",
+    "RMRRRRRRRMRRRRRRRRRMRRRRRRRR",
+    "RMRRRRRRRRRRRRRRRRRRMRRRRRRR"
    ],
    "objects": [
     {
-     "piece": "dungeon/stoneWallAged_N.png",
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 3,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
      "x": 4,
-     "y": 18,
+     "y": 2,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -3707,7 +3717,7 @@
     {
      "piece": "dungeon/stoneWall_N.png",
      "x": 5,
-     "y": 18,
+     "y": 2,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -3716,25 +3726,25 @@
     {
      "piece": "dungeon/stoneWall_N.png",
      "x": 6,
-     "y": 18,
+     "y": 2,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWallArchway_N.png",
+     "piece": "dungeon/stoneWall_N.png",
      "x": 7,
-     "y": 18,
+     "y": 2,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWallAged_N.png",
+     "piece": "dungeon/stoneWall_N.png",
      "x": 8,
-     "y": 18,
+     "y": 2,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -3743,7 +3753,7 @@
     {
      "piece": "dungeon/stoneWall_N.png",
      "x": 9,
-     "y": 18,
+     "y": 2,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -3752,7 +3762,142 @@
     {
      "piece": "dungeon/stoneWall_N.png",
      "x": 10,
-     "y": 18,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 11,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 12,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallArchway_N.png",
+     "x": 13,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 14,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 15,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 16,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 17,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 18,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 19,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 20,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 21,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 22,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 23,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_N.png",
+     "x": 24,
+     "y": 2,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_S.png",
+     "x": 3,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -3822,133 +3967,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 19,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 20,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 21,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 22,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 23,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 24,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 19,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 20,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 21,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 22,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 23,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 24,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_N.png",
-     "x": 3,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_W.png",
-     "x": 3,
-     "y": 25,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_S.png",
+     "piece": "dungeon/stoneWall_S.png",
      "x": 11,
      "y": 25,
      "fw": 1,
@@ -3957,36 +3976,9 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 12,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 13,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 14,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
      "piece": "dungeon/stoneWall_S.png",
      "x": 12,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -3995,187 +3987,25 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 13,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
+     "piece": "dungeon/stoneWallArchway_S.png",
      "x": 14,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 11,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 11,
-     "y": 14,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 11,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 11,
-     "y": 17,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 15,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 15,
-     "y": 14,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallArchway_E.png",
-     "x": 15,
-     "y": 15,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": false,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_E.png",
+     "piece": "dungeon/stoneWall_S.png",
      "x": 15,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 15,
-     "y": 17,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_N.png",
-     "x": 11,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_E.png",
-     "x": 15,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_W.png",
-     "x": 11,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 16,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 17,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 18,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 19,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 20,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 21,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 22,
-     "y": 10,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4184,7 +4014,7 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 16,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4193,7 +4023,7 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 17,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4202,7 +4032,7 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 18,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4211,7 +4041,7 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 19,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4220,7 +4050,7 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 20,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4229,7 +4059,7 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 21,
-     "y": 18,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4238,214 +4068,7 @@
     {
      "piece": "dungeon/stoneWall_S.png",
      "x": 22,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 15,
-     "y": 11,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 15,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 15,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 15,
-     "y": 14,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallArchway_E.png",
-     "x": 15,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 15,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 15,
-     "y": 17,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
-     "y": 11,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
-     "y": 14,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
-     "y": 17,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_N.png",
-     "x": 15,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_E.png",
-     "x": 23,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_W.png",
-     "x": 15,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_S.png",
-     "x": 23,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 18,
-     "y": 2,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 19,
-     "y": 2,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 20,
-     "y": 2,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 21,
-     "y": 2,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallWindow_N.png",
-     "x": 22,
-     "y": 2,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4453,26 +4076,8 @@
     },
     {
      "piece": "dungeon/stoneWall_S.png",
-     "x": 18,
-     "y": 9,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallArchway_N.png",
-     "x": 19,
-     "y": 9,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 20,
-     "y": 9,
+     "x": 23,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4480,17 +4085,8 @@
     },
     {
      "piece": "dungeon/stoneWall_S.png",
-     "x": 21,
-     "y": 9,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 22,
-     "y": 9,
+     "x": 24,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4498,7 +4094,7 @@
     },
     {
      "piece": "dungeon/stoneWall_W.png",
-     "x": 17,
+     "x": 2,
      "y": 3,
      "fw": 1,
      "fh": 1,
@@ -4507,7 +4103,7 @@
     },
     {
      "piece": "dungeon/stoneWall_W.png",
-     "x": 17,
+     "x": 2,
      "y": 4,
      "fw": 1,
      "fh": 1,
@@ -4516,7 +4112,7 @@
     },
     {
      "piece": "dungeon/stoneWall_W.png",
-     "x": 17,
+     "x": 2,
      "y": 5,
      "fw": 1,
      "fh": 1,
@@ -4525,7 +4121,7 @@
     },
     {
      "piece": "dungeon/stoneWall_W.png",
-     "x": 17,
+     "x": 2,
      "y": 6,
      "fw": 1,
      "fh": 1,
@@ -4534,7 +4130,7 @@
     },
     {
      "piece": "dungeon/stoneWall_W.png",
-     "x": 17,
+     "x": 2,
      "y": 7,
      "fw": 1,
      "fh": 1,
@@ -4543,7 +4139,7 @@
     },
     {
      "piece": "dungeon/stoneWall_W.png",
-     "x": 17,
+     "x": 2,
      "y": 8,
      "fw": 1,
      "fh": 1,
@@ -4551,8 +4147,152 @@
      "dy": 0
     },
     {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 9,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 10,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 11,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 12,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 13,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallArchway_W.png",
+     "x": 2,
+     "y": 14,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 15,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 16,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 17,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_W.png",
+     "x": 2,
+     "y": 18,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_W.png",
+     "x": 2,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_W.png",
+     "x": 2,
+     "y": 20,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_W.png",
+     "x": 2,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_W.png",
+     "x": 2,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 23,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWall_W.png",
+     "x": 2,
+     "y": 24,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
+     "x": 25,
      "y": 3,
      "fw": 1,
      "fh": 1,
@@ -4561,7 +4301,7 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
+     "x": 25,
      "y": 4,
      "fw": 1,
      "fh": 1,
@@ -4570,7 +4310,7 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
+     "x": 25,
      "y": 5,
      "fw": 1,
      "fh": 1,
@@ -4579,7 +4319,7 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
+     "x": 25,
      "y": 6,
      "fw": 1,
      "fh": 1,
@@ -4588,7 +4328,7 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
+     "x": 25,
      "y": 7,
      "fw": 1,
      "fh": 1,
@@ -4597,7 +4337,7 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 23,
+     "x": 25,
      "y": 8,
      "fw": 1,
      "fh": 1,
@@ -4605,26 +4345,8 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWallCorner_N.png",
-     "x": 17,
-     "y": 2,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_E.png",
-     "x": 23,
-     "y": 2,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWallCorner_W.png",
-     "x": 17,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
      "y": 9,
      "fw": 1,
      "fh": 1,
@@ -4632,80 +4354,53 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWallCorner_S.png",
-     "x": 23,
-     "y": 9,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
+     "y": 10,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 4,
-     "y": 8,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
+     "y": 11,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 5,
-     "y": 8,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
+     "y": 12,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWallAged_N.png",
-     "x": 6,
-     "y": 8,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
+     "y": 13,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 7,
-     "y": 8,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
+     "y": 14,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 8,
-     "y": 8,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 9,
-     "y": 8,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_N.png",
-     "x": 10,
-     "y": 8,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 4,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
      "y": 15,
      "fw": 1,
      "fh": 1,
@@ -4713,18 +4408,9 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 5,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 6,
-     "y": 15,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
+     "y": 16,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4732,89 +4418,17 @@
     },
     {
      "piece": "dungeon/stoneWallArchway_E.png",
-     "x": 7,
-     "y": 15,
+     "x": 25,
+     "y": 17,
      "fw": 1,
      "fh": 1,
      "solid": false,
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 8,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 9,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_S.png",
-     "x": 10,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 9,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 10,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 11,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": true,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneWall_W.png",
-     "x": 3,
-     "y": 14,
+     "piece": "dungeon/stoneWall_E.png",
+     "x": 25,
+     "y": 18,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4822,8 +4436,8 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 9,
+     "x": 25,
+     "y": 19,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4831,8 +4445,8 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 10,
+     "x": 25,
+     "y": 20,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4840,8 +4454,8 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 11,
+     "x": 25,
+     "y": 21,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4849,8 +4463,8 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 12,
+     "x": 25,
+     "y": 22,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4858,8 +4472,8 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 13,
+     "x": 25,
+     "y": 23,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4867,8 +4481,8 @@
     },
     {
      "piece": "dungeon/stoneWall_E.png",
-     "x": 11,
-     "y": 14,
+     "x": 25,
+     "y": 24,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4876,8 +4490,8 @@
     },
     {
      "piece": "dungeon/stoneWallCorner_N.png",
-     "x": 3,
-     "y": 8,
+     "x": 2,
+     "y": 2,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4885,8 +4499,8 @@
     },
     {
      "piece": "dungeon/stoneWallCorner_E.png",
-     "x": 11,
-     "y": 8,
+     "x": 25,
+     "y": 2,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4894,8 +4508,8 @@
     },
     {
      "piece": "dungeon/stoneWallCorner_W.png",
-     "x": 3,
-     "y": 15,
+     "x": 2,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
@@ -4903,341 +4517,503 @@
     },
     {
      "piece": "dungeon/stoneWallCorner_S.png",
-     "x": 11,
-     "y": 15,
+     "x": 25,
+     "y": 25,
      "fw": 1,
      "fh": 1,
      "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/woodenSupports_N.png",
-     "x": 6,
-     "y": 22,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupports_N.png",
-     "x": 6,
-     "y": 20,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupports_N.png",
+     "piece": "dungeon/stoneWallHalf_N.png",
      "x": 8,
-     "y": 20,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupports_N.png",
-     "x": 8,
-     "y": 22,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupportBeams_N.png",
-     "x": 5,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupportBeams_N.png",
-     "x": 6,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupportBeams_N.png",
-     "x": 7,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupportBeams_N.png",
-     "x": 8,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenSupportBeams_N.png",
-     "x": 9,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/chestClosed_N.png",
-     "x": 5,
-     "y": 24,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/chestOpen_N.png",
-     "x": 9,
-     "y": 24,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/barrel_N.png",
-     "x": 12,
-     "y": 14,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/barrel_N.png",
-     "x": 13,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/barrel_N.png",
-     "x": 14,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/tableRoundChairs_N.png",
-     "x": 12,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/tableShortChairs_N.png",
-     "x": 13,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/barrelsStacked_N.png",
-     "x": 14,
      "y": 17,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/woodenCrates_N.png",
-     "x": 14,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/chair_N.png",
-     "x": 13,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/chestClosed_N.png",
-     "x": 14,
-     "y": 16,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenCrate_N.png",
-     "x": 12,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenCrate_N.png",
-     "x": 12,
-     "y": 14,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/woodenCrate_N.png",
-     "x": 13,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/barrels_N.png",
-     "x": 16,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/barrels_N.png",
-     "x": 20,
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 9,
      "y": 17,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/barrels_N.png",
-     "x": 18,
-     "y": 12,
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 10,
+     "y": 17,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/barrels_N.png",
-     "x": 17,
-     "y": 16,
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 11,
+     "y": 17,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/woodenCrates_N.png",
-     "x": 17,
-     "y": 11,
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 9,
+     "y": 9,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/woodenCrates_N.png",
-     "x": 22,
-     "y": 12,
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 10,
+     "y": 9,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/woodenCrates_N.png",
-     "x": 17,
-     "y": 14,
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 15,
+     "y": 9,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/woodenCrates_N.png",
-     "x": 20,
-     "y": 11,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/chestClosed_N.png",
-     "x": 17,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/chestClosed_N.png",
-     "x": 22,
-     "y": 13,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/chestClosed_N.png",
-     "x": 17,
-     "y": 12,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/barrel_N.png",
+     "piece": "dungeon/stoneWallHalf_N.png",
      "x": 16,
-     "y": 14,
+     "y": 9,
      "fw": 1,
      "fh": 1,
-     "solid": false,
+     "solid": true,
      "dy": 0
     },
     {
-     "piece": "dungeon/barrel_N.png",
+     "piece": "dungeon/stoneWallGateOpen_E.png",
      "x": 19,
-     "y": 11,
+     "y": 20,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallGateOpen_E.png",
+     "x": 19,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallGateOpen_E.png",
+     "x": 19,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallArchway_E.png",
+     "x": 19,
+     "y": 15,
      "fw": 1,
      "fh": 1,
      "solid": false,
      "dy": 0
     },
     {
-     "piece": "dungeon/barrel_N.png",
-     "x": 18,
-     "y": 15,
+     "piece": "dungeon/stoneWallColumnIn_E.png",
+     "x": 19,
+     "y": 14,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallColumnIn_E.png",
+     "x": 19,
+     "y": 16,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_S.png",
+     "x": 20,
+     "y": 13,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_S.png",
+     "x": 21,
+     "y": 13,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_S.png",
+     "x": 22,
+     "y": 13,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_S.png",
+     "x": 23,
+     "y": 13,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 10,
+     "y": 3,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 11,
+     "y": 3,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 12,
+     "y": 3,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 13,
+     "y": 3,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 14,
+     "y": 3,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_N.png",
+     "x": 15,
+     "y": 3,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_W.png",
+     "x": 9,
+     "y": 4,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_E.png",
+     "x": 16,
+     "y": 4,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_W.png",
+     "x": 9,
+     "y": 5,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_E.png",
+     "x": 16,
+     "y": 5,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_W.png",
+     "x": 9,
+     "y": 6,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_E.png",
+     "x": 16,
+     "y": 6,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_W.png",
+     "x": 9,
+     "y": 7,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_E.png",
+     "x": 16,
+     "y": 7,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_W.png",
+     "x": 9,
+     "y": 8,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_E.png",
+     "x": 16,
+     "y": 8,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_W.png",
+     "x": 9,
+     "y": 9,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_E.png",
+     "x": 16,
+     "y": 9,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_E.png",
+     "x": 9,
+     "y": 10,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallHalf_W.png",
+     "x": 16,
+     "y": 10,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_E.png",
+     "x": 7,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_E.png",
+     "x": 7,
+     "y": 20,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_E.png",
+     "x": 7,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_E.png",
+     "x": 7,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_E.png",
+     "x": 7,
+     "y": 23,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_E.png",
+     "x": 7,
+     "y": 24,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_N.png",
+     "x": 2,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_N.png",
+     "x": 3,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_N.png",
+     "x": 4,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_N.png",
+     "x": 5,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneWallBroken_N.png",
+     "x": 6,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": true,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneColumn_N.png",
+     "x": 10,
+     "y": 13,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneColumn_N.png",
+     "x": 17,
+     "y": 13,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneColumn_N.png",
+     "x": 10,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneColumn_N.png",
+     "x": 17,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneColumn_N.png",
+     "x": 22,
+     "y": 6,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneColumn_N.png",
+     "x": 22,
+     "y": 21,
      "fw": 1,
      "fh": 1,
      "solid": false,
@@ -5245,8 +5021,8 @@
     },
     {
      "piece": "dungeon/tableShort_N.png",
-     "x": 20,
-     "y": 3,
+     "x": 13,
+     "y": 6,
      "fw": 1,
      "fh": 1,
      "solid": false,
@@ -5254,7 +5030,7 @@
     },
     {
      "piece": "dungeon/chair_N.png",
-     "x": 19,
+     "x": 13,
      "y": 7,
      "fw": 1,
      "fh": 1,
@@ -5263,25 +5039,7 @@
     },
     {
      "piece": "dungeon/chestClosed_N.png",
-     "x": 20,
-     "y": 7,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneColumn_N.png",
-     "x": 21,
-     "y": 3,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "dungeon/stoneColumn_N.png",
-     "x": 18,
+     "x": 15,
      "y": 6,
      "fw": 1,
      "fh": 1,
@@ -5289,9 +5047,162 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneColumn_N.png",
-     "x": 20,
+     "piece": "dungeon/woodenCrate_N.png",
+     "x": 12,
+     "y": 7,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/tableRoundChairs_N.png",
+     "x": 22,
+     "y": 20,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/tableShortChairs_N.png",
+     "x": 24,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/barrels_N.png",
+     "x": 21,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/barrel_N.png",
+     "x": 23,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/chair_N.png",
+     "x": 25,
+     "y": 20,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/woodenCrates_N.png",
+     "x": 22,
+     "y": 6,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/chestClosed_N.png",
+     "x": 23,
+     "y": 7,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/barrelsStacked_N.png",
+     "x": 25,
+     "y": 6,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/woodenCrate_N.png",
+     "x": 24,
      "y": 8,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/chair_N.png",
+     "x": 13,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/chair_N.png",
+     "x": 15,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/chestOpen_N.png",
+     "x": 14,
+     "y": 23,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/barrel_N.png",
+     "x": 12,
+     "y": 24,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/woodenSupportBeams_N.png",
+     "x": 4,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/woodenSupports_N.png",
+     "x": 5,
+     "y": 22,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/chestClosed_N.png",
+     "x": 4,
+     "y": 23,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/barrel_N.png",
+     "x": 6,
+     "y": 23,
      "fw": 1,
      "fh": 1,
      "solid": false,
@@ -5300,15 +5211,14 @@
    ],
    "portals": [
     {
-     "x": 7,
-     "y": 22,
+     "x": 14,
+     "y": 24,
      "to": "qingxuan",
      "tx": 17,
      "ty": 27,
      "label": "返回青玄山门"
     }
-   ],
-   "npcs": []
+   ]
   }
  ]
 }

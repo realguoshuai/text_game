@@ -99,15 +99,29 @@
   var DUNGEON_IMGS = [
     // 地面
     'dungeon/stoneTile_N.png', 'dungeon/dirtTiles_N.png', 'dungeon/planks_N.png', 'dungeon/stoneMissingTiles_N.png',
+    'dungeon/planksBroken_N.png', 'dungeon/planksHole_N.png',
+    // 楼梯
+    'dungeon/stoneSteps_N.png', 'dungeon/stoneSteps_E.png', 'dungeon/stoneSteps_S.png', 'dungeon/stoneSteps_W.png',
     // 墙四向 + 变化
     'dungeon/stoneWall_N.png', 'dungeon/stoneWall_E.png', 'dungeon/stoneWall_S.png', 'dungeon/stoneWall_W.png',
     'dungeon/stoneWallAged_N.png', 'dungeon/stoneWallAged_E.png', 'dungeon/stoneWallAged_S.png', 'dungeon/stoneWallAged_W.png',
     'dungeon/stoneWallWindow_N.png', 'dungeon/stoneWallWindow_E.png', 'dungeon/stoneWallWindow_S.png', 'dungeon/stoneWallWindow_W.png',
+    'dungeon/stoneWallWindowBars_N.png', 'dungeon/stoneWallWindowBars_E.png', 'dungeon/stoneWallWindowBars_S.png', 'dungeon/stoneWallWindowBars_W.png',
     'dungeon/stoneWallHole_N.png', 'dungeon/stoneWallHole_E.png', 'dungeon/stoneWallHole_S.png', 'dungeon/stoneWallHole_W.png',
+    'dungeon/stoneWallHalf_N.png', 'dungeon/stoneWallHalf_E.png', 'dungeon/stoneWallHalf_S.png', 'dungeon/stoneWallHalf_W.png',
+    'dungeon/stoneWallColumnIn_N.png', 'dungeon/stoneWallColumnIn_E.png', 'dungeon/stoneWallColumnIn_S.png', 'dungeon/stoneWallColumnIn_W.png',
+    'dungeon/stoneWallBroken_N.png', 'dungeon/stoneWallBroken_E.png', 'dungeon/stoneWallBroken_S.png', 'dungeon/stoneWallBroken_W.png',
+    'dungeon/stoneWallBrokenLeft_N.png', 'dungeon/stoneWallBrokenLeft_E.png', 'dungeon/stoneWallBrokenLeft_S.png', 'dungeon/stoneWallBrokenLeft_W.png',
+    'dungeon/stoneWallBrokenRight_N.png', 'dungeon/stoneWallBrokenRight_E.png', 'dungeon/stoneWallBrokenRight_S.png', 'dungeon/stoneWallBrokenRight_W.png',
     // 墙角四向
     'dungeon/stoneWallCorner_N.png', 'dungeon/stoneWallCorner_E.png', 'dungeon/stoneWallCorner_S.png', 'dungeon/stoneWallCorner_W.png',
-    // 门四向
+    // 门/拱门/栅栏门
     'dungeon/stoneWallArchway_N.png', 'dungeon/stoneWallArchway_E.png', 'dungeon/stoneWallArchway_S.png', 'dungeon/stoneWallArchway_W.png',
+    'dungeon/stoneWallDoorClosed_N.png', 'dungeon/stoneWallDoorClosed_E.png', 'dungeon/stoneWallDoorClosed_S.png', 'dungeon/stoneWallDoorClosed_W.png',
+    'dungeon/stoneWallDoorOpen_N.png', 'dungeon/stoneWallDoorOpen_E.png', 'dungeon/stoneWallDoorOpen_S.png', 'dungeon/stoneWallDoorOpen_W.png',
+    'dungeon/stoneWallDoorBars_N.png', 'dungeon/stoneWallDoorBars_E.png', 'dungeon/stoneWallDoorBars_S.png', 'dungeon/stoneWallDoorBars_W.png',
+    'dungeon/stoneWallGateClosed_N.png', 'dungeon/stoneWallGateClosed_E.png', 'dungeon/stoneWallGateClosed_S.png', 'dungeon/stoneWallGateClosed_W.png',
+    'dungeon/stoneWallGateOpen_N.png', 'dungeon/stoneWallGateOpen_E.png', 'dungeon/stoneWallGateOpen_S.png', 'dungeon/stoneWallGateOpen_W.png',
     // 柱/支撑
     'dungeon/stoneColumn_N.png', 'dungeon/woodenSupports_N.png', 'dungeon/woodenSupportBeams_N.png',
     // 家具
