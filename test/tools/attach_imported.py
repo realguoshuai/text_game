@@ -23,7 +23,12 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAPS = os.path.join(ROOT, 'assets', 'maps.json')
 # 要挂进来的图（顺序 = 地图速切按钮里的顺序）
-WANT = ['imported_map.json', 'gr_iso_map.json']
+WANT = ['flare_map.json']
+# 要下掉的图：
+#   kenney_hall 只有 7x7 —— 本游戏地图都是 28~36 格，差了一个数量级，一张小房间挂在虚空里；
+#   grasstest 虽 25x25，但 625 个物件全是地面瓦，没有建筑/道具/NPC，像底图不像"一个地方"。
+# 两张都被否掉，这里清掉，免得有人以为它们还能用。
+DROP = ['kenney_hall', 'grasstest']
 
 
 def main():
@@ -39,7 +44,18 @@ def main():
     else:
         print('[walkable] 已含 k，不动')
 
-    # 2) 逐张挂载
+    # 2) 下掉不再要的图（--check 时只报不动）
+    for mid in DROP:
+        old = next((i for i, m in enumerate(maps) if m['id'] == mid), -1)
+        if old < 0:
+            continue
+        if check:
+            print('[待下架] %s' % mid)
+        else:
+            gone = maps.pop(old)
+            print('[下架] %-12s %s  %dx%d' % (gone['id'], gone.get('name', ''), gone['w'], gone['h']))
+
+    # 3) 逐张挂载
     for fn in WANT:
         src = os.path.join(ROOT, 'assets', fn)
         if not os.path.exists(src):

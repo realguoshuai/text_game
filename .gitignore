@@ -36,9 +36,10 @@ test/_analysis/
 test/assets/foes/
 
 # 外来地图的中间瓦片（tools/import_tmx.py 产物；运行时只用 <prefix>_atlas.webp/.json，
-# 引擎的 piece() 会先去图集里按 'imported/xxx.png' 这种键名查，不读这些散图）
+# 引擎的 piece() 会先去图集里按 'flare/xxx.png' 这种键名查，不读这些散图）
 test/assets/imported/
 test/assets/gr_iso/
+test/assets/flare/
 
 # 用户提供的原始 AI 场景素材（大体积 JPEG，源材料非运行时资源，不入库）
 sucai/

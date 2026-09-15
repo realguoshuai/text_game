@@ -137,11 +137,9 @@
     //       anim = 新式「每怪一组动作帧序列」（侧视多动作素材，见 assets/beasts.json）
     foes: { img: null, rect: null, anim: null },
       // dungeon: 地宫素材图集（原 228 张独立 PNG 打包成 1 张，见 tools/build_dungeon_atlas.py）
-      // imported / gr_iso: 外来地图图集，都由 tools/import_tmx.py 从别人的 Tiled 工程转出
-      //   （imported = Kenney 官方 Tiled 样例；gr_iso = Clint Bellanger 等距草地水池）
+      // flare: 外来地图图集（Flare 开源 ARPG 的战役关卡，由 tools/import_tmx.py 转出）
       dungeon: { img: null, rect: null },
-      imported: { img: null, rect: null },
-      gr_iso: { img: null, rect: null }
+      flare: { img: null, rect: null }
     };
   function atlasReady(a) { return !!(a.img && a.rect); }
 
@@ -336,7 +334,7 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=9', json: true, weight: 129, label: '读取地图数据' },
+      { url: 'assets/maps.json?v=11', json: true, weight: 186, label: '读取地图数据' },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -352,14 +350,14 @@
   var dmJson = { url: 'assets/dungeon_atlas.json?v=2', json: true, weight: 2, label: '读取地宫索引' };
   LOAD_PLAN.push(dmImg, dmJson);
   // 外来地图：由 tools/import_tmx.py 把别人的 Tiled 工程（.tmx）原样转进来的。
-  // 这两张不是自己摆的 —— imported 是 Kenney 官方 Tiled 样例，gr_iso 是 Clint Bellanger
-  // 的等距草地/水池（Tiled 官方示例图）。加图集走的就是 dmImg/dmJson 那套，
-  // 新增一张图 = 这里 push 两项 + maps.json 里加条目，引擎其它地方不用动。
-  var imImg = { url: 'assets/imported_atlas.webp?v=1', atlas: 'imported', weight: 26, label: '载入外来地图·玄石回廊' };
-  var imJson = { url: 'assets/imported_atlas.json?v=1', json: true, weight: 1, label: '读取玄石回廊索引' };
-  var grImg = { url: 'assets/gr_iso_atlas.webp?v=1', atlas: 'gr_iso', weight: 105, label: '载入外来地图·草地水池' };
-  var grJson = { url: 'assets/gr_iso_atlas.json?v=1', json: true, weight: 1, label: '读取草地水池索引' };
-  LOAD_PLAN.push(imImg, imJson, grImg, grJson);
+  // 这张不是自己摆的 —— Flare（开源 ARPG，flareteam/flare-game，CC-BY-SA）的战役开场
+  // 关卡 arrival，等距 192x96（与本引擎 TILE_W/TILE_H = 120/60 同为 2:1）。
+  // 加图集走的就是 dmImg/dmJson 那套，新增一张图 = 这里 push 两项 + maps.json 里加条目。
+  // weight 填**真实体积 KB**：加载进度条按它预估总量，填小了会在最后一段卡住不动。
+  // ⚠ 图集内容一变就要升 ?v=，否则浏览器缓存会把旧 webp 喂回来（Pages 的 max-age=600）。
+  var flImg = { url: 'assets/flare_atlas.webp?v=2', atlas: 'flare', weight: 689, label: '载入外来地图·远航之岸' };
+  var flJson = { url: 'assets/flare_atlas.json?v=2', json: true, weight: 5, label: '读取远航之岸索引' };
+  LOAD_PLAN.push(flImg, flJson);
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
   function fmtBytes(n) {
@@ -471,10 +469,8 @@
         ATLAS.dungeon.img = LOAD_PLAN[LOAD_PLAN.indexOf(dmImg)].value;
         ATLAS.dungeon.rect = LOAD_PLAN[LOAD_PLAN.indexOf(dmJson)].value;
         // 外来地图图集（import_tmx.py 产出），同样按引用查找
-        ATLAS.imported.img = LOAD_PLAN[LOAD_PLAN.indexOf(imImg)].value;
-        ATLAS.imported.rect = LOAD_PLAN[LOAD_PLAN.indexOf(imJson)].value;
-        ATLAS.gr_iso.img = LOAD_PLAN[LOAD_PLAN.indexOf(grImg)].value;
-        ATLAS.gr_iso.rect = LOAD_PLAN[LOAD_PLAN.indexOf(grJson)].value;
+        ATLAS.flare.img = LOAD_PLAN[LOAD_PLAN.indexOf(flImg)].value;
+        ATLAS.flare.rect = LOAD_PLAN[LOAD_PLAN.indexOf(flJson)].value;
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;
@@ -489,7 +485,20 @@
       TILE_W = data.tileW; TILE_H = data.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
       PAL = data.tilePalette; WALK = data.walkable; WATER = data.water || '';
       MAPS = data.maps;
-      MAPS.forEach(function (m) { m.solid = solidFrom(m); m.home = nearWalkable(m); IDX[m.id] = m; });
+      MAPS.forEach(function (m) {
+        m.solid = solidFrom(m);
+        // 出生点：默认由引擎自己算（离图心最近的可走格）—— 游戏自带的图都是"中间是空地"，
+        // 这个启发式够用。但**外来地图**（import_tmx.py 产出，带 homeFromMap 标记）不行：
+        // 别人的图可走区常是岛/半岛/环形，图心很可能落在湖里或贴着崖边，
+        // 那种位置"能站"但一开局就面壁。所以外来图自带施工方挑好的出生点
+        // （四邻皆可走的格），只要它确实合法就直接采用。
+        var h = m.home, okH = false;
+        if (m.homeFromMap && h && h.y >= 0 && h.y < m.h && h.x >= 0 && h.x < m.w) {
+          okH = WALK.indexOf(m.ground[h.y][h.x]) >= 0 && !m.solid['' + h.x + ',' + h.y];
+        }
+        m.home = okH ? h : nearWalkable(m);
+        IDX[m.id] = m;
+      });
 
       var q = new URLSearchParams(location.search);
       {
@@ -590,6 +599,72 @@
             var g = document.getElementById('dbg');
             if (g) g.textContent = JSON.stringify(s);
           }, 80);
+        }
+        if (at === 'importmap') {
+          // ?map=<外来图>&autotest=importmap —— 外来地图（tools/import_tmx.py 产出）的接入验收。
+          // 这类图是别人做的，最容易坏的三处全都**不报错**，只是静默不能用：
+          //   ① maps.json 的 walkable 忘了并进 'k' → 整张图点了不动（不能走，但画得好好的）
+          //   ② 出生点落在水里/虚空 → switchTo 会 snapWalkable 把它挪到别处，玩家一进来就在莫名位置
+          //   ③ Tiled 的"复合瓦"（2x2 等）锚点错 → 露出黑缺口（bg/ob 全空的那几格本来是给它盖的）
+          // 这三条都量化进 #probe，跑批里一眼能看出是哪一类。
+          setTimeout(function () {
+            var walk = 0, voidc = 0;
+            for (var y = 0; y < CUR.h; y++) {
+              for (var x = 0; x < CUR.w; x++) {
+                if (CUR.ground[y][x] !== ' ') walk++; else voidc++;
+              }
+            }
+            var big = 0, gnd = 0, solid = 0;
+            CUR.objects.forEach(function (o) {
+              if ((o.fw || 1) > 1 || (o.fh || 1) > 1) big++;
+              if (o.gnd) gnd++; else if (o.solid) solid++;
+            });
+            var dp = CUR.home || { x: -1, y: -1 };
+            // 从出生点做一次小半径 BFS，找一格"能走且不被实体占"的远处格子当点击目标 ——
+            // 有这么一格才说明这张图真的能玩（走不动 = walkable 没配好）
+            var sx = Math.round(player.mx), sy = Math.round(player.my);
+            var seen = {}, order = [[sx, sy]], target = null;
+            seen[sx + ',' + sy] = 1;
+            for (var qi = 0; qi < order.length && order.length < 260 && !target; qi++) {
+              var c = order[qi];
+              for (var d = 0; d < 4; d++) {
+                var nx = c[0] + (d === 0 ? 1 : d === 1 ? -1 : 0);
+                var ny = c[1] + (d === 2 ? 1 : d === 3 ? -1 : 0);
+                var k = nx + ',' + ny;
+                if (seen[k] || !walkable(nx, ny) || isSolid(nx, ny)) continue;
+                seen[k] = 1; order.push([nx, ny]);
+                // 2~5 步之内、又不在出生点旁边（太近的话 clickCell 可能是原地）
+                var dd = Math.abs(nx - sx) + Math.abs(ny - sy);
+                if (dd >= 2 && dd <= 5) { target = [nx, ny]; break; }
+              }
+            }
+            var r = {
+              map: CUR.id, w: CUR.w, h: CUR.h,
+              obj: CUR.objects.length, gnd: gnd, solid: solid, big: big,
+              walk: walk, voidCells: voidc,
+              voidColor: CUR.voidColor || '',
+              spawnDeclared: dp.x + ',' + dp.y,
+              spawnOnWalkable: walkable(dp.x, dp.y),
+              atSpawn: (Math.round(player.mx) === dp.x && Math.round(player.my) === dp.y),
+              targetFound: !!target,
+              reached: null, moved: null
+            };
+            if (target) {
+              var ok = window.ISLES.clickCell(target[0], target[1]);
+              sim(5);
+              r.clickAccepted = ok;
+              r.target = target[0] + ',' + target[1];
+              r.reached = Math.abs(player.mx - player.tx) < 0.02 && Math.abs(player.my - player.ty) < 0.02;
+              r.moved = (Math.round(player.mx) !== sx || Math.round(player.my) !== sy);
+              r.end = Math.round(player.mx) + ',' + Math.round(player.my);
+            }
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
         }
         if (at === 'train') {
           // ?map=qingxuan&autotest=train —— 人物调试场自测：
@@ -1036,6 +1111,14 @@
       ctx.fillStyle = dg; ctx.fillRect(0, 0, W, H);
       return;
     }
+    // 外来地图自带的"虚空底色"（来源 Tiled 工程的 backgroundcolor）。
+    // Flare 的草原图美术前提是「悬崖下方是一片深谷」——崖壁瓦本身就画着黑谷底，
+    // 空隙处若露本引擎的天蓝天空，会变成一块块刺眼的白洞。用来源图的底色填上即吻合。
+    if (CUR && CUR.voidColor) {
+      ctx.fillStyle = CUR.voidColor;
+      ctx.fillRect(0, 0, W, H);
+      return;
+    }
     var g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, SKY_TOP); g.addColorStop(0.5, SKY_MID); g.addColorStop(1, SKY_BOT);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -1346,10 +1429,41 @@
     CUR.portals.forEach(drawPortal);
 
     // 物件按深度排序（x+y 大者更靠前）；NPC 与玩家一起参与排序
-    var list = [];
-    CUR.objects.forEach(function (o, i) {
-      list.push({ k: (o.x + (o.fw || 1) - 1) + (o.y + (o.fh || 1) - 1) + 0.5, i: i, o: o });
-    });
+    // 静态物件的 k 只由坐标决定，地图加载后永不改变 —— 把排好序的数组缓存在 CUR 上，
+    // 每帧只 slice 一次、再把动态项（NPC/妖兽/玩家）插进去重排。
+    // 大图（外来 flare 图 36x38 有 1300+ 物件）下，这省掉每帧上千次对象分配与全量比较。
+    // 地面瓦（o.gnd，由 import_tmx.py 标出）不参与深度排序 —— 它们永远在所有物件之下，
+    // 单独先铺一遍即可。外来大图（flare 36x38）有 1300+ 个地面瓦，混进排序列表会把每帧拖垮。
+    // 静态部分（地面 + 物件）的排序结果缓存到 CUR 上，每帧只 slice + 插动态项。
+    if (!CUR._objSorted) {
+      CUR._groundTiles = [];
+      CUR._objSorted = [];
+      CUR.objects.forEach(function (o, i) {
+        var k = (o.x + (o.fw || 1) - 1) + (o.y + (o.fh || 1) - 1) + 0.5;
+        if (o.gnd) CUR._groundTiles.push({ k: k, o: o });
+        else CUR._objSorted.push({ k: k, i: i, o: o });
+      });
+      CUR._groundTiles.sort(function (a, b) { return a.k - b.k; });
+      CUR._objSorted.sort(function (a, b) { return a.k - b.k; });
+    }
+
+    // 画一个地图物件（地面瓦与普通物件共用同一套对齐/裁剪/视野判断）
+    function paintObj(o) {
+      var pz = piece(o.piece);
+      if (!pz) return;
+      var ax = o.x + ((o.fw || 1) - 1) / 2, ay = o.y + ((o.fh || 1) - 1) / 2;
+      var p = isoToScreen(ax, ay);
+      var bx = p.x, by = p.y + HH * Z + (o.dy || 0) * Z;
+      var ow = pz.w * Z, oh = pz.h * Z;
+      if (bx < -ow || bx > W + ow || by < -oh * 1.4 || by > H + oh * 1.6) return;
+      ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
+                    Math.round(bx - ow / 2), Math.round(by - oh), Math.round(ow), Math.round(oh));
+    }
+
+    // 地面先铺，再画排好序的物件（含 NPC / 妖兽 / 玩家）
+    CUR._groundTiles.forEach(function (it) { paintObj(it.o); });
+
+    var list = CUR._objSorted.slice();
     (CUR.npcs || []).forEach(function (n) { list.push({ k: n.x + n.y + 0.01, i: -2, o: n }); });
     foes.forEach(function (f) { list.push({ k: f.x + f.y, i: -3, o: f }); });
     list.push({ k: player.mx + player.my, i: -1, o: null });
@@ -1361,15 +1475,7 @@
       if (it.i === -3) { drawFoe(it.o); return; }
       if (it.i === -2) { drawNPC(it.o); return; }
       if (it.i === -1) { drawCharacter(); return; }
-      var o = it.o;
-      var pz = piece(o.piece);
-      if (!pz) return;
-      var ax = o.x + ((o.fw || 1) - 1) / 2, ay = o.y + ((o.fh || 1) - 1) / 2;
-      var p = isoToScreen(ax, ay);
-      var bx = p.x, by = p.y + HH * Z + (o.dy || 0) * Z;
-      var ow = pz.w * Z, oh = pz.h * Z;
-      if (bx < -ow || bx > W + ow || by < -oh * 1.4 || by > H + oh * 1.6) return;
-      ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, Math.round(bx - ow / 2), Math.round(by - oh), Math.round(ow), Math.round(oh));
+      paintObj(it.o);
     });
     drawSkillFx();    // 技能特效（剑气/雷爆/剑雨）画在飘字下面，别盖住伤害数字
     drawFloaters();   // 伤害飘字 + 击杀粒子（猎场用）

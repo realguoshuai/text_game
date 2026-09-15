@@ -149,13 +149,29 @@ results.push(run('技能 三招与冷却', 'map=qingxuan&autotest=skill', ({ pro
 ));
 //    外加领地（leash）验收 —— 越界不许咬人、必须回巢、回巢后还能被重新拉起。
 //    这条 sim 的时长以「秒」计（20s + 14s），预算要给足。
+//    ⚠ 本机实测这条要 46s 才跑完：预算给 30000 会随机读到「dbg 有、probe 没有」，
+//      表现成假 FAIL（而重试逻辑只在 dbg/probe 都空时才触发，救不到它）。给 60s。
 results.push(run('灵泉 妖兽领地', 'map=lingquan&autotest=bestiary', ({ probe }) =>
   !!probe && probe.total === 9 && Array.isArray(probe.err) && probe.err.length === 0 &&
   probe.zombieHit === true && probe.knightHit === true &&
   !!probe.leash && probe.leash.attackedWhileLeashed === false &&
   probe.leash.returnedHome === true && probe.leash.retCleared === true &&
   probe.leash.reengaged === true,
-{ budget: 30000 }));
+{ budget: 60000 }));
+
+// 9.5) 外来地图（tools/import_tmx.py 从别人的 Tiled 工程转进来的）接入验收。
+//      这类图的故障全是**静默**的：不能走但画得好好的、出生点在水里、复合瓦露黑缺口 ——
+//      人眼扫一眼截图看不出是"没配好"还是"地图本来长这样"。这条把三件事都量化了。
+//      断言口径刻意不写死坐标（换一张外来图只要重新生成即可），只锁性质：
+//      有可走区、有内容、出生点确实站得住、能点着走过去。
+results.push(run('外来地图 远航之岸', 'map=flare_arrival&autotest=importmap', ({ probe }) =>
+  !!probe && probe.map === 'flare_arrival' &&
+  probe.w === 36 && probe.h === 38 &&
+  probe.walk > 400 && probe.obj > 1000 &&
+  probe.spawnOnWalkable === true && probe.atSpawn === true &&
+  probe.targetFound === true && probe.clickAccepted === true &&
+  probe.reached === true && probe.moved === true,
+{ budget: 22000 }));
 
 // 10) 手机端 UI：桌面 Chrome 里 pointer:coarse 恒假，这套分支平时根本跑不到，
 //     而它坏起来全是「点了没反应」——电脑上盯多久都看不出来。用 ?touch=1 强制打开验：
