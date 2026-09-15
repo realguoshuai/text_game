@@ -332,11 +332,11 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=7', json: true, weight: 64, label: '读取地图数据' },
-      { url: 'assets/tiles_atlas.webp?v=4', atlas: 'tiles', weight: 176, label: '载入地貌与建筑' },
+      { url: 'assets/maps.json?v=8', json: true, weight: 64, label: '读取地图数据' },
+      { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
-      { url: 'assets/tiles_atlas.json?v=4', json: true, weight: 4, label: '读取地貌索引' },
+      { url: 'assets/tiles_atlas.json?v=5', json: true, weight: 5, label: '读取地貌索引' },
     { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
     { url: 'assets/foes_atlas.json?v=2', json: true, weight: 10, label: '读取妖兽索引' },
     { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
@@ -1087,14 +1087,18 @@
           var name = file, top = false;
           var vs = GT && GT[ch];
           if (vs && vs.length) {
+            // noSideWall：本图图幅内没有虚空（整幅都是水/陆），边缘退回带侧壁的
+            // 原始瓦只会露出一圈底座，所以直接全程用无缝顶面瓦。
+            var flat = !!CUR.noSideWall;
             if (WATER.indexOf(ch) >= 0) {
-              if (waterAround(x, y)) { name = vs[0]; top = true; }
+              // 全湖只画 vs[0] 会是「一张水图反复贴」，格感很重 —— 按格 hash 挑变体。
+              if (flat || waterAround(x, y)) { name = vs[tileHash(x, y) % vs.length]; top = true; }
             } else {
               // 南邻(y+1) / 东邻(x+1) 在屏幕上位于本格的左下与右下 —— 只有它们
               // 是虚空时，本格的泥土侧壁才露得出来；否则整格用无缝顶面瓦。
               var sb = (y + 1 < CUR.h) ? CUR.ground[y + 1][x] : ' ';
               var se = (x + 1 < CUR.w) ? row[x + 1] : ' ';
-              if (PAL[sb] && PAL[se]) { name = vs[tileHash(x, y) % vs.length]; top = true; }
+              if (flat || (PAL[sb] && PAL[se])) { name = vs[tileHash(x, y) % vs.length]; top = true; }
             }
           }
           var pz = piece(name);

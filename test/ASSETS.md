@@ -6,23 +6,23 @@
 
 ---
 
-## 一、运行时真正加载的（11 个文件，合计 2.26MB，全部已入库）
+## 一、运行时真正加载的（11 个文件，合计 1.32MB，全部已入库）
 
 线上只要这 11 个文件在，游戏就是完整的。逐个核过 git 跟踪状态，无遗漏。
 
 | # | 路径 | 体积 | 用途 | 缓存版本 |
 |---|---|---|---|---|
-| 1 | `test/index.html` | 13KB | 页面骨架、HUD、触屏/横屏样式 | — |
-| 2 | `test/js/game.js` | 112KB | 引擎（地图、战斗、怪物 AI、手机适配） | — |
-| 3 | `test/assets/maps.json` | 62KB | 4 张地图：`qingxuan` 青玄山门 / `lingquan` 灵泉灵瀑 / `beilin` 碑林石阵 / `dungeon` 幽冥地宫（Kenney 地牢素材测试） | `?v=1` |
-| 4 | `test/assets/tiles_atlas.webp` | 121KB | 地图瓦片与物件图集（`deco_*` / `prop_*` / `building_*`） | `?v=1` |
-| 5 | `test/assets/tiles_atlas.json` | 2KB | 瓦片图集索引 `{rect}` | `?v=1` |
-| 6 | `test/assets/chars_atlas.webp` | 183KB | 主角 11 套外形图集 | `?v=3` |
+| 1 | `test/index.html` | 22KB | 页面骨架、HUD、触屏/横屏样式 | — |
+| 2 | `test/js/game.js` | 157KB | 引擎（地图、战斗、怪物 AI、手机适配） | — |
+| 3 | `test/assets/maps.json` | 62KB | 5 张地图：`qingxuan` 青玄山门 / `lingquan` 灵泉灵瀑 / `beilin` 碑林石阵 / `dungeon` 幽冥地宫（Kenney 地牢素材测试） / `bixiao` 碧霄灵谷 | `?v=8` |
+| 4 | `test/assets/tiles_atlas.webp` | 228KB | 地图瓦片与物件图集（`deco_*` / `prop_*` / `building_*` / `floor_*`） | `?v=5` |
+| 5 | `test/assets/tiles_atlas.json` | 5KB | 瓦片图集索引 `{rect}` | `?v=5` |
+| 6 | `test/assets/chars_atlas.webp` | 183KB | 主角 11 套外形图集 | `?v=1` |
 | 7 | `test/assets/chars_atlas.json` | <1KB | 主角帧索引 | `?v=3` |
 | 8 | `test/assets/heroes.json` | 2KB | 主角外形清单 + 素材包授权 | `?v=1` |
 | 9 | `test/assets/foes_atlas.webp` | 680KB | 怪物图集（9 只：牛魔×2 / 游方×3 / 蛇妖×2 / 铠甲卫 / 小僵尸），由 PNG 转有损 q90 | `?v=1` |
-| 10 | `test/assets/foes_atlas.json` | 10KB | 怪物帧索引（每只每个动作的帧矩形） | `?v=2` |
-| 11 | `test/assets/beasts.json` | 11KB | 怪物属性 / 刷怪格 / 动作帧率 | `?v=1` |
+| 10 | `test/assets/foes_atlas.json` | 8KB | 怪物帧索引（每只每个动作的帧矩形） | `?v=2` |
+| 11 | `test/assets/beasts.json` | 9KB | 怪物属性 / 刷怪格 / 动作帧率 | `?v=2` |
 
 加载顺序与进度权重写在 `game.js` 的 `LOAD_PLAN` 里（第 252 行）。
 
@@ -115,6 +115,13 @@ vamp_31.png  vamp_32.png  vamp_33.png     ninja_41.png  ninja_42.png  ninja_43.p
 - 建议：以后往 `sucai/` 丢新包时**保留原始下载目录名**，或在登记表的 `license` 字段里直接写上产品页 URL。
 
 **地图素材**：`tiles_atlas.png` 由 AI 生成（Gemini）的等距场景大图经 `tools/slice_sheet.py` 连通域切图得到，原始大图归档在 `sucai/`（不入库）。
+
+**地面无缝瓦 `assets/floor/`（2026-09-15 新增，仅 `bixiao` 碧霄灵谷使用）**：源是 **Screaming Brain Studios** 的等距瓦包（Overworld / Floor），
+发布在 OpenGameArt 与 itch.io，**CC0 / 公共领域，可商用、免署名、可再分发**（比 CraftPix 那批更宽松）。
+`tools/prep_floor.py` 把它重铸成两类瓦：`<terrain>_<nn>.png`（无缝顶面瓦，高通 + 统一颗粒幅度 + 格边渐隐，
+密铺不露菱形补丁）与 `<terrain>_cube.png`（**带崖壁的立方瓦**，供岛缘侧壁用）。原始包不入库（`_cc0/` 已 gitignore），
+产物 `assets/floor/` 入库。重跑：`prep_floor.py --map bixiao` → `build_atlas.py --only tiles` → `make_webp.py tiles_atlas`。
+⚠ 这几块瓦**只挂给 bixiao 自己的字符**（`g m s p r h d`）；`tilePalette` 是全局表，别去改 `.` `,` `#` 那些键，否则会连带改掉其它四张图的岸线。
 
 **另有两处素材不在 `test/` 这条线上**：
 

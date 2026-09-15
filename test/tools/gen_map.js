@@ -25,8 +25,22 @@ const CFG = { id: 'bixiao', name: '碧霄灵谷', w: 36, h: 36, seed: 20260915 }
 const W = CFG.w, H = CFG.h;
 const cx = (W - 1) / 2, cy = (H - 1) / 2;
 
-const CH_VOID = ' ', CH_GRASS = '.', CH_SOIL = ',', CH_PAVE = '#', CH_WATER = '~',
-  CH_SHALLOW = '-';
+// ★ 本图用**自己的一套地形字符**（g/m/s/p/r/h/d），不复用 '.' ',' '#' ';' '~' '-'。
+// 原因：字符 -> 瓦 的映射里，groundTop 是按地图给的（可以各图不同），但
+//   **tilePalette 是全局的**，它决定"没有 groundTop 的时候退回哪块**带崖壁的立方瓦**"。
+//   本图沿用旧字符时，海岸线那一圈（南/东邻是虚空的陆格）必定退回旧瓦 —— 也就是
+//   用户点名的「纯色板绿」和「霓虹青水面」，结果就是一圈旧素材包着新地面。
+//   开一套新字符，才能把 tilePalette 里这几块**也换成重铸过的崖壁瓦**，
+//   同时完全不动青玄/灵泉/碑林/地宫在用的那几块。
+//   （早期版本只新增了一个 '=' 岸沫字符，就是被这个约束逼的。）
+const CH_VOID = ' ';
+const CH_GRASS = 'g';    // 常草
+const CH_MEADOW = 'm';   // 亮草甸（同源、更亮，用来切出成片明暗草场）
+const CH_SOIL = 's';     // 滩涂/裸土
+const CH_PAVE = 'p';     // 石板路
+const CH_RIM = 'r';      // 岸沫
+const CH_SHALLOW = 'h';  // 浅水
+const CH_WATER = 'd';    // 深水
 
 // 注意：ROT.Noise.Simplex 的第一个参数是「梯度表」不是种子，传数字会死循环。
 // 要可复现的噪声，正确做法是先用 ROT.RNG.setSeed 固定随机源、再无参构造。
@@ -34,6 +48,8 @@ ROT.RNG.setSeed(CFG.seed);
 const nA = new ROT.Noise.Simplex();
 ROT.RNG.setSeed(CFG.seed + 977);
 const nB = new ROT.Noise.Simplex();
+ROT.RNG.setSeed(CFG.seed + 8123);
+const nC = new ROT.Noise.Simplex();
 ROT.RNG.setSeed(CFG.seed + 4242);
 
 let __t = Date.now();
@@ -54,17 +70,72 @@ function pieceSize(f) {
 }
 
 // ---------------------------------------------------------------- 1. 有机岛形
-const RX = 17.0, RY = 15.8;
+// 形状取向（2026-09-15 第四版）：回到全套地图统一的做法 —— **虚空 + 有机海岸线 +
+// 崖壁**。前三版走过的弯路记在这里，别再回头：
+//   · 第一版：小岛 + 一圈浅水 + 圈外虚空 → 观感是"浮空的贴片"（用户原话）。
+//   · 第二版：把陆地顶到图幅四边 → 四边被图幅直接切断，成了一个正方地块；
+//     而且半径≈图幅半宽时，椭圆轮廓在等距下就是一整条 45° 斜线，投影出来是
+//     一圈**步长完全一致**的锯齿（像机器切的菱形）。
+//   · 第三版：岛落在图幅内、四周由水包住 → 不切边了，但轮廓还是一条椭圆，
+//     投影出来仍是**几何菱形**：青玄山门那种"参差的海岸线"完全没有。原因见下。
+//   · 这一版：把「边缘处理」交还给引擎本来就在用的那套（虚空 + PAL[ch] 的带崖壁
+//     立方瓦），陆地只负责长成有机形状。
+// 关键手法：**在二维噪声场上取轮廓**，不是在圆周上采样噪声。
+//   旧写法 nA.get(cos(ang)*k, sin(ang)*k) 把噪声只沿一条圆采样 —— 于是陆地的
+//   极坐标半径 ang -> r(ang) 是**单值函数**，形状在数学上被限定为"星形"：可以有
+//   凸起和凹口，但**永远不可能出现真正咬进去的海湾或伸出来的岬角**。这就是为什么
+//   无论把幅度调多大、倍频加几档，投影出来始终是个圆（等距下＝标准菱形）。
+//   改成 d(x,y) <= 1 + field(x,y)：边界是「径向包络」与「二维噪声等值线」的交，
+//   噪声场自身带闭合的岛/湾结构，海岸线才真的参差。
+// 两个尺度分工（2026-09-15 补）：低频项（~18 格）负责"这块整体鼓出来 / 凹进去"，
+//   决定岛的**轮廓走向**，它才填得满图幅四角；中高频项只负责岸线上的小湾小岬。
+//   只放中高频（旧版 0.105/0.255/0.560）时，轮廓仍是一条半径均匀的椭圆 ——
+//   因为那些项在一个"整岛尺度"上互相抵消，平均下来还是圆。
+// 包络形状 = **椭圆**（p=2）。为什么不用超椭圆去"填四角"（试过 p=6，反而更糟）：
+//   p 越大轴向那一段越平 —— p=6 时边界在 |dy|<=0.5 的范围内 x 只变化 0.03 格，
+//   等距下就是一条 13 格长的**笔直海岸线**，比椭圆更假。四角本来就该留虚空：
+//   青玄山门的岸线也是"大块陆地填满内部、四角倒角、边缘薄薄一圈不规则虚空"。
+//   所以轮廓的参差完全交给噪声，包络只负责"别碰到图幅边"。
+const INSET = 2.6;                  // 包络半径离图幅边这么多格（噪声还能往外鼓过它）
+const RXN = cx - INSET, RYN = cy - INSET;
+// 噪声配比（2026-09-15 定，land≈63%，与青玄的 63% 同量级）：
+//   ⚠ 只用一档最低频时，它的**零等值线**会刚好顺着一条轴向跑，海岸线被"拖直"
+//   十几格（试过：整条左边是笔直的竖线）。两档低频、不同噪声源、不同相位叠加之后
+//   等值线才弯得起来。中高频只负责岸线上的小湾小岬，权重不能大。
+const LAND_TERMS = [
+  [nC, 0.034, 7, 0.28],    // 岛的大鼓包 / 大凹进（~29 格）
+  [nA, 0.062, 41, 0.30],   // 次级大湾（~16 格）
+  [nA, 0.120, 3, 0.24],    // 大湾 / 大岬角（~8 格）
+  [nC, 0.240, 77, 0.16],   // 次级海湾（~4 格）
+  [nA, 0.550, 90, 0.09],   // 岸线碎边（~1.8 格）
+];
+const LAND_AMP = 0.46;
 function landAt(x, y) {
-  const dx = (x - cx) / RX, dy = (y - cy) / RY;
-  const d = Math.hypot(dx, dy);
-  if (d > 1.38) return false;
-  const ang = Math.atan2(y - cy, x - cx);
-  const n =
-    nA.get(Math.cos(ang) * 2.1 + 10, Math.sin(ang) * 2.1 + 10) * 0.110 +
-    nA.get(Math.cos(ang) * 5.6 + 40, Math.sin(ang) * 5.6 + 40) * 0.050 +
-    nA.get(x * 0.40 + 3, y * 0.40 + 3) * 0.042;
-  return d <= 1 + n;
+  const dx = Math.abs(x - cx) / RXN, dy = Math.abs(y - cy) / RYN;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d > 2.2) return false;                      // 远到不可能成陆，省掉噪声采样
+  let f = 0;
+  for (const [n, k, o, w] of LAND_TERMS) f += n.get(x * k + o, y * k + o) * w;
+  return d <= 1 + f * LAND_AMP;
+}
+
+/** 8 邻多数滤波：削 1 格凸起、填 1 格凹口。等距下海岸线的锯齿全靠它抹平。 */
+function smoothMask(mask, passes, lo, hi) {
+  for (let pass = 0; pass < passes; pass++) {
+    const nx = mask.map(r => r.slice());
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let c = 0;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+        const yy = y + j, xx = x + i;
+        if (yy < 0 || yy >= H || xx < 0 || xx >= W) continue;
+        c += mask[yy][xx];
+      }
+      if (mask[y][x] && c < lo) nx[y][x] = 0;       // 孤零零的凸起 → 削掉
+      if (!mask[y][x] && c > hi) nx[y][x] = 1;      // 只剩一格的凹口 → 填平
+    }
+    mask = nx;
+  }
+  return mask;
 }
 
 let land = [];
@@ -72,20 +143,9 @@ for (let y = 0; y < H; y++) {
   land[y] = [];
   for (let x = 0; x < W; x++) land[y][x] = landAt(x, y) ? 1 : 0;
 }
-for (let pass = 0; pass < 2; pass++) {
-  const nx = land.map(r => r.slice());
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    let c = 0;
-    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
-      const yy = y + j, xx = x + i;
-      if (yy < 0 || yy >= H || xx < 0 || xx >= W) continue;
-      c += land[yy][xx];
-    }
-    if (land[y][x] && c < 3) nx[y][x] = 0;
-    if (!land[y][x] && c >= 7) nx[y][x] = 1;
-  }
-  land = nx;
-}
+// lo=4 / hi=4 是标准多数滤波；跑 3 遍足以把 1 格锯齿消干净，
+// 再往上跑就会把噪声给的"湖湾"也啃圆，失去有机感。
+land = smoothMask(land, 1, 4, 4);
 tick('岛形');
 
 // 只保留最大连通域
@@ -112,21 +172,86 @@ tick('岛形');
   for (const [x, y] of best) land[y][x] = 1;
 })();
 
+// 填掉被陆地围住的孤立虚空格。
+// keepBiggest 只处理"孤立的陆地"，管不了"陆地中间的洞"：噪声在海湾处留下一个
+// 1 格的虚空，四邻全是陆地，等距下就是一个**露天的窟窿**（天空从地面中央透出来）。
+// 判据很省事：从图幅四边把"非陆格"淹没一遍，淹不到的非陆格就是洞。
+(function fillHoles() {
+  const seen = land.map(r => r.map(() => 0));
+  const q = [];
+  for (let x = 0; x < W; x++) {
+    if (!land[0][x]) { seen[0][x] = 1; q.push([x, 0]); }
+    if (!land[H - 1][x]) { seen[H - 1][x] = 1; q.push([x, H - 1]); }
+  }
+  for (let y = 0; y < H; y++) {
+    if (!land[y][0]) { seen[y][0] = 1; q.push([0, y]); }
+    if (!land[y][W - 1]) { seen[y][W - 1] = 1; q.push([W - 1, y]); }
+  }
+  for (let i = 0; i < q.length; i++) {
+    const [x, y] = q[i];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || xx >= W || yy < 0 || yy >= H) continue;
+      if (land[yy][xx] || seen[yy][xx]) continue;
+      seen[yy][xx] = 1; q.push([xx, yy]);
+    }
+  }
+  let filled = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!land[y][x] && !seen[y][x]) { land[y][x] = 1; filled++; }
+  }
+  if (filled) console.error('  [补洞] ' + filled + ' 个被围住的虚空格 → 陆地');
+})();
+
+// 填掉"针眼"：8 邻域里陆地邻居 >=5 的虚空格，只剩一个口子通向外面 —— 等距下就是
+// 岸线上一个 1 格的针孔，读起来像噪点而不是海湾。真正的海湾至少宽 2 格。
+// ⚠ 上一步的 smoothMask 里其实有同一条规则（hi=4 就是"陆地邻居 >=5 就填"），
+//   但它在 keepBiggest 之前跑，被 drop 掉的分量附近的计数会失真，留下漏网的。
+//   这里在 keepBiggest 之后再跑一遍，且跑两趟（填一格会让旁边的计数达到阈值）。
+for (let pass = 0; pass < 2; pass++) {
+  const add = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (land[y][x]) continue;
+    let c = 0;
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      if (!i && !j) continue;
+      const yy = y + j, xx = x + i;
+      if (yy < 0 || yy >= H || xx < 0 || xx >= W) continue;
+      if (land[yy][xx]) c++;
+    }
+    if (c >= 5) add.push([x, y]);
+  }
+  if (!add.length) break;
+  for (const [x, y] of add) land[y][x] = 1;
+  if (pass === 0) console.error('  [补针眼] ' + add.length + ' 格');
+}
+
 // ---------------------------------------------------------------- 2. 灵湖
-const LX = cx, LY = cy - 3.0, LRX = 6.8, LRY = 5.0;
+// 中央灵湖是全图唯一的大水面，必须够大才立得住：第一版 LRX/LRY=6.8/5.0 只有
+// 33 格深水，在一整片草地上就是一个"水坑"。现在约 170 格，且同样只由角度低频
+// 项塑形 + 多数滤波，避免湖岸碎成锯齿。
+const LX = cx, LY = cy - 1.4, LRX = 8.6, LRY = 7.1;
+// ⚠ 湖岸同样**不能**沿圆周采样噪声（和岛形是同一个错，见上）：那样湖的极半径是
+//   单值函数，形状被数学锁死成星形 —— 投影出来就是一个"方台阶水池"，
+//   而湖岸恰好是全图最显眼的一条边。照样改成二维噪声场取等值线。
+const LAKE_TERMS = [
+  [nA, 0.150, 31, 0.55],   // 湖的大湾（~6.7 格）
+  [nA, 0.330, 7, 0.28],    // 次级凸凹（~3 格）
+  [nA, 0.700, 61, 0.12],   // 岸线碎边（~1.4 格）
+];
 function lakeAt(x, y) {
   const dx = (x - LX) / LRX, dy = (y - LY) / LRY;
-  const d = Math.hypot(dx, dy);
-  if (d > 1.3) return false;
-  const ang = Math.atan2(y - LY, x - LX);
-  const n = nA.get(Math.cos(ang) * 1.9 + 60, Math.sin(ang) * 1.9 + 60) * 0.18 +
-    nB.get(x * 0.5 + 11, y * 0.5 + 11) * 0.10;
-  return d <= 1 + n;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d > 1.6) return false;
+  let f = 0;
+  for (const [n, k, o, w] of LAKE_TERMS) f += n.get(x * k + o, y * k + o) * w;
+  return d <= 1 + f * 0.32;
 }
 let water = land.map(r => r.map(() => 0));
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   if (land[y][x] && lakeAt(x, y)) water[y][x] = 1;
 }
+water = smoothMask(water, 1, 4, 4);
 
 // ---------------------------------------------------------------- 距离场工具
 function bfsDistFrom(isSource) {
@@ -169,27 +294,33 @@ for (let y = 0; y < H; y++) {
   for (let x = 0; x < W; x++) {
     if (!land[y][x]) { ground[y][x] = CH_VOID; continue; }
     if (water[y][x]) { ground[y][x] = CH_WATER; continue; }
-    // 滩涂：岛缘与湖缘都取「离水/离虚空的距离」，取小值当边带宽度。
-    // ⚠ 这里曾经是「逐格采样噪声决定土/草」，出来的是满地单点泥斑 —— 滩涂是
-    //    一条连续的带，不是随机撒的泥点。所以先保证 eb=1 一圈连续，再用低频
-    //    噪声把 eb=2 的地方断续加宽，形成宽窄不一的滩嘴。
+    // 滩涂：取「离水/离虚空的距离」小值，只有 1 格宽的连续带。
+    // ⚠ 两处历史坑，都出自同一类错误 —— 用逐格噪声去修饰一条"带"：
+    //   ① 最早是逐格采样噪声决定土/草，出来满地单点泥斑；
+    //   ② 后来改成 eb=1 连续 + eb=2 再按噪声断续加宽，第二圈就变成了
+    //      "草地内部打满碎石补丁"（滩涂在地图上占 15%，却全在草地中间碎掉）。
+    //   滩涂是水陆过渡，就老老实实贴着岸走一圈，宽度交给岸线形状去变化。
     const eb = Math.min(distVoid[y][x], distWater[y][x]);
     if (eb <= 1) {
       ground[y][x] = CH_SOIL;
-    } else if (eb === 2 && nB.get(x * 0.22 + 31, y * 0.22 + 31) > 0.18) {
-      ground[y][x] = CH_SOIL;
     } else {
-      ground[y][x] = CH_GRASS;
+      // 大尺度草甸斑块：低频噪声分出「亮草甸 / 常草」两种草地。
+      // 整张图只铺一种绿，投影成一个菱形大色块，平坦得像一块毯子；有了成片
+      // 的明暗草场，地面才有"地形"的读感。
+      // ⚠ 频率必须**很低**：0.19 时特征尺度只有 ~5 格，出来是满地绿斑（又变回撒点
+      //   噪声了，只是斑块大一点）。0.105 给到 ~10 格，才是"一片草场"。
+      ground[y][x] = nC.get(x * 0.105 + 5, y * 0.105 + 5) > 0.20 ? CH_MEADOW : CH_GRASS;
     }
   }
 }
 
-// 环岛灵池：岛不能直接断在半空 —— 草地一步踩出去就是天空，整座岛看着像
-// 一块浮在纸上的贴片。只铺 RING 圈也不够：圈外依然是虚空，等于把"浮空的岛"
-// 换成了"浮空的岛+浮空的水圈"。所以图幅内所有非陆格一律铺浅水，整幅图就是
-// 一汪到边的灵池，岛坐沉在池底，"岸 → 浅滩 → 池水"的过渡一气呵成。
+// 图幅内所有非陆格 = 虚空（CH_VOID），引擎跳过不画，露出天空。
+// 为什么不再"非陆格一律铺水"：全铺水等于给岛套了一圈规则的水带，读到的还是
+// "一块浮板 + 一圈蓝边"。引擎本来就有一套边缘处理 —— 陆格的南/东邻是虚空时，
+// 它改用 PAL[ch] 那块**带崖壁的立方瓦**（见 game.js 的 drawGround），于是岛有了
+// 厚度，和其余四张图完全同款。水只留在岛内的灵湖里，是"地形"，不是"边框"。
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-  if (!land[y][x]) ground[y][x] = CH_SHALLOW;
+  if (!land[y][x]) { ground[y][x] = CH_VOID; water[y][x] = 0; }
 }
 
 // ---------------------------------------------------------------- 4. 中轴：石堤 + 湖心祭坛
@@ -227,17 +358,34 @@ for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
 })();
 tick('石堤 + 湖心祭坛');
 
-// 湖缘浅水：贴岸一圈换用 '-' 瓦，让水面有「浅 → 深」的层次，
+// 岸线浅水：所有「水与非水相邻」的格子换成 '-' 瓦。这样每一条岸（灵湖的、
+// 湖湾的、图幅边缘的）都自带一圈更亮的浅水，水面才有「浅 → 深」的层次；
 // 否则一整片同色水在等距下就是一块平板。
-(function shadeLakeEdge() {
+(function shadeShore() {
+  // ⚠ 别用 distLand：它的源是「是否陆地」，而湖格本身也算陆地（水是陆地掩码的子集），
+  //   于是湖里每格的 distLand 都是 0，整片湖会被判成"贴岸"而全刷成浅水 ——
+  //   深浅水的层次直接消失（这正是"湖面像一块平板"的真凶）。
+  //   要量"离岸多远"必须反过来：从**非水**的格子出发做距离场。
+  //
+  // 三档水色按「离岸距离」逐格**概率**决定：
+  //   '=' 岸沫（最亮）→ '-' 浅水 → '~' 深水（最暗）。
+  // 两个要点：
+  //   ① 必须有"亮 → 暗"的渐变带，水才有深度。只有两档且色调拉开时，边界是一条
+  //      1 格一阶的楼梯，湖面被切成亮、暗两块剪纸；色调不拉开则整片平掉。
+  //   ② 每一档都用概率抖，不用"距离 <= N 就一定是某档" —— 硬边界在等距网格上
+  //      永远是楼梯。抖动之后，5 格宽度里自然过渡，看不出格。
+  // <0.5 时取更亮的那一档。
+  const distDry = bfsDistFrom(([x, y]) => !water[y][x]);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!water[y][x]) continue;
-    let edge = false;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const xx = x + dx, yy = y + dy;
-      if (xx < 0 || xx >= W || yy < 0 || yy >= H || !water[yy][xx]) { edge = true; break; }
-    }
-    if (edge) ground[y][x] = CH_SHALLOW;
+    const dd = Math.min(5, distDry[y][x]);
+    // 抖动量用**低频噪声**而不是纯随机：纯随机的深浅交界是满地麻点，像油渍；
+    // 让抖动沿噪声等值线走，深水区就成片、边界是有形状的（这才像水深变化）。
+    const r = 0.5 + 0.5 * nB.get(x * 0.34 + 7, y * 0.34 + 7);
+    if (dd <= 1) ground[y][x] = CH_RIM;
+    else if (dd === 2) ground[y][x] = r < 0.22 ? CH_RIM : CH_SHALLOW;
+    else if (dd === 3) ground[y][x] = r < 0.55 ? CH_SHALLOW : CH_WATER;
+    else ground[y][x] = CH_WATER;
   }
 })();
 
@@ -291,19 +439,49 @@ function findPath(from, to) {
   return out.reverse();
 }
 
+// 谷口定在南缘正中 —— 「从南边进谷」是这个场景的叙事起点。
+// ⚠ 原来靠 distVoid<=2（"紧贴岸线"）来判定谷口，前提是"岛被水围一圈"。改成
+//   陆地铺到图幅四边之后，南缘整条都是陆地、distVoid 很大，于是条件永远不成立，
+//   循环一路扫到最北边才碰到水，谷口跑到了北岸（整套路网跟着翻个个儿）。
+//   现在只要求"南缘能走、且两格内有邻居能走"，不再依赖水的存在。
 let entry = null;
-for (let y = H - 1; y >= 0 && !entry; y--) {
-  for (let x = Math.floor(cx) - 3; x <= Math.ceil(cx) + 3; x++) {
-    if (passable(x, y) && distVoid[y][x] <= 2) { entry = [x, y]; break; }
+for (let y = H - 1; y >= 1 && !entry; y--) {
+  for (let x = Math.floor(cx) - 4; x <= Math.ceil(cx) + 4; x++) {
+    if (!passable(x, y) || !passable(x, y - 1)) continue;
+    let open = 0;
+    for (let j = 0; j <= 2; j++) for (const dx of [-1, 0, 1]) if (passable(x + dx, y - j)) open++;
+    if (open >= 8) { entry = [x, y - 1]; break; }
   }
 }
+// 锚点写的是"大概位置"（"东边竹林那一片"），而岛形/湖形每调一次参数就会动，
+// 于是锚点很容易落到水里或虚空里 —— findPath 返回 null，那条支路**静默消失**，
+// 只在自检里留一行 ⚠。所以锚点一律先吸到最近的、**站得住**的可行走格再拿去寻路。
+// ⚠ 光判 passable 不够：湖形一变，(27,17) 那种"一格孤岛"也会 passable，
+//   吸上去照样不可达（实测踩过 —— 竹苑那条路整条没了）。所以还要求四邻里至少
+//   3 格可走，把 1 格窄的悬崖边、堤头排除掉。
+function openDeg(x, y) {
+  let n = 0;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (passable(x + dx, y + dy)) n++;
+  return n;
+}
+function snapAnchor(a, maxR) {
+  if (passable(a[0], a[1]) && openDeg(a[0], a[1]) >= 3) return a;
+  for (let r = 1; r <= (maxR || 9); r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = a[0] + dx, y = a[1] + dy;
+      if (passable(x, y) && openDeg(x, y) >= 3) return [x, y];
+    }
+  }
+  return a;
+}
 const ANCHORS = {
-  vein: [Math.round(cx) - 6, 6],
-  bamboo: [W - 9, Math.round(cy) + 1],
-  spring: [8, Math.round(cy) + 7],
-  garden: [W - 11, H - 11],
+  vein: snapAnchor([Math.round(cx) - 5, 5]),
+  bamboo: snapAnchor([W - 9, Math.round(cy) - 1]),
+  spring: snapAnchor([7, Math.round(cy) + 8]),
+  garden: snapAnchor([W - 10, H - 9]),
 };
-const altar = [AX_X, altarY + 2];   // 可达性锚点：雕像占住台心，锚点定在雕像南侧的迎宾位
+const altar = snapAnchor([AX_X, altarY + 2]);   // 可达性锚点：雕像占住台心，锚点定在雕像南侧的迎宾位
 
 const routes = [];
 function drawRoute(r) {
@@ -328,6 +506,57 @@ for (const k of Object.keys(ANCHORS)) {
 let paveN = 0;
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (ground[y][x] === CH_PAVE) paveN++;
 tick('主路 + 支路');
+const paveBefore = paveN;
+
+// ---------------------------------------------------------------- 5b. 路面骨架化
+// 支路汇入主路时总会并行两三个格子才贴上，画出来就是一小块"宽石台"（放大看很扎眼）。
+// 代价函数再怎么罚都消不干净 —— 因为并行段确实是最短路径。所以画完统一收缩：
+// 反复删掉「删了也不影响路面连通性」的格子（非端点、且其路面邻居互相仍连通）。
+// 保护集 = 祭坛平台 + 石堤：那两处的"宽"是设计意图，不是并线事故。
+(function thinPave() {
+  const keep = new Set();
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+    if (Math.abs(dx) + Math.abs(dy) > 3) continue;
+    const x = AX_X + dx, y = altarY + dy;
+    if (x >= 0 && x < W && y >= 0 && y < H) keep.add(x + ',' + y);
+  }
+  for (let dy = -4; dy <= 4; dy++) keep.add(AX_X + 1 + ',' + (altarY + dy));
+  for (let dy = -4; dy <= 4; dy++) keep.add(AX_X - 1 + ',' + (altarY + dy));
+
+  const N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  const isP = (x, y) => x >= 0 && x < W && y >= 0 && y < H && ground[y][x] === CH_PAVE;
+  for (let pass = 0; pass < 3; pass++) {
+    const list = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (isP(x, y)) list.push([x, y]);
+    shuffle(list);
+    let removed = 0;
+    for (const [x, y] of list) {
+      if (!isP(x, y) || keep.has(x + ',' + y)) continue;
+      const nb = N8.filter(([i, j]) => isP(x + i, y + j)).map(([i, j]) => [x + i, y + j]);
+      if (nb.length < 2) continue;                 // 端点：删了就成断头路
+      // 去掉本格后，路面邻居之间是否仍然连通？连通 → 本格是"赘肉"，可删。
+      const set = new Set(nb.map(p => p[0] + ',' + p[1]));
+      const seen = new Set([nb[0][0] + ',' + nb[0][1]]);
+      const q = [nb[0]];
+      while (q.length) {
+        const [ax, ay] = q.pop();
+        for (const [i, j] of N8) {
+          const k = (ax + i) + ',' + (ay + j);
+          if (!set.has(k) || seen.has(k)) continue;
+          seen.add(k); q.push([ax + i, ay + j]);
+        }
+      }
+      if (seen.size !== set.size) continue;         // 是割点，删了会断路
+      ground[y][x] = CH_GRASS;
+      removed++;
+      nb.length = 0;
+    }
+    if (!removed) break;
+  }
+})();
+paveN = 0;
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (ground[y][x] === CH_PAVE) paveN++;
+tick('路面骨架化（' + paveBefore + ' → ' + paveN + ' 格）');
 
 // ---------------------------------------------------------------- 6. 景区分区
 const REGION_ANCHORS = [
@@ -658,6 +887,9 @@ const mapObj = {
   objects,
   portals,
   spawn,
+  // ⚠ 不要加 noSideWall。它的作用是"整幅图没有虚空、边缘退回原始瓦只会露底座"，
+  //   本图有虚空，正是要靠引擎的侧壁逻辑给岛做出厚度（和青玄山门等四张图一致）。
+  //   曾经为了掩盖"水面/纯色顶面瓦不配套"用过它，结果是岛变成一张没有厚度的纸片。
   note: '灵气汇聚的谷地秘境：中轴石堤贯穿灵湖、湖心祭坛，东竹苑、西南温泉、北灵脉晶簇、东南静观石庭，南谷口通山门',
   npcs: [
     { x: entry[0] + 4, y: entry[1] - 3, char: 'npc_5', name: '守谷弟子', face: 'down', line: '沿石堤走过去就是湖心祭坛。那碑上的符别乱碰——上回有人拔了一张，躺了半个月。' },

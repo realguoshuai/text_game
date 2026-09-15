@@ -37,7 +37,7 @@ def tile_hash(x, y):
     return (h & 0x7FFFFFFF)
 
 
-def render(map_id, out, Z=0.30, pad=50, show_marks=True, ground_only=False, only=None):
+def render(map_id, out, Z=0.30, pad=50, show_marks=True, ground_only=False, only=None, floor_dir=None):
     """only: 只画这些地面字符（其余当空格）—— 用来把地面按层拆开看，
     定位"这片怪颜色到底是谁"时比盯着综合图猜快得多。"""
     maps, atlas, idx = load()
@@ -61,12 +61,17 @@ def render(map_id, out, Z=0.30, pad=50, show_marks=True, ground_only=False, only
         if name in raw_cache:
             return raw_cache[name]
         im = None
-        p = os.path.join(ASSETS, name)
-        if os.path.exists(p):
-            im = Image.open(p).convert('RGBA')
-        elif name in idx:
-            x, y, w, h = idx[name]
-            im = atlas.crop((x, y, x + w, y + h))
+        if name.startswith('@'):
+            fp = os.path.join(floor_dir or '', name[1:])
+            if floor_dir and os.path.exists(fp):
+                im = Image.open(fp).convert('RGBA')
+        else:
+            p = os.path.join(ASSETS, name)
+            if os.path.exists(p):
+                im = Image.open(p).convert('RGBA')
+            elif name in idx:
+                x, y, w, h = idx[name]
+                im = atlas.crop((x, y, x + w, y + h))
         raw_cache[name] = im
         return im
 
@@ -123,15 +128,18 @@ def render(map_id, out, Z=0.30, pad=50, show_marks=True, ground_only=False, only
             name, top = f, False
             vs = GT.get(ch)
             if vs:
+                flat = bool(mp.get('noSideWall'))
                 if ch in W_CLR:
                     nb = [mp['ground'][yy][xx] for xx, yy in ((x+1, y), (x-1, y), (x, y+1), (x, y-1))
                           if 0 <= xx < w and 0 <= yy < h]
-                    if all(n in W_CLR and PAL.get(n) for n in nb):
-                        name, top = vs[0], True
+                    if flat or all(n in W_CLR and PAL.get(n) for n in nb):
+                        # ⚠ 这里原本取 vs[0]：全湖只用第 0 号变体，整片水就是同一张图
+                        #   反复贴 —— 湖面因此有"瓷砖感"。必须按格 hash 挑变体。
+                        name, top = vs[tile_hash(x, y) % len(vs)], True
                 else:
                     sb = mp['ground'][y + 1][x] if y + 1 < h else ' '
                     se = row[x + 1] if x + 1 < w else ' '
-                    if PAL.get(sb) and PAL.get(se):
+                    if flat or (PAL.get(sb) and PAL.get(se)):
                         name, top = vs[tile_hash(x, y) % len(vs)], True
             im = raw_piece(name)
             if im is None:
