@@ -78,6 +78,42 @@
   #zRange::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;
     background:#ffe6a6;box-shadow:0 0 6px rgba(255,215,94,.7);cursor:pointer}
 
+  /* ---------- 右上角竖排容器：地图速切 + 场景缩略图 ----------
+   * 缩略图要紧跟在地图面板正下方，而那块面板的高度是动态的（手机端默认折叠、
+   * 展开后按钮换行），写死 top 偏移早晚会撞上。放进同一个 flex 列交给布局排，
+   * 两个面板各自再管自己的折叠。容器本身 pointer-events:none，不吃画布点击。 */
+  #rightcol{position:fixed;top:14px;right:14px;z-index:10;display:flex;flex-direction:column;
+    align-items:flex-end;gap:10px;pointer-events:none;max-height:calc(100vh - 28px)}
+  #rightcol #topright{position:static}
+
+  /* ---------- 场景缩略图（右上角）----------
+   * 只解决一件事：我在哪。底图 1 像素 1 格 —— 绿=能走 / 深灰=挡路 / 蓝=水 /
+   * 透明=虚空；上面压传送门(青)、NPC(黄)、妖兽(红)、主角(白圈红点+朝向尖角)，
+   * 再套一个白色视野框。点击任意一格就走到那一格（与画布点击同一条寻路入口）。
+   * 标题条点一下折叠，收起后只剩一条标题，不占画面。 */
+  #minimap{position:static;padding:8px 10px 9px;pointer-events:auto}
+  #minimap .t{font-size:12px;color:#c9bda0;letter-spacing:1px;user-select:none;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    cursor:pointer;pointer-events:auto}
+  #minimap .t .tg{color:#8bf3ff;font-size:11px}
+  #minimap .t #mmName{font-style:normal;color:#8bf3ff;font-weight:600}
+  #minimap .t #mmName:not(:empty)::before{content:' · ';color:#c9bda0;font-weight:400}
+  #minimap canvas{display:block;margin:7px auto 0;border-radius:6px;cursor:crosshair;
+    background:rgba(8,12,22,.85);border:1px solid rgba(214,178,96,.32);
+    image-rendering:pixelated}      /* 底图是 1 像素 1 格，放大必须最近邻，否则糊成一团 */
+  #minimap .leg{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;font-size:10.5px;color:#9fb0c8}
+  #minimap .leg em{display:inline-flex;align-items:center;font-style:normal;white-space:nowrap}
+  #minimap .leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px}
+  #minimap.folded{padding:6px 10px}
+  #minimap.folded .t{margin:0}
+  #minimap.folded canvas,#minimap.folded .leg{display:none}
+  body.touch #minimap{max-width:46vw}
+  /* 手机横屏只有 ~390 高，右上角那两块一起展开会把缩略图顶出屏幕。
+     给 canvas 一个视口高度上限（手机默认是收起的，这条只在用户主动展开时生效）；
+     canvas 是替换元素，只给 max-height 会等比缩，点击换算走 getBoundingClientRect，
+     缩放不影响"点哪走哪"。 */
+  body.touch #minimap canvas{max-height:34vh}
+
   /* 底部操作说明：默认折叠成一行小标签，点一下展开/收起（手机端走 touch 的精简+自动收起逻辑） */
   #bottom{bottom:14px;left:50%;transform:translateX(-50%);padding:5px 13px;
     font-size:12px;color:#c9bda0;text-align:center;line-height:1.7;max-width:72vw;
@@ -255,6 +291,7 @@
   </div>
 </div>
 
+<div id="rightcol">
 <div id="topright" class="hud panel">
   <div class="t">地图速切（无缝流转）</div>
   <div class="maps" id="mapBtns"></div>
@@ -271,6 +308,21 @@
     <div class="t"><span>主角外形</span><b id="heroNow">1 号</b></div>
     <div class="heros" id="heroBtns"></div>
   </div>
+</div>
+
+<!-- 场景缩略图：跟着地图面板排在同一列，标题条点一下收起，展开时点地图任意一格即寻路过去 -->
+<div id="minimap" class="hud panel folded">
+  <div class="t" id="mmHead"><span>场景缩略图<i id="mmName"></i></span><span class="tg" id="mmTg">▸</span></div>
+  <canvas id="mmCanvas" width="120" height="120"></canvas>
+  <div class="leg">
+    <em><i style="background:#7fa86b"></i>可走</em>
+    <em><i style="background:#5a5248"></i>挡路</em>
+    <em><i style="background:#2a5f86"></i>水</em>
+    <em><i style="background:#5fe9ff"></i>传送门</em>
+    <em><i style="background:#ff5a4a"></i>妖兽</em>
+    <em><i style="background:#ff2f2f"></i>你</em>
+  </div>
+</div>
 </div>
 
 <div id="bottom" class="hud panel folded">
@@ -329,6 +381,6 @@
   </div>
 </div>
 
-<script src="js/game.js?v=15"></script>
+<script src="js/game.js?v=16"></script>
 </body>
 </html>

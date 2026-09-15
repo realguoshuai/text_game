@@ -135,7 +135,17 @@ def main():
     ap.add_argument('--block', default='', help='不让走的瓦（本 tileset 内的 tile id，支持区间，如 22,23 或 144-207=水）')
     ap.add_argument('--block-tileset', default='',
                     help='按 tileset 名整组判为不可走（逗号分隔，如 water）。'
-                         '比 --block 写 gid 区间更好维护：Flare 的水面是独立 tileset，名字一眼可辨')
+                         '比 --block 写 gid 区间更好维护：Flare 的水面是独立 tileset，名字一眼可辨。'
+                         '⚠ 与 --trust-collision 同时使用时语义变为「这类瓦算水面」：'
+                         '不再一律判死，只用于剪掉「孤立的水格」（见该参数说明）')
+    ap.add_argument('--trust-collision', action='store_true',
+                    help='★ 按来源引擎的语义判可走：collision 层说了算，object 层只是美术。'
+                         'Flare 地图里真正挡路的是 collision 层（树/墙/崖 100%% 都有标记），'
+                         '而 object 层混着大量「本来就要走上去」的东西 —— 木栈桥、斜坡、矮草、圆石台。'
+                         '一律 solid 会把桥判死；配合 --block-tileset 一刀切水面，'
+                         '连桥下的过道也一起判死（perdition_harbor 实测 41 格，玩家过不了河）。'
+                         '开启后：① 有背景瓦且 collision 为空 = 可走（不再按 tileset 判死）；'
+                         '② object 层的瓦一律不挡路；③ --block-tileset 只用来剪「孤立水格」')
     ap.add_argument('--spawn', default=None,
                     help='出生点 x,y（引擎格，相对裁剪后的图）。默认自动取"四邻皆可走、离图心最近"的格 —— '
                          '导入图的可走区常是岛屿/半岛，硬编码 (W//2,H-1) 会掉进海里')
@@ -335,13 +345,18 @@ def main():
         miss = block_sets - set(s['name'] for s in sets)
         if miss:
             print('  ! --block-tileset 里这些 tileset 不存在: %s' % ','.join(sorted(miss)))
-        for s in sets:
-            if s['name'] in block_sets:
-                nxt = min((t['first'] for t in sets if t['first'] > s['first']), default=10 ** 9)
-                block.update(range(s['first'], nxt))
-        print('  整组不可走: %s' % ','.join(sorted(block_sets)))
+        if a.trust_collision:
+            print('  --block-tileset=%s：collision 说了算，仅在剪枝时当「水面」用（见末尾剪枝报告）'
+                  % ','.join(sorted(block_sets)))
+        else:
+            for s in sets:
+                if s['name'] in block_sets:
+                    nxt = min((t['first'] for t in sets if t['first'] > s['first']), default=10 ** 9)
+                    block.update(range(s['first'], nxt))
+            print('  整组不可走: %s' % ','.join(sorted(block_sets)))
 
     ground = []
+    tset_of = []          # 每格的 background 瓦属于哪个 tileset（剪枝要用）
     wl = [n for n, _ in layers].index(walk_layer)
     sl = None
     if a.solid_layer:
@@ -352,14 +367,15 @@ def main():
             print('  ! --solid-layer %r 不存在，忽略' % a.solid_layer)
     for y in range(y0, y1 + 1):
         row = ''
+        trow = []
         for x in range(x0, x1 + 1):
             # 碰撞层有瓦 -> 该格不可走（Flare 用 collision 层画碰撞区，语义与 walk_layer 相反）
             if sl is not None and layers[sl][1][y * MW + x]:
-                row += ' '
+                row += ' '; trow.append('')
                 continue
             v = layers[wl][1][y * MW + x]
             if not v:
-                row += ' '
+                row += ' '; trow.append('')
                 continue
             # 水面之类"看着是地、其实不让走"的瓦，直接落成虚空字符。
             # 必须在导入期判掉：ground 是引擎唯一的可走性来源（物件 solid 只挡格子，
@@ -367,8 +383,50 @@ def main():
             # block 同时认绝对 gid（v）与 tileset 内相对 id（v-first）：--block 写成
             # 区间时两种口径都可能被用户拿来用，认两种比认一种少踩坑。
             s = [t for t in sets if t['first'] <= v][-1]
-            row += ' ' if (v in block or (v - s['first']) in block) else GRASS
+            hard = v in block or (v - s['first']) in block
+            if a.trust_collision:
+                # collision 层没标 = 作者认为这儿能走（桥下、浅滩、木板道都是这么留的）
+                row += ' ' if hard else GRASS
+            else:
+                row += ' ' if (hard or s['name'] in block_sets) else GRASS
+            trow.append(s['name'])
         ground.append(row)
+        tset_of.append(trow)
+
+    # ---- 剪枝：玩家根本到不了的孤立格 ---------------------------------------
+    # Flare 作者靠"不画 collision"来留出过道（桥/浅滩），但偶尔也会漏标零星的水格；
+    # collision 画得密的地方也常留下一个被围死的单格。判据：
+    #   ① 一块只由水面瓦构成、四周不挨陆地的可走区 —— 到不了，留着就是水面上多一个点；
+    #   ② 只有 1 格的可走区 —— 孤格，四邻全不可走，走进去/点过去的路径都不存在。
+    # 两种都会变成"看着能站、点上去不动"，剪掉最干净。
+    pruned = 0
+    if a.trust_collision:
+        hh, ww = len(ground), len(ground[0])
+        seen = [[False] * ww for _ in range(hh)]
+        for sy2 in range(hh):
+            for sx2 in range(ww):
+                if ground[sy2][sx2] == ' ' or seen[sy2][sx2]:
+                    continue
+                q = [(sx2, sy2)]; seen[sy2][sx2] = True; comp = []; has_land = False
+                while q:
+                    cx, cy = q.pop(); comp.append((cx, cy))
+                    if tset_of[cy][cx] not in block_sets:
+                        has_land = True
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        nx, ny = cx + dx, cy + dy
+                        if 0 <= nx < ww and 0 <= ny < hh and not seen[ny][nx] and ground[ny][nx] != ' ':
+                            seen[ny][nx] = True; q.append((nx, ny))
+                wateronly = block_sets and not has_land
+                if wateronly or len(comp) == 1:
+                    for cx, cy in comp:
+                        r2 = ground[cy]
+                        ground[cy] = r2[:cx] + ' ' + r2[cx + 1:]
+                    pruned += len(comp)
+        if pruned:
+            print('  剪枝 %d 格：孤立水面 + 孤格（玩家本来就走不到，留着只会"看着有路点了不动"）'
+                  % pruned)
+
+    # ---- 复合瓦盖住的格按「瓦」算（在 objects 建好之后处理，见下方 _collision_on）----
     objects = []
     for lname, g in layers:
         if lname in skip:
@@ -416,10 +474,40 @@ def main():
             # 混进排序列表会把每帧的排序与对象分配拖垮。
             objects.append(dict(piece='%s/%s' % (a.prefix, nm),
                                 x=mx - x0, y=my - y0 + oy, fw=fw, fh=fh,
-                                solid=(lname != walk_layer),
+                                # solid：挡不挡路。
+                                # --trust-collision 时一律 False —— 来源引擎里 object 层只是美术，
+                                # 挡路的是 collision 层（已经落进 ground 了）。不这么做的话，
+                                # 木栈桥/斜坡/矮草这些"本来就要走上去"的瓦会变成隐形墙。
+                                solid=(lname != walk_layer) and not a.trust_collision,
                                 # 补回裁 bbox 时去掉的底部余量，保证底边仍对齐格底
                                 dy=int(round(s['off'][1] * scale)) + int(round(cache[(p, crop)][3] * scale)),
                                 gnd=(1 if lname == walk_layer else 0)))
+
+    # 复合瓦（fw*fh>1 且不挡路）盖住的格：源图里这些格是空的（本来就要靠这张瓦画出来），
+    # 只按 background 层算就会变成"看着有台子、点上去不动"。collision 为空才放开。
+    def _collision_on(ox, oy):
+        if sl is None:
+            return False
+        return bool(layers[sl][1][oy * MW + ox])
+
+    opened = 0
+    for o in objects:
+        if o.get('solid') or (o['fw'] == 1 and o['fh'] == 1):
+            continue
+        for dy in range(o['fh']):
+            for dx in range(o['fw']):
+                cx, cy = o['x'] + dx, o['y'] + dy
+                if not (0 <= cx < W and 0 <= cy < H):
+                    continue
+                if ground[cy][cx] != ' ':
+                    continue
+                if _collision_on(cx + x0, cy + y0):
+                    continue
+                ground[cy] = ground[cy][:cx] + GRASS + ground[cy][cx + 1:]
+                opened += 1
+    if opened:
+        print('  复合瓦放开的格：%d 格（Tiled 大瓦盖住的格，源图为空）' % opened)
+
 
     # ---------------------------------------------------------------- 出生点
     # 导入图的可走区经常是岛屿 / 半岛 / 环形，硬编码 (W//2, H-1) 大概率掉进水里，
@@ -439,13 +527,17 @@ def main():
                     continue
                 nb = sum(1 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
                          if 0 <= x + dx < W and 0 <= y + dy < H and walk[y + dy][x + dx])
-                key = (-nb, (x - W / 2.0) ** 2 + (y - H / 2.0) ** 2)
+                # 第三顺位是「是不是水面瓦」：--trust-collision 下水格也能走了（桥/浅滩），
+                # 但出生点落在桥中间很怪 —— 同样四邻可走时优先陆地。
+                key = (-nb, 1 if tset_of[y][x] in block_sets else 0,
+                       (x - W / 2.0) ** 2 + (y - H / 2.0) ** 2)
                 if best is None or key < best:
                     best, sx, sy = key, x, y
         if best is None:
             raise SystemExit('这张图没有任何可走格 —— 检查 --walk-layer / --solid-layer / --block')
-        print('  出生点 %d,%d（四邻可走=%d，离图心 %.1f 格）'
-              % (sx, sy, -best[0], best[1] ** 0.5))
+        print('  出生点 %d,%d（四邻可走=%d，离图心 %.1f 格%s）'
+              % (sx, sy, -best[0], best[1] ** 0.5,
+                 '，水面上' if tset_of[sy][sx] in block_sets else ''))
 
     entry = dict(id=a.id, name=a.name or a.id, note=a.note or ('由 %s 导入' % os.path.basename(tmx)),
                  w=W, h=H, ground=ground, objects=objects,

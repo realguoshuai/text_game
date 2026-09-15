@@ -44,9 +44,9 @@
 | 授权文件 | 仓库根 `LICENSE.txt`（CC BY-SA 3.0 全文） |
 | 规格 | 原图 40×40 格，导进去裁成 36×38；等距 192×96 → ×0.625 缩到引擎的 120×60 |
 | 图层 | `background` 地面 / `object` 物件 / `collision` 碰撞标记 |
-| 转换参数 | `--walk-layer=background --skip-layer=collision --solid-layer=collision --block-tileset=water` |
-| 转化出来 | `assets/flare_arrival_map.json` 130KB / 1370 物件 / 583 可行走格（瓦并进公用图集，见 §2） |
-| 出生点 | (19,19)，由导入器自动挑（四邻皆可走、离图心最近） |
+| 转换参数 | `--walk-layer=background --skip-layer=collision --solid-layer=collision --trust-collision --block-tileset=water` |
+| 转化出来 | `assets/flare_arrival_map.json` 130KB / 1370 物件 / 586 可行走格（瓦并进公用图集，见 §2） |
+| 出生点 | (19,19)，由导入器自动挑（四邻皆可走、离图心最近、优先陆地） |
 
 内容是一整个**崖壁围合的山谷**：岩石崖壁有厚度（立方瓦做出立体感）、
 草地有纹理变化、松树灌木自然散布、中间还有水塘。地形过渡和植被层次都是手摆的，
@@ -74,8 +74,8 @@
 | 原文件 | `tiled/empyrean_campaign/perdition_harbor.tmx`（瓦表与 arrival 是同一批） |
 | 授权 | **CC-BY-SA 3.0** ⚠️ 同上 |
 | 规格 | 原图 40×40 格，导进去裁成 39×38；等距 192×96 → ×0.625 |
-| 转换参数 | 同 §1，另加 **`--append`**（瓦并进 arrival 那套图集） |
-| 转化出来 | `assets/flare_harbor_map.json` 129KB / 1329 物件 / 438 可行走格 |
+| 转换参数 | 同 §1（含 `--trust-collision`），另加 **`--append`**（瓦并进 arrival 那套图集） |
+| 转化出来 | `assets/flare_harbor_map.json` 129KB / 1329 物件 / 481 可行走格（全域连通） |
 | 出生点 | (18,21)，同样是导入器自动挑的 |
 
 内容是一处**有人居住的渔村小港**：两座木屋、两座木栈桥、圆石台、木栅栏、
@@ -86,6 +86,9 @@
 > 一度以为"可走区只剩 90 格，太小"。**实测后是 438 格** —— 那 389 格里
 > 有 348 格本来就带 `collision`，只有 41 格是"水但没标碰撞"。
 > 教训：算可走区别只数"某一层有多少瓦"，要按 `有地面瓦 且 collision 为空` 算。
+>
+> ★ **那 41 格就是后来"桥上过不去"的病根** —— 它们是桥下的水，作者用"不画 collision"
+> 留出的过道。修法见下方「静默杀手 ⑤」。修后 438 → **481 格、4 个连通块 → 1 个**。
 
 ---
 
@@ -210,11 +213,13 @@ Flare 的瓦片有两套坐标，**别用错**：
 
 ---
 
-## ★ 外来图的四个"静默杀手"（2026-09-15 补，都不是报错，是悄悄不能用）
+## ★ 外来图的五个"静默杀手"（2026-09-15 补，都不是报错，是悄悄不能用）
 
 接入外来图和接入自己生成的图最大的区别：**自己生成的图我全都知道长什么样，
-别人的图我什么都不知道**。下面这四类问题不抛异常、不白屏，截图看起来也"有画面"，
-但玩起来是坏的。`import_tmx.py` 现在把前三个都自动处理了，第四个要人工看一眼。
+别人的图我什么都不知道**。下面这五类问题不抛异常、不白屏，截图看起来也"有画面"，
+但玩起来是坏的。前四个 `import_tmx.py` 现在都自动处理了；第五个（桥）要靠
+`--trust-collision` 参数打开 —— **参数漏了就是那个毛病**（所以它写进了标准命令行）。
+第⑥节不是杀手，是给你肉眼扫一遍的探针。
 
 ### ① 整张图走不动 —— `maps.json` 的 `walkable` 少了 `'k'`
 
@@ -264,28 +269,105 @@ Tiled 允许瓦片尺寸**大于网格**。Flare 的 `tiled_grassland_2x2` 就�
 | 内容真把声明框填满 ≥95% | 排除 `trees`（声明 384×768 但内容只占 0.44 高）、`grassland`（只占 0.25 高）、`tall structures`（0.38~0.56） |
 
 两道都过才按 `fw = tw/TW`、`fh = th/TH` 设 `fw/fh`，并把 `y` 上移 `fh-1`。
-`arrival.tmx` 里命中的**只有那 1 张石台**（`gnd=917 / solid=453 / big=1`）。
+`arrival.tmx` 里命中的**只有那 1 张石台**（`gnd=917 / big=1`）。
 
 > 误判的代价是把整排崖壁/树整体上移 N 格，比留个缺口严重得多，所以判别从严。
+
+### ⑤ ★ 看着是路却走不动（桥）—— 图层语义搞反了（这条坑最深）
+
+**症状**：木栈桥画得好好的、和海面分得清清楚楚，人却站在桥头过不去，点桥对面也不动。
+更迷惑的是它**不是全图走不动**——陆地能走，只是被水隔成互不相通的两三块，
+所以看起来像"寻路算法坏了"，其实是地图数据把桥判死了。
+
+**根因有两层，缺一不可**：
+
+1. **Flare 的图层语义和直觉相反**：真正挡路的是 `collision` 层（树/墙/崖壁，
+   `arrival.tmx` 里 453 个 collision 标记全落在这些物件上）；而 `object` 层**只是美术**
+   —— 桥、斜坡、矮草、圆石台全在里面，**本来就该走上去**。
+   旧导入器把 object 层一律 `solid=True`，等于让玩家绕着桥走。
+2. **桥下的水面格没有 collision 标记**（作者用"不画 collision"来留过道），
+   而旧参数 `--block-tileset=water` 一刀切把所有 water tileset 的格子判死 →
+   **桥面整段落水**。`perdition_harbor` 实测 41 个这样的格，`arrival` 只 1 个
+   —— 所以港湾坏得最明显。
+
+**修法**：导入时加 `--trust-collision`。
+
+| 参数 | 语义 |
+|---|---|
+| `--trust-collision` | collision 层说了算：**object 层一律 `solid=False`**，某格有背景瓦且 collision 为空 = 可走（不再按 tileset 判死） |
+| `--block-tileset=water` | 与上者同用时降级为"**只用于剪枝时当水面**"，不再直接判死格子 |
+
+配套还做了两件收尾（都属于"顺手把死区清掉"）：
+
+- **孤立水面 / 孤格落成虚空**：既没地面瓦、又和主可走区不连通的水面格，
+  以及四周都不通的单格，直接剪掉 —— 否则它们会在地图上留一圈"能站但走不到"的假路。
+- **出生点第三顺位**：同样"四邻可走"时优先陆地（`tset_of` 记住每格背景瓦属于哪个 tileset，
+  是 water 就往后排），避免出生点落在桥上。
+
+**效果**（`flare_harbor` 39×38）：
+
+| | 可走格 | 连通块 | 出生点 |
+|---|---|---|---|
+| 修前 | 438 | **4 块**（桥断） | 18,21 |
+| 修后 | **481** | **1 块**（全域连通） | 18,21 |
+
+**验收：`?autotest=crossing`** —— 这条专治"看着有路走不到"，断言的是**性质**不是坐标：
+
+```
+{"map":"flare_harbor","walk":481,"reach":481,"isolated":0,
+ "far":"4,4","farDist":35,"arrived":true,"clickAccepted":true}
+```
+
+`walk` = `walkable()` 认了的格数；`reach` = 从玩家脚下 BFS 真的走得到的格数；
+**`isolated` = 两者之差，必须为 0** —— 不为 0 就是那些"看着能站、点上去不动"的格子。
+`farDist` 是最远那一格的距离，`arrived` = 真的从出生点走到了那里（跨桥）。
+正式用例已进 `headless_check.js`（「外来地图 港湾跨桥连通」/「彼岸全域连通」两张图各一条）。
+
+**换新图时的自查**（离线、秒级，不用开浏览器）：
+
+```
+python tools/walk_audit.py <地图 id>                 # 连通块分析：碎成几块、孤立格几个
+python tools/walk_audit.py <地图 id> --overlay _w.png   # 叠色图：绿=能走 橙=有地但被挡 红=无地面瓦
+```
+
+### ⑥ 肉眼自查：右上角缩略图就是这类问题的探针
+
+`?autotest=minimap` 之外，缩略图平时就是排查外来图最省事的工具：
+底图 1 像素 1 格，绿=能走 / 深灰=挡路 / 蓝=水 / 透明=虚空，
+桥、断崖、断开的可走区**一眼就能看见**（断桥会在缩略图上呈现为一条明显的空白豁口）。
+点缩略图任意一格即可寻路过去；点不可走的格会打红叉并提示"那边过不去"。
+
+相关调试参数（都是 URL query）：
+
+| 参数 | 作用 |
+|---|---|
+| `?mm=1` / `?mm=0` | 强制展开 / 收起缩略图。手机端默认收起，无头截图时点不了按钮，靠它核对展开态 |
+| `?autotest=minimap` | 缩略图程序化验收：画布比例、四类格数、底图非空、主角标记落点、折叠来回切、点缩略图能否走 |
+| `?autotest=crossing` | 「看着有路走不动」验收：可走区必须**全域连通**（`isolated == 0`），并真的跨桥走到最远格 |
+
+两条都进了 `tools/headless_check.js` 跑批（共 32 条）。
 
 ### 验收：`?autotest=importmap`
 
 新加的接入验收自测，把上面几条量化成 `#probe`，跑批里一眼能看出是哪一类坏：
 
 ```
-node tools/_one.js "map=<id>&autotest=importmap" 30000
+node tools/probe.js "map=<id>&autotest=importmap"
 ```
 
 ```json
-{"map":"flare_arrival","w":36,"h":38,"obj":1370,"gnd":917,"solid":453,"big":1,
- "walk":583,"voidCells":785,"voidColor":"#000000",
- "spawnDeclared":"19,19","spawnOnWalkable":true,"atSpawn":true,
+{"map":"flare_arrival","w":36,"h":38,"obj":1370,"gnd":917,"solid":0,"big":1,
+ "walk":586,"voidCells":782,"voidColor":"#000000",
+ "spawnDeclared":"18,19","spawnOnWalkable":true,"atSpawn":true,
  "targetFound":true,"clickAccepted":true,"reached":true,"moved":true}
 ```
 
-`big` = 被认成复合瓦的物件数；`atSpawn` = 玩家真的站在声明的出生点（说明整条链没被 snap 走）；
-`reached` = 点了一格远处的可走格后确实走到了（**这条不过 = 图不能玩**）。
-正式用例已进 `tools/headless_check.js`（「外来地图 远航之岸」）。
+`solid` = 挂在 object 层上的"被挡"格数。**用 `--trust-collision` 后应为 0**
+（挡路的全在 collision 层，那部分落成虚空、不计入 `solid`）；这个数不是 0 就说明
+object 层还在误挡（见「静默杀手 ⑤」）。
+`walk` = 可走格数；`big` = 被认成复合瓦的物件数；`atSpawn` = 玩家真的站在声明的出生点
+（说明整条链没被 snap 走）；`reached` = 点了一格远处的可走格后确实走到了（**这条不过 = 图不能玩**）。
+正式用例已进 `tools/headless_check.js`（「外来地图 远航之岸」/「殒落港湾」/「港湾跨桥连通」）。
 
 ---
 
@@ -296,23 +378,30 @@ node tools/_one.js "map=<id>&autotest=importmap" 30000
    `sucai/_dl/flare/tiled/tilesheets/` —— **必须保持相对层级**（tmx 里写的是 `../tilesheets/xxx.png`）
 3. 导入（`--prefix` = 图集名，多张图共用一个；`--id` = 地图名）：
    - **第一张**（重建图集目录）：
-     `python tools/import_tmx.py <tmx> --id=<id> --name=<中文名> --prefix=<前缀> --walk-layer=background --skip-layer=collision --solid-layer=collision --block-tileset=water`
+     `python tools/import_tmx.py <tmx> --id=<id> --name=<中文名> --prefix=<前缀> --walk-layer=background --skip-layer=collision --solid-layer=collision --trust-collision --block-tileset=water`
    - **之后每张**：同上，末尾加 **`--append`**（瓦并进已有图集，见上文「一套图集服务多张图」）
    - `--solid-layer=collision`：Flare 的 collision 层**语义相反**（有瓦 = 不可走），且不能画出来
-   - `--block-tileset=water`：把整个 water tileset 判为不可走（collision 层没盖全时会漏水）
+   - `--trust-collision`：**别漏**。collision 层说了算，object 层一律当美术（桥/斜坡/矮草本就要走上去）。
+     漏了它 = 整张图的可走区被砍一圈，桥过不去（见「静默杀手 ⑤」）
+   - `--block-tileset=water`：配合 `--trust-collision` 时只用于**剪枝**（判定哪些水格该落成虚空），
+     不再直接判死格子 —— 否则桥下水面会把桥面一起判没
    - 出生点、虚空底色、复合瓦锚点都是自动的，看它打印的「出生点 / 虚空底色」两行确认
-4. 离线核对几何：`python tools/render_map_json.py <地图 id> 0.4 _r_<id>.png`（秒级；
+4. **离线核对可走性**（秒级，强烈建议）：`python tools/walk_audit.py <地图 id>`
+   —— 直接给出**连通块数量**，必须是 `1`（多块 = 有地方看着能走其实走不到）。
+   要肉眼看就加 `--overlay _w.png` 出一张叠色图（绿=能走 橙=有地但被挡 红=无地面瓦）。
+5. 离线核对几何：`python tools/render_map_json.py <地图 id> 0.4 _r_<id>.png`（秒级；
    图集前缀脚本自己从地图档的 piece 名反推，不用手填）
-5. 挂载：`tools/attach_imported.py` 的 `WANT` 加上 `<id>_map.json`，跑一遍
+6. 挂载：`tools/attach_imported.py` 的 `WANT` 加上 `<id>_map.json`，跑一遍
    （别手写 maps.json：`'k'`、`homeFromMap`、`atlas`、`src` 都由它带进去。
    它写的是**轻条目** —— 地形留在 `<id>_map.json` 里按需取，见上面「按需加载」那节）
-6. 引擎：在 `js/game.js` 的 `EXTRA` 里声明这套新图集（照 `flare` 那条抄，键名对齐
+7. 引擎：在 `js/game.js` 的 `EXTRA` 里声明这套新图集（照 `flare` 那条抄，键名对齐
    `ATLAS`），**不要** push 进 `LOAD_PLAN` —— 那等于让所有人首屏等它。
    若这张图和已有的图共用一套图集（导入时带了 `--append`），则什么都不用加。
-7. 版本号：升 `index.html` 的 `game.js?v=`；`maps.json?v=` 也要升（内容变了）。
+8. 版本号：升 `index.html` 的 `game.js?v=`；`maps.json?v=` 也要升（内容变了）。
    图集 `?v=` 只在**图集内容**变了时才升；外来地形的版本号是自动的（内容 md5）。
-8. 验收：`node tools/_one.js "map=<id>&autotest=importmap" 30000` 先单条看 `#probe`，
-   再 `node tools/headless_check.js` 跑全套；改过加载链路就顺带跑
+9. 验收：`node tools/probe.js "map=<id>&autotest=importmap"` 先单条看 `#probe`，
+   再 `node tools/probe.js "map=<id>&autotest=crossing"` 确认**全域连通**（`isolated` 必须 0），
+   最后 `node tools/headless_check.js` 跑全套；改过加载链路就顺带跑
    `?autotest=bootstats` 与 `?autotest=lazygoto&goto=<id>` 确认首屏没变胖、按需能补上。
 
 > **截图别用「离线渲染就够了」当借口**：`render_map_json.py` 只验几何，

@@ -18,6 +18,9 @@ _*.html
 _*.webp
 _*.err
 _*.out
+
+# 本工作目录里的 WorkBuddy 元数据 / 手工备份（bak_*）—— 绝不入库
+.workbuddy/
 # `_` 前缀的一次性分析脚本（正式工具无下划线前缀）
 test/tools/_*.py
 test/tools/_*.js

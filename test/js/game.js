@@ -337,7 +337,7 @@
       // ⚠ weight 填**真实体积 KB**：进度条按它加权，填小了会在最后一段卡住不动。
       //   maps.json 现在只放「游戏自带的 5 张图」+ 外来图的轻条目（地形数据另有文件），
       //   所以从 322KB 掉到 65KB —— 首屏少背 260KB。
-      { url: 'assets/maps.json?v=13', json: true, weight: 65, label: '读取地图数据', _expand: true },
+      { url: 'assets/maps.json?v=14', json: true, weight: 65, label: '读取地图数据', _expand: true },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -486,6 +486,9 @@
       okH = WALK.indexOf(m.ground[h.y][h.x]) >= 0 && !m.solid['' + h.x + ',' + h.y];
     }
     m.home = okH ? h : nearWalkable(m);
+    // 缩略图的底图是缓存出来的（1 像素 1 格）。地形/实心表一变就要让它重画 ——
+    // 按需加载的外来图是「先出条目、后到地形」，_mmVer 就是给这个时序兜底的。
+    m._mmVer = (m._mmVer || 0) + 1;
     return m;
   }
 
@@ -748,6 +751,7 @@
         buildCloudSprite();
         buildButtons();
         buildZoomUI();
+        mmInit();               // 右上角场景缩略图（折叠开关 + 点击寻路）
         // 底部操作说明：桌面端默认折叠成一行小标签，点一下展开/收起。
         // 手机端（body.touch）走 initMobile 里的精简文案 + 6s 自动收起（点按切 faded），
         // 两套逻辑互斥，这里遇到 touch 直接放手，否则一次点击会同时切 faded 和 folded。
@@ -945,6 +949,143 @@
               r.reached = Math.abs(player.mx - player.tx) < 0.02 && Math.abs(player.my - player.ty) < 0.02;
               r.moved = (Math.round(player.mx) !== sx || Math.round(player.my) !== sy);
               r.end = Math.round(player.mx) + ',' + Math.round(player.my);
+            }
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
+        if (at === 'crossing') {
+          // ?map=<图>&autotest=crossing —— 「看着有路却走不到」验收。
+          // 把整张图的可走格按 4 连通分成块，然后从玩家脚下 BFS：
+          //   walk     = walkable() 认了的格数
+          //   reach    = 从玩家脚下真的走得到的格数
+          //   isolated = 两者之差 —— ★ 必须为 0。不为 0 就是"看着能站、点上去不动"的格子
+          //              （外来图最容易出：桥下被 collision/水面判死、塌成孤岛）
+          // 再取最远的一格当目标真的走过去，验证跨桥/绕崖的寻路成立。
+          setTimeout(function () {
+            var sx = Math.round(player.mx), sy = Math.round(player.my);
+            var dist = {}, q2 = [[sx, sy]], head = 0, far = [sx, sy], fd = 0, reach = 0;
+            dist[sx + ',' + sy] = 0;
+            while (head < q2.length) {
+              var c = q2[head++], cx = c[0], cy = c[1], d0 = dist[cx + ',' + cy];
+              reach++;
+              if (d0 > fd) { fd = d0; far = [cx, cy]; }
+              for (var k = 0; k < 4; k++) {
+                var nx = cx + (k === 0 ? 1 : k === 1 ? -1 : 0);
+                var ny = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+                var kk = nx + ',' + ny;
+                if (dist[kk] !== undefined || !walkable(nx, ny)) continue;
+                dist[kk] = d0 + 1; q2.push([nx, ny]);
+              }
+            }
+            var walkN = 0;
+            for (var y = 0; y < CUR.h; y++) {
+              for (var x = 0; x < CUR.w; x++) if (walkable(x, y)) walkN++;
+            }
+            var r = { map: CUR.id, walk: walkN, reach: reach, isolated: walkN - reach,
+              far: far[0] + ',' + far[1], farDist: fd, arrived: null };
+            if (fd > 2) {
+              r.clickAccepted = window.ISLES.clickCell(far[0], far[1]);
+              sim(Math.min(40, fd / 3.8 * 1.4 + 0.8));   // 玩家 3.8 格/秒（见 update 里的 speed）
+              r.arrived = Math.abs(player.mx - far[0]) < 0.75 && Math.abs(player.my - far[1]) < 0.75;
+              r.end = Math.round(player.mx) + ',' + Math.round(player.my);
+            }
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
+        if (at === 'minimap') {
+          // ?map=<图>&autotest=minimap —— 右上角缩略图验收：
+          // 画布按地图比例出尺寸、四类格子（能走/挡路/水/虚空）数对得上、
+          // 主角标记落在画布内、折叠开关能来回切、**点缩略图能真的走过去**。
+          setTimeout(function () {
+            var r = { map: CUR.id, cv: !!MM.cv, foldedAtStart: MM.folded };
+            if (!MM.cv) {
+              var pb0 = document.getElementById('probe');
+              if (!pb0) {
+                pb0 = document.createElement('div'); pb0.id = 'probe';
+                pb0.style.display = 'none'; document.body.appendChild(pb0);
+              }
+              pb0.textContent = JSON.stringify(r);
+              return;
+            }
+            mmFold(false); MM.last = ''; updateMinimap();
+            r.folded = MM.folded;
+            r.size = [MM.cv.width, MM.cv.height];
+            r.cellPx = +MM.s.toFixed(3);
+            r.ratio = +((MM.cv.width / MM.cv.height) - (CUR.w / CUR.h)).toFixed(3);
+            var n = { walk: 0, block: 0, water: 0, void: 0 };
+            for (var y = 0; y < CUR.h; y++) {
+              for (var x = 0; x < CUR.w; x++) {
+                var ch = CUR.ground[y][x];
+                if (ch === ' ') n.void++;
+                else if (WATER.indexOf(ch) >= 0) n.water++;
+                else if (CUR.solid['' + x + ',' + y]) n.block++;
+                else n.walk++;
+              }
+            }
+            var cb = MM.cv.getBoundingClientRect();
+            // CSS 尺寸 vs 位图尺寸：手机端 34vh 上限会等比压扁显示尺寸（多 +2 是 1px 边框），
+            // 点击换算走的就是它，所以两者必须能对上、且不能被放大（放大会糊）。
+            r.cssBox = [Math.round(cb.width), Math.round(cb.height)];
+            r.notUpscaled = cb.height <= MM.cv.height + 2.5;
+            r.cells = n;
+            r.player = Math.round(player.mx) + ',' + Math.round(player.my);
+            // 面板几何：防"缩略图被顶出屏幕 / 压住地图面板"这类纯布局回归。
+            // 右上角那两块是 flex 竖排的，地图面板一展开就变高，缩略图必须还在屏内。
+            var mp = document.getElementById('minimap');
+            if (mp) {
+              var bb = mp.getBoundingClientRect();
+              r.box = [Math.round(bb.left), Math.round(bb.top), Math.round(bb.width), Math.round(bb.height)];
+              var tr2 = document.getElementById('topright');
+              r.overlapsPanel = tr2 ? (function () {
+                var tb = tr2.getBoundingClientRect();
+                return !(bb.top >= tb.bottom - 0.5 || bb.bottom <= tb.top + 0.5 ||
+                         bb.left >= tb.right - 0.5 || bb.right <= tb.left + 0.5);
+              })() : false;
+              r.inViewport = bb.left >= 0 && bb.top >= 0 &&
+                bb.right <= window.innerWidth + 0.5 && bb.bottom <= window.innerHeight + 0.5;
+              r.viewport = [window.innerWidth, window.innerHeight];
+              r.rightGap = Math.round(window.innerWidth - bb.right);   // 离右边缘的距离（应 == 14）
+            }
+            var px = (player.mx + 0.5) * MM.s, py = (player.my + 0.5) * MM.s;
+            r.markPx = [Math.round(px), Math.round(py)];
+            r.markInCanvas = px >= 0 && px < MM.cv.width && py >= 0 && py < MM.cv.height;
+            // 底图像素真的画上去了吗（别是空画布）：抽样统计非透明像素
+            var im = MM.cx.getImageData(0, 0, MM.cv.width, MM.cv.height).data;
+            var solidPx = 0;
+            for (var i = 3; i < im.length; i += 4) if (im[i] > 200) solidPx++;
+            r.solidPx = solidPx;
+            // 折叠 → 展开
+            mmFold(true); r.foldedAfter = MM.folded;
+            mmFold(false); r.unfoldedAfter = MM.folded;
+            // 点缩略图走过去：挑一格 3~6 步外的可走格，换算成画布像素点下去
+            var sx2 = Math.round(player.mx), sy2 = Math.round(player.my), tgt = null;
+            for (var rad = 3; rad <= 8 && !tgt; rad++) {
+              for (var dy = -rad; dy <= rad && !tgt; dy++) {
+                for (var dx = -rad; dx <= rad && !tgt; dx++) {
+                  if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
+                  var cx2 = sx2 + dx, cy2 = sy2 + dy;
+                  if (walkable(cx2, cy2)) tgt = [cx2, cy2];
+                }
+              }
+            }
+            if (tgt) {
+              var rect = MM.cv.getBoundingClientRect();
+              r.clickTarget = tgt[0] + ',' + tgt[1];
+              r.clickAccepted = mmClick(rect.left + (tgt[0] + 0.5) / CUR.w * rect.width,
+                                        rect.top + (tgt[1] + 0.5) / CUR.h * rect.height);
+              sim(3.0);
+              r.clickMoved = Math.abs(player.mx - sx2) > 0.5 || Math.abs(player.my - sy2) > 0.5;
+              r.clickEnd = Math.round(player.mx) + ',' + Math.round(player.my);
             }
             var pb = document.getElementById('probe');
             if (!pb) {
@@ -1809,6 +1950,7 @@
     }
     updateHUD();
     updateSkillUI();   // 技能冷却遮罩与倒计时
+    updateMinimap();   // 右上角缩略图（内部有脏检查，不是每帧都重画）
   }
 
   // ---------------- 逻辑 ----------------
@@ -2146,14 +2288,25 @@
   // 设置移动目标格：鼠标点击与自测钩子 ISLES.clickCell 共用同一个入口，
   // 保证自测跑的确实是点击移动这条真实路径，而不是另写一份逻辑
   function setTargetCell(cx, cy) {
-    if (!walkable(cx, cy)) return false;
-    // 用 BFS 找一条绕开建筑/水面的路；不可达就整个忽略这次点击，
-    // 而不是让角色朝墙一路撞过去
-    var path = findPath(Math.round(player.mx), Math.round(player.my), cx, cy);
-    if (!path || !path.length) return false;
+    var tx = Math.round(cx), ty = Math.round(cy);
+    // 三种「点了没反应」要分开说清楚，否则玩家只会以为游戏卡了 ——
+    // 外来地图（桥/断崖多）尤其明显：桥就在眼前，怎么点都不动。
+    //   ① 目标格本身走不了（水/崖壁/墙里）
+    //   ② 目标格能走，但被水面或断崖隔成了另一个连通块 —— BFS 找不到路
+    //   ③ 正常 → 交给寻路
+    if (!walkable(tx, ty)) { badMark(tx, ty, '那里过不去'); return false; }
+    var path = findPath(Math.round(player.mx), Math.round(player.my), tx, ty);
+    if (!path || !path.length) { badMark(tx, ty, '这边过不去，得绕路'); return false; }
     player.path = path;
-    player.tx = cx; player.ty = cy;
+    player.tx = tx; player.ty = ty;
     return true;
+  }
+  /** 「去不了」的反馈：红色叉号打在那格上 + 一句说明。1.2 秒内不重复弹，免得连点刷屏 */
+  var badT = -1e9;
+  function badMark(mx, my, msg) {
+    clickMark = { mx: mx, my: my, life: 0.7, max: 0.7, bad: true };
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    if (now - badT > 1200) { toast(msg); badT = now; }
   }
 
   // ---------------- 妖兽战斗逻辑 ----------------
@@ -2952,7 +3105,9 @@
       ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1 * Z; ctx.strokeRect(bx, by, bw, bh);
     }
   }
-  // 点击行走的目标指示：落地菱形 + 扩散圈，淡出 0.7s，让玩家明确知道点到了哪格
+  // 点击行走的目标指示：落地菱形 + 扩散圈，淡出 0.7s，让玩家明确知道点到了哪格。
+  // bad=true 是"这一格去不了"的红色叉号 —— 外来大图里常有"看着有路、其实被水/断崖隔开"的格子，
+  // 没反馈的话玩家只会以为自己卡住了。
   function drawClickMark() {
     if (!clickMark) return;
     var p = isoToScreen(clickMark.mx, clickMark.my);
@@ -2960,6 +3115,17 @@
     var t = Math.max(0, clickMark.life / clickMark.max);
     var grow = 1 - t;
     ctx.save();
+    if (clickMark.bad) {
+      var rr = TILE_W * 0.34 * (0.7 + grow * 0.5) * Z;
+      ctx.globalAlpha = t * 0.9; ctx.lineWidth = 3 * Z; ctx.strokeStyle = '#ff5a4a';
+      ctx.beginPath();
+      ctx.moveTo(cx - rr, cy - rr * 0.5); ctx.lineTo(cx + rr, cy + rr * 0.5);
+      ctx.moveTo(cx + rr, cy - rr * 0.5); ctx.lineTo(cx - rr, cy + rr * 0.5);
+      ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(cx, cy, rr * 1.25, rr * 0.62, 0, 0, 6.2832); ctx.stroke();
+      ctx.restore();
+      return;
+    }
     var r = TILE_W * 0.5 * (0.4 + grow * 0.8) * Z;
     ctx.globalAlpha = t * 0.8; ctx.strokeStyle = '#8bf3ff'; ctx.lineWidth = 2.5 * Z;
     ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.5, 0, 0, 6.2832); ctx.stroke();
@@ -3038,6 +3204,165 @@
         ft.querySelector('.ftfill').style.width = Math.max(0, f.hp / f.maxhp * 100) + '%';
       } else ft.style.display = 'none';
     }
+  }
+
+  /* ---------------- 场景缩略图（右上角） ----------------
+   * 只解决一个问题：**我在哪**。大图（外来图 36×38）走起来很容易迷失方向，
+   * 光看画面不知道自己在山谷的哪一角、往哪走能出去。
+   *
+   * 分两层画，开销与地图大小无关：
+   *   · 底图 MM.base —— 1 像素 1 格画在离屏 canvas 上，只在地图切换 / 地形补齐时重画一次；
+   *   · 每帧只 drawImage 贴一次底图，再点几个标记（传送门 / NPC / 妖兽 / 主角 / 视野框）。
+   * 折叠起来时整个跳过（一点开销都不留）。
+   *
+   * 颜色是「读图」用的，不是美术：绿=能走 / 深灰=挡路 / 蓝=水 / 透明=虚空。
+   * 妙处在于它天然把外来图的问题显出来 —— 桥、断崖、断开的可走区一眼就能看见。
+   */
+  var MM_MAX = 168;                  // 长边像素上限（宽高按地图比例等比）
+  var MM_C_WALK = [127, 168, 107];
+  var MM_C_BLOCK = [90, 82, 72];
+  var MM_C_WATER = [42, 95, 134];
+  var MM = { cv: null, cx: null, base: null, baseKey: '', last: '', folded: false,
+             w: 0, h: 0, s: 1 };
+
+  function mmInit() {
+    MM.cv = document.getElementById('mmCanvas');
+    if (!MM.cv) return false;
+    MM.cx = MM.cv.getContext('2d');
+    var box = document.getElementById('minimap');
+    var head = document.getElementById('mmHead');
+    if (head) head.onclick = function () { mmFold(!MM.folded); };
+    MM.cv.addEventListener('mousedown', function (e) {
+      if (e.button === 0) { e.preventDefault(); mmClick(e.clientX, e.clientY); }
+    });
+    MM.cv.addEventListener('touchstart', function (e) {
+      e.preventDefault(); var t = e.touches[0]; mmClick(t.clientX, t.clientY);
+    }, { passive: false });
+    // HTML 里先写着 folded（避免 JS 起来前面板闪一个空白画布），这里按设备把状态对齐：
+    // 手机默认收起（右上角本来就挤），桌面默认展开。
+    // ?mm=1 / ?mm=0 强制开关：手机端默认收起，无头截图核对"展开态长什么样"时点不了按钮。
+    var mq2 = new URLSearchParams(location.search).get('mm');
+    var fold = document.body.classList.contains('touch');
+    if (mq2 === '0') fold = true; else if (mq2 === '1') fold = false;
+    if (box) mmFold(fold);
+    return true;
+  }
+  function mmFold(f) {
+    MM.folded = !!f;
+    var box = document.getElementById('minimap');
+    if (box) box.classList.toggle('folded', MM.folded);
+    var tg = document.getElementById('mmTg');
+    if (tg) tg.textContent = MM.folded ? '▸' : '▾';
+    if (!MM.folded) { MM.last = ''; updateMinimap(); }
+  }
+  /** 底图：1 像素 1 格，缓存在离屏 canvas 上 */
+  function mmBuildBase() {
+    if (!CUR || !CUR.ground) return null;
+    var key = CUR.id + '#' + (CUR._mmVer || 0);
+    if (MM.base && MM.baseKey === key) return MM.base;
+    var cv = document.createElement('canvas');
+    cv.width = CUR.w; cv.height = CUR.h;
+    var c = cv.getContext('2d');
+    var img = c.createImageData(CUR.w, CUR.h), d = img.data;
+    for (var y = 0; y < CUR.h; y++) {
+      for (var x = 0; x < CUR.w; x++) {
+        var ch = CUR.ground[y][x];
+        var col, alpha = 255;
+        if (ch === ' ') { col = MM_C_WALK; alpha = 0; }              // 虚空 → 透明，露出面板底
+        else if (WATER.indexOf(ch) >= 0) col = MM_C_WATER;
+        else if (CUR.solid['' + x + ',' + y]) col = MM_C_BLOCK;
+        else col = MM_C_WALK;
+        var i = (y * CUR.w + x) * 4;
+        d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = alpha;
+      }
+    }
+    c.putImageData(img, 0, 0);
+    MM.base = cv; MM.baseKey = key;
+    return cv;
+  }
+  /** 画布尺寸：长边不超过 MM_MAX，等比缩。ratio = 每格几个像素 */
+  function mmLayout() {
+    var s = MM_MAX / Math.max(CUR.w, CUR.h);
+    MM.w = Math.max(24, Math.round(CUR.w * s));
+    MM.h = Math.max(24, Math.round(CUR.h * s));
+    MM.s = s;
+    return { w: MM.w, h: MM.h, s: s };
+  }
+  function mmDot(c, mx, my, r, fill, stroke) {
+    var px = (mx + 0.5) * MM.s, py = (my + 0.5) * MM.s;
+    c.beginPath(); c.arc(px, py, r, 0, 6.2832);
+    if (fill) { c.fillStyle = fill; c.fill(); }
+    if (stroke) { c.strokeStyle = stroke; c.lineWidth = 1; c.stroke(); }
+  }
+  function drawMinimap() {
+    if (!MM.cx || MM.folded || !CUR || !CUR.ground) return;
+    var base = mmBuildBase(); if (!base) return;
+    var nm = document.getElementById('mmName');       // 标题带地图名：收起后只剩标题条，靠它认路
+    if (nm && nm.textContent !== (CUR.name || '')) nm.textContent = CUR.name || '';
+    var L = mmLayout(), c = MM.cx;
+    if (MM.cv.width !== L.w || MM.cv.height !== L.h) { MM.cv.width = L.w; MM.cv.height = L.h; }
+    // 面板底色：虚空/地图外的部分露出来
+    c.clearRect(0, 0, L.w, L.h);
+    c.fillStyle = 'rgba(8,12,22,.85)'; c.fillRect(0, 0, L.w, L.h);
+    c.imageSmoothingEnabled = false;        // 1 像素 1 格的底图，放大必须用最近邻，否则糊成一团
+    c.drawImage(base, 0, 0, L.w, L.h);
+    c.imageSmoothingEnabled = true;
+
+    // 视野框：把屏幕四角反算成地图坐标，取其外接矩形。
+    // 等距世界里这个框其实是斜的，但缩略图是正方的 —— 取 AABB 表示"我大概看得到这一片"。
+    var cs = [screenToIso(0, 0), screenToIso(W, 0), screenToIso(0, H), screenToIso(W, H)];
+    var vx0 = 1e9, vy0 = 1e9, vx1 = -1e9, vy1 = -1e9;
+    cs.forEach(function (q) {
+      vx0 = Math.min(vx0, q.mx); vx1 = Math.max(vx1, q.mx);
+      vy0 = Math.min(vy0, q.my); vy1 = Math.max(vy1, q.my);
+    });
+    c.strokeStyle = 'rgba(255,255,255,.34)'; c.lineWidth = 1;
+    c.strokeRect(Math.round(vx0 * L.s) + 0.5, Math.round(vy0 * L.s) + 0.5,
+                 Math.max(2, Math.round((vx1 - vx0) * L.s)),
+                 Math.max(2, Math.round((vy1 - vy0) * L.s)));
+
+    // 传送门（青）、NPC（黄）、妖兽（红），主角最后画 → 永远压在最上面
+    (CUR.portals || []).forEach(function (pt) { mmDot(c, pt.x, pt.y, 2.2, '#5fe9ff'); });
+    (CUR.npcs || []).forEach(function (n) { mmDot(c, n.x, n.y, 2.0, '#ffd75e'); });
+    (foes || []).forEach(function (f) {
+      if (!f.alive) return;
+      mmDot(c, f.x, f.y, 2.2, f.def_ && f.def_.dummy ? '#9fd0ff' : '#ff5a4a');
+    });
+    // 主角：外圈白描边 + 实心点 + 朝向小尖角
+    var pmx = (player.mx + 0.5) * L.s, pmy = (player.my + 0.5) * L.s;
+    c.beginPath(); c.arc(pmx, pmy, 4.2, 0, 6.2832);
+    c.fillStyle = 'rgba(255,255,255,.92)'; c.fill();
+    c.beginPath(); c.arc(pmx, pmy, 3.0, 0, 6.2832);
+    c.fillStyle = '#ff2f2f'; c.fill();
+    var fv = FACE_VEC[player.face] || FACE_VEC.down;
+    c.beginPath();
+    c.moveTo(pmx + fv.x * 8.5, pmy + fv.y * 8.5);
+    c.lineTo(pmx + fv.y * 3.4 - fv.x * 2.2, pmy - fv.x * 3.4 - fv.y * 2.2);
+    c.lineTo(pmx - fv.y * 3.4 - fv.x * 2.2, pmy + fv.x * 3.4 - fv.y * 2.2);
+    c.closePath(); c.fillStyle = '#ff2f2f'; c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 1; c.stroke();
+  }
+  /** 脏检查：主角换格 / 朝向变 / 怪死 / 换图 / 缩放变 / 相机平移了才重画 */
+  function updateMinimap() {
+    if (!MM.cx || MM.folded || !CUR || !CUR.ground) return;
+    var key = CUR.id + '#' + (CUR._mmVer || 0) + '|' + Math.round(player.mx) + ',' +
+              Math.round(player.my) + '|' + player.face + '|' + foes.length + '|' +
+              Math.round(Z * 100) + '|' + Math.round(camX / 8) + ',' + Math.round(camY / 8) + '|' +
+              (CUR.portals ? CUR.portals.length : 0) + '|' + Math.round(W) + 'x' + Math.round(H);
+    if (key === MM.last) return;
+    MM.last = key;
+    drawMinimap();
+  }
+  /** 点缩略图 = 点那一格（走的是和画布点击同一条入口，所以寻路/碰撞完全一致） */
+  function mmClick(clientX, clientY) {
+    if (!CUR || !CUR.ground) return false;
+    var r = MM.cv.getBoundingClientRect();
+    if (!r.width || !r.height) return false;
+    var x = Math.floor((clientX - r.left) / r.width * CUR.w);
+    var y = Math.floor((clientY - r.top) / r.height * CUR.h);
+    if (x < 0 || y < 0 || x >= CUR.w || y >= CUR.h) return false;
+    if (setTargetCell(x, y)) clickMark = { mx: x, my: y, life: 0.7, max: 0.7 };
+    return true;
   }
 
   // 点击移动
@@ -3259,6 +3584,14 @@
     get map() { return CUR ? CUR.id : null; },
     list: function () { return MAPS.map(function (m) { return { id: m.id, name: m.name, w: m.w, h: m.h, objects: m.objects.length, portals: m.portals.map(function (p) { return { x: p.x, y: p.y, to: p.to }; }) }; }); },
     state: function () { return { map: CUR && CUR.id, mx: +player.mx.toFixed(2), my: +player.my.toFixed(2), face: player.face, fade: +fadeA.toFixed(2), zoom: +Z.toFixed(3) }; },
+    /** 右上角缩略图状态（自测/排查用）：画布尺寸、每格像素、主角在画布上的落点 */
+    minimap: function () {
+      var px = MM.cv ? (player.mx + 0.5) * MM.s : -1;
+      var py = MM.cv ? (player.my + 0.5) * MM.s : -1;
+      return { has: !!MM.cv, folded: MM.folded, size: MM.cv ? [MM.cv.width, MM.cv.height] : null,
+        cellPx: +MM.s.toFixed(3), px: +px.toFixed(1), py: +py.toFixed(1) };
+    },
+    mmFold: function (f) { mmFold(f); return MM.folded; },
     /** 等价于鼠标点击第 (x,y) 格：走的是 onClick 同一条设置目标格的路径 */
     clickCell: function (x, y) { return setTargetCell(x, y); },
     setZoom: function (z) { setZoom(z, W / 2, H / 2); return Zt; },

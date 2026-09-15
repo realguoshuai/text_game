@@ -185,6 +185,68 @@ results.push(run('外来地图 殒落港湾', 'map=flare_harbor&autotest=importm
   probe.reached === true && probe.moved === true,
 { budget: 22000 }));
 
+// 9.65) ★「看着是路却走不动」验收（外来图的隐形杀手）。
+//      Flare 原作里挡路的是 collision 层，object 层只是美术（桥/斜坡/矮草本该走上去）；
+//      旧导入器把 object 层一律判 solid，桥下的水面格又没有 collision 标记 ——
+//      结果是桥面被整段判死，港湾两块陆地被切成互不相通的几块。
+//      这条锁死性质：可走格必须**全域连通**，isolated 必须为 0；
+//      并且真的从出生点走到最远那一格（跨桥）验证寻路成立。
+//      不写死坐标/格数，换图重导即可复用。
+[['flare_harbor', '外来地图 港湾跨桥连通', 20], ['flare_arrival', '外来地图 彼岸全域连通', 20]]
+  .forEach(([m, label, budget]) => {
+    results.push(run(label, 'map=' + m + '&autotest=crossing', ({ probe }) =>
+      !!probe && probe.map === m &&
+      probe.walk > 300 && probe.reach === probe.walk && probe.isolated === 0 &&
+      probe.farDist > 10 && probe.clickAccepted === true && probe.arrived === true,
+    { budget: budget * 1000 }));
+  });
+
+// 9.66) 右上角场景缩略图。
+//      ① 青玄：四类格（可走/挡路/水/虚空）都齐 —— 把「底图四种颜色都画得出来」验全；
+//      ② 港湾（39×38，非正方）：画布宽高比必须等于地图宽高比，否则后面所有标记都会偏。
+//      两条都验：底图像素真画上去了（不是空画布）、主角标记在画布内、折叠能来回切、
+//      且**点缩略图能真的走过去**（与画布点击同一条寻路入口）。
+results.push(run('右上角 缩略图 四类格', 'map=qingxuan&autotest=minimap', ({ probe }) =>
+  !!probe && probe.cv === true &&
+  probe.cells.walk > 300 && probe.cells.block > 0 &&
+  probe.cells.water > 0 && probe.cells.void > 0 &&
+  probe.solidPx > 2000 && probe.markInCanvas === true &&
+  probe.inViewport === true && probe.overlapsPanel === false &&
+  probe.notUpscaled === true &&
+  probe.foldedAfter === true && probe.unfoldedAfter === false &&
+  probe.clickAccepted === true && probe.clickMoved === true,
+{ budget: 22000 }));
+
+results.push(run('右上角 缩略图 非正方图', 'map=flare_harbor&autotest=minimap', ({ probe }) =>
+  !!probe && probe.cv === true &&
+  Math.abs(probe.ratio) < 0.01 &&                    // 画布宽高比 == 地图宽高比（39:38）
+  probe.cellPx > 2 && probe.cellPx < 8 &&            // 长边 168px 上限下的每格像素
+  probe.cells.walk > 300 && probe.solidPx > 2000 &&
+  probe.markInCanvas === true &&
+  probe.inViewport === true && probe.overlapsPanel === false &&
+  probe.notUpscaled === true &&
+  probe.clickAccepted === true && probe.clickMoved === true,
+{ budget: 22000 }));
+
+// 9.67) 缩略图在手机横屏（844×390）下的行为：**默认收起**（那块屏本来就不够放），
+//      强制展开后必须仍在视口内、不压住地图速切面板、画布不被 CSS 放大（1 像素 1 格放大就会糊），
+//      且点缩略图仍然能走过去。`?mm=1` 是给无头截图/自测用的强制展开开关。
+results.push(run('右上角 缩略图 手机横屏', 'map=lingquan&touch=1&mm=1&autotest=minimap', ({ probe }) =>
+  !!probe && probe.cv === true &&
+  probe.viewport[0] === 844 && probe.viewport[1] === 390 &&
+  probe.notUpscaled === true &&
+  probe.cssBox[1] < probe.size[1] &&              // 34vh 上限确实压到了显示尺寸
+  probe.inViewport === true && probe.overlapsPanel === false &&
+  probe.markInCanvas === true &&
+  probe.foldedAfter === true && probe.unfoldedAfter === false &&
+  probe.clickAccepted === true && probe.clickMoved === true,
+{ size: '870,546', budget: 22000 }));
+
+//      同一台手机**不**给 `?mm=` 时必须默认收起（用户要的是"能收起来"，手机上默认就该是收着的）
+results.push(run('右上角 缩略图 手机默认收起', 'map=lingquan&touch=1&autotest=minimap', ({ probe }) =>
+  !!probe && probe.cv === true && probe.foldedAtStart === true,
+{ size: '870,546', budget: 22000 }));
+
 // 9.7) 首屏体积：地宫（547KB）与外来图（940KB）都**不在首屏**——它们只在该图要被用到时
 //      才载（?map= 指到它 / 用户点按钮 / 后台空闲预取）。这条把「首屏到底背了多少」钉住：
 //      一旦有人把大图集挪回 LOAD_PLAN，这里立刻红。这种回归的体感是"开屏越来越慢"，
