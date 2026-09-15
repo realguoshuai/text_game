@@ -18,6 +18,7 @@ build_atlas.py —— 把零散 PNG 打包成三张图集，减少首屏请求�
 输出：
     <atlas>.png  +  <atlas>.json   { 名字: [x, y, w, h] }
 """
+import argparse
 import json
 import os
 import sys
@@ -78,9 +79,18 @@ def build_tiles():
     for m in d['maps']:
         for o in m['objects']:
             names.add(o['piece'])
+        # groundTop：build_ground_tops.py 派生的「无接缝顶面瓦 + 变体」
+        for vs in (m.get('groundTop') or {}).values():
+            names.update(vs)
     items, missing, total = [], [], 0
     for n in sorted(names):
+        # 地宫素材有独立的 dungeon_atlas（build_dungeon_atlas.py），这里跳过，
+        # 否则 55 张墙/家具会白白塞进 tiles 图集、把首屏体积抬上去。
+        if n.startswith('dungeon/'):
+            continue
         p = os.path.join(SLICED, n)
+        if not os.path.exists(p):
+            p = os.path.join(ASSETS, n)      # ground/ 等派生素材直接放在 assets 下
         if os.path.exists(p):
             items.append((n, Image.open(p).convert('RGBA')))
             total += os.path.getsize(p)
@@ -148,11 +158,23 @@ def build_foes():
 
 
 def main():
-    t0, tiles = build_tiles()
-    t1, chars = build_chars()
-    t2, foes = build_foes()
+    ap = argparse.ArgumentParser(description='重建图集。')
+    ap.add_argument('--only', default='all', choices=['all', 'tiles', 'chars', 'foes'],
+                    help='只重建其中一个。⚠ 本脚本的 chars / foes 分支已过时——它们现在分别由 '
+                         'build_chars_atlas.py 与 build_beasts_atlas.py 负责，直接全量跑会把'
+                         '角色与怪物图集打回精简版。日常只跑 --only tiles。')
+    args = ap.parse_args()
+
+    t0 = t1 = t2 = 0
+    tiles = chars = foes = None
+    if args.only in ('all', 'tiles'):
+        t0, tiles = build_tiles()
+    if args.only in ('all', 'chars'):
+        t1, chars = build_chars()
+    if args.only in ('all', 'foes'):
+        t2, foes = build_foes()
     print()
-    print('分散总计 : %6.0f KB / %d 个请求' % ((t0 + t1 + t2) / 1024, 
+    print('分散总计 : %6.0f KB / %d 个请求' % ((t0 + t1 + t2) / 1024,
           (tiles or {}).get('count', 0) + (chars or {}).get('count', 0) + (foes or {}).get('count', 0)))
     print('图集总计 : %6.0f KB / 3 个请求' % (
         ((tiles or {}).get('bytes', 0) + (chars or {}).get('bytes', 0) + (foes or {}).get('bytes', 0)) / 1024))

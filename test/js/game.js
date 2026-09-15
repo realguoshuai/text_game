@@ -143,7 +143,7 @@
 
   var IMG = {};              // file -> Image（只留给非图集的小图，例如云）
   var MAPS = [], IDX = {}, CUR = null;
-  var PAL = {}, WALK = '';
+  var PAL = {}, WALK = '', WATER = '';
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
     hp: 260, maxhp: 260, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
     attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0,
@@ -331,12 +331,12 @@
   // 分母突然变大、进度条倒退。
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
-  var LOAD_PLAN = [
-    { url: 'assets/maps.json?v=4', json: true, weight: 62, label: '读取地图数据' },
-    { url: 'assets/tiles_atlas.webp?v=1', atlas: 'tiles', weight: 121, label: '载入地貌与建筑' },
-    { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
-    { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
-    { url: 'assets/tiles_atlas.json?v=1', json: true, weight: 2, label: '读取地貌索引' },
+    var LOAD_PLAN = [
+      { url: 'assets/maps.json?v=5', json: true, weight: 62, label: '读取地图数据' },
+      { url: 'assets/tiles_atlas.webp?v=2', atlas: 'tiles', weight: 105, label: '载入地貌与建筑' },
+      { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
+      { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
+      { url: 'assets/tiles_atlas.json?v=2', json: true, weight: 2, label: '读取地貌索引' },
     { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
     { url: 'assets/foes_atlas.json?v=2', json: true, weight: 10, label: '读取妖兽索引' },
     { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
@@ -469,7 +469,7 @@
         LOAD_PLAN.forEach(function (p) { if (p.imgKey && p.value) IMG[p.imgKey] = p.value; });
 
       TILE_W = data.tileW; TILE_H = data.tileH; HW = TILE_W / 2; HH = TILE_H / 2;
-      PAL = data.tilePalette; WALK = data.walkable;
+      PAL = data.tilePalette; WALK = data.walkable; WATER = data.water || '';
       MAPS = data.maps;
       MAPS.forEach(function (m) { m.solid = solidFrom(m); m.home = nearWalkable(m); IDX[m.id] = m; });
 
@@ -1042,23 +1042,73 @@
     return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
   }
 
-  function drawGround() {
-    var tw = TILE_W * Z, th = TILE_H * Z;
-    for (var y = 0; y < CUR.h; y++) {
-      for (var x = 0; x < CUR.w; x++) {
-        var file = PAL[CUR.ground[y][x]];
-        if (!file) continue;
-        var pz = piece(file);
-        if (!pz) continue;
-        var p = isoToScreen(x, y);
-        if (p.x < -tw * 1.6 || p.x > W + tw * 1.6 || p.y < -th * 4 || p.y > H + th * 4) continue;
-        // 统一按宽度归一到 TILE_W*Z，保证菱形水平对角线与网格严格对齐
-        var s = tw / pz.w;
-        ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
-          p.x - tw / 2, p.y, tw, pz.h * s);
+    /* 地面绘制：两级策略，取决于这张地图有没有 groundTop
+     *   （groundTop 由 tools/build_ground_tops.py 从原「整块地形瓦」派生出来）
+     *
+     * 有 groundTop —— 内部格改用「无接缝顶面瓦」：原素材是 120x60 的菱形顶面
+     *   底下压着 15px 泥土侧壁、最外一圈还带描边，逐格整块铺就会满屏砖缝。
+     *   顶面瓦把侧壁和描边都去掉了，于是地面连成一片。具体分三种情况：
+     *     · 岛缘（南邻或东邻不是实体地）→ 仍用原带侧壁瓦，露出泥土断层；
+     *     · 水格四邻皆水 → 用无岸顶面瓦，几十格水连成一湖；
+     *     · 其余 → 用顶面瓦，按坐标伪随机取变体，打散「一张瓦铺几百格」的规律感。
+     * 没有 groundTop —— 沿用旧的整块铺法，行为与改造前完全一致。
+     *   （lingquan / beilin / dungeon 尚未生成顶面瓦，靠这条回退路径不受影响。）
+     */
+    var TOP_OVER = 1.03;      // 顶面瓦绘制放大比例（见 drawGround 内的说明）
+    var NT4X = [1, -1, 0, 0], NT4Y = [0, 0, 1, -1];
+    /** 确定性伪随机：同一坐标永远得到同一个数，刷新/换机都不变 */
+    function tileHash(x, y) {
+      var h = Math.imul(x + 0x9E37, 0x27D4EB2D) ^ Math.imul(y + 0x85EB, 0x165667B1);
+      h = Math.imul(h ^ (h >>> 15), 0x2545F491);
+      return (h ^ (h >>> 13)) >>> 0;
+    }
+    /** 四邻是否全是水（越界按不是水处理，岸边因此保留岸线） */
+    function waterAround(x, y) {
+      for (var i = 0; i < 4; i++) {
+        var nx = x + NT4X[i], ny = y + NT4Y[i];
+        if (nx < 0 || ny < 0 || nx >= CUR.w || ny >= CUR.h) return false;
+        if (WATER.indexOf(CUR.ground[ny][nx]) < 0) return false;
+      }
+      return true;
+    }
+
+    function drawGround() {
+      var tw = TILE_W * Z, th = TILE_H * Z;
+      var GT = CUR.groundTop;
+      for (var y = 0; y < CUR.h; y++) {
+        var row = CUR.ground[y];
+        for (var x = 0; x < CUR.w; x++) {
+          var ch = row[x];
+          var file = PAL[ch];
+          if (!file) continue;
+          var name = file, top = false;
+          var vs = GT && GT[ch];
+          if (vs && vs.length) {
+            if (WATER.indexOf(ch) >= 0) {
+              if (waterAround(x, y)) { name = vs[0]; top = true; }
+            } else {
+              // 南邻(y+1) / 东邻(x+1) 在屏幕上位于本格的左下与右下 —— 只有它们
+              // 是虚空时，本格的泥土侧壁才露得出来；否则整格用无缝顶面瓦。
+              var sb = (y + 1 < CUR.h) ? CUR.ground[y + 1][x] : ' ';
+              var se = (x + 1 < CUR.w) ? row[x + 1] : ' ';
+              if (PAL[sb] && PAL[se]) { name = vs[tileHash(x, y) % vs.length]; top = true; }
+            }
+          }
+          var pz = piece(name);
+          if (!pz) continue;
+          var p = isoToScreen(x, y);
+          if (p.x < -tw * 1.6 || p.x > W + tw * 1.6 || p.y < -th * 4 || p.y > H + th * 4) continue;
+          // 统一按宽度归一到 TILE_W*Z，保证菱形水平对角线与网格严格对齐。
+          // 顶面瓦再放大 3%：缩放比不是整数（120/119），密铺时边缘会差半像素露缝，
+          // 略微重叠就盖住了；相邻格重叠区颜色一致，看不出来。
+          var s = tw / pz.w;
+          var dw = top ? tw * TOP_OVER : tw;
+          var dh = pz.h * s * (top ? TOP_OVER : 1);
+          ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
+            p.x - dw / 2, p.y - (dh - pz.h * s) / 2, dw, dh);
+        }
       }
     }
-  }
 
   function drawPortal(pt) {
     var p = isoToScreen(pt.x, pt.y);
