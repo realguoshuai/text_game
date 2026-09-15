@@ -1364,6 +1364,14 @@
      "spawnX": 15,
      "spawnY": 22,
      "label": "碑林石阵"
+    },
+    {
+     "x": 29,
+     "y": 24,
+     "to": "dungeon",
+     "spawnX": 4,
+     "spawnY": 14,
+     "label": "幽冥地宫"
     }
    ],
    "spawn": {
@@ -2621,6 +2629,14 @@
      "spawnX": 15,
      "spawnY": 22,
      "label": "碑林石阵"
+    },
+    {
+     "x": 12,
+     "y": 26,
+     "to": "dungeon",
+     "spawnX": 22,
+     "spawnY": 17,
+     "label": "幽冥地宫"
     }
    ],
    "spawn": {
@@ -3625,6 +3641,14 @@
      "spawnX": 27,
      "spawnY": 24,
      "label": "灵泉灵瀑"
+    },
+    {
+     "x": 17,
+     "y": 24,
+     "to": "dungeon",
+     "spawnX": 14,
+     "spawnY": 21,
+     "label": "幽冥地宫"
     }
    ],
    "spawn": {
@@ -3677,18 +3701,18 @@
     "RRDDDDDDDDPPPPPPDDDDDDDDDDRM",
     "RRDDDDDDDDPPPPPPDDDDDDDDDDRR",
     "RRDDDDDDDDDSSSSDDDDDDDDDDDRR",
-    "RRDDDDDDDDDDDDDDDDDDDDDDDDRR",
-    "RRDDDDDDDDDDDDDDDDDDDDDDDDRR",
-    "MRDDDDDDDDDDDDDDDDDDDDDDDDRR",
-    "RRDDDDDDDDDDDDDDDDDDPPPPPDRR",
-    "RMDDDDDDDDDDDDDDDDDDPPPPPDRR",
-    "MRDDDDDDDDDDDDDDDDDDPPPPPDRR",
-    "MMDDDDDDDDDDDDDDDDDDDDDDDDRR",
-    "MRDDDDDDDDDDDDDDDDDDPPPPPDRR",
-    "RRRRRRRRDDDDDDDDDDDDPPPPPDRR",
-    "RMMMMRRRDDDDDDDDDDDDPPPPPDRR",
-    "MRMMMRRRDDDDDDDDDDDDPPPPPDRR",
-    "RRRMMMMMDDDDDDDDDDDDPPPPPDMR",
+    "RRDDDDDDDDDDDDPDDDDDDDDDDDRR",
+    "RRDDDDDDDDDDDDPDDDDDDDDDDDRR",
+    "MRDDDDDDDDDDDDPDDDDDDDDDDDRR",
+    "RRDDDDDDDDDDDDPDDDDDPPPPPDRR",
+    "RMDDDDDDDDDDDDPDDDDDPPPPPDRR",
+    "MRDDDDDDDDDDDDPDDDDDPPPPPDRR",
+    "MMDDDDDDDDDDDDPDDDDDDDDDDDRR",
+    "MRDDDDDDDDDDDDPDDDDDPPPPPDRR",
+    "RRRRRRRRDDDDDDPDDDDDPPPPPDRR",
+    "RMMMMRRRDDDDDDPDDDDDPPPPPDRR",
+    "MRMMMRRRDDDDDDPDDDDDPPPPPDRR",
+    "RRRMMMMMDDDDDDPDDDDDPPPPPDMR",
     "MRRMMMMRDDDDDDDDDDDDPPPPPDMR",
     "RRRMMMMMDDDDDDDDDDDDPPPPPDRR",
     "RRRRRRRMDDDDDDDDDDDDDDDDDDRR",
@@ -5214,11 +5238,31 @@
      "x": 14,
      "y": 24,
      "to": "qingxuan",
-     "tx": 17,
-     "ty": 27,
-     "label": "返回青玄山门"
+     "spawnX": 17,
+     "spawnY": 27,
+     "label": "青玄山门"
+    },
+    {
+     "x": 3,
+     "y": 14,
+     "to": "lingquan",
+     "spawnX": 10,
+     "spawnY": 26,
+     "label": "灵泉灵瀑"
+    },
+    {
+     "x": 24,
+     "y": 17,
+     "to": "beilin",
+     "spawnX": 15,
+     "spawnY": 24,
+     "label": "碑林石阵"
     }
-   ]
+   ],
+   "spawn": {
+    "x": 14,
+    "y": 22
+   }
   }
  ]
 }

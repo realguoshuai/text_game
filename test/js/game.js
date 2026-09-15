@@ -135,7 +135,9 @@
     chars: { img: null, rect: null },
     // foes: rect = 老式「逐帧独立矩形」扁平表（等距妖兽，只有 idle/attack/death 三态）；
     //       anim = 新式「每怪一组动作帧序列」（侧视多动作素材，见 assets/beasts.json）
-    foes: { img: null, rect: null, anim: null }
+    foes: { img: null, rect: null, anim: null },
+    // dungeon: 地宫素材图集（原 228 张独立 PNG 打包成 1 张，见 tools/build_dungeon_atlas.py）
+    dungeon: { img: null, rect: null }
   };
   function atlasReady(a) { return !!(a.img && a.rect); }
 
@@ -191,6 +193,13 @@
    * ⚠ side:1 = 侧视素材（只有朝右一版），引擎按 face 做水平翻转，见 beastRect/drawFoe。 */
   var BEASTS = [];              // assets/beasts.json 里的 monsters
   var LINGQUAN_SPAWNS = [];
+  // 幽冥地宫：8 只小僵尸散布各处（大殿/储藏室/餐厅/入口/废墟方向），坐标会经 snapWalkable 吸附
+  var DUNGEON_SPAWNS = [
+    { x: 6,  y: 6,  t: 'zombie_a' }, { x: 21, y: 6,  t: 'zombie_a' },
+    { x: 6,  y: 21, t: 'zombie_a' }, { x: 21, y: 21, t: 'zombie_a' },
+    { x: 14, y: 13, t: 'zombie_a' }, { x: 10, y: 15, t: 'zombie_a' },
+    { x: 18, y: 12, t: 'zombie_a' }, { x: 8,  y: 18, t: 'zombie_a' }
+  ];
   var BEAST_FALLBACK = { run: 'walk', atk2: 'atk', walk: 'idle', hurt: 'idle', dead: 'idle' };
   function absorbBeasts(list) {
     BEASTS = list || [];
@@ -323,7 +332,7 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
   var LOAD_PLAN = [
-    { url: 'assets/maps.json?v=2', json: true, weight: 62, label: '读取地图数据' },
+    { url: 'assets/maps.json?v=3', json: true, weight: 62, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.webp?v=1', atlas: 'tiles', weight: 121, label: '载入地貌与建筑' },
     { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
     { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -333,9 +342,11 @@
     { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
     { url: 'assets/beasts.json?v=2', json: true, weight: 11, label: '读取怪物图录' }
   ];
-  DUNGEON_IMGS.forEach(function (n) {
-    LOAD_PLAN.push({ url: 'assets/' + n, imgKey: n, weight: 5, label: '地牢素材' });
-  });
+  // 地宫素材：228 张独立 PNG 已打包成单张 dungeon_atlas.webp（见 tools/build_dungeon_atlas.py），
+  // 从 228 次请求压到 2 次（图集 + 索引）。DUNGEON_IMGS 仅作素材清单参考，不再逐个加载。
+  var dmImg = { url: 'assets/dungeon_atlas.webp?v=1', atlas: 'dungeon', weight: 475, label: '载入地宫图集' };
+  var dmJson = { url: 'assets/dungeon_atlas.json?v=1', json: true, weight: 2, label: '读取地宫索引' };
+  LOAD_PLAN.push(dmImg, dmJson);
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
   function fmtBytes(n) {
@@ -443,6 +454,9 @@
         var fj = LOAD_PLAN[6].value || {};
         ATLAS.foes.rect = fj.rect || fj;
         ATLAS.foes.anim = fj.anims || {};
+        // 地宫图集（按引用查找，不依赖下标，顺序变动也不怕）
+        ATLAS.dungeon.img = LOAD_PLAN[LOAD_PLAN.indexOf(dmImg)].value;
+        ATLAS.dungeon.rect = LOAD_PLAN[LOAD_PLAN.indexOf(dmJson)].value;
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;
@@ -1000,6 +1014,9 @@
   function piece(name) {
     var a = ATLAS.tiles, r = a.rect && a.rect[name];
     if (a.img && r) return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
+    // 地宫图集：原 228 张独立 PNG 打包成单张，键名同为 dungeon/xxx.png
+    var d = ATLAS.dungeon, dr = d.rect && d.rect[name];
+    if (d.img && dr) return { img: d.img, sx: dr[0], sy: dr[1], w: dr[2], h: dr[3] };
     // 独立 PNG 回退：用于测试/接入未入 tiles_atlas 的新素材（如 Kenney 地牢包）
     if (IMG[name]) {
       var im = IMG[name];
@@ -1290,11 +1307,13 @@
     if (silent) hintEl.textContent = '踩上青色光门即可切换地图';
     else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试招（J 攻击A / K 重击B / U 御剑诀 / I 雷罡咒 / O 太虚剑域 / 1~6 试动作）';
     else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 ' + LINGQUAN_SPAWNS.length + ' 只（J 普攻 / K 重击 / U·I·O 三招技能，Shift 奔跑）';
+    else if (CUR.id === 'dungeon') hintEl.textContent = '幽冥地宫 · 尸气弥漫：小僵尸 ' + DUNGEON_SPAWNS.length + ' 只盘踞各处，南/西/东三门分别通往青玄山门 / 灵泉灵瀑 / 碑林石阵';
     else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
     // 只有碑林石阵刷妖兽（猎场）；青玄山门刷训练靶（调试场）；灵泉灵瀑刷五族怪物；其它图清空战斗状态
     if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：老猎场
     else if (CUR.id === 'qingxuan') { foes = makeFoes(QINGXUAN_SPAWNS); }  // 青玄山门：调试场
     else if (CUR.id === 'lingquan') { foes = makeFoes(LINGQUAN_SPAWNS); }  // 灵泉灵瀑：五族怪物
+    else if (CUR.id === 'dungeon') { foes = makeFoes(DUNGEON_SPAWNS); }    // 幽冥地宫：小僵尸群
     else { foes = []; floaters = []; particles = []; player.targetFoe = null; }
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;

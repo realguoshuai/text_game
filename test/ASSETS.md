@@ -32,13 +32,14 @@
 
 > 历史坑：`tiles_atlas.png` / `maps.json` 原本**没有**版本号，换图后没法做缓存失效。本次一并补上 `?v=1`。
 
-### 1.1 新增：幽冥地宫（Kenney 等距微缩地牢）
+### 1.1 幽冥地宫（Kenney 等距微缩地牢）
 
-第四张地图 `dungeon` 使用了 **Kenney Isometric Mini Dungeon**（CC0）素材。为了保持实验性接入的灵活性，这些素材未打入 `tiles_atlas`，而是作为独立 PNG 由 `game.js` 的 `piece()` 回退加载，并在 `LOAD_PLAN` 中预加载。
+第四张地图 `dungeon` 使用了 **Kenney Isometric Mini Dungeon**（CC0）素材。**已打包为单张图集**：`tools/build_dungeon_atlas.py` 把 `assets/dungeon/` 下全部 228 张 PNG 拼成 `dungeon_atlas.webp`（475KB）+ `dungeon_atlas.json`（rect 索引，键名 `dungeon/文件名`），`piece()` 优先查该图集 —— 请求数从 228 压到 2。`assets/dungeon/` 下的原始 PNG 保留作重建输入，运行时不再逐个请求。
 
 | 路径 | 体积 | 用途 |
 |---|---|---|
-| `test/assets/dungeon/stoneTile_N.png` 等 15 张 | 约 130KB 合计 | 地宫地面、石墙、拱门、柱子、木桶、宝箱、桌椅、木桥 |
+| `test/assets/dungeon_atlas.webp` + `.json` | 475KB + 索引 | 地宫全部素材（地面/石墙/拱门/柱子/家具），228 次请求 → 2 次 |
+| `test/assets/dungeon/*.png`（228 张） | 约 2.4MB | 图集的重建输入，运行时不加载 |
 
 授权：`ImmortalGame/地形包/等距微缩地牢/License.txt` —— CC0，可商用，建议署名 Kenney。
 

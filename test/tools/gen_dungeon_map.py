@@ -78,6 +78,10 @@ set_floor_rect(20, 4, 24, 13, 'D')
 # 连接储藏室和餐厅的走廊：x=20..24, y=14..16，木板
 set_floor_rect(20, 14, 24, 16, 'P')
 
+# 中央主道：木板路从入口直通祭坛台阶，一条醒目的「回家路」
+for ry in range(11, 23):
+    GND[ry][14] = 'P'
+
 # 碎石过渡：在泥土废墟与主厅交界处撒一些破损石砖
 rng = random.Random(2026)
 for y in range(H):
@@ -283,13 +287,14 @@ cluster([
 # ------------------------------------------------------------------
 # 传送门 + 玩家起点
 # ------------------------------------------------------------------
-portals = [{
-    'x': 14, 'y': 24,
-    'to': 'qingxuan',
-    'tx': 17, 'ty': 27,
-    'label': '返回青玄山门'
-}]
-start_x, start_y = 14, 23
+# 南/西/东三个拱门各设一个外传门（北门作装饰）；落点 = 目标图的安全格，
+# 且与该图的返回门错开，避免「落地即回传」死循环。
+portals = [
+    { 'x': 14, 'y': 24, 'to': 'qingxuan', 'spawnX': 17, 'spawnY': 27, 'label': '青玄山门' },
+    { 'x': 3,  'y': 14, 'to': 'lingquan', 'spawnX': 10, 'spawnY': 26, 'label': '灵泉灵瀑' },
+    { 'x': 24, 'y': 17, 'to': 'beilin',   'spawnX': 15, 'spawnY': 24, 'label': '碑林石阵' }
+]
+start_x, start_y = 14, 22
 
 
 # ------------------------------------------------------------------
@@ -302,7 +307,8 @@ new_map = {
     'w': W, 'h': H,
     'ground': [''.join(row) for row in GND],
     'objects': OBJS,
-    'portals': portals
+    'portals': portals,
+    'spawn': { 'x': start_x, 'y': start_y }
 }
 
 data['maps'].append(new_map)
