@@ -2613,94 +2613,6 @@
      "y": 14,
      "fw": 1,
      "fh": 1
-    },
-    {
-     "piece": "ling/fountain.png",
-     "x": 16,
-     "y": 15,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/waterfall.png",
-     "x": 16,
-     "y": 11,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/tree.png",
-     "x": 6,
-     "y": 8,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/tree.png",
-     "x": 25,
-     "y": 6,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/tree.png",
-     "x": 28,
-     "y": 24,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/trees.png",
-     "x": 5,
-     "y": 25,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/trees.png",
-     "x": 27,
-     "y": 5,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/hill.png",
-     "x": 4,
-     "y": 6,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/hill.png",
-     "x": 7,
-     "y": 29,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/hill.png",
-     "x": 27,
-     "y": 27,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/rock.png",
-     "x": 11,
-     "y": 22,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
     }
    ],
    "portals": [
@@ -2734,16 +2646,7 @@
     "y": 26
    },
    "note": "灵泉湖泊：竹海、松林、水岸栈桥、瀑布石阶",
-   "npcs": [],
-   "tilePalette": {
-    ".": "ling/grass.png",
-    ",": "ling/dirt.png",
-    "#": "ling/moss.png",
-    ";": "ling/stone.png",
-    "~": "ling/water.png",
-    "-": "ling/shore.png"
-   },
-   "solid": {}
+   "npcs": []
   },
   {
    "id": "beilin",

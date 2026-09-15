@@ -137,9 +137,7 @@
     //       anim = 新式「每怪一组动作帧序列」（侧视多动作素材，见 assets/beasts.json）
     foes: { img: null, rect: null, anim: null },
     // dungeon: 地宫素材图集（原 228 张独立 PNG 打包成 1 张，见 tools/build_dungeon_atlas.py）
-    dungeon: { img: null, rect: null },
-    // ling: 灵泉灵瀑主题瓦片与装饰物件图集（见 tools/gen_lingquan_tiles.py）
-    ling: { img: null, rect: null }
+    dungeon: { img: null, rect: null }
   };
   function atlasReady(a) { return !!(a.img && a.rect); }
 
@@ -334,7 +332,7 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
   var LOAD_PLAN = [
-    { url: 'assets/maps.json?v=6', json: true, weight: 93, label: '读取地图数据' },
+    { url: 'assets/maps.json?v=4', json: true, weight: 62, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.webp?v=1', atlas: 'tiles', weight: 121, label: '载入地貌与建筑' },
     { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
     { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -349,9 +347,6 @@
   var dmImg = { url: 'assets/dungeon_atlas.webp?v=2', atlas: 'dungeon', weight: 547, label: '载入地宫图集' };
   var dmJson = { url: 'assets/dungeon_atlas.json?v=2', json: true, weight: 2, label: '读取地宫索引' };
   LOAD_PLAN.push(dmImg, dmJson);
-  var lingImg = { url: 'assets/lingquan_atlas.webp?v=1', atlas: 'ling', weight: 16, label: '载入灵泉图集' };
-  var lingJson = { url: 'assets/lingquan_atlas.json?v=1', json: true, weight: 1, label: '读取灵泉索引' };
-  LOAD_PLAN.push(lingImg, lingJson);
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 
   function fmtBytes(n) {
@@ -462,9 +457,6 @@
         // 地宫图集（按引用查找，不依赖下标，顺序变动也不怕）
         ATLAS.dungeon.img = LOAD_PLAN[LOAD_PLAN.indexOf(dmImg)].value;
         ATLAS.dungeon.rect = LOAD_PLAN[LOAD_PLAN.indexOf(dmJson)].value;
-        // 灵泉灵瀑图集
-        ATLAS.ling.img = LOAD_PLAN[LOAD_PLAN.indexOf(lingImg)].value;
-        ATLAS.ling.rect = LOAD_PLAN[LOAD_PLAN.indexOf(lingJson)].value;
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;
@@ -1005,12 +997,7 @@
       return;
     }
     var g = ctx.createLinearGradient(0, 0, 0, H);
-    if (CUR && CUR.id === 'lingquan') {
-      // 灵泉：淡青绿天空，配合 Kenney 自然低多边形风格
-      g.addColorStop(0, '#b8dce8'); g.addColorStop(0.55, '#dff2f7'); g.addColorStop(1, '#f7fcfd');
-    } else {
-      g.addColorStop(0, SKY_TOP); g.addColorStop(0.5, SKY_MID); g.addColorStop(1, SKY_BOT);
-    }
+    g.addColorStop(0, SKY_TOP); g.addColorStop(0.5, SKY_MID); g.addColorStop(1, SKY_BOT);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     if (!cloudCv) return;
     var span = W + 700;
@@ -1037,9 +1024,6 @@
     // 地宫图集：原 228 张独立 PNG 打包成单张，键名同为 dungeon/xxx.png
     var d = ATLAS.dungeon, dr = d.rect && d.rect[name];
     if (d.img && dr) return { img: d.img, sx: dr[0], sy: dr[1], w: dr[2], h: dr[3] };
-    // 灵泉灵瀑图集：键名为 ling/xxx.png
-    var l = ATLAS.ling, lr = l.rect && l.rect[name];
-    if (l.img && lr) return { img: l.img, sx: lr[0], sy: lr[1], w: lr[2], h: lr[3] };
     // 独立 PNG 回退：用于测试/接入未入 tiles_atlas 的新素材（如 Kenney 地牢包）
     if (IMG[name]) {
       var im = IMG[name];
@@ -1060,11 +1044,9 @@
 
   function drawGround() {
     var tw = TILE_W * Z, th = TILE_H * Z;
-    // 允许单个地图用自己的 tilePalette 覆盖全局调色板，互不串味
-    var pal = CUR.tilePalette || PAL;
     for (var y = 0; y < CUR.h; y++) {
       for (var x = 0; x < CUR.w; x++) {
-        var file = pal[CUR.ground[y][x]];
+        var file = PAL[CUR.ground[y][x]];
         if (!file) continue;
         var pz = piece(file);
         if (!pz) continue;
@@ -1076,29 +1058,6 @@
           p.x - tw / 2, p.y, tw, pz.h * s);
       }
     }
-  }
-
-  /** 灵泉灵瀑专属氛围：水面波光、薄雾、天光射线、灵泉粒子。
-   * 纯视觉，不参与任何玩法判定。 */
-  function drawLingquanAtmos() {
-    var tw = TILE_W * Z, th = TILE_H * Z;
-    var waterChars = '~-', cx, cy, a, ch, p;
-    // 只保留极轻微的水面波光，配合 Kenney 干净低多边形风格
-    for (var y = 0; y < CUR.h; y++) {
-      for (var x = 0; x < CUR.w; x++) {
-        ch = CUR.ground[y][x];
-        if (waterChars.indexOf(ch) === -1) continue;
-        p = isoToScreen(x, y);
-        if (p.x < -tw || p.x > W + tw || p.y < -th * 2 || p.y > H + th * 2) continue;
-        cx = p.x; cy = p.y + HH * Z;
-        a = 0.10 + 0.08 * Math.sin(time * 1.8 + x * 1.1 + y * 0.7);
-        if (ch === '~') {
-          ctx.fillStyle = 'rgba(200,255,255,' + (a * 0.18).toFixed(3) + ')';
-          ctx.beginPath(); ctx.ellipse(cx, cy + 4 * Z, tw * 0.14, th * 0.11, 0, 0, 6.2832); ctx.fill();
-        }
-      }
-    }
-    ctx.restore();
   }
 
   function drawPortal(pt) {
@@ -1315,9 +1274,6 @@
     });
     drawSkillFx();    // 技能特效（剑气/雷爆/剑雨）画在飘字下面，别盖住伤害数字
     drawFloaters();   // 伤害飘字 + 击杀粒子（猎场用）
-
-    // 灵泉灵瀑氛围层：水面波光、薄雾、天光射线、灵泉粒子
-    if (CUR.id === 'lingquan') drawLingquanAtmos();
 
     // 地宫氛围层：以玩家为中心的「灯笼光晕」——近处亮、远处沉入黑暗，
     // 再加一圈冷色边缘暗角，营造地下空间纵深。纯视觉，不影响任何玩法判定。
