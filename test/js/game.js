@@ -344,8 +344,8 @@
   ];
   // 地宫素材：228 张独立 PNG 已打包成单张 dungeon_atlas.webp（见 tools/build_dungeon_atlas.py），
   // 从 228 次请求压到 2 次（图集 + 索引）。DUNGEON_IMGS 仅作素材清单参考，不再逐个加载。
-  var dmImg = { url: 'assets/dungeon_atlas.webp?v=1', atlas: 'dungeon', weight: 475, label: '载入地宫图集' };
-  var dmJson = { url: 'assets/dungeon_atlas.json?v=1', json: true, weight: 2, label: '读取地宫索引' };
+  var dmImg = { url: 'assets/dungeon_atlas.webp?v=2', atlas: 'dungeon', weight: 547, label: '载入地宫图集' };
+  var dmJson = { url: 'assets/dungeon_atlas.json?v=2', json: true, weight: 2, label: '读取地宫索引' };
   LOAD_PLAN.push(dmImg, dmJson);
   var loadUI = { bar: null, pct: null, tip: null, sub: null };
 

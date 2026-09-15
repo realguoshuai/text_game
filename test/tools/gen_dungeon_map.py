@@ -14,17 +14,19 @@ data['maps'] = [m for m in data['maps'] if m['id'] != 'dungeon']
 # tilePalette 扩展
 PAL = data.get('tilePalette', {})
 PAL.update({
-    'D': 'dungeon/stoneTile_N.png',           # 石砖地面（主厅/室内）
+    'T': 'dungeon/stoneUneven_N.png',         # 石块路（凸起、一眼是「路」，全部可走区）
+    'D': 'dungeon/stoneTile_N.png',           # 平整石砖（留作非路面对照，当前地宫不再使用）
     'P': 'dungeon/planks_N.png',              # 木板地面（高台/餐厅/桥）
-    'R': 'dungeon/dirtTiles_N.png',           # 泥土（废墟外围）
-    'M': 'dungeon/stoneMissingTiles_N.png',   # 破损地面（废墟）
+    'R': 'dungeon/dirtTiles_N.png',           # 泥土（旧，保留兼容）
+    'X': 'dungeon/dirtTiles_N.png',           # 外围泥土（不可走：点了也过不去，与可走区视觉区分）
+    'M': 'dungeon/stoneMissingTiles_N.png',   # 破损地面（废墟，可走）
     'S': 'dungeon/stoneSteps_N.png',          # 石阶（可行走）
 })
 data['tilePalette'] = PAL
-data['walkable'] = '.,#;DPRMS'   # S 也允许走
+data['walkable'] = '.,#;DPRTMS'   # T=石块路 可走；X 不在表内=不可走
 
 # 地面网格
-GND = [['R' for _ in range(W)] for _ in range(H)]
+GND = [['X' for _ in range(W)] for _ in range(H)]  # 外圈默认=不可走泥土
 OBJS = []
 
 
@@ -51,18 +53,18 @@ def in_rect(x, y, x0, y0, x1, y1):
 # 主地宫范围：外墙围成的大空间
 DUNGEON_X0, DUNGEON_Y0 = 2, 2
 DUNGEON_X1, DUNGEON_Y1 = 25, 25
-set_floor_rect(DUNGEON_X0, DUNGEON_Y0, DUNGEON_X1, DUNGEON_Y1, 'D')
+set_floor_rect(DUNGEON_X0, DUNGEON_Y0, DUNGEON_X1, DUNGEON_Y1, 'T')
 
-# 废墟角：西南角（x=2..7, y=19..25）崩塌成泥土/破损地面
-set_floor_rect(2, 19, 7, 25, 'R')
+# 废墟角：西南角（x=2..7, y=19..25）崩塌成破损地面（仍在墙内，可走）
+set_floor_rect(2, 19, 7, 25, 'T')
 set_floor_rect(3, 22, 6, 24, 'M')
 set_floor_rect(2, 20, 4, 21, 'M')
 
 # 入口大厅：南部居中，y=18..24, x=8..19
-set_floor_rect(8, 18, 19, 24, 'D')
+set_floor_rect(8, 18, 19, 24, 'T')
 
 # 中央大厅：y=10..17, x=8..19
-set_floor_rect(8, 10, 19, 17, 'D')
+set_floor_rect(8, 10, 19, 17, 'T')
 
 # 祭坛高台：北部居中，y=4..9, x=10..15，木板地面
 set_floor_rect(10, 4, 15, 9, 'P')
@@ -73,7 +75,7 @@ for x in range(11, 15):
 # 餐厅：东南角，x=20..24, y=18..24，木板地面
 set_floor_rect(20, 18, 24, 24, 'P')
 # 储藏室：东北角，x=20..24, y=4..13
-set_floor_rect(20, 4, 24, 13, 'D')
+set_floor_rect(20, 4, 24, 13, 'T')
 
 # 连接储藏室和餐厅的走廊：x=20..24, y=14..16，木板
 set_floor_rect(20, 14, 24, 16, 'P')
@@ -82,11 +84,11 @@ set_floor_rect(20, 14, 24, 16, 'P')
 for ry in range(11, 23):
     GND[ry][14] = 'P'
 
-# 碎石过渡：在泥土废墟与主厅交界处撒一些破损石砖
+# 碎石过渡：在废墟角撒一些破损石砖，增强废弃感
 rng = random.Random(2026)
 for y in range(H):
     for x in range(W):
-        if GND[y][x] == 'R' and rng.random() < 0.15:
+        if GND[y][x] == 'T' and rng.random() < 0.04:
             GND[y][x] = 'M'
 
 
@@ -308,7 +310,8 @@ new_map = {
     'ground': [''.join(row) for row in GND],
     'objects': OBJS,
     'portals': portals,
-    'spawn': { 'x': start_x, 'y': start_y }
+    'spawn': { 'x': start_x, 'y': start_y },
+    'home': { 'x': start_x, 'y': start_y }   # 直达 ?map=dungeon 时的出生点（引擎读 home）
 }
 
 data['maps'].append(new_map)
