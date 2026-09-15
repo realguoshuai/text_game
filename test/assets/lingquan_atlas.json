@@ -1,74 +1,74 @@
 {
-  "ling/grass.png": [
-    2,
-    0,
-    120,
-    76
-  ],
-  "ling/grass2.png": [
-    124,
-    0,
-    120,
-    76
-  ],
-  "ling/moss.png": [
-    246,
-    0,
-    120,
-    76
-  ],
-  "ling/dirt.png": [
-    368,
-    0,
-    120,
-    76
-  ],
-  "ling/stone.png": [
-    490,
-    0,
-    120,
-    76
-  ],
-  "ling/shore.png": [
-    612,
-    0,
-    120,
-    76
-  ],
-  "ling/water.png": [
-    734,
-    0,
-    120,
-    76
-  ],
-  "ling/water2.png": [
-    856,
-    0,
-    120,
-    76
-  ],
-  "ling/waterfall.png": [
-    978,
-    0,
-    120,
-    220
-  ],
-  "ling/lotus.png": [
-    1100,
-    0,
-    52,
-    34
-  ],
-  "ling/spirit_stone.png": [
-    1154,
-    0,
-    44,
-    52
-  ],
-  "ling/rock.png": [
-    1200,
-    0,
-    28,
-    22
-  ]
+ "ling/grass.png": [
+  0,
+  0,
+  120,
+  90
+ ],
+ "ling/dirt.png": [
+  120,
+  0,
+  120,
+  90
+ ],
+ "ling/moss.png": [
+  240,
+  0,
+  120,
+  90
+ ],
+ "ling/stone.png": [
+  360,
+  0,
+  120,
+  90
+ ],
+ "ling/water.png": [
+  480,
+  0,
+  120,
+  75
+ ],
+ "ling/shore.png": [
+  600,
+  0,
+  120,
+  90
+ ],
+ "ling/fountain.png": [
+  720,
+  0,
+  120,
+  90
+ ],
+ "ling/waterfall.png": [
+  840,
+  0,
+  120,
+  119
+ ],
+ "ling/tree.png": [
+  960,
+  0,
+  120,
+  75
+ ],
+ "ling/trees.png": [
+  1080,
+  0,
+  120,
+  75
+ ],
+ "ling/hill.png": [
+  1200,
+  0,
+  120,
+  119
+ ],
+ "ling/rock.png": [
+  1320,
+  0,
+  120,
+  90
+ ]
 }

@@ -334,7 +334,7 @@
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
   var LOAD_PLAN = [
-    { url: 'assets/maps.json?v=5', json: true, weight: 62, label: '读取地图数据' },
+    { url: 'assets/maps.json?v=6', json: true, weight: 93, label: '读取地图数据' },
     { url: 'assets/tiles_atlas.webp?v=1', atlas: 'tiles', weight: 121, label: '载入地貌与建筑' },
     { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
     { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -1005,7 +1005,12 @@
       return;
     }
     var g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, SKY_TOP); g.addColorStop(0.5, SKY_MID); g.addColorStop(1, SKY_BOT);
+    if (CUR && CUR.id === 'lingquan') {
+      // 灵泉：淡青绿天空，配合 Kenney 自然低多边形风格
+      g.addColorStop(0, '#b8dce8'); g.addColorStop(0.55, '#dff2f7'); g.addColorStop(1, '#f7fcfd');
+    } else {
+      g.addColorStop(0, SKY_TOP); g.addColorStop(0.5, SKY_MID); g.addColorStop(1, SKY_BOT);
+    }
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     if (!cloudCv) return;
     var span = W + 700;
@@ -1078,7 +1083,7 @@
   function drawLingquanAtmos() {
     var tw = TILE_W * Z, th = TILE_H * Z;
     var waterChars = '~-', cx, cy, a, ch, p;
-    // 水面波光：给深水和浅岸加上缓慢闪烁的高光
+    // 只保留极轻微的水面波光，配合 Kenney 干净低多边形风格
     for (var y = 0; y < CUR.h; y++) {
       for (var x = 0; x < CUR.w; x++) {
         ch = CUR.ground[y][x];
@@ -1086,54 +1091,12 @@
         p = isoToScreen(x, y);
         if (p.x < -tw || p.x > W + tw || p.y < -th * 2 || p.y > H + th * 2) continue;
         cx = p.x; cy = p.y + HH * Z;
-        a = 0.22 + 0.18 * Math.sin(time * 2.3 + x * 1.1 + y * 0.7);
+        a = 0.10 + 0.08 * Math.sin(time * 1.8 + x * 1.1 + y * 0.7);
         if (ch === '~') {
-          ctx.fillStyle = 'rgba(200,255,255,' + (a * 0.35).toFixed(3) + ')';
-          ctx.beginPath(); ctx.ellipse(cx, cy + 4 * Z, tw * 0.16, th * 0.13, 0, 0, 6.2832); ctx.fill();
-        } else {
-          ctx.fillStyle = 'rgba(220,255,245,' + (a * 0.22).toFixed(3) + ')';
-          ctx.beginPath(); ctx.ellipse(cx, cy + 4 * Z, tw * 0.13, th * 0.10, 0, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = 'rgba(200,255,255,' + (a * 0.18).toFixed(3) + ')';
+          ctx.beginPath(); ctx.ellipse(cx, cy + 4 * Z, tw * 0.14, th * 0.11, 0, 0, 6.2832); ctx.fill();
         }
       }
-    }
-    // 薄雾：几片缓慢漂移的径向雾
-    ctx.save(); ctx.globalCompositeOperation = 'screen';
-    for (var i = 0; i < 4; i++) {
-      var mx = (W * 0.12 + i * W * 0.22 + time * 10 * (i % 2 === 0 ? 1 : -1));
-      mx = ((mx % (W + 240)) + (W + 240)) % (W + 240) - 120;
-      var my = H * 0.48 + Math.sin(time * 0.35 + i) * 30;
-      var rg = ctx.createRadialGradient(mx, my, 0, mx, my, Math.min(W, H) * 0.34);
-      rg.addColorStop(0, 'rgba(210,245,255,0.14)');
-      rg.addColorStop(1, 'rgba(210,245,255,0)');
-      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-    }
-    ctx.restore();
-    // 天光射线：从上方投下几束柔和的青光
-    ctx.save(); ctx.globalCompositeOperation = 'screen';
-    for (var i = 0; i < 3; i++) {
-      var ax = W * (0.22 + i * 0.28) + Math.sin(time * 0.25 + i) * 40;
-      var grad = ctx.createLinearGradient(ax, 0, ax + W * 0.12, H * 0.6);
-      grad.addColorStop(0, 'rgba(255,255,255,0.10)');
-      grad.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(ax - 26 * Z, 0);
-      ctx.lineTo(ax + 26 * Z, 0);
-      ctx.lineTo(ax + W * 0.12 + 55 * Z, H * 0.6);
-      ctx.lineTo(ax + W * 0.12 - 55 * Z, H * 0.6);
-      ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
-    // 灵泉粒子：在画面上半部缓慢上升的小光点
-    ctx.save(); ctx.globalCompositeOperation = 'screen';
-    for (var i = 0; i < 15; i++) {
-      var t = time * 0.55 + i * 1.3;
-      var px = (W * 0.2 + (i * 61) % (W * 0.6)) + Math.sin(t * 0.7) * 25;
-      var py = H * 0.6 - (t % 8) * H * 0.09 + Math.cos(t * 0.5) * 15;
-      var pa = 0.38 * (1 - ((t % 8) / 8));
-      if (pa <= 0) continue;
-      ctx.fillStyle = 'rgba(200,255,230,' + pa.toFixed(3) + ')';
-      ctx.beginPath(); ctx.arc(px, py, (1.1 + (i % 3) * 0.35) * Z, 0, 6.2832); ctx.fill();
     }
     ctx.restore();
   }

@@ -2615,58 +2615,81 @@
      "fh": 1
     },
     {
-     "piece": "ling/waterfall.png",
+     "piece": "ling/fountain.png",
      "x": 16,
-     "y": 11,
-     "fw": 1,
-     "fh": 1,
-     "solid": false,
-     "dy": 0
-    },
-    {
-     "piece": "ling/lotus.png",
-     "x": 22,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/lotus.png",
-     "x": 23,
-     "y": 18,
-     "fw": 1,
-     "fh": 1,
-     "solid": false
-    },
-    {
-     "piece": "ling/lotus.png",
-     "x": 25,
      "y": 15,
      "fw": 1,
      "fh": 1,
      "solid": false
     },
     {
-     "piece": "ling/spirit_stone.png",
-     "x": 14,
-     "y": 22,
+     "piece": "ling/waterfall.png",
+     "x": 16,
+     "y": 11,
      "fw": 1,
      "fh": 1,
      "solid": false
     },
     {
-     "piece": "ling/spirit_stone.png",
+     "piece": "ling/tree.png",
+     "x": 6,
+     "y": 8,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/tree.png",
      "x": 25,
-     "y": 16,
+     "y": 6,
      "fw": 1,
      "fh": 1,
      "solid": false
     },
     {
-     "piece": "ling/spirit_stone.png",
-     "x": 24,
-     "y": 20,
+     "piece": "ling/tree.png",
+     "x": 28,
+     "y": 24,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/trees.png",
+     "x": 5,
+     "y": 25,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/trees.png",
+     "x": 27,
+     "y": 5,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/hill.png",
+     "x": 4,
+     "y": 6,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/hill.png",
+     "x": 7,
+     "y": 29,
+     "fw": 1,
+     "fh": 1,
+     "solid": false
+    },
+    {
+     "piece": "ling/hill.png",
+     "x": 27,
+     "y": 27,
      "fw": 1,
      "fh": 1,
      "solid": false
