@@ -3688,36 +3688,36 @@
   {
    "id": "dungeon",
    "name": "幽冥地宫",
-   "note": "Kenney 风格重制：连续外墙围合、半墙分隔、立柱支撑、祭坛高台与废墟角",
+   "note": "视觉重制 v3：平整石砖房间 + 凸起石块路网 + 木板高台分层，风化墙/窗栏/残骸营造废墟氛围",
    "w": 28,
    "h": 28,
    "ground": [
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     "XXTTTTTTTTTTTTTTTTTTTTTTTTXX",
-    "XXTTTTTTTTTTTTTMTTTTTTTTTTXX",
-    "XXTTTTTTTMPPPPPPTTTTTTTTTTXX",
-    "XXTTTTTTTTPPPPPPTTTTTTTTTMXX",
-    "XXTTTTTTTTPPPPPPTTTTTTTTTTXX",
-    "XXTTTTTTTTPPPPPPTTTTTTMMTTXX",
-    "XXTTTTTTTTPPPPPPTTTTTTTTTTXX",
-    "XXTTTTTTTTPPPPPPTTTTTMTTTTXX",
-    "XXTTMTTTTTTSSSSTTTTTTTTTTTXX",
-    "XXTTTTTTTTTTTTPTTTTTTTTTTTXX",
-    "XXTTTTTTTTTTTTPTTTTTTTTTTTXX",
-    "XXTTTTTTTTTTTTPTTTTTTTTTTTXX",
-    "XXTTTTTTTMTMTTPTTTTTPPPPPTXX",
-    "XXTTTTTTTTTTTTPTTTTMPPPPPTXX",
-    "XXTTTTTTTTTTTTPTTTTTPPPPPTXX",
-    "XXMTTTTTTTTTTTPTTTMTTTTTTTXX",
-    "XXTTTTTTTTTMTTPTTTTTPPPPPTXX",
-    "XXTTTTTTTTTTTTPTTTTTPPPPPTXX",
-    "XXMMMTTTTTTTTTPTMTTTPPPPPTXX",
-    "XXMMMTTTTTTTTTPTTTTTPPPPPTXX",
-    "XXTMMMMTTTTTMTPTTTTTPPPPPTXX",
-    "XXTMMMMTTTTTTTTMTTTTPPPPPTXX",
-    "XXTMMMMTTTTTTTTTTTTTPPPPPTXX",
     "XXTTTTTTTTTTTTTTTTTTTTTTTTXX",
+    "XXTTTTTTTTPPPPPPTTTTDDDDDTXX",
+    "XXTTTTTTTTPPPPPPTTTTDDDDDTXX",
+    "XXTTTTTTTTPPPPPPTTTTDDDDDTXX",
+    "XXTTTTTTTTPPPPPPTTTTDDDDDTXX",
+    "XXTTTTTTTTPPPPPPTTTTDDDDDTXX",
+    "XXTTTTTTTTPPPPPPTTTTDDDDDTXX",
+    "XXTTTTTTDDDSSSSDDDDDDDDDDTXX",
+    "XXTTTTTTDDDDDTTDDDDDDDDDDTXX",
+    "XXTTTTTTDDDDDTTDDDDDDDDDDTXX",
+    "XXTTTTTTDDDDDTTDDDDDDDDDDTXX",
+    "XXTTTTTTDDDDDTTDDDDDPPPPPTXX",
+    "XXTTTTTTTTTTTTTTTTTTTTTTTTXX",
+    "XXTTTTTTTTTTTTTTTTTTTTTTTTXX",
+    "XXTTTTTTDDDDDTTDDDDDTTTTTTXX",
+    "XXTTTTTTDDDDDTTDDDDDPPPPPTXX",
+    "XXMTTTMMDDDDDTTDDDDDPPPPPTXX",
+    "XXMMMTTTDDDDDTTDDDDDPPPPPTXX",
+    "XXMMMTTTDDDDDTTDDDDDPPPPPTXX",
+    "XXTMMMMTDDDDDTTDDDDDPPPPPTXX",
+    "XXMMMMMTDDDDDDDDDDDDPPPPPTXX",
+    "XXMMMMMTDDDDDDDDDDDDPPPPPTXX",
+    "XXTTTTMMTTTTTTTTTTTTTTTTTTXX",
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     "XXXXXXXXXXXXXXXXXXXXXXXXXXXX"
    ],
@@ -3741,7 +3741,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
+     "piece": "dungeon/stoneWallAged_N.png",
      "x": 5,
      "y": 2,
      "fw": 1,
@@ -3768,7 +3768,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
+     "piece": "dungeon/stoneWallWindowBars_N.png",
      "x": 8,
      "y": 2,
      "fw": 1,
@@ -3777,7 +3777,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
+     "piece": "dungeon/stoneWallAged_N.png",
      "x": 9,
      "y": 2,
      "fw": 1,
@@ -3849,7 +3849,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
+     "piece": "dungeon/stoneWallAged_N.png",
      "x": 17,
      "y": 2,
      "fw": 1,
@@ -3885,7 +3885,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_N.png",
+     "piece": "dungeon/stoneWallAged_N.png",
      "x": 21,
      "y": 2,
      "fw": 1,
@@ -3939,7 +3939,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
+     "piece": "dungeon/stoneWallAged_S.png",
      "x": 5,
      "y": 25,
      "fw": 1,
@@ -3975,7 +3975,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
+     "piece": "dungeon/stoneWallAged_S.png",
      "x": 9,
      "y": 25,
      "fw": 1,
@@ -4011,7 +4011,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
+     "piece": "dungeon/stoneWallAged_S.png",
      "x": 13,
      "y": 25,
      "fw": 1,
@@ -4047,7 +4047,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
+     "piece": "dungeon/stoneWallAged_S.png",
      "x": 17,
      "y": 25,
      "fw": 1,
@@ -4083,7 +4083,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_S.png",
+     "piece": "dungeon/stoneWallAged_S.png",
      "x": 21,
      "y": 25,
      "fw": 1,
@@ -4137,7 +4137,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_W.png",
+     "piece": "dungeon/stoneWallAged_W.png",
      "x": 2,
      "y": 5,
      "fw": 1,
@@ -4173,7 +4173,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_W.png",
+     "piece": "dungeon/stoneWallAged_W.png",
      "x": 2,
      "y": 9,
      "fw": 1,
@@ -4209,7 +4209,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_W.png",
+     "piece": "dungeon/stoneWallAged_W.png",
      "x": 2,
      "y": 13,
      "fw": 1,
@@ -4245,7 +4245,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_W.png",
+     "piece": "dungeon/stoneWallAged_W.png",
      "x": 2,
      "y": 17,
      "fw": 1,
@@ -4254,7 +4254,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWallBroken_W.png",
+     "piece": "dungeon/stoneWallBrokenLeft_W.png",
      "x": 2,
      "y": 18,
      "fw": 1,
@@ -4290,7 +4290,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWallBroken_W.png",
+     "piece": "dungeon/stoneWallBrokenRight_W.png",
      "x": 2,
      "y": 22,
      "fw": 1,
@@ -4335,7 +4335,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_E.png",
+     "piece": "dungeon/stoneWallAged_E.png",
      "x": 25,
      "y": 5,
      "fw": 1,
@@ -4362,7 +4362,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_E.png",
+     "piece": "dungeon/stoneWallHole_E.png",
      "x": 25,
      "y": 8,
      "fw": 1,
@@ -4371,7 +4371,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_E.png",
+     "piece": "dungeon/stoneWallAged_E.png",
      "x": 25,
      "y": 9,
      "fw": 1,
@@ -4407,7 +4407,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_E.png",
+     "piece": "dungeon/stoneWallAged_E.png",
      "x": 25,
      "y": 13,
      "fw": 1,
@@ -4479,7 +4479,7 @@
      "dy": 0
     },
     {
-     "piece": "dungeon/stoneWall_E.png",
+     "piece": "dungeon/stoneWallAged_E.png",
      "x": 25,
      "y": 21,
      "fw": 1,
@@ -5046,6 +5046,24 @@
      "dy": 0
     },
     {
+     "piece": "dungeon/stoneColumnWood_N.png",
+     "x": 9,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stoneColumnWood_N.png",
+     "x": 18,
+     "y": 19,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
      "piece": "dungeon/tableShort_N.png",
      "x": 13,
      "y": 6,
@@ -5121,6 +5139,24 @@
      "piece": "dungeon/chair_N.png",
      "x": 25,
      "y": 20,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/planksBroken_N.png",
+     "x": 21,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/planksHole_N.png",
+     "x": 23,
+     "y": 23,
      "fw": 1,
      "fh": 1,
      "solid": false,
@@ -5229,6 +5265,33 @@
      "piece": "dungeon/barrel_N.png",
      "x": 6,
      "y": 23,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/tableChairsBroken_N.png",
+     "x": 3,
+     "y": 21,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/woodenPile_N.png",
+     "x": 5,
+     "y": 24,
+     "fw": 1,
+     "fh": 1,
+     "solid": false,
+     "dy": 0
+    },
+    {
+     "piece": "dungeon/stairsSpiral_N.png",
+     "x": 3,
+     "y": 24,
      "fw": 1,
      "fh": 1,
      "solid": false,

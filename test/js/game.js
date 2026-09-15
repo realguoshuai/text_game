@@ -989,6 +989,13 @@
   ];
 
   function drawSky() {
+    // 地宫：纯黑岩窟背景，不画天空/云
+    if (CUR && CUR.id === 'dungeon') {
+      var dg = ctx.createLinearGradient(0, 0, 0, H);
+      dg.addColorStop(0, '#0a0d16'); dg.addColorStop(1, '#05070d');
+      ctx.fillStyle = dg; ctx.fillRect(0, 0, W, H);
+      return;
+    }
     var g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, SKY_TOP); g.addColorStop(0.5, SKY_MID); g.addColorStop(1, SKY_BOT);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -1268,10 +1275,33 @@
     drawSkillFx();    // 技能特效（剑气/雷爆/剑雨）画在飘字下面，别盖住伤害数字
     drawFloaters();   // 伤害飘字 + 击杀粒子（猎场用）
 
-    // 洞外虚空柔化（地图边缘渐隐到天空）
+    // 地宫氛围层：以玩家为中心的「灯笼光晕」——近处亮、远处沉入黑暗，
+    // 再加一圈冷色边缘暗角，营造地下空间纵深。纯视觉，不影响任何玩法判定。
+    if (CUR.id === 'dungeon') {
+      var pp = isoToScreen(player.mx, player.my);
+      var ppy = pp.y + HH * Z;   // 以脚底为光心（isoToScreen 返回格顶）
+      var lr = Math.max(W, H) * 0.62;
+      var lit = ctx.createRadialGradient(pp.x, ppy, Math.min(W, H) * 0.18, pp.x, ppy, lr);
+      lit.addColorStop(0, 'rgba(5,8,18,0)');
+      lit.addColorStop(0.55, 'rgba(5,8,18,0.18)');
+      lit.addColorStop(1, 'rgba(4,6,15,0.52)');
+      ctx.fillStyle = lit; ctx.fillRect(0, 0, W, H);
+      // 光晕中心带一点暖色，模拟火把/灯笼
+      var warm = ctx.createRadialGradient(pp.x, ppy, 0, pp.x, ppy, Math.min(W, H) * 0.22);
+      warm.addColorStop(0, 'rgba(255,196,120,0.07)');
+      warm.addColorStop(1, 'rgba(255,196,120,0)');
+      ctx.fillStyle = warm; ctx.fillRect(0, 0, W, H);
+    }
+
+    // 洞外虚空柔化（地图边缘渐隐）；地宫改用暗色暗角，和灯笼光晕统一
     var vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.30, W / 2, H / 2, Math.max(W, H) * 0.72);
-    vg.addColorStop(0, 'rgba(255,255,255,0)');
-    vg.addColorStop(1, 'rgba(180,220,240,.16)');
+    if (CUR.id === 'dungeon') {
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(3,5,12,.5)');
+    } else {
+      vg.addColorStop(0, 'rgba(255,255,255,0)');
+      vg.addColorStop(1, 'rgba(180,220,240,.16)');
+    }
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 
     // 受重击红闪：给"被击退"一个明确的画面反馈，不再是无声无息地换个位置
