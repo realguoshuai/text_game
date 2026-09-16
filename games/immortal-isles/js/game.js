@@ -236,6 +236,9 @@
   // 上一帧的绘制计数（QA 用）：确认 NPC 真的走了 drawNPC 分支，
   // 而不是被 <0 的兜底分支当成玩家画出来
   var _draw = { actor: 0, npc: 0 };
+  // 地面层落点探针（?autotest=seams 用）：n=本帧铺的瓦数，frac=落点/尺寸非整数的瓦数。
+  // 缝隙就是 frac 累积出来的 —— 正常情况下必须恒为 0（见 drawGround 里的说明）。
+  var GND = { on: false, n: 0, frac: 0 };
   // 视口缩放：Zt=目标倍数、Z=平滑跟随值；zAx/zAy=缩放锚点（默认屏幕中心）
   // 幅度刻意收窄在 0.62~1.72（约 ±40%）：再小地图碎成蚂蚁、再大贴图糊成色块
   var Z = 1, Zt = 1, ZMIN = 0.62, ZMAX = 1.72, zAx = 0, zAy = 0, zAnchor = false;
@@ -256,6 +259,17 @@
     var a = (sx - camX) / (HW * Z), b = (sy - camY) / (HH * Z);
     return { mx: (a + b) / 2, my: (b - a) / 2 };
   }
+  // 手机端缩放补偿的输入换算（见 index.html 「视口防线」③）。
+  // ZoomFix 没启用时是**恒等**的 —— 桌面、未缩放时行为与改动前逐字节一致，零回归。
+  // 用法：把触点 clientX/clientY 过一遍 ptX/ptY 拿到画布本地坐标（0..W / 0..H）。
+  // ⚠ 画布有 transform 后 getBoundingClientRect() 返回的是**已被缩放**的框，
+  //   所以偏移量（r.left）也要过同一把尺子再相减，不能混用两套坐标系。
+  var IDF = { on: false, s: 1, ox: 0, oy: 0,
+    ptX: function (x) { return x; }, ptY: function (y) { return y; } };
+  function ZF() { return (window.ZoomFix && window.ZoomFix.on) ? window.ZoomFix : IDF; }
+  /** 触点/鼠标坐标 → 画布本地坐标（考虑页面被放大后的反向补偿） */
+  function localX(clientX, r) { var z = ZF(); return z.ptX(clientX) - z.ptX(r.left); }
+  function localY(clientY, r) { var z = ZF(); return z.ptY(clientY) - z.ptY(r.top); }
   function cellChar(x, y) {
     // 用「取反的连比」一次挡掉越界、NaN、undefined：任何与 NaN 的比较都是 false，
     // 取反后直接 return，不会走到 ground[NaN] → undefined[NaN] 把渲染循环打死。
@@ -1069,6 +1083,159 @@
             }
             pbs.textContent = JSON.stringify(r);
           }, 60);
+        }
+        if (at === 'skillclick') {
+          // ?autotest=skillclick —— 技能盘「点击链路」验收（用户报过「点 P 没效果」）。
+          // 为什么必须单独立一条：?autotest=skill 是**直接调 castSkill()**，绕过了整个 DOM，
+          // 所以「按钮点了没反应」这类故障它永远看不见 —— 按钮被别的层盖住、被 pointer-events
+          // 吃掉、data-s 与 SKILLS 下标错位、点击处理器没绑上，全都是零报错静默失效。
+          // 这里逐键做两件事：
+          //   ① elementFromPoint 命中测试 —— 按钮中心点到底压在谁身上（真·可点性）；
+          //   ② 真派发 click —— 看 skillCd / 弹丸 / 特效有没有起来（真·接线）。
+          // 最后再把键盘同一入口（SKILL_KEYS）过一遍，确认「按键 == 点按钮」。
+          setTimeout(function () {
+            var pad = document.getElementById('skillpad');
+            var r = { vp: [window.innerWidth, window.innerHeight], btns: [], kb: [] };
+            var bs = pad ? pad.querySelectorAll('.sk[data-s]') : [];
+            player.invuln = 999;                       // 别被怪打断，也别被打死
+            player.dead = false;
+            for (var i = 0; i < bs.length; i++) {
+              var b = bs[i], si = +b.dataset.s, bb = b.getBoundingClientRect();
+              var cx = Math.round(bb.left + bb.width / 2), cy = Math.round(bb.top + bb.height / 2);
+              var t = document.elementFromPoint(cx, cy);
+              var o = { s: si, key: SKILLS[si] ? SKILLS[si].key : null,
+                hit: !!t && (t === b || b.contains(t)),
+                onTop: t ? (t.id || String(t.className) || t.tagName) : null };
+              // 清干净再点：上一招的 actHold 会掐断下一招，那是设计，不是点击失效
+              player.skillCd[si] = 0; player.actHold = 0; player.attackCd = 0;
+              var pj0 = projectiles.length, cfx0 = skillFx.length;
+              b.click();
+              o.cdAfter = +player.skillCd[si].toFixed(2);
+              o.proj = projectiles.length - pj0;
+              o.fx = skillFx.length - cfx0;
+              o.act = player.actHold > 0;
+              r.btns.push(o);
+            }
+            // 键盘走 SKILL_KEYS（与按钮同一个 castSkill 入口）
+            for (var k = 0; k < SKILLS.length; k++) {
+              player.skillCd[k] = 0; player.actHold = 0; player.attackCd = 0;
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: SKILLS[k].key, bubbles: true }));
+              r.kb.push({ key: SKILLS[k].key, cdAfter: +player.skillCd[k].toFixed(2) });
+              window.dispatchEvent(new KeyboardEvent('keyup', { key: SKILLS[k].key, bubbles: true }));
+            }
+            var pbs = document.getElementById('probe');
+            if (!pbs) {
+              pbs = document.createElement('div'); pbs.id = 'probe';
+              pbs.style.display = 'none'; document.body.appendChild(pbs);
+            }
+            pbs.textContent = JSON.stringify(r);
+          }, 260);
+        }
+        if (at === 'viewport') {
+          // ?autotest=viewport —— 手机端「视口/画布」一致性验收。
+          // 手机上报"移动时地图一块块漏出来"这类症状，很大一部分出在视口而不是绘制逻辑：
+          //   ① 画布位图尺寸 ≠ CSS 盒尺寸 → 浏览器拉伸位图 → 每格瓦片都落在像素栅格外
+          //   ② 尺寸没变却重设 canvas.width → 整屏被清空（地址栏动画会连发 resize）
+          //   ③ touch-action / 手势拦截没生效 → 单指拖摇杆变成原生平移页面
+          // 这三条都不报错、截图也未必看得出来，只能这样量着断言。
+          setTimeout(function () {
+            var vv = window.visualViewport;
+            var cs = getComputedStyle(canvas), bs = getComputedStyle(document.body);
+            var r = {
+              inner: [window.innerWidth, window.innerHeight],
+              canvas: [canvas.width, canvas.height],
+              client: [canvas.clientWidth, canvas.clientHeight],
+              dpr: window.devicePixelRatio || 1,
+              vv: vv ? [Math.round(vv.width), Math.round(vv.height), +(+vv.scale).toFixed(3)] : null,
+              touchAction: cs.touchAction, bodyTouchAction: bs.touchAction,
+              overscroll: bs.overscrollBehavior || bs.overscrollBehaviorY || '',
+              zoomFix: !!window.ZoomFix, zoomOn: !!(window.ZoomFix && window.ZoomFix.on),
+              viewfix: !!document.getElementById('viewfix')
+            };
+            // ① 位图必须 1:1 等于 CSS 盒（不等就是被拉伸 → 缝隙/错位）
+            r.sizeMatch = (canvas.width === canvas.clientWidth && canvas.height === canvas.clientHeight);
+            // ③ 防线真的注册上了吗：合成事件探一次默认行为有没有被拦
+            try {
+              var ge = new Event('gesturestart', { cancelable: true, bubbles: true });
+              document.dispatchEvent(ge); r.gestureBlocked = ge.defaultPrevented;
+              var de = new Event('dblclick', { cancelable: true, bubbles: true });
+              document.dispatchEvent(de); r.dblBlocked = de.defaultPrevented;
+            } catch (e) { r.evErr = String((e && e.message) || e); }
+            // ② 哨兵像素：尺寸没变时调 resize（含连打 5 次）都**不许**把画布擦掉
+            try {
+              ctx.fillStyle = '#ff00ff'; ctx.fillRect(3, 3, 2, 2);
+              resize();
+              var a1 = ctx.getImageData(3, 3, 1, 1).data;
+              r.survivedResize = (a1[0] === 255 && a1[1] === 0 && a1[2] === 255);
+              for (var ri = 0; ri < 5; ri++) resize();
+              var a2 = ctx.getImageData(3, 3, 1, 1).data;
+              r.survivedStorm = (a2[0] === 255 && a2[1] === 0 && a2[2] === 255);
+            } catch (e2) { r.pxErr = String((e2 && e2.message) || e2); }
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
+        if (at === 'seams') {
+          // ?autotest=seams —— 「瓦片之间露缝」验收（手机端"地图一块块漏、有缝隙"的另一半）。
+          // 缝隙来自「分数坐标落点 + imageSmoothingEnabled=false」：浏览器对每块瓦各自取整，
+          // 误差逐格累积 → 边界上留出 1px 的底色/天空线。
+          // 所以查两件事，互补：
+          //   ① GND.frac —— 本帧铺的瓦里，有多少块的落点/尺寸不是整数（必须 0，与 DPR 无关）
+          //   ② seamPx   —— 站在瓦片**接缝正中间**采样：本该是草地的地方露没露天空色
+          // 天空是 (0,0)->(0,H) 的三段线性渐变，按行高直接算出该行的理论色值即可，
+          // 不用去"先画一遍天空取色"（那样还得躲开云）。
+          setTimeout(function () {
+            render();
+            var out = { map: CUR.id, z: +Z.toFixed(3), frac: -1, n: -1, pairs: 0, seamPx: 0 };
+            var hex = function (h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; };
+            var k = Math.round(player.mx) + Math.round(player.my) + 3;   // 主角前方 3 格那条对角线
+            var base = isoToScreen(0, k);
+            var sy = Math.round(base.y + 30 * Z);                        // 瓦片菱形中心（瓦高 60）
+            if (sy < 4 || sy > H - 5) sy = Math.round(H * 0.62);
+            out.sy = sy;
+            if (!CUR.voidColor && CUR.id !== 'dungeon') {
+              var tt = Math.max(0, Math.min(1, sy / H));
+              var A = hex(SKY_TOP), M = hex(SKY_MID), D = hex(SKY_BOT), sky;
+              if (tt <= 0.5) { var u = tt / 0.5; sky = [A[0] + (M[0] - A[0]) * u, A[1] + (M[1] - A[1]) * u, A[2] + (M[2] - A[2]) * u]; }
+              else { var v = (tt - 0.5) / 0.5; sky = [M[0] + (D[0] - M[0]) * v, M[1] + (D[1] - M[1]) * v, M[2] + (D[2] - M[2]) * v]; }
+              out.sky = [Math.round(sky[0]), Math.round(sky[1]), Math.round(sky[2])];
+              var gx0 = Math.round(player.mx) - 5;
+              for (var d = 0; d <= 9; d++) {
+                var ga = gx0 + d, gb = ga + 1, ya = k - ga, yb = k - gb;
+                var ca = cellChar(ga, ya), cb = cellChar(gb, yb);
+                if (ca === ' ' || cb === ' ') continue;
+                if (WATER.indexOf(ca) >= 0 || WATER.indexOf(cb) >= 0) continue;   // 水面本身偏蓝，会误判
+                var xa = isoToScreen(ga, ya), xb = isoToScreen(gb, yb);
+                var bx = Math.round((xa.x + xb.x) / 2);
+                if (bx < 3 || bx > W - 4) continue;
+                out.pairs++;
+                // 接缝是一条竖线：上下各取一点，任一点露天空色就算这条缝漏了
+                for (var oy = -6; oy <= 6; oy += 3) {
+                  var px2 = ctx.getImageData(bx, sy + oy, 1, 1).data;
+                  if (Math.abs(px2[0] - sky[0]) + Math.abs(px2[1] - sky[1]) + Math.abs(px2[2] - sky[2]) < 26) {
+                    out.seamPx++;
+                    if (!out.seamSample) out.seamSample = [bx, sy + oy, px2[0], px2[1], px2[2]];
+                  }
+                }
+              }
+            } else {
+              out.bg = CUR.voidColor || 'dungeon';
+            }
+            GND.on = true; GND.n = 0; GND.frac = 0;
+            render();
+            GND.on = false;
+            out.n = GND.n; out.frac = GND.frac;
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            pb.textContent = JSON.stringify(out);
+          }, 80);
         }
         if (at === 'rendersmoke') {
           // ?autotest=rendersmoke —— 「开局这一屏真的画出来了吗」的确定性断言。
@@ -2017,8 +2184,27 @@
           var over = (top && WATER.indexOf(ch) >= 0) ? TOP_OVER_WATER : TOP_OVER;
           var dw = top ? tw * over : tw;
           var dh = pz.h * s * (top ? over : 1);
-          ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
-            p.x - dw / 2, p.y - (dh - pz.h * s) / 2, dw, dh);
+          // ★ 落点与尺寸一起吸到整数像素栅格 —— 手机端"瓦片之间露缝"的根因就是这里。
+          //   相邻格在屏幕上的横向间距**恰好等于 dw**（同一行相邻格 p.x 相差 HW*Z=tw/2，
+          //   而屏幕上真正相邻的是 (x+1,y-1)，相差整好 tw=dw）。只要 dw 取整、并且落点
+          //   也是整数，左边缘就构成等差数列 round(p.x0-dw/2) + i*dw —— 严格密铺，
+          //   既不重叠也不露缝。分数坐标 + imageSmoothingEnabled=false 时浏览器会各自
+          //   取整，误差逐格累积，于是出现 1px 的透明/底色缝。
+          //   （物件层 paintObj 早就在 Math.round，地面层是唯一的例外 —— 就是它漏了。）
+          var dwr = Math.round(dw), dhr = Math.round(dh);
+          var dxr = Math.round(p.x - dw / 2);
+          var dyr = Math.round(p.y - (dh - pz.h * s) / 2);
+          if (GND.on) {
+            // 量的是**真正交给 drawImage 的那四个值**，不是"原值是不是整数" ——
+            // 后者恒为真（tw*Z 基本不会是整数），没有任何可证伪性。
+            // 这里只要有任何一个不是整数，浏览器就会对这块瓦单独取整 → 误差累积成缝。
+            GND.n++;
+            if (dxr !== Math.round(dxr) || dyr !== Math.round(dyr) ||
+              dwr !== Math.round(dwr) || dhr !== Math.round(dhr)) GND.frac++;
+          }
+          if (dwr >= 1 && dhr >= 1) {
+            ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, dxr, dyr, dwr, dhr);
+          }
         }
       }
     }
@@ -3869,7 +4055,7 @@
   // 点击移动
   function onClick(e) {
     var r = canvas.getBoundingClientRect();
-    var iso = screenToIso(e.clientX - r.left, e.clientY - r.top);
+    var iso = screenToIso(localX(e.clientX, r), localY(e.clientY, r));
     var cx = iso.mx, cy = iso.my;
     // 点到妖兽：锁定追击（清空普通寻路目标）；点空地：取消锁定
     for (var i = 0; i < foes.length; i++) {
@@ -3974,17 +4160,19 @@
     // 单次事件限幅，避免一格滚轮就跳到底；触控板小增量则保持顺滑
     var f = Math.pow(1.0022, -e.deltaY);
     f = Math.max(0.90, Math.min(1.11, f));
-    zoomBy(f, e.clientX - r.left, e.clientY - r.top);
+    zoomBy(f, localX(e.clientX, r), localY(e.clientY, r));
   }, { passive: false });
 
   // 触屏双指捏合缩放
+  // ⚠ touchDist 是**两点距离之比**（pinchD 比 d），两数在同一坐标系里，缩放因子约掉
+  //   → 不需要过 ptX；touchMid 是**绝对值**（拿去当 zoomBy 的锚点）→ 必须换算，否则放大后锚点飘。
   function touchDist(e) {
     var a = e.touches[0], b = e.touches[1];
     return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   }
   function touchMid(e) {
     var r = canvas.getBoundingClientRect(), a = e.touches[0], b = e.touches[1];
-    return { x: (a.clientX + b.clientX) / 2 - r.left, y: (a.clientY + b.clientY) / 2 - r.top };
+    return { x: localX((a.clientX + b.clientX) / 2, r), y: localY((a.clientY + b.clientY) / 2, r) };
   }
   var pinchD = 0;
   canvas.addEventListener('touchstart', function (e) {
@@ -4147,8 +4335,19 @@
   })();
 
   function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    // 用画布**自己的布局盒**，不用 window.innerWidth/Height —— 这是手机端"地图一块块漏"的主因之一：
+    //   CSS 是 #game{width/height:100%}，跟的是**布局视口**；而 innerHeight 在手机上会在
+    //   「大视口（地址栏收起）/ 小视口（地址栏展开）」之间跳。两者不相等时画布位图被浏览器
+    //   拉伸去填 CSS 盒 → 每一格瓦片都落在像素栅格之外 → 缝隙、错位一起出来。
+    //   clientWidth/clientHeight 就是 CSS 盒本身，与 100% 恒等，一条都对不上。
+    var w = canvas.clientWidth || window.innerWidth;
+    var h = canvas.clientHeight || window.innerHeight;
+    // ★ 尺寸没变就**一个字都不做**：给 canvas.width 赋值会清空整块画布并重置 ctx 状态。
+    //   手机上拖动时地址栏动画会连发 resize，每次清一屏 → 看到的就是"地图一块一块地漏出来"。
+    //   原来没有这道早退，等于每帧把自己擦一遍。
+    if (w === W && h === H) return;
+    W = w; H = h;
+    canvas.width = w; canvas.height = h;
     ctx.imageSmoothingEnabled = false;
     // 视口尺寸一变就立刻把相机对准主角。只改 W/H 的话，相机要等 updateCam 平滑
     // 几帧才归位 —— 拖拽窗口时会看到画面滑动，首屏（boot 时拿到的是默认窗口尺寸）
@@ -4159,6 +4358,9 @@
     }
   }
   window.addEventListener('resize', resize);
+  // 手机上地址栏收放、软键盘弹出都只改**可视视口**，不触发 window.resize ——
+  // 不挂这条的话画布尺寸会一直停在旧值上，直到用户转动屏幕。
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
   resize();
 
   var last = 0;
@@ -4311,20 +4513,27 @@
     var JOY_R = 48;
     var joy = { active: false, id: null };
     function joyStart(e) {
-      if (e.clientX > window.innerWidth / 2) return;   // 右半屏留给点地移动 / 出招按钮
+      // 页面被放大时不能拿 window.innerWidth 当尺子：innerWidth 是**布局视口**宽，
+      // 而触点的 clientX 是**可视视口**坐标 —— 两者一混，右半屏会被误判成左半屏，
+      // 想点地走路却弹出摇杆。统一换算到画布本地坐标再比中线。
+      var z = ZF();
+      if (z.ptX(e.clientX) > canvas.clientWidth / 2) return;   // 右半屏留给点地移动 / 出招按钮
       joy.active = true; joy.id = e.pointerId;
       var size = joyEl.offsetWidth || 120;
-      joyEl.style.left = (e.clientX - size / 2) + 'px';
-      joyEl.style.top = (e.clientY - size / 2) + 'px';
+      // #joystick 是 position:fixed、**不在**被补偿的 #game 里：它用布局坐标定位，
+      // 所以落点也要过 ptX/ptY（未缩放时是恒等，行为不变）。
+      joyEl.style.left = (z.ptX(e.clientX) - size / 2) + 'px';
+      joyEl.style.top = (z.ptY(e.clientY) - size / 2) + 'px';
       joyEl.style.display = 'block';
       joyKnob.style.transform = 'translate(0px,0px)';
       joyMove(e); e.preventDefault();
     }
     function joyMove(e) {
       if (!joy.active || e.pointerId !== joy.id) return;
-      var rect = joyEl.getBoundingClientRect();
-      var dx = e.clientX - (rect.left + rect.width / 2);
-      var dy = e.clientY - (rect.top + rect.height / 2);
+      var rect = joyEl.getBoundingClientRect(), z = ZF();
+      // ⚠ rect 与 clientX 必须过同一把尺子再相减，混用会让放大状态下"摇杆追不上手指"
+      var dx = z.ptX(e.clientX) - z.ptX(rect.left + rect.width / 2);
+      var dy = z.ptY(e.clientY) - z.ptY(rect.top + rect.height / 2);
       var dd = Math.hypot(dx, dy);
       if (dd > JOY_R) { dx = dx / dd * JOY_R; dy = dy / dd * JOY_R; }
       joyVec.x = dx / JOY_R; joyVec.y = dy / JOY_R;

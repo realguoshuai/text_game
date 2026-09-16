@@ -338,6 +338,30 @@ results.push(run('技能盘 手机缩放', 'autotest=skillpad&touch=1', ({ probe
   probe.minGap > 4 && probe.inView === true,
 { size: '870,546', budget: 22000 }));
 
+// 9.73) ★ 手机端视口防线（"移动时地图一块块漏出来"的主因，三条一起守）：
+//      ① 画布位图必须 1:1 等于 CSS 盒 —— 不等就是被浏览器拉伸，每格瓦都落在像素栅格外；
+//      ② 尺寸没变时 resize（含连打，模拟地址栏动画）**不许**清空画布（原来每次都清 → 一块块漏）；
+//      ③ touch-action / 手势拦截真的生效 —— 单指拖摇杆不能变成原生平移页面。
+//      这三条都不报错、截图也未必看得出来，只能量着断言。
+results.push(run('视口一致+画布不清空', 'autotest=viewport&preload=0', ({ probe }) =>
+  !!probe && probe.sizeMatch === true &&
+  probe.touchAction === 'none' && probe.bodyTouchAction === 'manipulation' && probe.overscroll === 'none' &&
+  probe.gestureBlocked === true && probe.dblBlocked === true && probe.zoomFix === true &&
+  probe.survivedResize === true && probe.survivedStorm === true,
+{ budget: 30000 }));
+results.push(run('视口一致 手机尺寸', 'autotest=viewport&preload=0&touch=1', ({ probe }) =>
+  !!probe && probe.sizeMatch === true && probe.touchAction === 'none' &&
+  probe.survivedResize === true && probe.survivedStorm === true,
+{ size: '870,546', budget: 30000 }));
+
+// 9.74) 地面瓦片「整数落点」：分数落点 + imageSmoothingEnabled=false 时，浏览器会对每块瓦
+//      各自取整、误差逐格累积 → 接缝上留 1px 底色。物件层一直在 Math.round，地面层原先漏了。
+//      ⚠ frac 量的是**真正交给 drawImage 的四个值**（不是"原值是否整数"——那个恒为真，
+//      没有可证伪性）。实测未取整时 488/488 全中，取整后为 0。
+results.push(run('地面瓦片整数落点', 'map=qingxuan&autotest=seams', ({ probe }) =>
+  !!probe && probe.n > 100 && probe.frac === 0 && probe.seamPx === 0 && probe.pairs >= 5,
+{ budget: 26000 }));
+
 //      反过来：?map= 直接指到那张图时，它**必须**算进首屏 —— 否则进图那一刻才开始下载，
 //      玩家看到的是"进去了但一片空白"。地宫是最难的一种：它的地图条目**没有 atlas 字段**，
 //      图集名要靠物件前缀（'dungeon/'）反推（见 expandPlan 分支②的 mapAtlas(x)）。

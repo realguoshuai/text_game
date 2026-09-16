@@ -2,13 +2,29 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 「添加到主屏幕」后无浏览器工具栏，视口不会被地址栏反复撑动（状态栏用 default：
+     black-translucent 会让内容钻到状态栏/刘海下面，把左上角面板压住） -->
+<meta name="theme-color" content="#cfe8f6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>仙岛寻踪 · 多地图无缝流转</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{width:100%;height:100%;overflow:hidden;background:#cfe8f6;
-    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;user-select:none}
-  #game{display:block;width:100%;height:100%}
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;user-select:none;
+    /* touch-action:manipulation = 干掉双击缩放（写 none 会连带禁掉浮层内部滚动，
+       世界地图要靠 .scroll 滚，所以这里只到 manipulation）；overscroll-behavior
+       干掉橡皮筋/下拉刷新 —— 不然单指拖摇杆会顺手把页面拉走。 */
+    touch-action:manipulation;overscroll-behavior:none;
+    -webkit-touch-callout:none;-webkit-text-size-adjust:100%}
+  /* ★ 画布必须全禁手势。preventDefault 只能拦住「浏览器还没开始滚动」的那一瞬：
+     一旦原生 pan 判定了，后面的 touchmove 就变成 non-cancelable，再 preventDefault 也无效。
+     单指按着拖摇杆移动时，页面就这样被原生平移出去、画布滑出视口
+     → 看到地图「一块一块地漏出来、中间露出 body 底色当缝隙」。
+     touch-action 是在手势判定**之前**就声明，才是可靠的那道闸。 */
+  #game{display:block;width:100%;height:100%;touch-action:none}
 
   .hud{position:fixed;pointer-events:none;z-index:10}
   .panel{background:linear-gradient(180deg,rgba(18,26,44,.88),rgba(10,16,30,.92));
@@ -100,6 +116,7 @@
   #minimap .t #mmName:not(:empty)::before{content:' · ';color:#c9bda0;font-weight:400}
   #minimap canvas{display:block;margin:7px auto 0;border-radius:6px;cursor:crosshair;
     background:rgba(8,12,22,.85);border:1px solid rgba(214,178,96,.32);
+    touch-action:none;   /* 点格寻路是"按下即走"，拖动时别让浏览器把它当平移 */
     image-rendering:pixelated}      /* 底图是 1 像素 1 格，放大必须最近邻，否则糊成一团 */
   #minimap .leg{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;font-size:10.5px;color:#9fb0c8}
   #minimap .leg em{display:inline-flex;align-items:center;font-style:normal;white-space:nowrap}
@@ -138,6 +155,9 @@
    * 冷却走 conic-gradient 扇形遮罩 + 中央倒计时，不额外发请求、不占图集。 */
   #skillpad{position:fixed;right:14px;bottom:14px;width:231px;height:271px;z-index:46;
     opacity:.86;transition:opacity .22s ease;pointer-events:none;
+    /* 手机端：手指压在技能键上时不许浏览器接管成平移（触屏整盘就是"右手点着不放"的用法）。
+       代价是这盘内不能滚 —— 它本来也不需要滚。 */
+    touch-action:none;
     transform-origin:100% 100%}
   #skillpad:hover,#skillpad.on{opacity:1}
   #skillpad .sk{position:absolute;border-radius:50%;padding:0;cursor:pointer;
@@ -331,7 +351,8 @@
     background:rgba(8,14,26,.8);color:#f0e3c2;outline:none}
   #worldmap .wmSearch::placeholder{color:#7e8ca6}
   #worldmap .wmSearch:focus{border-color:#ffd75e;box-shadow:0 0 10px rgba(255,210,74,.35)}
-  #worldmap .scroll{overflow:auto;padding:14px 18px 20px;
+  /* 全局 touch-action:manipulation 下仍要在浮层里显式放行纵向平移，否则节点多了滚不动 */
+  #worldmap .scroll{overflow:auto;padding:14px 18px 20px;touch-action:pan-y;
     background-image:radial-gradient(rgba(214,178,96,.07) 1px,transparent 1px);
     background-size:22px 22px}
   #worldmap .region{margin-bottom:16px}
@@ -357,6 +378,13 @@
   #worldBtn.on{border-color:#ffd24a;box-shadow:0 0 14px rgba(255,210,74,.6)}
   #worldBtn svg{display:block}
   body.touch #worldBtn{top:auto;bottom:14px;left:14px}  /* 手机左下，避开右上面板 */
+
+  /* 缩放兜底出口：拦截脚本在部分机/浏览器上拦不住时，页面真被放大 → 显示这个按钮彻底复位 */
+  #viewfix{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:90;display:none;
+    font-family:inherit;font-size:12px;padding:7px 14px;border-radius:20px;cursor:pointer;
+    border:1px solid rgba(214,178,96,.7);background:rgba(18,26,44,.92);color:#f0e3c2;
+    box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  #viewfix.on{display:block}
 </style>
 </head>
 <body>
@@ -493,6 +521,89 @@
   </div>
 </div>
 
-<script src="js/game.js?v=29"></script>
+<button id="viewfix" type="button">已自动校正视图 · 点此彻底复位</button>
+
+<script>
+/* ────────────────── 手机端「视口防线」 ──────────────────
+   为什么必须有：`maximum-scale=1, user-scalable=no` 从 iOS 10 起被 Safari 忽略
+   （苹果为无障碍故意放开）。而这游戏的标准操作就是「左手摇杆 + 右手出招」——
+   两个触点同时压在屏上，Safari 直接判定为捏合缩放，手指稍一分合页面就被放大，
+   而且**不会自动还原**。随后拖动移动就变成平移可视区，画布跟着滑出屏幕。
+
+   三道闸，缺一不可：
+   ① 拦截：Safari 走自己那套 gesture* 事件，标准 touch 事件拦不住 → 单独拦；
+      且必须用非被动监听（passive:false），否则 Safari 下 preventDefault 静默失效。
+   ② CSS：#game{touch-action:none} 管安卓（见上方样式说明）。
+   ③ 兜底补偿：①② 在部分机 / 浏览器上仍会漏。真被放大就反向缩回来，
+      让画面照样 1:1 铺满，玩家根本感觉不到；同时给一个彻底复位的出口。
+   ⚠ 必须放在游戏主脚本之前：最早时机注册，抢在浏览器判定手势之前。 */
+(function () {
+  var NP = { passive: false };                       // 少了它，Safari 里 preventDefault 是空操作
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, NP);
+  });
+  document.addEventListener('touchstart', function (e) {       // 多指＝游戏内的正常操作，别让浏览器拿去缩放
+    if (e.touches.length > 1) e.preventDefault();
+  }, NP);
+  document.addEventListener('touchmove', function (e) {
+    if (e.touches.length > 1 || (e.scale !== undefined && e.scale !== 1)) e.preventDefault();
+  }, NP);
+  var lastTap = 0;                                             // 双击缩放
+  document.addEventListener('touchend', function (e) {
+    if (e.touches.length !== 0) return;
+    var now = Date.now();
+    if (now - lastTap < 320) e.preventDefault();
+    lastTap = now;
+  }, NP);
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); }, NP);
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });   // 长按菜单 / 放大镜
+
+  // —— ③ 反向补偿 ——
+  // 数学关系（游戏侧输入换算全靠它）：设缩放 s、可视区偏移 (ox,oy)，则
+  //   本地坐标 u ↔ 浏览器坐标：clientX = ox + u/s  ⇒  ptX(clientX) = (clientX − ox) × s = u
+  // #game 经 scale(1/s) 后，在布局上占 [ox, ox + 100vw/s]，正好等于可视区 ——
+  // 于是本地坐标 u 落在屏幕第 u 个像素上，命中测试天然自洽（game.js 里调 ptX/ptY 即可）。
+  var V = { on: false, s: 1, ox: 0, oy: 0 };
+  V.ptX = function (x) { return (x - V.ox) * V.s; };
+  V.ptY = function (y) { return (y - V.oy) * V.s; };
+  window.ZoomFix = V;                                 // 暴露给游戏主脚本用（退化时就是恒等）
+  var cv = document.getElementById('game'), vv = window.visualViewport;
+  var fixEl = document.getElementById('viewfix');
+  var applied = null;                                 // 上次套用的状态串：状态没变就不碰样式
+  function sync() {                                   // （vv 的 scroll 事件很密，别每帧都写 DOM）
+    if (!vv) return;
+    var z = vv.scale || 1, on = z > 1.02;
+    V.on = on; V.s = on ? z : 1;
+    V.ox = on ? (vv.offsetLeft || 0) : 0;
+    V.oy = on ? (vv.offsetTop || 0) : 0;
+    var key = on ? (z + '|' + V.ox + '|' + V.oy) : 'off';
+    if (key === applied) return;
+    applied = key;
+    if (cv) {
+      cv.style.transformOrigin = '0 0';
+      cv.style.transform = on ? 'translate(' + V.ox + 'px,' + V.oy + 'px) scale(' + (1 / V.s) + ')' : '';
+    }
+    document.body.classList.toggle('zoom-comp', on);
+    if (!fixEl) return;
+    // 补偿已生效 → 画面看着是正常的，提示 3.5s 后收起，不长期占着屏幕
+    if (!on) { fixEl.classList.remove('on'); return; }
+    fixEl.classList.add('on');
+    setTimeout(function () { if (vv.scale > 1.02) fixEl.classList.remove('on'); }, 3500);
+    // 兜底出口：补偿只保证画面能玩，用户想真正复位就重载（缩放状态一去不返）
+    if (!fixEl.dataset.bound) {
+      fixEl.dataset.bound = '1';
+      fixEl.addEventListener('click', function () { location.reload(); });
+    }
+  }
+  if (vv) {
+    vv.addEventListener('resize', sync);
+    vv.addEventListener('scroll', sync);
+  }
+  window.addEventListener('resize', sync);
+  sync();
+})();
+</script>
+
+<script src="js/game.js?v=30"></script>
 </body>
 </html>
