@@ -60,8 +60,7 @@
   var FOE_LEASH_PAD = 4;    // 领地半径 = 仇恨半径 + 这个值：怪最多被引到离巢这么远，再远就回巢待命
   // 文件名带版本号：浏览器会缓存同名图片，换精灵时必须换名，否则玩家仍看到旧图
   // 主角外形可切换：1/5/10/14/18/20 取自「武侠修仙免费包」；31~33 取自 CraftPix 免费吸血鬼包；
-  // 41~43 取自 CraftPix 免费忍者包（Fighter / Samurai / Shinobi）；
-  // 51 取自 flare-game 官方默认角色（分层素材由 build_chars_atlas.py 合成，CC-BY-SA 3.0）。
+  // 41~43 取自 CraftPix 免费忍者包（Fighter / Samurai / Shinobi）。
   // 三套素材统一到同一规格（6 列 × 5 行 @64px），所以能塞进同一张 chars_atlas 直接切换。
   // 1 号是该包官方 Godot 示例的默认角色；其余几个同时兼任 NPC，不重复打包素材。
   // 外部两包原图都是 128px 横版侧视，已按 50% 降采样对齐（实高 35~42px，与主角同量级）。
@@ -82,8 +81,7 @@
     { n: 33, file: 'vamp_33.png', label: '33', nick: '33 血族少女', side: true },
     { n: 41, file: 'ninja_41.png', label: '41', nick: '41 东瀛格斗家', side: true },
     { n: 42, file: 'ninja_42.png', label: '42', nick: '42 东瀛武士', side: true },
-    { n: 43, file: 'ninja_43.png', label: '43', nick: '43 东瀛忍者', side: true },
-    { n: 51, file: 'flare_51.png', label: '51', nick: '51 帝国冒险者', side: true }  // flare-game 官方角色，tools/build_chars_atlas.py 分层合成（CC-BY-SA 3.0）
+    { n: 43, file: 'ninja_43.png', label: '43', nick: '43 东瀛忍者', side: true }
   ];
   var PLAYER_CHAR = HERO_OPTIONS[0].file;      // 主角当前用的动作表（chars_atlas 里的 key）
   var PLAYER_SRC = PLAYER_CHAR;                // 主角图集 key（setHero / buildHeroUI 会改写；先给默认值，避免严格模式下未声明报错）
@@ -354,7 +352,7 @@
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
       { url: 'assets/tiles_atlas.json?v=5', json: true, weight: 2, label: '读取地貌索引' },
-      { url: 'assets/chars_atlas.json?v=4', json: true, weight: 1, label: '读取人物索引' },
+      { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
       { url: 'assets/foes_atlas.json?v=2', json: true, weight: 2, label: '读取妖兽索引' },
       { url: 'assets/heroes.json?v=1', json: true, weight: 1, label: '读取角色清单' },
       { url: 'assets/beasts.json?v=2', json: true, weight: 2, label: '读取怪物图录' }
