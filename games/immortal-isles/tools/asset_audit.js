@@ -1,8 +1,8 @@
 // 素材引用清单：把「代码里引用的路径」× 「磁盘上是否存在」× 「git 是否跟踪」三方对齐，
 // 再把「素材包出处 / 授权 / 是否已登记」一并抽出来。
 //
-//   node test/tools/asset_audit.js             # 控制台报表
-//   node test/tools/asset_audit.js --md <file> # 额外写一份 Markdown
+//   node games/immortal-isles/tools/asset_audit.js             # 控制台报表
+//   node games/immortal-isles/tools/asset_audit.js --md <file> # 额外写一份 Markdown
 //
 // 防两类事故：
 //   ① 代码引用了磁盘上不存在的文件 —— 本地有缓存看不出来，线上直接 404；
@@ -44,7 +44,7 @@ function ignoredOf(list) {
 }
 
 // ---------- 1. 代码里引用的路径 ----------
-const CODE = ['test/index.html', 'test/js/game.js', 'test/js/tile.js', 'test/js/path.js'];
+const CODE = ['games/immortal-isles/index.html', 'games/immortal-isles/js/game.js', 'games/immortal-isles/js/tile.js', 'games/immortal-isles/js/path.js'];
 const refs = new Map();
 for (const f of CODE) {
   const txt = readIf(path.join(ROOT, f));
@@ -56,12 +56,12 @@ for (const f of CODE) {
   }
 }
 
-// 运行时素材 = test/ 下交付必须加载到的（js / assets / index.html）
+// 运行时素材 = games/immortal-isles/ 下交付必须加载到的（js / assets / index.html）
 const allFiles = walk(ROOT);
-const runtime = allFiles.filter((f) => /^test\/(assets|js)\/[^/]+$/.test(f) || f === 'test/index.html');
+const runtime = allFiles.filter((f) => /^test\/(assets|js)\/[^/]+$/.test(f) || f === 'games/immortal-isles/index.html');
 
 // 子目录里的大件（sliced_* 是构建中间产物；objects/ 是切片产物）
-const runtimeDirs = ['test/assets/foes', 'test/assets/sliced', 'test/assets/objects'];
+const runtimeDirs = ['games/immortal-isles/assets/foes', 'games/immortal-isles/assets/sliced', 'games/immortal-isles/assets/objects'];
 const dirStats = runtimeDirs.map((d) => {
   const list = allFiles.filter((f) => f.startsWith(d + '/'));
   const size = list.reduce((a, f) => a + (fs.statSync(path.join(ROOT, f)).size), 0);
@@ -80,7 +80,7 @@ const missing = [];
 const atlasKeys = [];
 for (const [r, where] of refs) {
   const cand = r.replace(/^\.?\//, '');
-  const hit = fileSet.has(cand) || fileSet.has('test/' + cand) ||
+  const hit = fileSet.has(cand) || fileSet.has('games/immortal-isles/' + cand) ||
               allFiles.some((f) => f.endsWith('/' + cand));
   if (hit) continue;
   const base = path.basename(cand);
@@ -151,7 +151,7 @@ const loadPlan = (() => {
 const planIssues = [];
 if (loadPlan) {
   for (const p of loadPlan) {
-    const file = 'test/' + p.url.split('?')[0];
+    const file = 'games/immortal-isles/' + p.url.split('?')[0];
     let size = 0;
     try { size = fs.statSync(path.join(ROOT, file)).size; } catch (e) { planIssues.push(file + ' 不存在'); continue; }
     const kb = size / 1024;
@@ -183,7 +183,7 @@ for (const r of refRows) {
 }
 
 P('');
-P('=== 二、运行时素材（test/assets + test/js + index.html，必须入库） ===');
+P('=== 二、运行时素材（games/immortal-isles/assets + js + index.html，必须入库） ===');
 const totalSize = runtime.reduce((a, f) => a + fs.statSync(path.join(ROOT, f)).size, 0);
 P('  顶层文件 ' + runtime.length + ' 个，合计 ' + kb(totalSize));
 dirStats.forEach((d) => P('  ' + d.dir.padEnd(24) + d.n + ' 个 / ' + kb(d.size)));
@@ -229,14 +229,14 @@ else planIssues.forEach((s) => P('  ! ' + s));
 const mdIdx = process.argv.indexOf('--md');
 if (mdIdx > 0 && process.argv[mdIdx + 1]) {
   let md = '# 仙岛寻踪 · 素材引用清单\n\n';
-  md += '> 由 `test/tools/asset_audit.js` 生成。三方对齐：**代码引用 × 磁盘存在 × git 跟踪**。\n\n';
+  md += '> 由 `games/immortal-isles/tools/asset_audit.js` 生成。三方对齐：**代码引用 × 磁盘存在 × git 跟踪**。\n\n';
   md += '## 一、代码引用的资源路径\n\n';
   for (const r of refRows) {
     md += '### `' + r.file + '`\n\n';
     r.refs.forEach((x) => { md += '- `' + x + '`\n'; });
     md += '\n';
   }
-  md += '## 二、运行时素材（test/assets + test/js + index.html）\n\n';
+  md += '## 二、运行时素材（games/immortal-isles/assets + js + index.html）\n\n';
   md += '顶层文件 ' + runtime.length + ' 个，合计 ' + kb(totalSize) + '。\n\n';
   md += '| 目录 | 文件数 | 体积 |\n|---|---|---|\n';
   dirStats.forEach((d) => { md += '| `' + d.dir + '` | ' + d.n + ' | ' + kb(d.size) + ' |\n'; });

@@ -9,7 +9,7 @@ slice_foes.py —— 妖兽图集切片（就地取材）
 本脚本负责：
   1. 按矩形裁出 12 只妖兽，裁掉四周透明边（保留完整外形）
   2. 按「目标身高」用最近邻等比缩放（像素画不允许插值，否则发糊）
-  3. 输出到 test/assets/foes/<name>.png（透明 PNG）
+  3. 输出到 games/immortal-isles/assets/foes/<name>.png（透明 PNG）
   4. 生成带标注的对照图 + 一份清单，供人工核对切得对不对
 
 为什么要裁透明边：foes.json 的矩形是「大致框」，各边留白不等。

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仙岛寻踪 · 多地图无缝流转</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#cfe8f6;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;user-select:none}
+  #game{display:block;width:100%;height:100%}
+
+  .hud{position:fixed;pointer-events:none;z-index:10}
+  .panel{background:linear-gradient(180deg,rgba(18,26,44,.88),rgba(10,16,30,.92));
+    border:1px solid rgba(214,178,96,.55);border-radius:10px;
+    box-shadow:0 6px 22px rgba(0,0,0,.35),inset 0 0 24px rgba(214,178,96,.08);
+    color:#f0e3c2}
+  /* 左上面板：默认折叠成一条迷你条（地图名+血条），点开才显示详情 */
+  #topleft{top:10px;left:10px;padding:6px 10px;pointer-events:auto;cursor:pointer}
+  #topleft .tlmini{display:flex;align-items:center;gap:8px;min-width:170px}
+  #topleft .tlmini .name{font-size:14px;font-weight:700;color:#ffe6a6;letter-spacing:1px;white-space:nowrap}
+  #topleft .tlmini .hpbar{flex:1;height:7px;min-width:44px;border-radius:4px;background:rgba(0,0,0,.4);
+    overflow:hidden;border:1px solid rgba(214,178,96,.35)}
+  #topleft .tlmini .hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff5a5a,#ff9a6a);transition:width .18s}
+  #topleft .tlmini .hpv{font-size:11px;color:#ffb9b9;font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+  #topleft .tlmini .tg{font-size:10px;color:#c9bda0;transition:transform .15s}
+  #topleft.open .tlmini .tg{transform:rotate(180deg)}
+  #topleft .tlfold{display:none}
+  #topleft.open .tlfold{display:block;margin-top:7px;padding-top:7px;border-top:1px solid rgba(214,178,96,.3)}
+  #topleft .row{font-size:11.5px;color:#c9bda0;margin-top:4px;line-height:1.55}
+  #topleft .row b{color:#8bf3ff;font-weight:600}
+  #topleft .row b.hpnum{color:#ff9a9a}
+  #topleft #foetarget{margin-top:6px;display:none}
+  #topleft #foetarget .ftname{font-size:11.5px;color:#ffd9a6;margin-bottom:3px;font-weight:600}
+  #topleft #foetarget .ftbar{height:7px;border-radius:4px;background:rgba(0,0,0,.4);overflow:hidden;
+    border:1px solid rgba(255,120,120,.4)}
+  #topleft #foetarget .ftfill{height:100%;width:100%;background:linear-gradient(90deg,#ff3b3b,#ff7a4a)}
+
+  #topright{top:14px;right:14px;padding:10px 12px}
+  #topright .t{font-size:12px;color:#c9bda0;margin-bottom:7px;letter-spacing:1px}
+  .maps{display:flex;gap:7px;pointer-events:auto}
+  .maps button{pointer-events:auto;cursor:pointer;font-family:inherit;
+    background:rgba(30,44,70,.85);color:#f0e3c2;border:1px solid rgba(214,178,96,.5);
+    border-radius:7px;padding:6px 11px;font-size:13px;transition:.15s}
+  .maps button:hover{background:rgba(58,84,128,.95);border-color:#ffd75e;color:#fff}
+  .maps button.on{background:linear-gradient(180deg,#4a6da8,#2c4570);border-color:#ffd75e;
+    color:#fff;box-shadow:0 0 10px rgba(255,215,94,.5)}
+
+  /* 主角外形切换：复用 .maps 的按钮样式，只是换一行 */
+  #herobar{margin-top:9px}
+  #herobar .t{font-size:12px;color:#c9bda0;margin-bottom:6px;letter-spacing:1px;
+    display:flex;justify-content:space-between;align-items:center}
+  #herobar .t b{color:#8bf3ff;font-weight:600}
+  .heros{display:flex;gap:6px;flex-wrap:wrap;pointer-events:auto;max-width:200px}
+  .heros button{pointer-events:auto;cursor:pointer;font-family:inherit;
+    background:rgba(30,44,70,.85);color:#f0e3c2;border:1px solid rgba(214,178,96,.5);
+    border-radius:7px;padding:5px 9px;font-size:12.5px;transition:.15s}
+  .heros button:hover{background:rgba(58,84,128,.95);border-color:#ffd75e;color:#fff}
+  .heros button.on{background:linear-gradient(180deg,#4a6da8,#2c4570);border-color:#ffd75e;
+    color:#fff;box-shadow:0 0 10px rgba(255,215,94,.5)}
+
+  #zoombar{margin-top:9px}
+  #zoombar .t{font-size:12px;color:#c9bda0;margin-bottom:6px;letter-spacing:1px;display:flex;
+    justify-content:space-between;align-items:center}
+  #zoombar .t b{color:#8bf3ff;font-family:ui-monospace,Consolas,monospace;font-weight:600}
+  .zline{display:flex;align-items:center;gap:7px;pointer-events:auto}
+  .zline button{pointer-events:auto;cursor:pointer;font-family:inherit;
+    background:rgba(30,44,70,.85);color:#f0e3c2;border:1px solid rgba(214,178,96,.5);
+    border-radius:7px;width:28px;height:26px;font-size:15px;line-height:1;transition:.15s}
+  .zline button:hover{background:rgba(58,84,128,.95);border-color:#ffd75e;color:#fff}
+  .zline button:disabled{opacity:.38;cursor:default;border-color:rgba(214,178,96,.25)}
+  .zline #zReset{width:auto;padding:0 9px;font-size:12px}
+  #zRange{-webkit-appearance:none;appearance:none;width:128px;height:4px;cursor:pointer;
+    background:linear-gradient(90deg,rgba(139,243,255,.75),rgba(214,178,96,.65));
+    border-radius:3px;outline:none;pointer-events:auto}
+  #zRange::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:#ffe6a6;border:1px solid #6b5a2e;box-shadow:0 0 6px rgba(255,215,94,.7);cursor:pointer}
+  #zRange::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;
+    background:#ffe6a6;box-shadow:0 0 6px rgba(255,215,94,.7);cursor:pointer}
+
+  /* ---------- 右上角竖排容器：地图速切 + 场景缩略图 ----------
+   * 缩略图要紧跟在地图面板正下方，而那块面板的高度是动态的（手机端默认折叠、
+   * 展开后按钮换行），写死 top 偏移早晚会撞上。放进同一个 flex 列交给布局排，
+   * 两个面板各自再管自己的折叠。容器本身 pointer-events:none，不吃画布点击。 */
+  #rightcol{position:fixed;top:14px;right:14px;z-index:10;display:flex;flex-direction:column;
+    align-items:flex-end;gap:10px;pointer-events:none;max-height:calc(100vh - 28px)}
+  #rightcol #topright{position:static}
+
+  /* ---------- 场景缩略图（右上角）----------
+   * 只解决一件事：我在哪。底图 1 像素 1 格 —— 绿=能走 / 深灰=挡路 / 蓝=水 /
+   * 透明=虚空；上面压传送门(青)、NPC(黄)、妖兽(红)、主角(白圈红点+朝向尖角)，
+   * 再套一个白色视野框。点击任意一格就走到那一格（与画布点击同一条寻路入口）。
+   * 标题条点一下折叠，收起后只剩一条标题，不占画面。 */
+  #minimap{position:static;padding:8px 10px 9px;pointer-events:auto}
+  #minimap .t{font-size:12px;color:#c9bda0;letter-spacing:1px;user-select:none;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    cursor:pointer;pointer-events:auto}
+  #minimap .t .tg{color:#8bf3ff;font-size:11px}
+  #minimap .t #mmName{font-style:normal;color:#8bf3ff;font-weight:600}
+  #minimap .t #mmName:not(:empty)::before{content:' · ';color:#c9bda0;font-weight:400}
+  #minimap canvas{display:block;margin:7px auto 0;border-radius:6px;cursor:crosshair;
+    background:rgba(8,12,22,.85);border:1px solid rgba(214,178,96,.32);
+    image-rendering:pixelated}      /* 底图是 1 像素 1 格，放大必须最近邻，否则糊成一团 */
+  #minimap .leg{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px;font-size:10.5px;color:#9fb0c8}
+  #minimap .leg em{display:inline-flex;align-items:center;font-style:normal;white-space:nowrap}
+  #minimap .leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px}
+  #minimap.folded{padding:6px 10px}
+  #minimap.folded .t{margin:0}
+  #minimap.folded canvas,#minimap.folded .leg{display:none}
+  body.touch #minimap{max-width:46vw}
+  /* 手机横屏只有 ~390 高，右上角那两块一起展开会把缩略图顶出屏幕。
+     给 canvas 一个视口高度上限（手机默认是收起的，这条只在用户主动展开时生效）；
+     canvas 是替换元素，只给 max-height 会等比缩，点击换算走 getBoundingClientRect，
+     缩放不影响"点哪走哪"。 */
+  body.touch #minimap canvas{max-height:34vh}
+
+  /* 底部操作说明：默认折叠成一行小标签，点一下展开/收起（手机端走 touch 的精简+自动收起逻辑） */
+  #bottom{bottom:14px;left:50%;transform:translateX(-50%);padding:5px 13px;
+    font-size:12px;color:#c9bda0;text-align:center;line-height:1.7;max-width:72vw;
+    pointer-events:auto;cursor:pointer}
+  #bottom .bt{font-size:12.5px;color:#8bf3ff;letter-spacing:1px;font-weight:600;white-space:nowrap}
+  #bottom .bd{margin-top:6px}
+  #bottom.folded .bd{display:none}
+  #bottom.folded{padding:5px 12px}
+  #bottom kbd{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+    border-radius:4px;padding:1px 5px;font-family:inherit;color:#fff;font-size:11px}
+  #bottom .hl{color:#8bf3ff}
+  /* 动作试演面板：桌面对齐素材用，挪到左下角把右下角让给技能盘（触屏整块隐藏） */
+  #actions{left:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-start;
+    gap:8px;pointer-events:auto;z-index:11}
+  /* ---------- 技能盘（王者荣耀式）----------
+   * 右下角：普攻大键 + 重击 + 三个技能沿弧线排布（越常用离普攻越近，大招最远）。
+   * 每键专属配色（普攻红铜 / 重击橙 / 剑青 / 雷紫 / 大招金），图标用内联 SVG 描边，
+   * 冷却用 conic-gradient 扇形遮罩 + 中央倒计时，不额外发请求、不占图集。 */
+  #skillpad{position:fixed;right:16px;bottom:16px;width:252px;height:240px;z-index:46;
+    opacity:.85;transition:opacity .22s ease;pointer-events:none}
+  #skillpad:hover,#skillpad.on{opacity:1}
+  #skillpad .sk{position:absolute;border-radius:50%;padding:0;cursor:pointer;
+    font-family:inherit;pointer-events:auto;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid var(--rim);color:var(--ic);
+    background:radial-gradient(circle at 35% 25%,var(--hi),var(--mid) 56%,var(--lo) 100%);
+    box-shadow:0 4px 14px rgba(0,0,0,.55),0 0 10px var(--glow),
+      inset 0 1px 0 rgba(255,255,255,.35),inset 0 -7px 14px rgba(0,0,0,.45);
+    transition:transform .08s ease,box-shadow .15s ease,filter .15s ease}
+  /* 图标：白色描边 SVG，带主色微光，浅色描边在深底上远看也清晰 */
+  #skillpad .sk .ic{display:flex;align-items:center;justify-content:center;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.7)) drop-shadow(0 0 5px var(--glow))}
+  #skillpad .sk .ic svg{display:block}
+  #skillpad .sk:active{transform:scale(.9);
+    box-shadow:0 0 0 3px var(--glow),0 2px 8px rgba(0,0,0,.55)}
+  /* —— 五键配色：一眼分清哪个键是什么 —— */
+  #skillpad .sk.c-atk{--rim:rgba(255,178,122,.95);--hi:rgba(255,126,92,.97);--mid:#7c2d24;
+    --lo:#38120e;--glow:rgba(255,112,80,.5);--ic:#ffddd0}
+  #skillpad .sk.c-heavy{--rim:rgba(255,195,107,.95);--hi:rgba(255,160,62,.97);--mid:#8a4d12;
+    --lo:#3c1f09;--glow:rgba(255,152,52,.48);--ic:#ffe8c2}
+  #skillpad .sk.c-jian{--rim:rgba(127,220,255,.95);--hi:rgba(66,172,232,.97);--mid:#14486e;
+    --lo:#082438;--glow:rgba(84,192,255,.52);--ic:#dcf5ff}
+  #skillpad .sk.c-lei{--rim:rgba(203,170,255,.95);--hi:rgba(152,107,242,.97);--mid:#4c2d8a;
+    --lo:#20103d;--glow:rgba(168,112,255,.58);--ic:#eee0ff}
+  /* 大招：双层金边 + 常亮金晕，一眼看出是压轴技能 */
+  #skillpad .sk.c-ult{--rim:rgba(255,224,138,.98);--hi:rgba(255,202,82,.98);--mid:#8a5c14;
+    --lo:#3a2407;--glow:rgba(255,205,90,.8);--ic:#fff4d0;
+    box-shadow:0 0 16px rgba(255,205,90,.6),0 0 30px rgba(255,180,60,.25),
+      0 4px 14px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.38),inset 0 -7px 14px rgba(0,0,0,.45)}
+  /* 冷却遮罩：--p 是剩余百分比，从上一条顺时针扫过 */
+  #skillpad .sk .cd{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+    background:conic-gradient(rgba(4,8,18,.72) calc(var(--p,0) * 1%),rgba(0,0,0,0) 0)}
+  #skillpad .sk .num{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    font-size:19px;font-weight:800;color:#fff;pointer-events:none;
+    text-shadow:0 2px 6px rgba(0,0,0,.9)}
+  #skillpad .sk.c-atk .num{font-size:24px}
+  #skillpad .sk.cooling .num{display:flex}
+  #skillpad .sk.cooling{filter:grayscale(.5) brightness(.82)}
+  #skillpad .sk kbd{position:absolute;right:4px;bottom:2px;font-size:10px;font-weight:800;
+    font-family:inherit;color:#fff;pointer-events:none;
+    text-shadow:0 1px 2px rgba(0,0,0,.9)}
+  /* 折叠把手：点一下把整个技能盘收成这一个小圆，横屏空间紧张时用 */
+  #skillToggle{position:absolute;right:0;top:0;width:36px;height:36px;border-radius:50%;
+    pointer-events:auto;cursor:pointer;padding:0;font-family:inherit;font-size:15px;
+    color:#ffe9b8;background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
+    border:2px solid rgba(226,192,110,.75);
+    box-shadow:0 3px 10px rgba(0,0,0,.45)}
+  #skillpad.folded{width:38px;height:38px}
+  #skillpad.folded .sk{display:none}
+  body.touch #skillpad{opacity:.92}     /* 触屏没有 hover，直接常亮，按键必须看得清 */
+  body.touch #skillpad.on{opacity:1}
+  /* 动作试演：1~6 六个按钮，没有键盘（手机）也能逐个看动作 */
+  #actbar{pointer-events:auto;background:rgba(12,20,34,.84);border:1px solid rgba(120,146,190,.42);
+    border-radius:12px;padding:8px 10px;display:flex;align-items:center;gap:9px;
+    box-shadow:0 6px 18px rgba(0,0,0,.36)}
+  #actbar .t{font-size:11.5px;color:#9fb3d0;letter-spacing:1px;white-space:nowrap}
+  #actbar .acts{display:flex;gap:6px;flex-wrap:wrap}
+  #actbar button{pointer-events:auto;cursor:pointer;font-family:inherit;background:rgba(30,44,70,.9);
+    color:#dfe9f6;border:1px solid rgba(120,146,190,.5);border-radius:8px;padding:7px 10px;
+    font-size:12.5px;font-weight:600;transition:.12s;white-space:nowrap}
+  #actbar button:hover{background:rgba(52,78,124,.95);border-color:#8bf3ff;color:#fff}
+  #actbar button:active{transform:translateY(1px)}
+  #actbar button.on{background:linear-gradient(180deg,#2f5f86,#1d3d5c);border-color:#8bf3ff;color:#fff}
+  /* 居中事件提示（被击退/折损灵石等） */
+  #toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-6px);z-index:60;
+    padding:10px 20px;border-radius:10px;pointer-events:none;max-width:82vw;text-align:center;
+    background:linear-gradient(180deg,rgba(120,26,26,.94),rgba(70,14,14,.96));
+    border:1px solid rgba(255,150,120,.55);color:#ffe4d6;font-size:14px;letter-spacing:1px;
+    box-shadow:0 8px 26px rgba(0,0,0,.45);opacity:0;transition:opacity .2s,transform .2s}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------- 竖屏旋转引导（触屏竖屏时盖一层；转横屏自动消失，也可点「竖屏也能玩」直接开玩） ---------- */
+  #rotate-hint{position:absolute;inset:0;z-index:70;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;text-align:center;padding:28px;
+    background:rgba(7,10,20,.965);backdrop-filter:blur(3px);color:#e8e6f5}
+  #rotate-hint .icon{font-size:58px;animation:rotphone 2.2s ease-in-out infinite}
+  #rotate-hint h2{font-size:22px;letter-spacing:2px;color:#ffd24a;margin:0}
+  #rotate-hint p{font-size:13px;line-height:1.9;color:#cfcbe8;max-width:300px;margin:0}
+  #rotate-hint .ghost-btn{margin-top:4px;background:transparent;color:#cfcbe8;
+    border:1px solid rgba(180,170,255,.4);border-radius:10px;padding:9px 20px;font-size:14px;
+    cursor:pointer;font-family:inherit}
+  #rotate-hint .ghost-btn:active{background:rgba(120,110,200,.22)}
+  @keyframes rotphone{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+  body.show-rotate #rotate-hint{display:flex}
+
+  /* ---------- 触屏适配：精简操作提示 + 收起调试面板，避免遮挡画面 ---------- */
+  body.touch #actbar{display:none}                 /* 动作试演只是核对素材用，手机游玩不需要，藏掉省空间 */
+  body.touch #actions{display:none}                /* 触屏只留右下技能盘，左下这块整块让给摇杆 */
+  body.touch #bottom{bottom:82px;font-size:11.5px;line-height:1.7;max-width:88vw;padding:6px 13px;
+    background:rgba(12,20,34,.86);border:1px solid rgba(120,146,190,.4);border-radius:10px;
+    transition:opacity .3s,transform .3s;cursor:pointer;pointer-events:auto}
+    /* ↑ .hud 带着 pointer-events:none，这里必须显式打开，否则"点这里收起"根本收不到点击 */
+  body.touch #bottom b{color:#8bf3ff}
+  body.touch #bottom .hl{color:#ffd24a}
+  body.touch #bottom.faded{opacity:0;transform:translate(-50%,12px);pointer-events:none}
+  body.touch #actions .act{padding:11px 16px;font-size:14px}
+
+  /* 右上「地图速切」折叠：桌面 / 触屏通用 —— 点标题条收成一行、再点展开（JS 记住选择，
+     手机默认收起）。手机上它会吃掉近半屏（地图按钮 + 缩放条 + 外形按钮），折叠尤其必要。 */
+  #topright .t{cursor:pointer;user-select:none;pointer-events:auto}
+  #topright .t .tg{color:#8bf3ff;font-size:11px;transition:transform .15s}
+  #topright.folded{padding:6px 12px}
+  #topright.folded .t{margin-bottom:0}
+  #topright.folded .t .tg{transform:rotate(-90deg)}
+  #topright.folded .maps,
+  #topright.folded #zoombar,
+  #topright.folded #herobar{display:none}
+  body.touch #topright{max-width:46vw;padding:8px 10px}
+  body.touch #topright.folded{pointer-events:auto}   /* 折叠后整条都可点，手指不用瞄 */
+  body.touch #topright .maps button,
+  body.touch #topright #herobar .heros button{padding:6px 9px;font-size:12px}
+
+  /* ---------- 浮动摇杆（触屏左半屏按住出现，半透明；借 realtime 的设计） ---------- */
+  #joystick{position:fixed;width:120px;height:120px;z-index:40;display:none;
+    pointer-events:none;opacity:.55;will-change:left,top}
+  #joy-base{position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle,rgba(20,30,52,.55),rgba(12,18,34,.35));
+    border:2px solid rgba(255,255,255,.4)}
+  #joy-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+    border-radius:50%;background:rgba(240,227,194,.65);border:2px solid rgba(255,255,255,.75);
+    box-shadow:0 2px 10px rgba(0,0,0,.35)}
+
+  #loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 38%,#16233f,#0a1120 72%);z-index:99}
+  .loadbox{width:min(360px,80vw);text-align:center}
+  .loadtitle{font-size:26px;font-weight:700;letter-spacing:6px;margin-bottom:18px;
+    background:linear-gradient(180deg,#ffe6a6,#d6b260);-webkit-background-clip:text;
+    background-clip:text;color:transparent}
+  .loadtip{font-size:14px;letter-spacing:2px;margin-bottom:12px;min-height:20px;color:#e8d6a8}
+  .loadbar{height:10px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;
+    border:1px solid rgba(214,178,96,.4)}
+  .loadfill{height:100%;width:0;background:linear-gradient(90deg,#8bf3ff,#d6b260);
+    transition:width .25s}
+  .loadpct{font-size:13px;margin-top:8px;color:#8bf3ff;font-family:ui-monospace,Consolas,monospace}
+  .loadsub{font-size:11.5px;margin-top:4px;color:#9fb0c8;min-height:15px;word-break:break-all}
+
+  /* ---------- 世界地图总览（Tab 开 / 手机图标开）----------
+   * 全部地图按「来源/主题」聚簇成节点，点节点即传送；当前地图高亮。
+   * 打开时盖全屏浮层，背后游戏暂停移动。缩略图在首次打开时按需绘制，不拖首屏。 */
+  #worldmap{position:fixed;inset:0;z-index:80;display:none;
+    align-items:center;justify-content:center;padding:24px;
+    background:rgba(6,10,20,.82);backdrop-filter:blur(4px)}
+  #worldmap.show{display:flex}
+  #worldmap .wm{width:min(900px,94vw);max-height:88vh;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(18,26,44,.96),rgba(10,16,30,.98));
+    border:1px solid rgba(214,178,96,.6);border-radius:14px;overflow:hidden;
+    box-shadow:0 18px 60px rgba(0,0,0,.6),inset 0 0 40px rgba(214,178,96,.06)}
+  #worldmap .wmh{display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:14px 18px;border-bottom:1px solid rgba(214,178,96,.3)}
+  #worldmap .wmh .tt h2{margin:0;font-size:18px;letter-spacing:3px;
+    background:linear-gradient(180deg,#ffe6a6,#d6b260);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #worldmap .wmh .tt .sub{font-size:12px;color:#9fb0c8}
+  #worldmap .x{cursor:pointer;pointer-events:auto;width:34px;height:34px;border-radius:50%;
+    border:1px solid rgba(214,178,96,.5);background:rgba(30,44,70,.85);color:#f0e3c2;
+    font-size:18px;line-height:1;font-family:inherit;flex:none}
+  #worldmap .x:hover{border-color:#ffd75e;color:#fff}
+  #worldmap .wmSearch{flex:1;max-width:260px;pointer-events:auto;font-family:inherit;font-size:13px;
+    padding:7px 12px;border-radius:9px;border:1px solid rgba(214,178,96,.45);
+    background:rgba(8,14,26,.8);color:#f0e3c2;outline:none}
+  #worldmap .wmSearch::placeholder{color:#7e8ca6}
+  #worldmap .wmSearch:focus{border-color:#ffd75e;box-shadow:0 0 10px rgba(255,210,74,.35)}
+  #worldmap .scroll{overflow:auto;padding:14px 18px 20px;
+    background-image:radial-gradient(rgba(214,178,96,.07) 1px,transparent 1px);
+    background-size:22px 22px}
+  #worldmap .region{margin-bottom:16px}
+  #worldmap .region h3{font-size:13px;color:#8bf3ff;letter-spacing:2px;margin:0 0 10px;
+    padding-bottom:6px;border-bottom:1px dashed rgba(139,243,255,.22)}
+  #worldmap .nodes{display:flex;flex-wrap:wrap;gap:10px}
+  #worldmap .node{position:relative;min-width:96px;max-width:140px;cursor:pointer;pointer-events:auto;font-family:inherit;
+    background:rgba(12,20,36,.7);border:1px solid rgba(120,146,190,.4);border-radius:10px;
+    padding:9px 11px;text-align:left;transition:.14s;color:#f0e3c2}
+  #worldmap .node:hover{border-color:#ffd75e;background:rgba(40,60,96,.85);
+    transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  #worldmap .node.on{border-color:#ffd75e;background:linear-gradient(180deg,#3a5a8e,#1d3d5c);
+    box-shadow:0 0 12px rgba(255,215,94,.5)}
+  #worldmap .node .nm{font-size:13px;font-weight:600;line-height:1.35;color:#f0e3c2;display:block}
+  #worldmap .node .dim{font-size:10px;color:#9fb0c8;margin-top:3px;display:block}
+  /* 打开世界地图的入口：桌面用 Tab，这里给鼠标/手机一个图标入口 */
+  #worldBtn{position:fixed;left:14px;top:60px;z-index:12;width:44px;height:44px;border-radius:50%;
+    pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
+    border:2px solid rgba(226,192,110,.75);box-shadow:0 3px 10px rgba(0,0,0,.45);
+    transition:border-color .15s,box-shadow .15s}
+  #worldBtn:hover{border-color:#ffd24a;box-shadow:0 0 12px rgba(255,210,74,.5)}
+  #worldBtn.on{border-color:#ffd24a;box-shadow:0 0 14px rgba(255,210,74,.6)}
+  #worldBtn svg{display:block}
+  body.touch #worldBtn{top:auto;bottom:14px;left:14px}  /* 手机左下，避开右上面板 */
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="topleft" class="hud panel">
+  <div class="tlmini" id="tlMini">
+    <span class="name" id="mapName">加载中…</span>
+    <div class="hpbar"><div class="hpfill" id="hpfill"></div></div>
+    <span class="hpv" id="hpv">260/260</span>
+    <span class="tg">▾</span>
+  </div>
+  <div id="foetarget">
+    <div class="ftname"></div>
+    <div class="ftbar"><div class="ftfill"></div></div>
+  </div>
+  <div class="tlfold">
+    <div class="row">坐标 <b id="pos">—</b></div>
+    <div class="row" id="hint">踩上青色光门即可切换地图</div>
+    <div class="row" id="expv">炼气期 · 修为 0</div>
+    <div class="row">灵石 <b id="stonev">0</b></div>
+  </div>
+</div>
+
+<!-- 世界地图入口：桌面 Tab 开关，手机点此图标；点开是诸天万界总览，点节点即传送 -->
+<button id="worldBtn" title="世界地图（Tab 开启）" aria-label="世界地图">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z"/><path d="M9 3v16"/><path d="M15 5v16"/></svg>
+</button>
+
+<div id="rightcol">
+<div id="topright" class="hud panel">
+  <div class="t" id="trHead" title="点击折叠 / 展开"><span>地图速切（无缝流转）</span><span class="tg" id="trTg">▾</span></div>
+  <div class="maps" id="mapBtns"></div>
+  <div id="zoombar">
+    <div class="t"><span>视图缩放</span><b id="zoomVal">100%</b></div>
+    <div class="zline">
+      <button id="zOut" title="缩小（-）">−</button>
+      <input id="zRange" type="range" min="62" max="172" value="100" step="1">
+      <button id="zIn" title="放大（+）">+</button>
+      <button id="zReset" title="复位（0）">100%</button>
+    </div>
+  </div>
+  <div id="herobar">
+    <div class="t"><span>主角外形</span><b id="heroNow">1 号</b></div>
+    <div class="heros" id="heroBtns"></div>
+  </div>
+</div>
+
+<!-- 场景缩略图：跟着地图面板排在同一列，标题条点一下收起，展开时点地图任意一格即寻路过去 -->
+<div id="minimap" class="hud panel folded">
+  <div class="t" id="mmHead"><span>场景缩略图<i id="mmName"></i></span><span class="tg" id="mmTg">▸</span></div>
+  <canvas id="mmCanvas" width="120" height="120"></canvas>
+  <div class="leg">
+    <em><i style="background:#7fa86b"></i>可走</em>
+    <em><i style="background:#5a5248"></i>挡路</em>
+    <em><i style="background:#2a5f86"></i>水</em>
+    <em><i style="background:#5fe9ff"></i>传送门</em>
+    <em><i style="background:#ff5a4a"></i>妖兽</em>
+    <em><i style="background:#ff2f2f"></i>你</em>
+  </div>
+</div>
+</div>
+
+<div id="bottom" class="hud panel folded">
+  <div class="bt">操作说明 <span id="btArrow">▸</span></div>
+  <div class="bd">
+  <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> 行走　·　
+  点击格子移动　·　<span class="hl">滚轮 / +/-</span> 缩放视图（0.62~1.72 倍）　·　
+  走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）　·　
+  走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
+  <span class="hl">Shift</span> 奔跑　·　<span class="hl">1~6</span> 试动作（待机/行走/奔跑/攻击A/攻击B/倒地）
+  </div>
+</div>
+
+<!-- 动作试演：桌面对齐素材用，移到左下角，把右下角让给技能盘 -->
+<div id="actions" class="hud">
+  <div id="actbar">
+    <span class="t">动作试演</span>
+    <div class="acts" id="actBtns"></div>
+  </div>
+</div>
+
+<!-- 技能盘（王者荣耀式）：右下角普攻大键 + 弧形排列重击与三个技能，每键专属配色、可折叠 -->
+<div id="skillpad" class="hud">
+  <button id="skillToggle" title="展开 / 收起技能盘">⚔</button>
+  <button class="sk c-jian" data-s="0" style="left:60px;top:98px;width:56px;height:56px"
+          title="御剑诀（U）：朝面朝方向斩出直线剑气，穿透多个目标">
+    <span class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9"/><path d="M3 12h6"/><path d="M3 16h9"/><path d="m12 18 8-8 1-4-4 1-8 8z"/></svg></span><i class="cd"></i><b class="num"></b><kbd>U</kbd>
+  </button>
+  <button class="sk c-lei" data-s="1" style="left:116px;top:46px;width:56px;height:56px"
+          title="雷罡咒（I）：以自身为中心雷爆，击退周围妖兽">
+    <span class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span><i class="cd"></i><b class="num"></b><kbd>I</kbd>
+  </button>
+  <button class="sk c-ult" data-s="2" style="left:184px;top:28px;width:58px;height:58px"
+          title="太虚剑域（O）：锁定最近目标落下剑雨，范围重创">
+    <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18"/><path d="M6 6v7"/><path d="m3.6 12.5 2.4 5 2.4-5"/><path d="M12 6v7"/><path d="m9.6 12.5 2.4 5 2.4-5"/><path d="M18 6v7"/><path d="m15.6 12.5 2.4 5 2.4-5"/></svg></span><i class="cd"></i><b class="num"></b><kbd>O</kbd>
+  </button>
+  <button class="sk c-heavy" id="skAtkB" style="left:94px;top:156px;width:56px;height:56px"
+          title="重击 B（K）：伤害翻倍、范围更大并击退妖兽">
+    <span class="ic"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="M14.5 6.5 18 3h3v3l-3.5 3.5"/><path d="m5 14 4 4"/><path d="m7 17-3 3"/><path d="M3 19l2 2"/></svg></span><i class="cd"></i><b class="num"></b><kbd>K</kbd>
+  </button>
+  <button class="sk c-atk" id="skAtk" style="left:158px;top:146px;width:84px;height:84px"
+          title="攻击 A（J / 空格）：普攻，只打面朝方向 ±60° 内的目标">
+    <span class="ic"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/></svg></span><kbd>J</kbd>
+  </button>
+</div>
+
+<div id="joystick"><div id="joy-base"></div><div id="joy-knob"></div></div>
+
+<!-- 世界地图总览浮层：全部地图按来源/主题聚簇成节点，点节点即传送 -->
+<div id="worldmap">
+  <div class="wm">
+    <div class="wmh">
+      <div class="tt"><h2>诸天万界</h2><span class="sub">点地图节点即刻传送 · Tab / Esc 关闭</span></div>
+      <input id="worldSearch" class="wmSearch" type="text" placeholder="搜索地图名…" autocomplete="off" />
+      <button class="x" id="worldClose" title="关闭">×</button>
+    </div>
+    <div class="scroll" id="worldScroll"></div>
+  </div>
+</div>
+
+<div id="loader">
+  <div class="loadbox">
+    <div class="loadtitle">仙岛寻踪</div>
+    <div class="loadtip" id="loadTip">读取地图数据</div>
+    <div class="loadbar"><div class="loadfill" id="loadBar"></div></div>
+    <div class="loadpct" id="loadPct">0%</div>
+    <div class="loadsub" id="loadSub"></div>
+  </div>
+</div>
+
+<script src="js/game.js?v=24"></script>
+</body>
+</html>

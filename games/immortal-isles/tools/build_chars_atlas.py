@@ -2,12 +2,12 @@
 """角色包统一集成脚本 —— 新增主角外形只需要跑这一个脚本。
 
 用法
-    python test/tools/build_chars_atlas.py            # 校验 + 生成图集与 heroes.json
-    python test/tools/build_chars_atlas.py --check     # 只校验，不写任何文件
+    python games/immortal-isles/tools/build_chars_atlas.py            # 校验 + 生成图集与 heroes.json
+    python games/immortal-isles/tools/build_chars_atlas.py --check     # 只校验，不写任何文件
 
 登记方式
     ① 把素材包解压进 ImmortalGame/sucai/
-    ② 在 test/tools/hero_packs.json 的 packs 里加一条（素材包 dir / cell / prefix / 角色清单）
+    ② 在 games/immortal-isles/tools/hero_packs.json 的 packs 里加一条（素材包 dir / cell / prefix / 角色清单）
     ③ 跑本脚本。校验不过会**拒绝出图**并说明哪里不合格，不会默默产出一张歪图集。
 
 素材格式（统一规范）
@@ -26,8 +26,8 @@
     row0 idle  row1 walk  row2 run  row3 atkA  row4 atkB  row5 dead
 
 输出
-    test/assets/chars_atlas.png / chars_atlas.json   —— 6x5 等距基础角色 + 每包追加 6x6 侧视动作表
-    test/assets/heroes.json                          —— 角色清单，引擎据此生成切换按钮（不再硬编码）
+    games/immortal-isles/assets/chars_atlas.png / chars_atlas.json   —— 6x5 等距基础角色 + 每包追加 6x6 侧视动作表
+    games/immortal-isles/assets/heroes.json                          —— 角色清单，引擎据此生成切换按钮（不再硬编码）
 
 素材授权：仅把素材烘进游戏图集，原始 PNG 始终留在 gitignore 的 sucai/ 里，不入库。
 """
@@ -36,8 +36,8 @@ from PIL import Image
 
 BASE = r'C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame'
 SUCAI = os.path.join(BASE, 'sucai')
-ASSETS = os.path.join(BASE, 'test/assets')
-MANIFEST = os.path.join(BASE, 'test/tools/hero_packs.json')
+ASSETS = os.path.join(BASE, 'games/immortal-isles/assets')
+MANIFEST = os.path.join(BASE, 'games/immortal-isles/tools/hero_packs.json')
 OUT_PNG = os.path.join(ASSETS, 'chars_atlas.png')
 OUT_JSON = os.path.join(ASSETS, 'chars_atlas.json')
 OUT_HEROES = os.path.join(ASSETS, 'heroes.json')

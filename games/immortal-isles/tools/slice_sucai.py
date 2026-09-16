@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """批量切图：对 sucai/ 下每张场景图跑「抠底 → 连通域 → 自适应切颈 → 重建」，
-输出到 test/assets/sliced_<tag>/，每张附标注总览图。
+输出到 games/immortal-isles/assets/sliced_<tag>/，每张附标注总览图。
 同时输出每张图的「主体 bbox / 轮廓占比 / 是否浮空岛」结构报告。
 """
 import os, json

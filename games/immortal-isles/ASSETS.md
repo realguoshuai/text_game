@@ -1,6 +1,6 @@
 # 仙岛寻踪 · 素材引用清单
 
-> 由 `test/tools/asset_audit.js` 生成。三方对齐：**代码引用 × 磁盘存在 × git 跟踪**。
+> 由 `games/immortal-isles/tools/asset_audit.js` 生成。三方对齐：**代码引用 × 磁盘存在 × git 跟踪**。
 
 ## 一、代码引用的资源路径
 
@@ -128,9 +128,9 @@
 
 | 目录 | 文件数 | 体积 |
 |---|---|---|
-| `test/assets/foes/` | 13 | 139KB |
-| `test/assets/sliced/` | 57 | 6469KB |
-| `test/assets/objects/` | 0 | 0B |
+| `games/immortal-isles/assets/foes/` | 13 | 139KB |
+| `games/immortal-isles/assets/sliced/` | 57 | 6469KB |
+| `games/immortal-isles/assets/objects/` | 0 | 0B |
 
 未被 git 跟踪的运行时文件：9 个
 

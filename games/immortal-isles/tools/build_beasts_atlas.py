@@ -8,17 +8,17 @@ build_beasts_atlas.py —— 怪物包统一接入器（灵泉灵瀑刷怪用）
   怪物包（128 格、单行、每文件一个动作）走本脚本。
 
 流程（先校验、后出图，任一条不过就拒绝出图）：
-  1) 读 test/tools/beast_packs.json 登记表
+  1) 读 games/immortal-isles/tools/beast_packs.json 登记表
   2) probe()  逐包逐怪校验：格尺寸 / 宽整除 / 帧数 / 各帧内容底边是否都落在格底
   3) select() 按 caps 抽样帧（一次性动作保留首末帧）
   4) anchor() 以 idle 第 0 帧内容中心为锚点，全动作共用同一位移 —— 绝不逐帧裁框居中
   5) 打包：保留既有 foes_atlas 内容，把新怪追加在下方，输出
-       test/assets/foes_atlas.png           （{rect, anims} 结构，旧 rect 原样保留）
-       test/assets/beasts.json              （引擎读取：怪物属性 + 帧数 + 锚点 + 刷怪点）
+       games/immortal-isles/assets/foes_atlas.png           （{rect, anims} 结构，旧 rect 原样保留）
+       games/immortal-isles/assets/beasts.json              （引擎读取：怪物属性 + 帧数 + 锚点 + 刷怪点）
 
 用法：
-  python test/tools/build_beasts_atlas.py --check     # 只校验，不写文件
-  python test/tools/build_beasts_atlas.py             # 校验并出图
+  python games/immortal-isles/tools/build_beasts_atlas.py --check     # 只校验，不写文件
+  python games/immortal-isles/tools/build_beasts_atlas.py             # 校验并出图
 """
 import json
 import glob
@@ -483,7 +483,7 @@ def main():
     json.dump({'rect': old_rect, 'anims': anims}, open(ATLAS_JSON, 'w', encoding='utf-8'),
               ensure_ascii=False, separators=(',', ':'))
     beasts = {
-        '_spec': '由 test/tools/build_beasts_atlas.py 从 test/tools/beast_packs.json 生成，勿手改。',
+        '_spec': '由 games/immortal-isles/tools/build_beasts_atlas.py 从 games/immortal-isles/tools/beast_packs.json 生成，勿手改。',
         'atlas': 'foes_atlas.png',
         'keys': [m['key'] for m in monsters],
         'monsters': [{k: v for k, v in m.items() if not k.startswith('_')} for m in monsters],

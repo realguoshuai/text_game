@@ -8,7 +8,7 @@ prep_floor.py —— 把 CC0 写实地表瓦加工成「可按地形名取用、
       https://opengameart.org/sites/default/files/sbs_-_isometric_floor_tiles_-_small_128x64.zip
       https://opengameart.org/sites/default/files/sbs_-_floor_tile_update_1_-_autotiles.zip
     解包后把 Worldmap 三张表（1 Forests / 2 Ground - Dry / 2 Ground - Rocky）按
-    128x64 切成单块，放进 SRC_DIR（本仓库落在 test/_cc0/tiles/，临时目录不入库）。
+    128x64 切成单块，放进 SRC_DIR（本仓库落在 games/immortal-isles/_cc0/tiles/，临时目录不入库）。
     切块+抠黑底由 tools/_cc0_tiles.py 完成。
 
 为什么不能直接用

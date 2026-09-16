@@ -2,7 +2,7 @@
 """
 把 FreePixel 免费素材（freepixel.art，免费商用、无需署名）打成游戏用的图集。
 
-输入：AssetLibrary/FreePixel/<分类>/<名字>.png   （200x200 透明 PNG）
+输入：text_game/assets_library/FreePixel/<分类>/<名字>.png（2026-09-16 素材库三合一后新位置）   （200x200 透明 PNG）
 输出：ImmortalGame/assets/foes.png   妖兽（3 列 × 4 行，每格 200px）
       ImmortalGame/assets/props.png  地图道具（6 列 × 8 行，每格 200px）
 
@@ -27,7 +27,7 @@ import json
 from PIL import Image
 
 SRC_ROOT = sys.argv[1] if len(sys.argv) > 1 else \
-    'C:/Users/Lenovo/WorkBuddy/text_game/AssetLibrary/FreePixel'
+    'C:/Users/Lenovo/WorkBuddy/text_game/assets_library/FreePixel'
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CELL = 200          # 格子边长（= 素材原始画布尺寸，内容不会被放大）

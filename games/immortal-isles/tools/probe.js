@@ -1,8 +1,8 @@
 // 无头探针：跑一个页面 + 查询串，把 #probe / #dbg 的 JSON 打出来。
 //
-//   node test/tools/probe.js "map=lingquan&autotest=bestiary"
-//   node test/tools/probe.js "map=lingquan&touch=1" --raw        # 只看 body class / 不解析 JSON
-//   node test/tools/probe.js "map=lingquan&autotest=bestiary" --keys=leash,zombieHit
+//   node games/immortal-isles/tools/probe.js "map=lingquan&autotest=bestiary"
+//   node games/immortal-isles/tools/probe.js "map=lingquan&touch=1" --raw        # 只看 body class / 不解析 JSON
+//   node games/immortal-isles/tools/probe.js "map=lingquan&autotest=bestiary" --keys=leash,zombieHit
 //
 // 为什么要有这个脚本：桌面 Chrome 的 pointer:coarse 恒为假、磁盘缓存又会把改过的
 // JSON 换回上一版，直接手敲 chrome 命令行很容易拿到"看起来是 bug 的假失败"。

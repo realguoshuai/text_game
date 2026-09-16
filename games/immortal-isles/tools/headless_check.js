@@ -2,7 +2,7 @@
 // 从 DOM 里读回 #dbg / #probe 的状态，直接断言引擎行为。
 //
 // 用法（本机）：
-//   node test/tools/headless_check.js
+//   node games/immortal-isles/tools/headless_check.js
 //
 // 为什么需要它：这台机器读不了图片像素（Read 图片会被过滤），而 --virtual-time-budget
 // 下 rAF 的 dt 常常接近 0，过渡动画会假死在半途。所以页面里统一用 ISLES.tick(1/60)
@@ -14,7 +14,7 @@ const os = require('os');
 const path = require('path');
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const GAME = 'file:///C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/index.html';
+const GAME = 'file:///C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/games/immortal-isles/index.html';
 // 命令行可选过滤：node headless_check.js "外来图" 只跑 label 含「外来图」的用例，
 // 方便单独复验某一类（尤其弱机/磁盘满时不想把 33 条全跑一遍）。空 = 全跑。
 const FILTER = process.argv[2] || '';
