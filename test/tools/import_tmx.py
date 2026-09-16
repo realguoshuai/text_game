@@ -119,6 +119,16 @@ def key_of(trans):
     return None
 
 
+def _theme_of(sets):
+    """按 tileset 名判主题（与 import_flare_all.py 的 THEME_ORDER 对齐）。"""
+    text = ' '.join((s['name'] or '').lower() for s in sets)
+    for kw, th in (('snowplains', 'snow'), ('ruins', 'ruins'), ('dungeon', 'dungeon'),
+                   ('cave', 'cave'), ('grassland', 'grass')):
+        if kw in text:
+            return th
+    return 'grass'
+
+
 # ------------------------------------------------------------------ 主流程
 
 def main():
@@ -155,8 +165,10 @@ def main():
                          '多张外来图共用一套图集时用（先导第一张，之后每张都加 --append）。'
                          '默认清空目录，只留本图的瓦')
     ap.add_argument('--dry', action='store_true', help='只解析不写文件')
+    ap.add_argument('--mask-only', action='store_true',
+                    help='只算可走掩码（ground + 出生点 + 主题），不裁瓦/不建图集/不建物件。'
+                         '纯 XML 解析，秒级/张，用于本地批量预览缩略图、供人工挑图')
     a = ap.parse_args()
-
     tmx = os.path.abspath(a.tmx)
     base = os.path.dirname(tmx)
     r = ET.parse(tmx).getroot()
@@ -538,6 +550,19 @@ def main():
         print('  出生点 %d,%d（四邻可走=%d，离图心 %.1f 格%s）'
               % (sx, sy, -best[0], best[1] ** 0.5,
                  '，水面上' if tset_of[sy][sx] in block_sets else ''))
+
+    # ---- mask-only：只导可走掩码，供本地批量预览挑图（跳过裁瓦/图集/物件）----
+    if getattr(a, 'mask_only', False):
+        bgc = (r.get('backgroundcolor') or '').strip()
+        mask_path = os.path.join(ASSETS, '%s_mask.json' % a.id)
+        walk_cnt = sum(row.count(GRASS) for row in ground)
+        mask = dict(id=a.id, name=a.name or a.id, w=W, h=H, ground=ground,
+                    spawn=dict(x=sx, y=sy), theme=_theme_of(sets), voidColor=(bgc or ''))
+        json.dump(mask, open(mask_path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+        print('  [mask-only] %s  %dx%d  可走 %d/%d 格 (%.0f%%)  主题 %s'
+              % (os.path.relpath(mask_path, ROOT), W, H, walk_cnt, W * H,
+                 100.0 * walk_cnt / (W * H or 1), mask['theme']))
+        return
 
     entry = dict(id=a.id, name=a.name or a.id, note=a.note or ('由 %s 导入' % os.path.basename(tmx)),
                  w=W, h=H, ground=ground, objects=objects,

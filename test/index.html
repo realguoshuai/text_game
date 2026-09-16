@@ -288,23 +288,27 @@
     border:1px solid rgba(214,178,96,.5);background:rgba(30,44,70,.85);color:#f0e3c2;
     font-size:18px;line-height:1;font-family:inherit;flex:none}
   #worldmap .x:hover{border-color:#ffd75e;color:#fff}
-  #worldmap .scroll{overflow:auto;padding:14px 18px 20px}
+  #worldmap .wmSearch{flex:1;max-width:260px;pointer-events:auto;font-family:inherit;font-size:13px;
+    padding:7px 12px;border-radius:9px;border:1px solid rgba(214,178,96,.45);
+    background:rgba(8,14,26,.8);color:#f0e3c2;outline:none}
+  #worldmap .wmSearch::placeholder{color:#7e8ca6}
+  #worldmap .wmSearch:focus{border-color:#ffd75e;box-shadow:0 0 10px rgba(255,210,74,.35)}
+  #worldmap .scroll{overflow:auto;padding:14px 18px 20px;
+    background-image:radial-gradient(rgba(214,178,96,.07) 1px,transparent 1px);
+    background-size:22px 22px}
   #worldmap .region{margin-bottom:16px}
   #worldmap .region h3{font-size:13px;color:#8bf3ff;letter-spacing:2px;margin:0 0 10px;
     padding-bottom:6px;border-bottom:1px dashed rgba(139,243,255,.22)}
-  #worldmap .nodes{display:flex;flex-wrap:wrap;gap:12px}
-  #worldmap .node{position:relative;width:108px;cursor:pointer;pointer-events:auto;font-family:inherit;
+  #worldmap .nodes{display:flex;flex-wrap:wrap;gap:10px}
+  #worldmap .node{position:relative;min-width:96px;max-width:140px;cursor:pointer;pointer-events:auto;font-family:inherit;
     background:rgba(12,20,36,.7);border:1px solid rgba(120,146,190,.4);border-radius:10px;
-    padding:8px 8px 9px;text-align:center;transition:.14s;color:#f0e3c2}
+    padding:9px 11px;text-align:left;transition:.14s;color:#f0e3c2}
   #worldmap .node:hover{border-color:#ffd75e;background:rgba(40,60,96,.85);
     transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.4)}
   #worldmap .node.on{border-color:#ffd75e;background:linear-gradient(180deg,#3a5a8e,#1d3d5c);
     box-shadow:0 0 12px rgba(255,215,94,.5)}
-  #worldmap .node canvas{display:block;width:92px;height:64px;margin:0 auto 6px;border-radius:6px;
-    background:rgba(8,12,22,.7);image-rendering:pixelated;border:1px solid rgba(214,178,96,.22)}
-  #worldmap .node .nm{font-size:12.5px;font-weight:600;line-height:1.3;color:#f0e3c2;
-    display:block;max-height:2.6em;overflow:hidden}
-  #worldmap .node .dim{font-size:10px;color:#9fb0c8;margin-top:2px;display:block}
+  #worldmap .node .nm{font-size:13px;font-weight:600;line-height:1.35;color:#f0e3c2;display:block}
+  #worldmap .node .dim{font-size:10px;color:#9fb0c8;margin-top:3px;display:block}
   /* 打开世界地图的入口：桌面用 Tab，这里给鼠标/手机一个图标入口 */
   #worldBtn{position:fixed;left:14px;top:60px;z-index:12;width:44px;height:44px;border-radius:50%;
     pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
@@ -429,6 +433,7 @@
   <div class="wm">
     <div class="wmh">
       <div class="tt"><h2>诸天万界</h2><span class="sub">点地图节点即刻传送 · Tab / Esc 关闭</span></div>
+      <input id="worldSearch" class="wmSearch" type="text" placeholder="搜索地图名…" autocomplete="off" />
       <button class="x" id="worldClose" title="关闭">×</button>
     </div>
     <div class="scroll" id="worldScroll"></div>
@@ -445,6 +450,6 @@
   </div>
 </div>
 
-<script src="js/game.js?v=19"></script>
+<script src="js/game.js?v=20"></script>
 </body>
 </html>

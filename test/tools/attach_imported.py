@@ -20,18 +20,34 @@ import hashlib
 import json
 import os
 import sys
+import glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAPS = os.path.join(ROOT, 'assets', 'maps.json')
-# 要挂进来的图（顺序 = 地图速切按钮里的顺序）
-#   两张 Flare 图共用同一套图集（flare_atlas）—— import_tmx.py 第一次导 arrival 时
-#   清空重建，之后每张都带 --append 把瓦并进去。加第三张照做即可。
-WANT = ['flare_arrival_map.json', 'flare_harbor_map.json']
-# 要下掉的图：
-#   kenney_hall 只有 7x7 —— 本游戏地图都是 28~36 格，差了一个数量级，一张小房间挂在虚空里；
-#   grasstest 虽 25x25，但 625 个物件全是地面瓦，没有建筑/道具/NPC，像底图不像"一个地方"。
-# 两张都被否掉，这里清掉，免得有人以为它们还能用。
-DROP = ['kenney_hall', 'grasstest']
+ASSETS = os.path.join(ROOT, 'assets')
+# 全量接入：扫描 import_flare_all.py 产出的所有 flare_*_map.json（顺序无关，
+# 引擎按 region 分组展示）。id 来自 import_tmx 的 --id（flare_<theme>_<parent>_<base>）。
+# 真正的顺序在世界地图里按 region 聚类，这里不必保序。
+MANIFEST = os.path.join(ASSETS, 'flare_manifest.json')
+# 要下掉的图（旧版 2 张 flare + 早期否掉的 kenney/grasstest）：
+#   旧 flare_arrival/flare_harbor 已被合并进 flare_grass 主题图集、改用新 id 重导，
+#   原 id 不再对应任何 _map.json，顺手清掉避免世界地图出现死链。
+DROP = ['flare_arrival', 'flare_harbor', 'kenney_hall', 'grasstest']
+
+
+def _want():
+    """返回 [(fn, region)]，region 优先取 manifest。"""
+    region_of = {}
+    if os.path.exists(MANIFEST):
+        for e in json.load(open(MANIFEST, encoding='utf-8')):
+            region_of[e['id']] = e.get('region', '')
+    out = []
+    for fn in sorted(glob.glob(os.path.join(ASSETS, 'flare_*_map.json'))):
+        mid = os.path.basename(fn).replace('_map.json', '')
+        if mid in DROP:
+            continue
+        out.append((os.path.basename(fn), region_of.get(mid, '')))
+    return out
 
 
 def main():
@@ -59,7 +75,7 @@ def main():
             print('[下架] %-12s %s  %dx%d' % (gone['id'], gone.get('name', ''), gone['w'], gone['h']))
 
     # 3) 逐张挂载（写轻条目：地形数据留在 <id>_map.json 里，由引擎按需取）
-    for fn in WANT:
+    for fn, region in _want():
         src = os.path.join(ROOT, 'assets', fn)
         if not os.path.exists(src):
             print('[skip] 缺少 %s' % fn)
@@ -69,9 +85,14 @@ def main():
         # 去掉 ground/objects（占这张图 99% 的体积），其余元信息全留 ——
         # 引擎要 name/note/w/h 建按钮，要 spawn/home/voidColor/homeFromMap 定初始站位与底色。
         light = {k: v for k, v in mp.items() if k not in ('ground', 'objects')}
-        # 图集名 = 瓦片键的前缀（'flare/xxx.png' -> 'flare'），引擎按它决定进图前补载哪套图集
+        # 图集名 = 瓦片键的前缀（'flare_grass/xxx.png' -> 'flare_grass'），引擎按它决定进图前补载哪套图集
         pre = (mp.get('objects') or [{}])[0].get('piece', '')
         light['atlas'] = pre.split('/')[0] if '/' in pre else 'flare'
+        # region：世界地图按它聚类成「诸天万界」节点墙；manifest 没给就按图集名兜底
+        if region:
+            light['region'] = region
+        elif light['atlas'].startswith('flare_'):
+            light['region'] = light['atlas'].split('_', 1)[1].capitalize() + '界'
         # 内容 md5 前 8 位当版本号：地形一改缓存键自动变，比手改 ?v= 靠谱
         light['src'] = 'assets/%s?v=%s' % (fn, hashlib.md5(open(src, 'rb').read()).hexdigest()[:8])
         old = next((i for i, m in enumerate(maps) if m['id'] == mp['id']), -1)
@@ -80,9 +101,8 @@ def main():
             maps[old] = light
         else:
             maps.append(light)
-        print('[%s] %-12s %-8s %dx%d  物件 %-5d  轻条目 %.1fKB（地形外置 %s）'
-              % (tag, light['id'], light['name'], light['w'], light['h'],
-                 len(mp.get('objects') or []),
+        print('[%s] %-12s %-8s %dx%d  region=%s  轻条目 %.1fKB（地形外置 %s）'
+              % (tag, light['id'], light['name'], light['w'], light['h'], light.get('region', '-'),
                  len(json.dumps(light, ensure_ascii=False, separators=(',', ':'))) / 1024, fn))
 
     if check:

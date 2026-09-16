@@ -3679,7 +3679,7 @@
   // 全量发布后地图会很多（140+），原来的「地图速切」按钮列表塞不下，改成分组节点浮层。
   // 节点缩略图用和右上角缩略图同一套配色（绿=可走 / 蓝=水 / 透明=虚空），首次打开才画，
   // 不拖首屏；地图表运行时不变，buildWorldMap 只在 boot 跑一次。
-  var worldOpen = false, worldThumbsDone = false;
+  var worldOpen = false;
   function mapRegion(m) {
     if (m.region) return m.region;
     if (m.atlas) {
@@ -3694,21 +3694,23 @@
     scroll.innerHTML = '';
     var groups = {};
     MAPS.forEach(function (m) { var r = mapRegion(m); (groups[r] = groups[r] || []).push(m); });
+    var frag = document.createDocumentFragment();
     Object.keys(groups).forEach(function (r) {
       var sec = document.createElement('div'); sec.className = 'region';
       var h = document.createElement('h3'); h.textContent = r + '（' + groups[r].length + '）'; sec.appendChild(h);
       var wrap = document.createElement('div'); wrap.className = 'nodes';
       groups[r].forEach(function (m) {
         var b = document.createElement('button'); b.className = 'node'; b.dataset.id = m.id;
-        var cv = document.createElement('canvas'); cv.setAttribute('data-thumb', '1');
+        b.dataset.name = (m.name || m.id).toLowerCase();
         var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = m.name;
         var dim = document.createElement('span'); dim.className = 'dim'; dim.textContent = m.w + '×' + m.h;
-        b.appendChild(cv); b.appendChild(nm); b.appendChild(dim);
+        b.appendChild(nm); b.appendChild(dim);
         b.onclick = function () { if (CUR.id !== m.id) goTo(m.id); closeWorld(); };
         wrap.appendChild(b);
       });
-      sec.appendChild(wrap); scroll.appendChild(sec);
+      sec.appendChild(wrap); frag.appendChild(sec);
     });
+    scroll.appendChild(frag);
     refreshWorldOn();
   }
   function refreshWorldOn() {
@@ -3716,40 +3718,12 @@
     var bs = document.querySelectorAll('#worldmap .node');
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].dataset.id === cur);
   }
-  function drawWorldThumb(cv, m) {
-    var gw = m.w, gh = m.h, W2 = 92, H2 = 64;
-    var off = document.createElement('canvas'); off.width = gw; off.height = gh;
-    var o = off.getContext('2d');
-    var img = o.createImageData(gw, gh);
-    var water = '-dhr~', walk = '#,.;';
-    for (var y = 0; y < gh; y++) {
-      var row = m.ground[y] || '';
-      for (var x = 0; x < gw; x++) {
-        var ch = row[x] || ' ', i = (y * gw + x) * 4, col;
-        if (ch === ' ') col = [0, 0, 0, 0];
-        else if (water.indexOf(ch) >= 0) col = [42, 95, 134, 255];
-        else if (walk.indexOf(ch) >= 0) col = [127, 168, 107, 255];
-        else col = [90, 82, 72, 255];
-        img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = col[3];
-      }
-    }
-    o.putImageData(img, 0, 0);
-    cv.width = W2; cv.height = H2;
-    var c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
-    c.drawImage(off, 0, 0, W2, H2);
-  }
-  function renderWorldThumbs() {
-    var cvs = document.querySelectorAll('#worldmap canvas[data-thumb]');
-    cvs.forEach(function (cv) {
-      var id = cv.parentNode && cv.parentNode.dataset ? cv.parentNode.dataset.id : null;
-      var m = id && IDX[id]; if (m) drawWorldThumb(cv, m);
-    });
-  }
   function openWorld() {
     var wm = document.getElementById('worldmap'); if (!wm) return;
     wm.classList.add('show'); worldOpen = true;
     var b = document.getElementById('worldBtn'); if (b) b.classList.add('on');
-    if (!worldThumbsDone) { renderWorldThumbs(); worldThumbsDone = true; }
+    var sb = document.getElementById('worldSearch');
+    if (sb) { sb.value = ''; filterWorldNodes(''); }
     refreshWorldOn();
   }
   function closeWorld() {
@@ -3757,12 +3731,29 @@
     wm.classList.remove('show'); worldOpen = false;
     var b = document.getElementById('worldBtn'); if (b) b.classList.remove('on');
   }
+  // 搜索框：按地图名过滤节点；整组无匹配则隐藏分组标题
+  function filterWorldNodes(q) {
+    q = (q || '').trim().toLowerCase();
+    var secs = document.querySelectorAll('#worldmap .region');
+    secs.forEach(function (sec) {
+      var nodes = sec.querySelectorAll('.node');
+      var vis = 0;
+      nodes.forEach(function (nd) {
+        var hit = !q || (nd.dataset.name || '').indexOf(q) >= 0;
+        nd.style.display = hit ? '' : 'none';
+        if (hit) vis++;
+      });
+      sec.style.display = vis ? '' : 'none';
+    });
+  }
   function toggleWorld() { if (worldOpen) closeWorld(); else openWorld(); }
   (function wireWorld() {
     var btn = document.getElementById('worldBtn');
     if (btn) btn.onclick = toggleWorld;
     var x = document.getElementById('worldClose');
     if (x) x.onclick = closeWorld;
+    var sb = document.getElementById('worldSearch');
+    if (sb) sb.addEventListener('input', function () { filterWorldNodes(sb.value); });
     var wm = document.getElementById('worldmap');
     if (wm) wm.addEventListener('click', function (e) { if (e.target === wm) closeWorld(); });
   })();
