@@ -347,7 +347,7 @@
     // ⚠ 数组下标被下面硬编码引用（LOAD_PLAN[0]/[1]/[4]/[5]/[6]/[7]/[8]），
     //   要往首屏加东西就 push 进 boot 里的 POOL，**别插进这个数组**。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=15', json: true, weight: 8, label: '读取地图数据', _expand: true },
+      { url: 'assets/maps.json?v=16', json: true, weight: 8, label: '读取地图数据', _expand: true },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
@@ -386,13 +386,6 @@
         { url: 'assets/dungeon_atlas.webp?v=2', atlas: 'dungeon', weight: 547, label: '载入地宫图集' },
         { url: 'assets/dungeon_atlas.json?v=2', atlas: 'dungeon', json: true, weight: 2, label: '读取地宫索引' }
       ]
-    },
-    flare: {
-      loaded: false, loading: null, queued: false,
-      items: [
-        { url: 'assets/flare_atlas.webp?v=3', atlas: 'flare', weight: 910, label: '载入外来地图图集' },
-        { url: 'assets/flare_atlas.json?v=3', atlas: 'flare', json: true, weight: 2, label: '读取外来地图索引' }
-      ]
     }
   };
   /* ── 按需资源的取用口 ─────────────────────────────────────────────── */
@@ -411,6 +404,23 @@
     return ok;
   }
 
+  /** 按需注册一套「按命名约定推导 URL」的 Flare 图集：
+   *  assets/<nm>_atlas.webp?v=<ver>  +  assets/<nm>_atlas.json?v=<ver>
+   *  nm 形如 flare_grass_empyrean_campaign；ver / weight 随地图条目走（atlasVer / atlasWeight），
+   *  不写死在 EXTRA 里 —— 这样 100+ 张外来图不需要在 EXTRA 手写几十条、也不会被首屏预取全拉。
+   *  只有玩家真正点进某张图时，mapAtlas 才会调用它（见下）。 */
+  function registerFlareAtlas(nm, ver, weight) {
+    if (EXTRA[nm] || nm.indexOf('flare_') !== 0) return;
+    var v = ver || '1', w = weight || 400;
+    EXTRA[nm] = {
+      loaded: false, loading: null, queued: false,
+      items: [
+        { url: 'assets/' + nm + '_atlas.webp?v=' + v, atlas: nm, weight: w, label: '载入' + nm + '图集' },
+        { url: 'assets/' + nm + '_atlas.json?v=' + v, atlas: nm, json: true, weight: 2, label: '读取' + nm + '索引' }
+      ]
+    };
+  }
+
   /** 这张图要用哪套「按需图集」（没有就返回 ''）。
    *  外来图的轻条目自带 atlas 字段；**自带图没有** —— 得从物件的瓦片前缀找：
    *  地宫的瓦在 'dungeon/' 下，其它图的前缀是主图集内部的键名（ground/、scene/…），
@@ -418,7 +428,14 @@
   function mapAtlas(m) {
     if (!m) return '';
     if (m._atlas !== undefined) return m._atlas;
-    var an = (m.atlas && EXTRA[m.atlas]) ? m.atlas : '';
+    var an = '';
+    if (m.atlas) {
+      // 外来 Flare 图集按需注册：键名 = m.atlas（flare_<theme>_<parent>），
+      // 版本与权重随地图条目走（atlasVer / atlasWeight），不写死在 EXTRA 里，
+      // 这样新增图集无需改 game.js、也不会被首屏预取全拉。
+      if (!EXTRA[m.atlas] && m.atlas.indexOf('flare_') === 0) registerFlareAtlas(m.atlas, m.atlasVer, m.atlasWeight);
+      an = EXTRA[m.atlas] ? m.atlas : '';
+    }
     if (!an) {
       var o = m.objects || [];
       for (var i = 0; i < o.length; i++) {
@@ -669,11 +686,6 @@
     // 计划池：LOAD_PLAN 是「一定会用到」的；expandPlan 会把「这张图额外要的」也推进来。
     // 池化 + 并发跑，是为了让首屏那 1.2MB 不再一个接一个地排队等。
     var POOL = LOAD_PLAN.slice();
-    // ★ 外来图集进首屏池（不插进 LOAD_PLAN，那会挪动上面硬编码的下标）。
-    //   queued=true 有两个作用：① expandPlan 不会再把它推一遍；② 语义上"已经在计划里"。
-    //   preloadExtras 靠 loaded 判断，loadItems 完成后 fillAtlas('flare') 会把它标上。
-    EXTRA.flare.queued = true;
-    EXTRA.flare.items.forEach(function (it) { POOL.push(it); });
     var W_TOTAL = POOL.reduce(function (a, p) { return a + p.weight; }, 0);
     var got = {};
     function report(label, sub) {
@@ -687,27 +699,29 @@
     /** 把「首屏要进的那张图」额外需要的资源推进池子。
      *  ⚠ 必须在 maps.json 解析完的那一刻**同步**做完：next() 是靠「step 追上池长」
      *  判断收工的，晚一步追加就没人回来取新任务了（next 末尾还有一次兜底）。 */
-    // 常驻图集：首屏就载、不要点击再加载（用户 2026-09-16 要求「这两张图一起加载，
-    // 不要点击再加载」）。外来图（远航之岸 / 殒落港湾）共用一套 flare 图集 —— 只下一张
-    // 就覆盖两张图，所以「一起加载」的代价是 +910KB 而不是 +1820KB。地宫仍按需（只有进去
-    // 才用得到，塞首屏是纯浪费）。
-    var EAGER_ATLAS = ['flare'];
+    // 常驻图集：原 flare_arrival / flare_harbor 共用的统一 flare 图集（EAGER_ATLAS=['flare']）已下架，
+    // 新进的外来图改用 per-(campaign,theme) 图集并走 mapAtlas 懒加载，这里留空 —— 不应有图集在首屏被强拉。
+    var EAGER_ATLAS = [];
     function expandPlan(data) {
       var q0 = new URLSearchParams(location.search);
       var want = q0.get('map');
       (data.maps || []).forEach(function (x) {
         // ① 常驻图集：这张图用到的图集在 EAGER_ATLAS 里，就并进首屏池 ——
         //   不再等 ?map= 指名、也不再等 2.5s 预取，用户点按钮就是同步切换。
-        var an = mapAtlas(x);
-        if (an && EAGER_ATLAS.indexOf(an) >= 0 && !EXTRA[an].queued) {
+        // 注意：这里只做「常驻图集是否进首屏」的判断，不能用会按需注册的 mapAtlas(x)，
+        // 否则会在 boot 期为每张外来图都 registerFlareAtlas，把 100+ 套图集全挂进 EXTRA，
+        // 随后 preloadExtras 会把它们一口气全下（首屏直接爆）。新图集保持懒加载。
+        var an = (x.atlas && EAGER_ATLAS.indexOf(x.atlas) >= 0 && EXTRA[x.atlas]) ? x.atlas : '';
+        if (an && !EXTRA[an].queued) {
           EXTRA[an].queued = true;
           EXTRA[an].items.forEach(function (it) {
             if (POOL.indexOf(it) < 0) { POOL.push(it); W_TOTAL += it.weight; }
           });
         }
-        // ② 用户直接点名的那张图：保险起见它的图集也进首屏（指到地宫这种按需图时兜底）
+        // ② 用户直接点名的那张图：保险起见它的图集也进首屏（仅对已在 EXTRA 的常驻图集生效；
+        //    外来图集走 goTo 的懒加载，不在这里预挂，理由同 ①）
         if (x.id === want) {
-          var an2 = mapAtlas(x);
+          var an2 = (x.atlas && EXTRA[x.atlas]) ? x.atlas : '';
           if (an2 && !EXTRA[an2].queued) {
             EXTRA[an2].queued = true;
             EXTRA[an2].items.forEach(function (it) {
@@ -774,10 +788,9 @@
         var fj = LOAD_PLAN[6].value || {};
         ATLAS.foes.rect = fj.rect || fj;
         ATLAS.foes.anim = fj.anims || {};
-        // 按需图集（地宫 / 外来地图）：flare 经 expandPlan 的 EAGER_ATLAS 总是进首屏池，
-        // dungeon 只在 ?map= 指到时进池。无论哪种，到这里的 item 都已加载完，fillAtlas
-        // 顺手把 loaded 标上，后台预取就不会再拉一遍。
-        fillAtlas('dungeon'); fillAtlas('flare');
+        // 按需图集：地宫 dungeon 在 ?map= 指到时进池。到这里的 item 都已加载完，
+        // fillAtlas 顺手把 loaded 标上，后台预取就不会再拉一遍。
+        fillAtlas('dungeon');
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;

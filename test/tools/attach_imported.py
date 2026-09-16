@@ -88,6 +88,14 @@ def main():
         # 图集名 = 瓦片键的前缀（'flare_grass/xxx.png' -> 'flare_grass'），引擎按它决定进图前补载哪套图集
         pre = (mp.get('objects') or [{}])[0].get('piece', '')
         light['atlas'] = pre.split('/')[0] if '/' in pre else 'flare'
+        # atlas 图集版本/权重：版本让浏览器缓存随图集内容变化失效（避免改图集还读旧 webp），
+        # 权重让进度条按该图集真实体积走（webp 已压缩，磁盘 KB 即线上传输 KB 的量级）。
+        apath = os.path.join(ASSETS, light['atlas'] + '_atlas.webp')
+        if not os.path.exists(apath):
+            apath = os.path.join(ASSETS, light['atlas'] + '_atlas.png')
+        if os.path.exists(apath):
+            light['atlasVer'] = hashlib.md5(open(apath, 'rb').read()).hexdigest()[:8]
+            light['atlasWeight'] = max(1, int(os.path.getsize(apath) / 1024))
         # region：世界地图按它聚类成「诸天万界」节点墙；manifest 没给就按图集名兜底
         if region:
             light['region'] = region
