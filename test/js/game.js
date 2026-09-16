@@ -576,6 +576,18 @@
     }
     el.style.display = '';
     el.textContent = text + (pct === undefined ? '' : ' ' + Math.round(pct * 100) + '%');
+    el._lu = Date.now();
+    // 停滞看门狗：提示条 40 秒没更新就明说「卡了，强刷」——不再让玩家对着 99% 干等
+    // （旧版代码被浏览器缓存时就会这样，得 Ctrl+F5 拿新 game.js）。
+    if (!mapLoadTip._wd) {
+      mapLoadTip._wd = setInterval(function () {
+        var e = document.getElementById('mapLoading');
+        if (!e || e.style.display === 'none' || !e.textContent) return;
+        if (Date.now() - (e._lu || 0) > 40000 && e.textContent.indexOf('Ctrl+F5') < 0) {
+          e.textContent += '（载入停滞，请按 Ctrl+F5 强制刷新）';
+        }
+      }, 5000);
+    }
   }
 
   /** 切图守卫：目标图的数据/图集没就绪就先补，再走原来的同步 switchTo。
