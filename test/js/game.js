@@ -395,11 +395,14 @@
   function fillAtlas(nm) {
     var e = EXTRA[nm];
     if (!e) return false;
+    // 懒注册的外来图集在 ATLAS 里没有预置槽位（tiles/chars/foes/dungeon/flare 是写死的），
+    // 必须在这里补建：否则对 undefined.rect 赋值抛 TypeError，loaded 永不置位 → 载入条卡 99%。
+    var A = ATLAS[nm] || (ATLAS[nm] = { img: null, rect: null });
     e.items.forEach(function (p) {
       if (!p.value) return;
-      if (p.json) ATLAS[nm].rect = p.value; else ATLAS[nm].img = p.value;
+      if (p.json) A.rect = p.value; else A.img = p.value;
     });
-    var ok = !!(ATLAS[nm].img && ATLAS[nm].rect);
+    var ok = !!(A.img && A.rect);
     if (ok) e.loaded = true;
     return ok;
   }
@@ -419,6 +422,8 @@
         { url: 'assets/' + nm + '_atlas.json?v=' + v, atlas: nm, json: true, weight: 2, label: '读取' + nm + '索引' }
       ]
     };
+    // piece() 是遍历 ATLAS 的键取件的 —— 槽位必须随注册一起建，绘制与 autotest 才找得到。
+    ATLAS[nm] = ATLAS[nm] || { img: null, rect: null };
   }
 
   /** 这张图要用哪套「按需图集」（没有就返回 ''）。
@@ -461,7 +466,7 @@
       if (!e.loaded && !e.loading) {
         e.loading = loadItems(e.items, onPct).then(function () {
           fillAtlas(nm); e.loading = null; return true;
-        });
+        }, function (err) { e.loading = null; throw err; }); 
       }
       if (e.loading) seq = seq.then(function () { return e.loading; });
     });
