@@ -3825,14 +3825,7 @@
       schedule();
     }
 
-    // —— 右上地图速切面板：默认折叠，点标题展开 ——
-    // 11 个外形按钮在 390 高的手机上会把右上角顶满，连玩法都看不清。
-    var tr = document.getElementById('topright');
-    if (tr) {
-      tr.classList.add('folded');
-      var trHead = tr.querySelector('.t');
-      if (trHead) trHead.addEventListener('click', function () { tr.classList.toggle('folded'); });
-    }
+    // （地图速切面板的折叠逻辑已上移到 initMobile 顶部，桌面 / 触屏共用，见上方）
 
     // —— 横屏提醒（竖屏才显示）——
     var hint = document.getElementById('rotate-hint');
