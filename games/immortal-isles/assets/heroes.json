@@ -39,6 +39,14 @@
    "label": "20 号"
   },
   {
+   "n": 51,
+   "file": "flare_51.png",
+   "label": "51",
+   "nick": "51 帝国冒险者",
+   "side": true,
+   "pack": "flare"
+  },
+  {
    "n": 31,
    "file": "vamp_31.png",
    "label": "31",
@@ -88,6 +96,11 @@
   }
  ],
  "packs": [
+  {
+   "id": "flare",
+   "name": "Flare 官方默认角色（flare-game）",
+   "license": "CC-BY-SA 3.0（github.com/flareteam/flare-game）；ShareAlike 同条款传染，对外分发需遵守"
+  },
   {
    "id": "craftpix-vampire",
    "name": "CraftPix 免费吸血鬼包 #506778",

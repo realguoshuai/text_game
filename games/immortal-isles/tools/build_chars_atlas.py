@@ -147,7 +147,6 @@ def build_sheet(folder, cell):
         cells = load_cells(p, cell)
         act_cells[key] = cells
         counts[key] = len(cells)
-
     # 统一平移锚点：以 idle 的内容中心落回格中央为准
     dx = 0
     for probe_key in ('idle', 'walk'):
@@ -180,6 +179,109 @@ def build_sheet(folder, cell):
     return sheet, counts, dx
 
 
+# ---------------- Flare 分层角色包（type=flare-layered）----------------
+# flare-game（github.com/flareteam/flare-game，CC-BY-SA 3.0）的角色是分层素材：
+# legs/chest/head 各一张整图集，帧矩形在 animations/avatar/male/<层>.txt：
+#   frame=帧序,方向,x,y,w,h,锚x,锚y   （注意前两字段是「帧序,方向」，不是「方向,帧序」）
+# 8 方向；这里取引擎右向合成 6 动作行，与 CraftPix 侧视包同一规格落库。
+FLARE_ACTS = [('idle', 'stance'), ('walk', 'run'), ('run', 'run'),
+              ('atkA', 'swing'), ('atkB', 'cast'), ('dead', 'die')]
+FLARE_DIR_RIGHT = 5   # flare-engine Utils.cpp calcDirection：向右移动 -> dir=5
+
+
+def parse_flare_anim(path):
+    """解析 flare 动画 txt -> {anim: {(帧序,方向): [x,y,w,h,ox,oy]}}"""
+    anims, cur = {}, None
+    for line in open(path, encoding='utf-8'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line[0] == '[' and line[-1] == ']':
+            cur = line[1:-1]
+            anims[cur] = {}
+            continue
+        k, _, v = line.partition('=')
+        k = k.strip()
+        if cur is None:
+            continue
+        if k == 'frames':
+            anims[cur]['_n'] = int(v)
+        elif k == 'frame':
+            p = [int(x) for x in v.split(',')]
+            anims[cur][(p[0], p[1])] = p[2:]
+    return anims
+
+
+def build_flare_sheet(srcdir):
+    """Flare 分层角色 -> 384x384 的 6列x6行 动作表。返回 (sheet, 每动作帧数)。"""
+    lay_names = ['default_legs', 'default_chest', 'head_short']
+    srcs = {n: Image.open(os.path.join(srcdir, n + '.png')).convert('RGBA') for n in lay_names}
+    anims = {n: parse_flare_anim(os.path.join(srcdir, n + '.txt')) for n in lay_names}
+
+    CAN, AX, AY = 512, 256, 500   # 大画布 + 锚点（脚底原点）位置
+
+    def comp(aname, idx):
+        """按锚点把三层合成一帧（腿最底、头最顶），锚点落在 (AX,AY)。"""
+        img = Image.new('RGBA', (CAN, CAN), (0, 0, 0, 0))
+        for ln in lay_names:
+            c = anims[ln].get(aname, {}).get((idx, FLARE_DIR_RIGHT))
+            if not c:
+                continue
+            x, y, w, h, ox, oy = c
+            if w <= 2 or h <= 2:
+                continue
+            img.alpha_composite(srcs[ln].crop((x, y, x + w, y + h)), (AX - ox, AY - oy))
+        return img
+
+    comp_frames = {}
+    for key, aname in FLARE_ACTS:
+        ch = anims['default_chest'][aname]
+        n = max(i for (i, d) in ch if d == FLARE_DIR_RIGHT) + 1
+        frames = [comp(aname, i) for i in range(n)]
+        if key == 'dead' and n >= 3:
+            # 与 CraftPix 包同策略：剔掉「倒地后消散」的尾帧，让动画停在躺平而不是消失
+            hh = []
+            for f in frames:
+                b = f.getchannel('A').getbbox()
+                hh.append((b[3] - b[1]) if b else 0)
+            hmax = max(hh) or 1
+            keep = [i for i, v in enumerate(hh) if v >= hmax * 0.28]
+            if len(keep) >= 2:
+                frames = [frames[i] for i in keep]
+        comp_frames[key] = frames
+
+    # 所有帧共用同一裁剪窗（帧间相对位移完整保留），整体缩到 128 格再降采样 64
+    boxes = [f.getchannel('A').getbbox() for fl in comp_frames.values() for f in fl]
+    boxes = [b for b in boxes if b]
+    if not boxes:
+        raise RuntimeError('Flare 素材合成后全透明：%s' % srcdir)
+    L = min(b[0] for b in boxes); T = min(b[1] for b in boxes)
+    R = max(b[2] for b in boxes); B = max(b[3] for b in boxes)
+    bw, bh = R - L, B - T
+    k = min(1.0, 120.0 / bw, 120.0 / bh)
+    sw, sh = max(1, round(bw * k / 2)), max(1, round(bh * k / 2))   # 64 格空间
+
+    # 64 格内摆放：脚底贴格底；水平以 idle 内容中心为准（钳回格内防裁剪）
+    idle_bbs = [f.getchannel('A').getbbox() for f in comp_frames['idle']]
+    idle_bbs = [b for b in idle_bbs if b]
+    icx = (min(b[0] for b in idle_bbs) + max(b[2] for b in idle_bbs)) / 2.0 - L
+    sx = max(0, min(CELL_DST - sw, int(round(CELL_DST / 2 - icx * k / 2))))
+    sy = CELL_DST - sh
+
+    sheet = Image.new('RGBA', (COLS * CELL_DST, len(FLARE_ACTS) * CELL_DST), (0, 0, 0, 0))
+    counts = {}
+    for row, (key, _an) in enumerate(FLARE_ACTS):
+        counts[key] = len(comp_frames[key])
+        picks = even_indices(len(comp_frames[key]), COLS)
+        for col in range(COLS):
+            fr = comp_frames[key][picks[col]].crop((L, T, R, B)).resize((sw, sh), Image.NEAREST)
+            sheet.alpha_composite(fr, (sx + col * CELL_DST, sy + row * CELL_DST))
+    if not (H_MIN <= sh <= H_MAX):
+        print('      WARN  Flare 角色缩放后内容高 %d px（常规 %d~%d），体型可能与现有角色不搭'
+              % (sh, H_MIN, H_MAX))
+    return sheet, counts
+
+
 def main():
     check_only = '--check' in sys.argv
     man = json.load(open(MANIFEST, encoding='utf-8'))
@@ -188,7 +290,22 @@ def main():
     jobs, fatal, warns_all = [], [], []
     seen_n = {}
     for pk in packs:
-        print('###### %s  (%s)' % (pk.get('name', pk.get('id')), pk.get('dir')))
+        print('###### %s  (%s)' % (pk.get('name', pk.get('id')), pk.get('dir') or pk.get('src')))
+        if pk.get('type') == 'flare-layered':
+            # Flare 分层包：源在 .workbuddy/（与 sucai/ 同为 gitignore 的原始素材）
+            srcdir = os.path.join(BASE, pk['src'])
+            if not os.path.isdir(srcdir):
+                fatal.append('Flare 素材目录不存在：%s' % pk.get('src'))
+                print('      目录不存在，跳过')
+                continue
+            for h in pk['heroes']:
+                tag = '%s %s' % (h.get('label'), h.get('nick', ''))
+                if h['n'] in seen_n:
+                    fatal.append('编号 %d 重复（%s 与 %s）' % (h['n'], seen_n[h['n']], tag))
+                seen_n[h['n']] = tag
+                print('  %s' % tag)
+                jobs.append((pk, h, srcdir, None))
+            continue
         pd = os.path.join(SUCAI, pk['dir'])
         if not os.path.isdir(pd):
             fatal.append('素材包目录不存在：sucai/%s' % pk['dir'])
@@ -246,16 +363,27 @@ def main():
     for i, (pk, h, folder, info) in enumerate(jobs):
         r, c = divmod(i, ROW_W)
         x, y = c * COLS * CELL_DST, base.height + r * sheeth
-        sheet, counts, dx = build_sheet(folder, pk.get('cell', 128))
-        out.alpha_composite(sheet, (x, y))
         key = '%s_%d.png' % (pk.get('prefix', pk['id']), h['n'])
         rect[key] = [x, y, COLS * CELL_DST, sheeth]
         heroes.append({'n': h['n'], 'file': key, 'label': h.get('label', str(h['n'])),
                        'nick': h.get('nick'), 'side': True, 'pack': pk.get('id')})
-        trace = ' '.join('%s=%d' % (k, counts[k]) for k, _f, _c, _n in ACTS)
-        print('  + %-14s dx=%+d  %s' % (key, dx, trace))
+        if pk.get('type') == 'flare-layered':
+            sheet, counts = build_flare_sheet(folder)
+            trace = ' '.join('%s=%d' % (k2, counts[k2]) for k2, _f, _c, _n in ACTS)
+            print('  + %-14s flare分层合成  %s' % (key, trace))
+        else:
+            sheet, counts, dx = build_sheet(folder, pk.get('cell', 128))
+            trace = ' '.join('%s=%d' % (k2, counts[k2]) for k2, _f, _c, _n in ACTS)
+            print('  + %-14s dx=%+d  %s' % (key, dx, trace))
+        out.alpha_composite(sheet, (x, y))
 
     out.save(OUT_PNG, optimize=True)
+    try:
+        out.save(os.path.join(ASSETS, 'chars_atlas.webp'), 'WEBP', quality=88, method=6)
+        print('chars_atlas.webp %.1fKB'
+              % (os.path.getsize(os.path.join(ASSETS, 'chars_atlas.webp')) / 1024))
+    except Exception as e:   # webp 失败必须处理：引擎加载的是 webp，旧 webp 会与新 json 不匹配
+        sys.exit('chars_atlas.webp 生成失败（引擎将加载到过期图集）：%s' % e)
     json.dump(rect, open(OUT_JSON, 'w', encoding='utf-8'),
               ensure_ascii=False, separators=(',', ':'))
     json.dump({

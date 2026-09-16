@@ -10,6 +10,17 @@
   },
   "packs": [
     {
+      "id": "flare",
+      "name": "Flare 官方默认角色（flare-game）",
+      "type": "flare-layered",
+      "src": ".workbuddy/flare_preview",
+      "license": "CC-BY-SA 3.0（github.com/flareteam/flare-game）；ShareAlike 同条款传染，对外分发需遵守",
+      "prefix": "flare",
+      "heroes": [
+        { "n": 51, "label": "51", "nick": "51 帝国冒险者" }
+      ]
+    },
+    {
       "id": "craftpix-vampire",
       "name": "CraftPix 免费吸血鬼包 #506778",
       "dir": "craftpix-net-506778-free-vampire-pixel-art-sprite-sheets",
