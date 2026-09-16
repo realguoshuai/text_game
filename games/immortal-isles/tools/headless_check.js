@@ -104,30 +104,32 @@ const results = [];
 const DIRS = ['down', 'left', 'right', 'up'];
 
 // 1) ★ 本次修的 bug：点击移动必须按行进方向转身（原来永远停在初始的 down）
+// ⚠ 必须写死 map=qingxuan：这几条假设出生点四周是**开阔空地**。默认开局图早已换成
+//   外来图「洛赫港」，它出生点周围有建筑/水，-3 格落点被判不可走 → 假失败（不是转身坏了）。
 [
   ['right', 'cdx=3&cdy=0'],
   ['left', 'cdx=-3&cdy=0'],
   ['down', 'cdx=0&cdy=3'],
   ['up', 'cdx=0&cdy=-3'],
 ].forEach(([want, q]) => {
-  results.push(run('点击转身 ' + want, 'autotest=click&' + q, ({ probe }) =>
+  results.push(run('点击转身 ' + want, 'map=qingxuan&autotest=click&' + q, ({ probe }) =>
     !!probe && probe.targetAccepted && probe.faceAfter === want && probe.reached));
 });
 
 // 2) 长距离点击：BFS 绕路后必须能走到，且全程不落到非法格
-results.push(run('点击 8 格直线', 'autotest=click&cdx=8&cdy=0&secs=4', ({ probe }) =>
+results.push(run('点击 8 格直线', 'map=qingxuan&autotest=click&cdx=8&cdy=0&secs=4', ({ probe }) =>
   !!probe && probe.cellOk && probe.reached && probe.faceAfter === 'right'));
-results.push(run('点击 长斜向 (8,8)', 'autotest=click&cdx=-8&cdy=-8&secs=8', ({ probe }) =>
-  !!probe && probe.cellOk && probe.reached && DIRS.indexOf(probe.faceAfter) >= 0));
-results.push(run('点击 回走 (6,-6)', 'autotest=click&cdx=-6&cdy=-6&secs=8', ({ probe }) =>
-  !!probe && probe.cellOk && probe.reached && DIRS.indexOf(probe.faceAfter) >= 0));
+results.push(run('点击 长斜向 (8,8)', 'map=qingxuan&autotest=click&cdx=-8&cdy=-8&secs=8', ({ probe }) =>
+  !!probe && probe.targetAccepted === true && probe.cellOk && probe.reached && DIRS.indexOf(probe.faceAfter) >= 0));
+results.push(run('点击 回走 (6,-6)', 'map=qingxuan&autotest=click&cdx=-6&cdy=-6&secs=8', ({ probe }) =>
+  !!probe && probe.targetAccepted === true && probe.cellOk && probe.reached && DIRS.indexOf(probe.faceAfter) >= 0));
 
 // 3) 点击虚空/水面应被拒绝（不会让角色朝墙撞过去）
-results.push(run('点击 不可达格 拒绝', 'autotest=click&cdx=40&cdy=40', ({ probe }) =>
+results.push(run('点击 不可达格 拒绝', 'map=qingxuan&autotest=click&cdx=40&cdy=40', ({ probe }) =>
   !!probe && probe.targetAccepted === false));
 
 // 4) 键盘对照：按住右键移动且朝向 right；松手后不得被残差翻成 left
-results.push(run('键盘 d 对照', 'autotest=walk', ({ dbg }) =>
+results.push(run('键盘 d 对照', 'map=qingxuan&autotest=walk', ({ dbg }) =>
   !!dbg && dbg.face === 'right' && dbg.mx > 17));
 
 // 5) 传送阵双向
@@ -136,8 +138,8 @@ results.push(run('传送 青玄→灵泉', 'map=qingxuan&autotest=portal', ({ db
 results.push(run('传送 碑林→青玄', 'map=beilin&autotest=portal', ({ dbg }) =>
   !!dbg && dbg.map === 'qingxuan' && dbg.fade === 0));
 
-// 6) NPC 绘制分支可达
-results.push(run('NPC 渲染计数', 'autotest=walk', ({ dbg }) => !!dbg && dbg.npcs > 0));
+// 6) NPC 绘制分支可达（只有青玄山门摆了 NPC，必须指名它，别指望默认开局图有）
+results.push(run('NPC 渲染计数', 'map=qingxuan&autotest=walk', ({ dbg }) => !!dbg && dbg.npcs > 0));
 
 // 7) 碑林石阵刷怪（就地取材的打怪场）
 results.push(run('碑林 刷怪', 'map=beilin', ({ dbg }) => !!dbg && dbg.foes > 0));
@@ -159,13 +161,15 @@ results.push(run('战斗 手感三件套', 'map=qingxuan&autotest=combat', ({ pr
   && probe.dmgMax > probe.dmgMin, { budget: 22000 }
 ));
 
-// 8.6) 技能盘：三个技能（御剑诀/雷罡咒/太虚剑域）各自要能命中掉血、冷却期间放不出来、
-//      冷却清零后能再放，且每次释放都产生一个特效对象。
-results.push(run('技能 三招与冷却', 'map=qingxuan&autotest=skill', ({ probe }) => {
-  if (!probe || !probe.skills || probe.skills.length !== 3) return false;
+// 8.6) 技能盘：每个技能（御剑诀/雷罡咒/太虚剑域/炎爆术…）各自要能命中掉血、冷却期间放不出来、
+//      冷却清零后能再放，且每次释放都产生特效对象。
+// ⚠ 别写死 3 招：2026-09-16 加了第 4 招（P 炎爆术）后这条就红了。改成「按实际招数逐条验」。
+results.push(run('技能 全招与冷却', 'map=qingxuan&autotest=skill', ({ probe }) => {
+  if (!probe || !Array.isArray(probe.skills) || probe.skills.length < 4) return false;
+  if (probe.n !== probe.skills.length) return false;
   return probe.skills.every((s) => s.cast === true && s.dmg > 0 && s.blocked === true
     && s.recast === true && s.dmg2 > 0 && s.fx >= 1 && s.cd > 0);
-}, { budget: 20000 }
+}, { budget: 24000 }
 ));
 //    外加领地（leash）验收 —— 越界不许咬人、必须回巢、回巢后还能被重新拉起。
 //    这条 sim 的时长以「秒」计（20s + 14s），预算要给足。
@@ -184,9 +188,9 @@ results.push(run('灵泉 妖兽领地', 'map=lingquan&autotest=bestiary', ({ pro
 //      人眼扫一眼截图看不出是"没配好"还是"地图本来长这样"。这条把三件事都量化了。
 //      断言口径刻意不写死坐标（换一张外来图只要重新生成即可），只锁性质：
 //      有可走区、有内容、出生点确实站得住、能点着走过去。
-results.push(run('外来地图 远航之岸', 'map=flare_arrival&autotest=importmap', ({ probe }) =>
-  !!probe && probe.map === 'flare_arrival' &&
-  probe.w === 36 && probe.h === 38 &&
+results.push(run('外来地图 洛赫港', 'map=flare_grass_empyrean_campaign_lochport&autotest=importmap', ({ probe }) =>
+  !!probe && probe.map === 'flare_grass_empyrean_campaign_lochport' &&
+  probe.w === 49 && probe.h === 60 &&
   probe.walk > 400 && probe.obj > 1000 &&
   probe.spawnOnWalkable === true && probe.atSpawn === true &&
   probe.targetFound === true && probe.clickAccepted === true &&
@@ -196,9 +200,9 @@ results.push(run('外来地图 远航之岸', 'map=flare_arrival&autotest=import
 // 9.6) 第二张外来图。两张**共用同一套图集**（导入器 --append 把瓦并进同一个目录）。
 //      追加导入最容易出的错是「后导入的瓦静默覆盖先导入的瓦」——图集照样加载、不报错，
 //      但前一张图整片错乱。所以这一条必须和上一条**同时**通过，才算图集没串。
-results.push(run('外来地图 殒落港湾', 'map=flare_harbor&autotest=importmap', ({ probe }) =>
-  !!probe && probe.map === 'flare_harbor' &&
-  probe.w === 39 && probe.h === 38 &&
+results.push(run('外来地图 河畔小径', 'map=flare_grass_empyrean_campaign_river_trail&autotest=importmap', ({ probe }) =>
+  !!probe && probe.map === 'flare_grass_empyrean_campaign_river_trail' &&
+  probe.w === 78 && probe.h === 35 &&
   probe.walk > 300 && probe.obj > 1000 &&
   probe.spawnOnWalkable === true && probe.atSpawn === true &&
   probe.targetFound === true && probe.clickAccepted === true &&
@@ -212,11 +216,22 @@ results.push(run('外来地图 殒落港湾', 'map=flare_harbor&autotest=importm
 //      这条锁死性质：可走格必须**全域连通**，isolated 必须为 0；
 //      并且真的从出生点走到最远那一格（跨桥）验证寻路成立。
 //      不写死坐标/格数，换图重导即可复用。
-[['flare_harbor', '外来地图 港湾跨桥连通', 20], ['flare_arrival', '外来地图 彼岸全域连通', 20]]
+// ⚠ isolated 的口径（2026-09-16 实测 12 张外来图后定的）：
+//   · 黑橡城 3044/3044 isolated=0 —— 拿它当**严格哨兵**，这条松了就是真回归（桥又被判死了）。
+//   · 其余图的原作美术本身就有零星断开格（洛赫港 5/1449=0.3%、纳齐亚高地 2 格…），
+//     要求全 0 等于每次重导都假红，所以第二张图允许 <2%。
+//   · 真正该盯的异常另记：法师塔·一层 2553/3149=81%、铁迷宫·裂隙 18.8%、莫格洞窟 8.1%、
+//     河畔小径 7.6%、洛赫港墓园 2.3% —— 这些是**原图分层/分间**，不是导入 bug，
+//     但玩家落地后能走的只剩一小块，属待办（见 .workbuddy/memory 同日记录）。
+[['flare_grass_empyrean_campaign_black_oak_city', '外来地图 黑橡城全连通', 24],
+ ['flare_grass_empyrean_campaign_lochport', '外来地图 洛赫港连通', 20]]
   .forEach(([m, label, budget]) => {
+    var strict = m.indexOf('black_oak_city') >= 0;
     results.push(run(label, 'map=' + m + '&autotest=crossing', ({ probe }) =>
       !!probe && probe.map === m &&
-      probe.walk > 300 && probe.reach === probe.walk && probe.isolated === 0 &&
+      probe.walk > 300 &&
+      (strict ? probe.reach === probe.walk && probe.isolated === 0
+              : probe.isolated / probe.walk < 0.02) &&
       probe.farDist > 10 && probe.clickAccepted === true && probe.arrived === true,
     { budget: budget * 1000 }));
   });
@@ -237,9 +252,9 @@ results.push(run('右上角 缩略图 四类格', 'map=qingxuan&autotest=minimap
   probe.clickAccepted === true && probe.clickMoved === true,
 { budget: 22000 }));
 
-results.push(run('右上角 缩略图 非正方图', 'map=flare_harbor&autotest=minimap', ({ probe }) =>
+results.push(run('右上角 缩略图 非正方图', 'map=flare_grass_empyrean_campaign_river_trail&autotest=minimap', ({ probe }) =>
   !!probe && probe.cv === true &&
-  Math.abs(probe.ratio) < 0.01 &&                    // 画布宽高比 == 地图宽高比（39:38）
+  Math.abs(probe.ratio) < 0.02 &&                    // 画布宽高比 ≈ 地图宽高比（78:35 极端扁图，168x75 取整后差 1.1%）
   probe.cellPx > 2 && probe.cellPx < 8 &&            // 长边 168px 上限下的每格像素
   probe.cells.walk > 300 && probe.solidPx > 2000 &&
   probe.markInCanvas === true &&
@@ -270,31 +285,67 @@ results.push(run('右上角 缩略图 手机默认收起', 'map=lingquan&touch=1
 // 9.66) 世界地图总览（分组节点浮层）：?autotest=worldmap 打开浮层、渲染节点、点节点传送、Tab 开关。
 //       这是把「地图速切按钮列表」重做成「Tab/图标开的总览」后的核心回归 —— 节点数必须 = 地图数，
 //       且点节点要真的把人传过去、浮层自动收起；Tab 键开/关桌面入口也得过。
+//       ⚠ v20 起改成「名称节点墙」，早已没有 canvas 缩略图，别再断言 thumbCanvases。
+//       ⚠ 节点数别写死：地图还在加，写死就等于每次加图都要来改测试（实测 16 张/5 个界）。
 results.push(run('世界地图总览 节点/传送/Tab', 'map=qingxuan&autotest=worldmap', ({ probe }) =>
   !!probe && probe.map === 'qingxuan' &&
-  probe.nodes === 6 && probe.regions >= 1 && probe.scrollExists === true &&
-  probe.opened === true && probe.shownNodes === 6 && probe.thumbCanvases > 0 && probe.thumbsDrawn > 0 &&
+  probe.nodes === probe.shownNodes && probe.nodes >= 10 && probe.regions >= 2 &&
+  probe.scrollExists === true &&
+  probe.opened === true &&
   probe.teleported === true && probe.closedAfterClick === true &&
   probe.tabOpens === true && probe.tabCloses === true,
 { budget: 22000 }));
 
-// 9.7) 首屏体积：2026-09-16 起策略变了 —— **外来图（远航之岸/殒落港湾）进首屏**，
-//      地宫仍按需。理由是这两张是常驻玩法区，老方案「进游戏 2.5s 后串行预取」会让
-//      点按钮的人正好撞在下载中段。这条同时把「首屏到底背了多少」钉住：谁再把别的
-//      大图集顺手挪进 LOAD_PLAN，这里立刻红（体感是"开屏越来越慢"，没人会去翻代码）。
-//      ⚠ weight 口径已改成**线上真实传输 KB**（JSON 走 gzip）：
-//      主图集 1091(webp 不可压) + 几个 JSON 17 + 外来图集 910 + 外来索引 2 + 两张地形 16 ≈ 2035KB。
-results.push(run('首屏含外来图 但不含地宫', 'map=qingxuan&autotest=bootstats&preload=0', ({ probe }) =>
-  !!probe && probe.map === 'qingxuan' &&
-  probe.total > 1900 && probe.total < 2200 &&
-  probe.extras && probe.extras.flare.loaded === true && probe.extras.dungeon.loaded === false,
-{ budget: 26000 }));
+// 9.7) ★ 开局那一屏：默认进**洛赫港**（maps.json 的 start），而它是外来图 —— 图集走懒注册。
+//      必须在 boot 期就把**这一套**图集注册+排进首屏池：否则 boot 末尾的 switchTo 会在一张
+//      「有地形、没图集」的图上渲染，piece() 一件都取不到 → 整屏黑掉、且零报错
+//      （2026-09-16 真踩过：默认图从自带图换成外来图，全线自测"通过"，实机一片黑）。
+//      extras 只该有 2 个键（地宫 + 开局这套）——顺带守住「boot 期不许把 100+ 套图集全注册」，
+//      那会让 preloadExtras 一口气全下、首屏直接爆。
+//      ⚠ weight 口径 = **线上真实传输 KB**（JSON 走 gzip）：主图集 1091 + 妖兽 680 + 人物 183
+//      + 技能 61 + 几个 JSON 17 + 开局图集 1069 + 它的索引 2 + 16 张地形 128 ≈ 2336KB。
+results.push(run('开局图 图集进首屏', 'autotest=bootstats&preload=0', ({ probe }) =>
+  !!probe && probe.map === 'flare_grass_empyrean_campaign_lochport' &&
+  probe.total > 2100 && probe.total < 2700 &&
+  probe.extras && probe.extras.flare_grass_empyrean_campaign &&
+  probe.extras.flare_grass_empyrean_campaign.loaded === true &&
+  probe.extras.flare_grass_empyrean_campaign.queued === true &&
+  probe.extras.dungeon.loaded === false &&
+  Object.keys(probe.extras).length === 2,
+{ budget: 34000 }));
+
+// 9.71) ★「开局这一屏真的画出来了吗」——只查 CUR.id / 无异常**拦不住**「有地形、没图集」
+//      这类静默故障（piece() 全取空、整屏黑、零报错，连 #probe 的异常出口都空着）。
+//      这条直接查瓦片件命中率与主画布真实像素：物件必须全部取到件，画面必须不黑、有颜色。
+results.push(run('开局渲染烟测', 'autotest=rendersmoke&preload=0', ({ probe }) =>
+  !!probe && probe.map === 'flare_grass_empyrean_campaign_lochport' &&
+  probe.atlasImg === true && probe.atlasHasTiles === true &&
+  probe.objHit > 1000 && probe.objMiss === 0 && probe.heroHasSheet === true &&
+  probe.px && probe.px.darkPct < 5 && probe.px.colors >= 12,
+{ budget: 34000 }));
+
+// 9.72) 技能盘排版（王者式弧线）：叠加/被顶出屏幕这类问题截图看不出来，量真实矩形。
+//      ⚠ 间距按「圆」算（圆心距 - 两半径），不能按外接矩形算 —— 圆排开时外接矩形天然咬角，
+//      用矩形会假报重叠（第一版就是这么误判的）。设计值 ≥10px，缩略后（手机 scale）≥6。
+results.push(run('技能盘 弧线不重叠', 'autotest=skillpad', ({ probe }) =>
+  !!probe && probe.boxes && probe.boxes.length === 6 &&
+  probe.minGap > 6 && probe.inView === true && probe.rightGap === 14 &&
+  probe.foldedAfter === true && probe.foldedBox && probe.foldedBox[0] === 38 &&
+  probe.unfoldedAfter === true,
+{ budget: 22000 }));
+results.push(run('技能盘 手机缩放', 'autotest=skillpad&touch=1', ({ probe }) =>
+  !!probe && probe.touch === true && probe.scale !== 'none' &&
+  probe.minGap > 4 && probe.inView === true,
+{ size: '870,546', budget: 22000 }));
 
 //      反过来：?map= 直接指到那张图时，它**必须**算进首屏 —— 否则进图那一刻才开始下载，
-//      玩家看到的是"进去了但一片空白"。地宫是最后一套按需图集，这条守着那条路径。
+//      玩家看到的是"进去了但一片空白"。地宫是最难的一种：它的地图条目**没有 atlas 字段**，
+//      图集名要靠物件前缀（'dungeon/'）反推（见 expandPlan 分支②的 mapAtlas(x)）。
+//      ⚠ 首屏体积别写死：随图集/地形增减而变。这里只锁「地宫那 549KB 确实进来了」。
 results.push(run('首屏含目标图图集', 'map=dungeon&autotest=bootstats&preload=0', ({ probe }) =>
   !!probe && probe.map === 'dungeon' &&
-  probe.total > 2400 && probe.total < 2800 && probe.extras.dungeon.loaded === true,
+  probe.total > 1700 && probe.total < 2100 &&
+  probe.extras.dungeon.queued === true && probe.extras.dungeon.loaded === true,
 { budget: 32000 }));
 
 // 9.8) 运行时按需补载：首屏只载自带图 + 外来图，然后模拟用户点地图按钮切过去 ——
@@ -309,8 +360,8 @@ results.push(run('按需切图 地宫', 'map=qingxuan&autotest=lazygoto&preload=
 // 9.85) 外来图「零等待切换」：用户要求「这两张图一起加载，不要点击再加载」的验收。
 //      before=true 说明点下去之前图集已就绪；地形也在首屏池里（m._data 已置位），
 //      所以 goTo 走的是同步分支 —— 一次网络请求都不发，载入提示也不该闪。
-results.push(run('外来图 零等待切换', 'map=qingxuan&autotest=lazygoto&preload=0&goto=flare_harbor', ({ probe }) =>
-  !!probe && probe.map === 'flare_harbor' && probe.before === true &&
+results.push(run('外来图 零等待切换', 'map=flare_grass_empyrean_campaign_lochport&autotest=lazygoto&preload=0&goto=flare_grass_empyrean_campaign_river_trail', ({ probe }) =>
+  !!probe && probe.map === 'flare_grass_empyrean_campaign_river_trail' && probe.before === true &&
   probe.obj > 1000 && probe.atlas === true &&
   probe.spawnOnWalkable === true && probe.atSpawn === true && probe.tipGone === true,
 { budget: 30000 }));

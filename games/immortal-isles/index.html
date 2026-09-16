@@ -129,64 +129,98 @@
   #actions{left:14px;bottom:14px;display:flex;flex-direction:column;align-items:flex-start;
     gap:8px;pointer-events:auto;z-index:11}
   /* ---------- 技能盘（王者荣耀式）----------
-   * 右下角：普攻大键 + 重击 + 三个技能沿弧线排布（越常用离普攻越近，大招最远）。
-   * 每键专属配色（普攻红铜 / 重击橙 / 剑青 / 雷紫 / 大招金），图标用内联 SVG 描边，
-   * 冷却用 conic-gradient 扇形遮罩 + 中央倒计时，不额外发请求、不占图集。 */
-  #skillpad{position:fixed;right:16px;bottom:16px;width:252px;height:240px;z-index:46;
-    opacity:.85;transition:opacity .22s ease;pointer-events:none}
+   * 右下角一个普攻大键坐角，其余 5 键沿一条**向外扩张的弧线**向左上排开 ——
+   * 越顺手的越靠近普攻（重击K → 炎爆P → 御剑U → 雷罡I），大招 O 最远、最大、带常亮金环。
+   * ⚠ 每个键的 left/top 不是凭感觉调的：是脚本在「任意两键外沿至少留 7px、整盘尽量矮」
+   *   的约束下解出来的最紧凑一组。要改按钮尺寸/增减技能，重跑那个求解（见 game.js
+   *   里 rendersmoke 附近注释），别手改数字，改了必重叠。
+   * 每键长相 = 深色宝石底 + 双层金属边（外深描边 + 内彩色环）+ 顶部高光 + 底部内阴影；
+   * 冷却走 conic-gradient 扇形遮罩 + 中央倒计时，不额外发请求、不占图集。 */
+  #skillpad{position:fixed;right:14px;bottom:14px;width:231px;height:271px;z-index:46;
+    opacity:.86;transition:opacity .22s ease;pointer-events:none;
+    transform-origin:100% 100%}
   #skillpad:hover,#skillpad.on{opacity:1}
   #skillpad .sk{position:absolute;border-radius:50%;padding:0;cursor:pointer;
-    font-family:inherit;pointer-events:auto;overflow:hidden;
+    font-family:inherit;pointer-events:auto;
     display:flex;align-items:center;justify-content:center;
-    border:2px solid var(--rim);color:var(--ic);
-    background:radial-gradient(circle at 35% 25%,var(--hi),var(--mid) 56%,var(--lo) 100%);
-    box-shadow:0 4px 14px rgba(0,0,0,.55),0 0 10px var(--glow),
-      inset 0 1px 0 rgba(255,255,255,.35),inset 0 -7px 14px rgba(0,0,0,.45);
-    transition:transform .08s ease,box-shadow .15s ease,filter .15s ease}
-  /* 图标：白色描边 SVG，带主色微光，浅色描边在深底上远看也清晰 */
+    border:4px solid var(--rim);
+    background:
+      radial-gradient(circle at 36% 23%,rgba(255,255,255,.32),rgba(255,255,255,0) 46%),
+      radial-gradient(circle at 50% 64%,var(--mid) 0%,var(--lo) 76%,#04070d 100%);
+    /* ⚠ 外圈只留 2px 深色分隔线：更宽的金环会把每个键的视觉外沿撑大，
+       相邻两键（实测圆面间距 9px）就会糊成一片。金环改成 border 本身（4px 实色），
+       再加下面 ::before 的内圈细线 —— 双层边的手感在圆面内部完成，不侵占间距。 */
+    box-shadow:
+      0 0 0 2px rgba(5,9,17,.92),
+      0 6px 16px rgba(0,0,0,.62),
+      0 0 16px var(--glow),
+      inset 0 2px 5px rgba(255,255,255,.3),
+      inset 0 -11px 20px rgba(0,0,0,.55);
+    transition:transform .09s ease,box-shadow .16s ease,filter .16s ease}
+  /* 宝石内圈细线：圆面看着有"厚度"，不是一张贴纸 */
+  #skillpad .sk::before{content:'';position:absolute;inset:2px;border-radius:50%;
+    border:1px solid var(--ring2,rgba(255,255,255,.22));pointer-events:none;
+    box-shadow:inset 0 0 7px rgba(255,255,255,.12)}
+  #skillpad .sk:hover{transform:scale(1.05);filter:brightness(1.12)}
   #skillpad .sk .ic{display:flex;align-items:center;justify-content:center;
-    filter:drop-shadow(0 1px 2px rgba(0,0,0,.7)) drop-shadow(0 0 5px var(--glow))}
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.75)) drop-shadow(0 0 6px var(--glow))}
   #skillpad .sk .ic svg{display:block}
   #skillpad .sk:active{transform:scale(.9);
-    box-shadow:0 0 0 3px var(--glow),0 2px 8px rgba(0,0,0,.55)}
-  /* —— 五键配色：一眼分清哪个键是什么 —— */
-  #skillpad .sk.c-atk{--rim:rgba(255,178,122,.95);--hi:rgba(255,126,92,.97);--mid:#7c2d24;
-    --lo:#38120e;--glow:rgba(255,112,80,.5);--ic:#ffddd0}
-  #skillpad .sk.c-heavy{--rim:rgba(255,195,107,.95);--hi:rgba(255,160,62,.97);--mid:#8a4d12;
-    --lo:#3c1f09;--glow:rgba(255,152,52,.48);--ic:#ffe8c2}
-  #skillpad .sk.c-jian{--rim:rgba(127,220,255,.95);--hi:rgba(66,172,232,.97);--mid:#14486e;
-    --lo:#082438;--glow:rgba(84,192,255,.52);--ic:#dcf5ff}
-  #skillpad .sk.c-lei{--rim:rgba(203,170,255,.95);--hi:rgba(152,107,242,.97);--mid:#4c2d8a;
-    --lo:#20103d;--glow:rgba(168,112,255,.58);--ic:#eee0ff}
-  #skillpad .sk.c-huo{--rim:rgba(255,154,61,.95);--hi:rgba(255,116,40,.97);--mid:#7a3410;
-    --lo:#331207;--glow:rgba(255,130,60,.52);--ic:#ffe3c8}
-  /* 大招：双层金边 + 常亮金晕，一眼看出是压轴技能 */
-  #skillpad .sk.c-ult{--rim:rgba(255,224,138,.98);--hi:rgba(255,202,82,.98);--mid:#8a5c14;
-    --lo:#3a2407;--glow:rgba(255,205,90,.8);--ic:#fff4d0;
-    box-shadow:0 0 16px rgba(255,205,90,.6),0 0 30px rgba(255,180,60,.25),
-      0 4px 14px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.38),inset 0 -7px 14px rgba(0,0,0,.45)}
-  /* 冷却遮罩：--p 是剩余百分比，从上一条顺时针扫过 */
+    box-shadow:0 0 0 2px rgba(5,9,17,.92),
+      0 2px 8px rgba(0,0,0,.6),0 0 22px var(--glow),
+      inset 0 2px 5px rgba(255,255,255,.36)}
+  /* —— 六键配色：一眼分清哪个键是什么 —— */
+  #skillpad .sk.c-atk{--rim:rgba(255,186,132,.95);--ring2:rgba(255,150,96,.5);
+    --hi:rgba(255,126,92,.97);--mid:#7c2d24;--lo:#38120e;
+    --glow:rgba(255,112,80,.5);--ic:#ffddd0}
+  #skillpad .sk.c-heavy{--rim:rgba(255,195,107,.95);--ring2:rgba(255,180,90,.5);
+    --hi:rgba(255,160,62,.97);--mid:#8a4d12;--lo:#3c1f09;
+    --glow:rgba(255,152,52,.48);--ic:#ffe8c2}
+  #skillpad .sk.c-jian{--rim:rgba(127,220,255,.95);--ring2:rgba(110,205,255,.5);
+    --hi:rgba(66,172,232,.97);--mid:#14486e;--lo:#082438;
+    --glow:rgba(84,192,255,.52);--ic:#dcf5ff}
+  #skillpad .sk.c-lei{--rim:rgba(203,170,255,.95);--ring2:rgba(180,140,255,.52);
+    --hi:rgba(152,107,242,.97);--mid:#4c2d8a;--lo:#20103d;
+    --glow:rgba(168,112,255,.58);--ic:#eee0ff}
+  #skillpad .sk.c-huo{--rim:rgba(255,154,61,.95);--ring2:rgba(255,140,60,.52);
+    --hi:rgba(255,116,40,.97);--mid:#7a3410;--lo:#331207;
+    --glow:rgba(255,130,60,.52);--ic:#ffe3c8}
+  /* 大招：金环更亮 + 额外一圈呼吸光环（只动 opacity/transform，走合成器，不动 box-shadow） */
+  #skillpad .sk.c-ult{--rim:rgba(255,228,150,.98);--ring2:rgba(255,206,88,.8);
+    --hi:rgba(255,202,82,.98);--mid:#8a5c14;--lo:#3a2407;
+    --glow:rgba(255,205,90,.72);--ic:#fff4d0}
+  #skillpad .sk.c-ult::after{content:'';position:absolute;inset:-4px;border-radius:50%;
+    border:2px solid rgba(255,214,110,.8);pointer-events:none;
+    animation:ultHalo 2.6s ease-in-out infinite}
+  @keyframes ultHalo{0%,100%{opacity:.3;transform:scale(.97)}50%{opacity:.9;transform:scale(1.04)}}
+  /* 冷却遮罩：--p 是剩余百分比，从顶部顺时针扫过（只在宝石内圈，金边不被盖掉） */
   #skillpad .sk .cd{position:absolute;inset:0;border-radius:50%;pointer-events:none;
-    background:conic-gradient(rgba(4,8,18,.72) calc(var(--p,0) * 1%),rgba(0,0,0,0) 0)}
+    background:conic-gradient(rgba(4,8,18,.74) calc(var(--p,0) * 1%),rgba(0,0,0,0) 0)}
   #skillpad .sk .num{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     font-size:19px;font-weight:800;color:#fff;pointer-events:none;
     text-shadow:0 2px 6px rgba(0,0,0,.9)}
-  #skillpad .sk.c-atk .num{font-size:24px}
+  #skillpad .sk.c-atk .num{font-size:26px}
   #skillpad .sk.cooling .num{display:flex}
-  #skillpad .sk.cooling{filter:grayscale(.5) brightness(.82)}
-  #skillpad .sk kbd{position:absolute;right:4px;bottom:2px;font-size:10px;font-weight:800;
-    font-family:inherit;color:#fff;pointer-events:none;
-    text-shadow:0 1px 2px rgba(0,0,0,.9)}
-  /* 折叠把手：点一下把整个技能盘收成这一个小圆，横屏空间紧张时用 */
-  #skillToggle{position:absolute;right:0;top:0;width:36px;height:36px;border-radius:50%;
+  #skillpad .sk.cooling{filter:grayscale(.55) brightness(.8)}
+  /* 按键提示：金色小徽章压在右下角（桌面必看；手机端也能靠它认位置） */
+  #skillpad .sk kbd{position:absolute;right:-2px;bottom:-2px;min-width:17px;height:17px;
+    padding:0 4px;border-radius:9px;font-size:10px;font-weight:800;font-family:inherit;
+    display:flex;align-items:center;justify-content:center;
+    color:#12192a;background:linear-gradient(180deg,#fff7de,#e3c169);
+    border:1px solid rgba(96,72,20,.75);pointer-events:none;
+    box-shadow:0 1px 4px rgba(0,0,0,.6)}
+  /* 折叠把手：点一下把整盘收成这一个小圆；放左上角空档，不压任何技能键 */
+  #skillToggle{position:absolute;left:0;top:0;width:36px;height:36px;border-radius:50%;
     pointer-events:auto;cursor:pointer;padding:0;font-family:inherit;font-size:15px;
     color:#ffe9b8;background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
     border:2px solid rgba(226,192,110,.75);
-    box-shadow:0 3px 10px rgba(0,0,0,.45)}
+    box-shadow:0 3px 10px rgba(0,0,0,.45);z-index:2}
+  #skillToggle:hover{border-color:#ffd24a}
   #skillpad.folded{width:38px;height:38px}
   #skillpad.folded .sk{display:none}
-  body.touch #skillpad{opacity:.92}     /* 触屏没有 hover，直接常亮，按键必须看得清 */
+  body.touch #skillpad{opacity:.95;transform:scale(.78)}  /* 触屏没有 hover 常亮；同时缩到屏宽友好 */
   body.touch #skillpad.on{opacity:1}
+  body.touch #skillpad.folded{transform:none}             /* 折叠态本就是 38px 小圆，别再缩 */
   /* 动作试演：1~6 六个按钮，没有键盘（手机）也能逐个看动作 */
   #actbar{pointer-events:auto;background:rgba(12,20,34,.84);border:1px solid rgba(120,146,190,.42);
     border-radius:12px;padding:8px 10px;display:flex;align-items:center;gap:9px;
@@ -405,32 +439,33 @@
   </div>
 </div>
 
-<!-- 技能盘（王者荣耀式）：右下角普攻大键 + 弧形排列重击与三个技能，每键专属配色、可折叠 -->
+<!-- 技能盘（王者荣耀式）：右下角普攻大键坐角，其余 5 键沿外扩弧线向左上排开（近→远：重击/炎爆/御剑/雷罡/大招），
+     大招最大最远带呼吸金环；每键专属配色、可折叠。坐标由脚本按「任意两键至少留 7px」解出，别手改数字。 -->
 <div id="skillpad" class="hud">
   <button id="skillToggle" title="展开 / 收起技能盘">⚔</button>
-  <button class="sk c-jian" data-s="0" style="left:60px;top:98px;width:56px;height:56px"
+  <button class="sk c-jian" data-s="0" style="left:33px;top:77px;width:58px;height:58px"
           title="御剑诀（U）：朝面朝方向斩出直线剑气，穿透多个目标">
-    <span class="ic"><svg width="28" height="28" viewBox="0 0 24 24"><defs><linearGradient id="gJian" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bff0ff"/><stop offset="1" stop-color="#2aa8e0"/></linearGradient><radialGradient id="gJianH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#6fd8ff" stop-opacity="0.5"/><stop offset="1" stop-color="#6fd8ff" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gJianH)"/><g transform="rotate(40 12 12)"><path d="M12 3 L14 11 L12 21 L10 11 Z" fill="url(#gJian)" stroke="#0c5a80" stroke-width="0.8"/><rect x="11.2" y="9" width="1.6" height="7" fill="#0c5a80"/><path d="M12 3 L12 21" stroke="#eafaff" stroke-width="0.8" opacity="0.9"/></g><circle cx="12" cy="20" r="1.4" fill="none" stroke="#6fd8ff" stroke-width="1"/></svg></span><i class="cd"></i><b class="num"></b><kbd>U</kbd>
+    <span class="ic"><svg width="29" height="29" viewBox="0 0 24 24"><defs><linearGradient id="gJian" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bff0ff"/><stop offset="1" stop-color="#2aa8e0"/></linearGradient><radialGradient id="gJianH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#6fd8ff" stop-opacity="0.5"/><stop offset="1" stop-color="#6fd8ff" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gJianH)"/><g transform="rotate(40 12 12)"><path d="M12 3 L14 11 L12 21 L10 11 Z" fill="url(#gJian)" stroke="#0c5a80" stroke-width="0.8"/><rect x="11.2" y="9" width="1.6" height="7" fill="#0c5a80"/><path d="M12 3 L12 21" stroke="#eafaff" stroke-width="0.8" opacity="0.9"/></g><circle cx="12" cy="20" r="1.4" fill="none" stroke="#6fd8ff" stroke-width="1"/></svg></span><i class="cd"></i><b class="num"></b><kbd>U</kbd>
   </button>
-  <button class="sk c-lei" data-s="1" style="left:116px;top:46px;width:56px;height:56px"
+  <button class="sk c-lei" data-s="1" style="left:86px;top:31px;width:58px;height:58px"
           title="雷罡咒（I）：以自身为中心雷爆，击退周围妖兽">
-    <span class="ic"><svg width="28" height="28" viewBox="0 0 24 24"><defs><linearGradient id="gLei" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset="0.5" stop-color="#ffd23a"/><stop offset="1" stop-color="#e8920c"/></linearGradient><radialGradient id="gLeiH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffcf3a" stop-opacity="0.55"/><stop offset="1" stop-color="#ffcf3a" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gLeiH)"/><polygon points="13 2 4 14 12 14 10 22 20 9 12 9 13 2" fill="url(#gLei)" stroke="#9c6b00" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13 2 4 14 12 14 10 22 20 9 12 9 13 2" fill="none" stroke="#fffbe6" stroke-width="0.6" opacity="0.8"/></svg></span><i class="cd"></i><b class="num"></b><kbd>I</kbd>
+    <span class="ic"><svg width="29" height="29" viewBox="0 0 24 24"><defs><linearGradient id="gLei" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset="0.5" stop-color="#ffd23a"/><stop offset="1" stop-color="#e8920c"/></linearGradient><radialGradient id="gLeiH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffcf3a" stop-opacity="0.55"/><stop offset="1" stop-color="#ffcf3a" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gLeiH)"/><polygon points="13 2 4 14 12 14 10 22 20 9 12 9 13 2" fill="url(#gLei)" stroke="#9c6b00" stroke-width="0.8" stroke-linejoin="round"/><polygon points="13 2 4 14 12 14 10 22 20 9 12 9 13 2" fill="none" stroke="#fffbe6" stroke-width="0.6" opacity="0.8"/></svg></span><i class="cd"></i><b class="num"></b><kbd>I</kbd>
   </button>
-  <button class="sk c-ult" data-s="2" style="left:184px;top:28px;width:58px;height:58px"
+  <button class="sk c-ult" data-s="2" style="left:152px;top:6px;width:68px;height:68px"
           title="太虚剑域（O）：锁定最近目标落下剑雨，范围重创">
-    <span class="ic"><svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="gUlt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd6f0"/><stop offset="1" stop-color="#e23aa0"/></linearGradient><radialGradient id="gUltH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff8ad0" stop-opacity="0.5"/><stop offset="1" stop-color="#ff8ad0" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gUltH)"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="#ff8ad0" stroke-width="1" stroke-dasharray="2 2"/><g fill="url(#gUlt)" stroke="#a01e6e" stroke-width="0.6"><g transform="rotate(0 12 12)"><path d="M12 4 L13.2 11 L12 12 L10.8 11 Z"/></g><g transform="rotate(120 12 12)"><path d="M12 4 L13.2 11 L12 12 L10.8 11 Z"/></g><g transform="rotate(240 12 12)"><path d="M12 4 L13.2 11 L12 12 L10.8 11 Z"/></g></g><circle cx="12" cy="12" r="2" fill="#fff0fa" stroke="#e23aa0" stroke-width="0.6"/></svg></span><i class="cd"></i><b class="num"></b><kbd>O</kbd>
+    <span class="ic"><svg width="34" height="34" viewBox="0 0 24 24"><defs><linearGradient id="gUlt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd6f0"/><stop offset="1" stop-color="#e23aa0"/></linearGradient><radialGradient id="gUltH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff8ad0" stop-opacity="0.5"/><stop offset="1" stop-color="#ff8ad0" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gUltH)"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="#ff8ad0" stroke-width="1" stroke-dasharray="2 2"/><g fill="url(#gUlt)" stroke="#a01e6e" stroke-width="0.6"><g transform="rotate(0 12 12)"><path d="M12 4 L13.2 11 L12 12 L10.8 11 Z"/></g><g transform="rotate(120 12 12)"><path d="M12 4 L13.2 11 L12 12 L10.8 11 Z"/></g><g transform="rotate(240 12 12)"><path d="M12 4 L13.2 11 L12 12 L10.8 11 Z"/></g></g><circle cx="12" cy="12" r="2" fill="#fff0fa" stroke="#e23aa0" stroke-width="0.6"/></svg></span><i class="cd"></i><b class="num"></b><kbd>O</kbd>
   </button>
-  <button class="sk c-huo" data-s="3" style="left:10px;top:116px;width:56px;height:56px"
+  <button class="sk c-huo" data-s="3" style="left:7px;top:141px;width:52px;height:52px"
           title="炎爆术（P）：掷出火球，命中爆炸并波及周围妖兽">
-    <span class="ic"><svg width="28" height="28" viewBox="0 0 24 24"><defs><radialGradient id="gHuo" cx="0.5" cy="0.6" r="0.5"><stop offset="0" stop-color="#fff4d6"/><stop offset="0.4" stop-color="#ffd36b"/><stop offset="0.75" stop-color="#ff9a3d"/><stop offset="1" stop-color="#ff5a2c"/></radialGradient><radialGradient id="gHuoH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff9a3d" stop-opacity="0.5"/><stop offset="1" stop-color="#ff9a3d" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gHuoH)"/><path d="M12 4 C14 8 17 9 15.5 13 C18 12 18 16 15 18 C16 20 13 21 12 20 C10 21 7 20 9 18 C6 16 6 12 9.5 13 C8 9 10 8 12 4 Z" fill="url(#gHuo)" stroke="#b8400c" stroke-width="0.7"/><circle cx="11" cy="13" r="3" fill="#fff4d6" opacity="0.85"/></svg></span><i class="cd"></i><b class="num"></b><kbd>P</kbd>
+    <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24"><defs><radialGradient id="gHuo" cx="0.5" cy="0.6" r="0.5"><stop offset="0" stop-color="#fff4d6"/><stop offset="0.4" stop-color="#ffd36b"/><stop offset="0.75" stop-color="#ff9a3d"/><stop offset="1" stop-color="#ff5a2c"/></radialGradient><radialGradient id="gHuoH" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff9a3d" stop-opacity="0.5"/><stop offset="1" stop-color="#ff9a3d" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#gHuoH)"/><path d="M12 4 C14 8 17 9 15.5 13 C18 12 18 16 15 18 C16 20 13 21 12 20 C10 21 7 20 9 18 C6 16 6 12 9.5 13 C8 9 10 8 12 4 Z" fill="url(#gHuo)" stroke="#b8400c" stroke-width="0.7"/><circle cx="11" cy="13" r="3" fill="#fff4d6" opacity="0.85"/></svg></span><i class="cd"></i><b class="num"></b><kbd>P</kbd>
   </button>
-  <button class="sk c-heavy" id="skAtkB" style="left:94px;top:156px;width:56px;height:56px"
+  <button class="sk c-heavy" id="skAtkB" style="left:6px;top:204px;width:52px;height:52px"
           title="重击 B（K）：伤害翻倍、范围更大并击退妖兽">
-    <span class="ic"><svg width="27" height="27" viewBox="0 0 24 24"><defs><linearGradient id="gHv" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf2ff"/><stop offset="1" stop-color="#7f93b5"/></linearGradient></defs><g stroke="#2b3b5c" stroke-width="0.7"><g transform="rotate(45 12 12)"><path d="M12 3 L13 11 L12 20 L11 11 Z" fill="url(#gHv)"/><rect x="11.3" y="10" width="1.4" height="8" fill="#2b3b5c"/></g><g transform="rotate(-45 12 12)"><path d="M12 3 L13 11 L12 20 L11 11 Z" fill="url(#gHv)"/><rect x="11.3" y="10" width="1.4" height="8" fill="#2b3b5c"/></g></g></svg></span><i class="cd"></i><b class="num"></b><kbd>K</kbd>
+    <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24"><defs><linearGradient id="gHv" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf2ff"/><stop offset="1" stop-color="#7f93b5"/></linearGradient></defs><g stroke="#2b3b5c" stroke-width="0.7"><g transform="rotate(45 12 12)"><path d="M12 3 L13 11 L12 20 L11 11 Z" fill="url(#gHv)"/><rect x="11.3" y="10" width="1.4" height="8" fill="#2b3b5c"/></g><g transform="rotate(-45 12 12)"><path d="M12 3 L13 11 L12 20 L11 11 Z" fill="url(#gHv)"/><rect x="11.3" y="10" width="1.4" height="8" fill="#2b3b5c"/></g></g></svg></span><i class="cd"></i><b class="num"></b><kbd>K</kbd>
   </button>
-  <button class="sk c-atk" id="skAtk" style="left:158px;top:146px;width:84px;height:84px"
+  <button class="sk c-atk" id="skAtk" style="left:135px;top:175px;width:90px;height:90px"
           title="攻击 A（J / 空格）：普攻，只打面朝方向 ±60° 内的目标">
-    <span class="ic"><svg width="44" height="44" viewBox="0 0 24 24"><defs><linearGradient id="gAtk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf2ff"/><stop offset="1" stop-color="#7f93b5"/></linearGradient></defs><g transform="rotate(35 12 12)" stroke="#2b3b5c" stroke-width="0.7"><path d="M12 2 L13.2 11 L12 21 L10.8 11 Z" fill="url(#gAtk)"/><rect x="11.3" y="10" width="1.4" height="9" fill="#2b3b5c"/></g></svg></span><kbd>J</kbd>
+    <span class="ic"><svg width="46" height="46" viewBox="0 0 24 24"><defs><linearGradient id="gAtk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf2ff"/><stop offset="1" stop-color="#7f93b5"/></linearGradient></defs><g transform="rotate(35 12 12)" stroke="#2b3b5c" stroke-width="0.7"><path d="M12 2 L13.2 11 L12 21 L10.8 11 Z" fill="url(#gAtk)"/><rect x="11.3" y="10" width="1.4" height="9" fill="#2b3b5c"/></g></svg></span><kbd>J</kbd>
   </button>
 </div>
 
@@ -458,6 +493,6 @@
   </div>
 </div>
 
-<script src="js/game.js?v=27"></script>
+<script src="js/game.js?v=29"></script>
 </body>
 </html>

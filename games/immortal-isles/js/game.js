@@ -168,7 +168,7 @@
     comboT: 0,        // 连击剩余窗口（秒），归零即断连
     comboFoe: null,   // 连击锁定的对象；换目标就断连
     critT: 0,         // 刚打出暴击的余晖计时，用于连击数放大特效
-    skillCd: [0, 0, 0] };  // 三个技能各自的剩余冷却（秒），顺序同 SKILLS
+    skillCd: [0, 0, 0, 0] };  // 各技能剩余冷却（秒），顺序同 SKILLS（加技能记得补一位）
   var screenFlash = 0;   // 受重击/被击退时的全屏红闪（避免玩家莫名其妙"换了个地方"）
 
   // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
@@ -736,6 +736,14 @@
     function expandPlan(data) {
       var q0 = new URLSearchParams(location.search);
       var want = q0.get('map');
+      // ★ 开局就要显示的那张图：?map= 点名优先，其次 maps.json 的 start。
+      //   它的图集必须在首屏池里 —— 否则 boot 末尾那次 switchTo 会在一张
+      //   「有地形、没图集」的地图上渲染：piece() 一件都取不到，地面与物件一个都不画，
+      //   表现为**整屏黑掉**，而且不报任何错（最容易误判成"加载失败"）。
+      //   所以这里把它的图集单独注册+排队，只注册开局这一套。
+      var byId = {};
+      (data.maps || []).forEach(function (x) { byId[x.id] = x; });
+      var bootId = (want && byId[want]) ? want : ((data.start && data.start.map) || '');
       (data.maps || []).forEach(function (x) {
         // ① 常驻图集：这张图用到的图集在 EAGER_ATLAS 里，就并进首屏池 ——
         //   不再等 ?map= 指名、也不再等 2.5s 预取，用户点按钮就是同步切换。
@@ -749,13 +757,19 @@
             if (POOL.indexOf(it) < 0) { POOL.push(it); W_TOTAL += it.weight; }
           });
         }
-        // ② 用户直接点名的那张图：保险起见它的图集也进首屏（仅对已在 EXTRA 的常驻图集生效；
-        //    外来图集走 goTo 的懒加载，不在这里预挂，理由同 ①）
-        if (x.id === want) {
-          var an2 = (x.atlas && EXTRA[x.atlas]) ? x.atlas : '';
-          if (an2 && !EXTRA[an2].queued) {
-            EXTRA[an2].queued = true;
-            EXTRA[an2].items.forEach(function (it) {
+        // ② 开局那张图（?map= 点名 / maps.json 的 start）：图集无条件进首屏。
+        //    ⚠ 必须用 mapAtlas(x) 取图集名，不能只看 x.atlas ——
+        //      · 外来图有 atlas 字段（flare_<theme>_<parent>），mapAtlas 负责懒注册；
+        //      · 自带图（地宫）**没有** atlas 字段，靠物件前缀反推（'dungeon/' → 'dungeon'）。
+        //      只判 x.atlas 会让「?map=dungeon」漏排地宫图集：进图那一刻才开始下载，
+        //      玩家看到「进去了但一片空白」。mapAtlas 只对**开局这一张**调 ——
+        //      千万别在 boot 期遍历全部外来图（那会把 100+ 套图集全挂进 EXTRA，
+        //      随后 preloadExtras 一口气全下，首屏直接爆）。其余外来图仍保持懒加载。
+        if (x.id === bootId) {
+          var ban = mapAtlas(x);
+          if (ban && EXTRA[ban] && !EXTRA[ban].queued) {
+            EXTRA[ban].queued = true;
+            EXTRA[ban].items.forEach(function (it) {
               if (POOL.indexOf(it) < 0) { POOL.push(it); W_TOTAL += it.weight; }
             });
           }
@@ -819,15 +833,21 @@
         var fj = LOAD_PLAN[6].value || {};
         ATLAS.foes.rect = fj.rect || fj;
         ATLAS.foes.anim = fj.anims || {};
-        // 按需图集：地宫 dungeon 在 ?map= 指到时进池。到这里的 item 都已加载完，
-        // fillAtlas 顺手把 loaded 标上，后台预取就不会再拉一遍。
-        fillAtlas('dungeon');
+        // 首屏池里排过的按需图集（地宫 / 开局这张外来图的图集）此刻都已下载完 ——
+        // 逐个把图与索引填进 ATLAS（fillAtlas 内部会把 loaded 置位），后台预取也不会再拉一遍。
+        // ⚠ 以前只写死 fillAtlas('dungeon')：开局图一旦换成外来图，它的图集虽然排进了池子，
+        //   却没人把值填进 ATLAS，piece() 依旧取不到件 → 开局整屏黑掉。这里按 queued 兜全。
+        Object.keys(EXTRA).forEach(function (nm) { if (EXTRA[nm].queued) fillAtlas(nm); });
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
         var hj = LOAD_PLAN[7].value;
         if (hj && hj.heroes && hj.heroes.length) HERO_OPTIONS = hj.heroes;
         // 怪物图录由 test/tools/build_beasts_atlas.py 生成：属性 + 刷怪格 + 动作帧率
-        var bj = LOAD_PLAN[8].value;
+        // ⚠ 按 url 取，**不能写死 LOAD_PLAN[8]**：首屏数组被硬编码下标引用，往中间插
+        //   一项（如 fx 特效）就会把 beasts.json 挤走 —— 取到的是别的东西，
+        //   bj.monsters 恒 undefined，absorbBeasts 静默不执行、FOE_DEFS 里没有那 9 只怪，
+        //   切到地宫/灵泉时 makeFoes 读 undefined.aggro 当场抛异常、画面卡死（2026-09-16 真踩过）。
+        var bj = (LOAD_PLAN.filter(function (p) { return /beasts\.json/.test(p.url); })[0] || {}).value;
         if (bj && bj.monsters && bj.monsters.length) absorbBeasts(bj.monsters);
 
         // 独立 PNG 素材入 IMG 缓存，供 piece() 回退使用
@@ -885,9 +905,6 @@
         // 用户点地图按钮时通常已经就绪（见 preloadExtras 注释）。
         // ?preload=0 关掉按需图集的后台预取（省流量/弱网，也让 lazygoto 自测能测到真·按需）
         if (q.get('preload') !== '0') preloadExtras();
-        // 手机端 UI 自测要等遮罩隐藏之后再跑，否则 elementFromPoint 只会命中遮罩
-        // （详见 initMobile 末尾 __mobileAudit 的注释）
-        if (window.__mobileAudit) window.__mobileAudit();
         var dbg = document.createElement('div');
         dbg.id = 'dbg'; dbg.style.display = 'none';
         document.body.appendChild(dbg);
@@ -916,6 +933,12 @@
             probeErr({ reject: String((r && r.message) || r), stack: String((r && r.stack) || '').slice(0, 400) });
           });
         }
+        // 手机端 UI 自测：要等遮罩隐藏之后再跑，否则 elementFromPoint 只会命中遮罩
+        // （详见 initMobile 末尾 __mobileAudit 的注释）。
+        // ★ 必须排在上面那对异常监听器**之后** —— 它随 UI 改动随时可能抛错，
+        //   早一步调用就会在「没人监听」的空窗里把 boot 的 then 链整条打断，
+        //   连 #dbg 都建不出来，现场不留任何痕迹（2026-09-16 就因此瞎猜了一轮）。
+        if (window.__mobileAudit) window.__mobileAudit();
         HOLD = q.get('hold') === '1';
         // ?pose=run —— 把主角锁在某个动作上（核对素材/截图用），取值见 ACT_CN
         var pq = q.get('pose');
@@ -989,6 +1012,112 @@
             pb.textContent = JSON.stringify(r);
           }, 60);
         }
+        if (at === 'skillpad') {
+          // ?autotest=skillpad —— 技能盘排版验收（王者式弧线）。
+          // 排版的坑是"看着还行、实际叠在一起/被顶出屏幕"，纯截图看不出来 —— 这里量真实矩形：
+          //   boxes   = 6 个键的 [left,top,w,h]（含 transform 缩放后的实际值）
+          //   minGap  = 任意两键外沿最小间距（必须 > 0；设计要求 ≥ 7，缩放后会等比变小）
+          //   inView  = 整盘是否全在视口内；folded 折叠开关能不能来回切
+          setTimeout(function () {
+            var pad = document.getElementById('skillpad');
+            var r = { vp: [window.innerWidth, window.innerHeight] };
+            if (!pad) { r.err = 'no #skillpad'; }
+            var els = pad ? pad.querySelectorAll('.sk') : [];
+            var boxes = [], i, j;
+            for (i = 0; i < els.length; i++) {
+              var b = els[i].getBoundingClientRect();
+              boxes.push({ n: els[i].id || ('s' + (els[i].dataset ? els[i].dataset.s : i)),
+                x: +b.left.toFixed(1), y: +b.top.toFixed(1),
+                w: +b.width.toFixed(1), h: +b.height.toFixed(1) });
+            }
+            r.boxes = boxes;
+            // ⚠ 间距必须按「圆」量，不能按外接矩形量：圆面排开时外接矩形天然互相咬角，
+            //   用矩形会有假重叠（第一版就是这么误报的）。这里用圆心距 - 两半径。
+            var min = 1e9, who = '';
+            for (i = 0; i < boxes.length; i++) {
+              for (j = i + 1; j < boxes.length; j++) {
+                var a = boxes[i], c = boxes[j];
+                var cx1 = a.x + a.w / 2, cy1 = a.y + a.h / 2;
+                var cx2 = c.x + c.w / 2, cy2 = c.y + c.h / 2;
+                var gap = Math.hypot(cx2 - cx1, cy2 - cy1) - (Math.min(a.w, a.h) + Math.min(c.w, c.h)) / 2;
+                if (gap < min) { min = gap; who = a.n + '/' + c.n; }
+              }
+            }
+            r.minGap = +min.toFixed(1); r.minGapPair = who;
+            var pb2 = pad ? pad.getBoundingClientRect() : null;
+            r.padBox = pb2 ? [Math.round(pb2.left), Math.round(pb2.top), Math.round(pb2.width), Math.round(pb2.height)] : null;
+            r.inView = !!pb2 && pb2.left >= -0.5 && pb2.top >= -0.5 &&
+              pb2.right <= window.innerWidth + 0.5 && pb2.bottom <= window.innerHeight + 0.5;
+            r.rightGap = pb2 ? Math.round(window.innerWidth - pb2.right) : null;
+            if (pad) {
+              var tg = document.getElementById('skillToggle');
+              r.tgTopLeft = tg ? [Math.round(tg.getBoundingClientRect().left), Math.round(tg.getBoundingClientRect().top)] : null;
+              // 折叠开关：切一次再切回来
+              if (tg) {
+                tg.click(); r.foldedAfter = pad.classList.contains('folded');
+                var fb = pad.getBoundingClientRect();
+                r.foldedBox = [Math.round(fb.width), Math.round(fb.height)];
+                tg.click(); r.unfoldedAfter = !pad.classList.contains('folded');
+              }
+              r.touch = document.body.classList.contains('touch');
+              r.scale = getComputedStyle(pad).transform;
+            }
+            var pbs = document.getElementById('probe');
+            if (!pbs) {
+              pbs = document.createElement('div'); pbs.id = 'probe';
+              pbs.style.display = 'none'; document.body.appendChild(pbs);
+            }
+            pbs.textContent = JSON.stringify(r);
+          }, 60);
+        }
+        if (at === 'rendersmoke') {
+          // ?autotest=rendersmoke —— 「开局这一屏真的画出来了吗」的确定性断言。
+          // 为什么单独立一条：只查 CUR.id / 坐标 / 无异常都**拦不住**「有地形、没图集」
+          // 这种静默故障 —— 那时 piece() 一件都取不到，地面与物件一个都不画，整屏黑掉
+          // 却不报任何错（连 #probe 的异常出口都空着），而 state 用例看着一切正常。
+          // 所以这里直接查两样东西：① 瓦片件命中率 ② 主画布真实像素的亮度/颜色分布。
+          setTimeout(function () {
+            render();     // headless 里 rAF 的 dt 常≈0，别指望"已经渲染过一帧"
+            var r = { map: CUR.id };
+            var an = mapAtlas(CUR);
+            r.atlasName = an || '(主图集)';
+            r.atlasImg = !!(an && ATLAS[an] && ATLAS[an].img);
+            r.atlasHasTiles = !!(an ? (ATLAS[an] && ATLAS[an].rect && Object.keys(ATLAS[an].rect).length) : ATLAS.tiles.rect);
+            var hit = 0, miss = 0, missSample = [];
+            for (var y = 0; y < CUR.h; y++) {
+              for (var x = 0; x < CUR.w; x++) {
+                var f = PAL[CUR.ground[y][x]];
+                if (!f) continue;
+                if (piece(f)) hit++;
+                else { miss++; if (missSample.length < 3) missSample.push(CUR.ground[y][x] + '→' + f); }
+              }
+            }
+            r.tileHit = hit; r.tileMiss = miss; r.missSample = missSample;
+            var o = CUR.objects || [], oh = 0, om = 0;
+            for (var i = 0; i < o.length; i++) { if (piece(o[i].piece)) oh++; else om++; }
+            r.objHit = oh; r.objMiss = om;
+            r.heroHasSheet = !!(ATLAS.chars && ATLAS.chars.img);
+            try {
+              var d = ctx.getImageData(0, 0, W, H).data;
+              var dark = 0, bright = 0, tot = 0, seen = {};
+              for (var p = 0; p < d.length; p += 4 * 37) {
+                tot++;
+                var R = d[p], G = d[p + 1], B = d[p + 2];
+                if (R < 24 && G < 24 && B < 24) dark++;
+                if (R + G + B > 150) bright++;
+                seen[(R >> 5) + ',' + (G >> 5) + ',' + (B >> 5)] = 1;
+              }
+              r.px = { tot: tot, darkPct: +(dark / tot * 100).toFixed(1),
+                brightPct: +(bright / tot * 100).toFixed(1), colors: Object.keys(seen).length };
+            } catch (e) { r.pxErr = String(e && e.message || e); }
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
         if (at === 'lazygoto') {
           // ?autotest=lazygoto&preload=0&goto=<id> —— 「运行时按需加载」验收
           // （配合 preload=0 关掉预取，否则预取会先把图集拉下来，测不出"当场补载"）。
@@ -996,7 +1125,12 @@
           // 加载提示要收掉。默认目标 = 远航之岸（外来图，带地形外置）。
           setTimeout(function () {
             var gid = q.get('goto') || 'flare_arrival';
-            var r = { from: CUR.id, gid: gid, before: !!ATLAS[(IDX[gid] && mapAtlas(IDX[gid])) || 'flare'].img };
+            // before = 「点下去之前，目标图要用的图集是否已就绪」。目标图没有独立图集时
+            // （地宫/自带图走主 tiles 图集）mapAtlas 返回 undefined —— 旧写法回退到已下架的
+            // 统一 'flare' 键，ATLAS['flare'] 是 undefined，.img 直接抛错（自测假失败的真因）。
+            var gm = IDX[gid], gan = gm && mapAtlas(gm);
+            var gslot = (gan && ATLAS[gan]) || ATLAS.tiles || {};
+            var r = { from: CUR.id, gid: gid, before: !!gslot.img };
             window.ISLES.goto(gid).then(function () {
               var an2 = mapAtlas(CUR);
               r.map = CUR.id;
@@ -1091,11 +1225,17 @@
           setTimeout(function () {
             var sx = Math.round(player.mx), sy = Math.round(player.my);
             var dist = {}, q2 = [[sx, sy]], head = 0, far = [sx, sy], fd = 0, reach = 0;
+            // 走过去的**目标**另挑一个：远端必须在 sim 的时长上限内走得到。
+            // 大图（黑橡城 95×94）离出生点最远能有 177 格，按 3.8 格/秒要 65 秒，
+            // 而 sim 封顶 40 秒 → 只走了 152 格，arrived 假红（它是"用例的天花板"，不是地图坏）。
+            // 所以取「距离 ≤110 格内最远的那一格」当走位目标；真正的"全图连通"由 isolated===0 保证。
+            var farWalk = [sx, sy], fwd = 0;
             dist[sx + ',' + sy] = 0;
             while (head < q2.length) {
               var c = q2[head++], cx = c[0], cy = c[1], d0 = dist[cx + ',' + cy];
               reach++;
               if (d0 > fd) { fd = d0; far = [cx, cy]; }
+              if (d0 <= 110 && d0 > fwd) { fwd = d0; farWalk = [cx, cy]; }
               for (var k = 0; k < 4; k++) {
                 var nx = cx + (k === 0 ? 1 : k === 1 ? -1 : 0);
                 var ny = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
@@ -1109,11 +1249,12 @@
               for (var x = 0; x < CUR.w; x++) if (walkable(x, y)) walkN++;
             }
             var r = { map: CUR.id, walk: walkN, reach: reach, isolated: walkN - reach,
-              far: far[0] + ',' + far[1], farDist: fd, arrived: null };
-            if (fd > 2) {
-              r.clickAccepted = window.ISLES.clickCell(far[0], far[1]);
-              sim(Math.min(40, fd / 3.8 * 1.4 + 0.8));   // 玩家 3.8 格/秒（见 update 里的 speed）
-              r.arrived = Math.abs(player.mx - far[0]) < 0.75 && Math.abs(player.my - far[1]) < 0.75;
+              far: far[0] + ',' + far[1], farDist: fd,
+              farWalk: farWalk[0] + ',' + farWalk[1], farWalkDist: fwd, arrived: null };
+            if (fwd > 2) {
+              r.clickAccepted = window.ISLES.clickCell(farWalk[0], farWalk[1]);
+              sim(Math.min(90, fwd / 3.8 * 1.4 + 0.8));   // 玩家 3.8 格/秒（见 update 里的 speed）
+              r.arrived = Math.abs(player.mx - farWalk[0]) < 0.75 && Math.abs(player.my - farWalk[1]) < 0.75;
               r.end = Math.round(player.mx) + ',' + Math.round(player.my);
             }
             var pb = document.getElementById('probe');
@@ -1682,15 +1823,19 @@
             };
             for (var si3 = 0; si3 < SKILLS.length; si3++) {
               setup(); player.skillCd[si3] = 0;
-              var ha = tg3.hp, fxA = skillFx.length;
+              var ha = tg3.hp, fxA = skillFx.length, fxPeak = 0;
               var ok1 = castSkill(si3);
               // 弹道技能（proj）的伤害在命中帧才结算：统一 tick 到「动作播完且弹道清空」
+              // ⚠ 特效数要在推进过程中取**峰值**：skillFx 是短命队列（life 到 0 当场 splice），
+              //   等动作播完再数，短特效早淡出了 → 恒为 0（旧写法漏了这个，白红过一次）。
               for (var sfi = 0; sfi < 260; sfi++) {
                 window.ISLES.tick(1 / 60);
+                var cfx = skillFx.length - fxA;
+                if (cfx > fxPeak) fxPeak = cfx;
                 if (player.actHold <= 0 && projectiles.length === 0) break;
               }
               res.push({ id: SKILLS[si3].id, cast: !!ok1, dmg: ha - tg3.hp,
-                cd: +player.skillCd[si3].toFixed(2), fx: skillFx.length - fxA });
+                cd: +player.skillCd[si3].toFixed(2), fx: fxPeak });
               setup();
               res[si3].blocked = (castSkill(si3) === false);   // 冷却没走完必须放不出来
               setup(); player.skillCd[si3] = 0;
@@ -2528,6 +2673,10 @@
   function makeFoes(list) {
     return (list || BEILIN_SPAWNS).map(function (s) {
       var d = FOE_DEFS[s.t];
+      // 未知怪种（登记表没这 key / 图录没加载）不能就地抛异常 —— makeFoes 跑在 switchTo 里，
+      // 一抛整个 rAF 循环当场死掉、画面卡住，而现象只是「切过去黑屏/不动」，极难定位。
+      // 这里跳过该条目（该格没有怪），并留一条控制台线索。
+      if (!d) { try { console.warn('[foes] 跳过未知怪种:', s.t, '@', s.x + ',' + s.y); } catch (e) {} return null; }
       var cell = snapWalkable(CUR, s.x, s.y);
       var aggro = d.aggro || AGGRO;
       return {
@@ -2545,7 +2694,7 @@
         // —— 绕行寻路（直线被石柱/水面挡住时启用，见 bfsNext）——
         bpath: null, repath: 0
       };
-    });
+    }).filter(function (f) { return !!f; });   // 剔掉上面跳过的未知怪种
   }
   function addFloater(mx, my, text, color, opts) {
     var o = opts || {};
@@ -4271,14 +4420,24 @@
         bottom.click(); r2.bottomDismissed = bottom.classList.contains('faded');
         bottom.click(); r2.bottomRestored = !bottom.classList.contains('faded');
       }
+      // ⚠ 这里按 id 现取，**不要**依赖外层变量：initMobile 作用域里本来就没有 tr/trHead
+      //   （折叠逻辑已上移成桌面/触屏共用的独立函数），一旦写成裸变量，严格模式下
+      //   直接 ReferenceError → 整条 boot 的 then 链断掉 → 连 #dbg/#probe 都建不出来，
+      //   表现为「手机端两条用例 dbg=- 永远失败」，还完全看不到报错（2026-09-16 真踩过）。
+      var tr = document.getElementById('topright');
+      var trHead = document.getElementById('trHead');
       if (tr && trHead) {
         r2.toprightBox = mid(tr);
         r2.foldedInit = tr.classList.contains('folded');
-        if (r2.foldedInit) r2.zoombarHidden = getComputedStyle(document.getElementById('zoombar')).display === 'none';
+        if (r2.foldedInit) {
+          var zb = document.getElementById('zoombar');
+          r2.zoombarHidden = !!zb && getComputedStyle(zb).display === 'none';
+        }
         // 竖屏时横屏浮层盖在最上层，标题本来就点不到 —— 跳过（浮层自己的命中测试见下）
         r2.headHit = overlayOn ? 'skipped-overlay' : hits(trHead);
         trHead.click(); r2.foldedAfterClick = tr.classList.contains('folded');
-        r2.herobarShown = getComputedStyle(document.getElementById('herobar')).display !== 'none';
+        var hb = document.getElementById('herobar');
+        r2.herobarShown = !!hb && getComputedStyle(hb).display !== 'none';
         trHead.click(); r2.foldedBack = tr.classList.contains('folded');
       }
       if (hint) {
