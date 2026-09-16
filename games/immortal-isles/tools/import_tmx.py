@@ -524,9 +524,38 @@ def main():
     # ---------------------------------------------------------------- 出生点
     # 导入图的可走区经常是岛屿 / 半岛 / 环形，硬编码 (W//2, H-1) 大概率掉进水里，
     # 玩家一出生就在虚空中被卡死（引擎不会报错，只是动不了）。
-    # 默认策略：优先"四邻皆可走"的格（远离崖边/水边，BFS 寻路不会一开局就贴墙），
-    # 同档里取离图心最近的 —— 稳定、可复现，且不需要理解来源图的任何语义。
+    # 默认策略（按优先级）：
+    #   ① **落在最大的连通块里** —— 这条排第一，因为来源图常常是「一间间独立的厅/室」
+    #      靠原作传送门串联（法师塔·一层就是 6 块）。只看「四邻可走 + 离图心近」会把
+    #      出生点放进离图心最近的那个**小厅**，玩家只能在那一小块里转
+    #      （实测法师塔：只能走 596/3149 格 = 19%，最大块有 1247 格）。我们没有原作的
+    #      传送门，所以「能玩到多少」几乎就等于「出生点那块有多大」。
+    #   ② 四邻皆可走（远离崖边/水边，一开局不贴墙）
+    #   ③ 非水面（--trust-collision 下水格也能走，但出生在桥中间很怪）
+    #   ④ 离图心最近 —— 稳定、可复现，且不需要理解来源图的任何语义
     walk = [[c != ' ' for c in row] for row in ground]
+    # 连通块编号（4 邻接）—— 只算一次，同时给下面的优先级用
+    comp = [[0] * W for _ in range(H)]
+    comp_sizes = []
+    _cn = 0
+    for _y0 in range(H):
+        for _x0 in range(W):
+            if not walk[_y0][_x0] or comp[_y0][_x0]:
+                continue
+            _cn += 1
+            _st = [(_x0, _y0)]
+            comp[_y0][_x0] = _cn
+            _n = 0
+            while _st:
+                _x, _y = _st.pop()
+                _n += 1
+                for _dx, _dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    _nx, _ny = _x + _dx, _y + _dy
+                    if 0 <= _nx < W and 0 <= _ny < H and walk[_ny][_nx] and not comp[_ny][_nx]:
+                        comp[_ny][_nx] = _cn
+                        _st.append((_nx, _ny))
+            comp_sizes.append(_n)
+    biggest = (comp_sizes.index(max(comp_sizes)) + 1) if comp_sizes else 0
     if a.spawn:
         sx, sy = (int(v) for v in a.spawn.split(','))
         if not (0 <= sx < W and 0 <= sy < H) or not walk[sy][sx]:
@@ -539,17 +568,22 @@ def main():
                     continue
                 nb = sum(1 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
                          if 0 <= x + dx < W and 0 <= y + dy < H and walk[y + dy][x + dx])
-                # 第三顺位是「是不是水面瓦」：--trust-collision 下水格也能走了（桥/浅滩），
-                # 但出生点落在桥中间很怪 —— 同样四邻可走时优先陆地。
-                key = (-nb, 1 if tset_of[y][x] in block_sets else 0,
-                       (x - W / 2.0) ** 2 + (y - H / 2.0) ** 2)
+                key = (0 if comp[y][x] == biggest else 1,          # ① 最大连通块
+                       -nb,                                       # ② 四邻可走数
+                       1 if tset_of[y][x] in block_sets else 0,    # ③ 优先陆地
+                       (x - W / 2.0) ** 2 + (y - H / 2.0) ** 2)    # ④ 离图心
                 if best is None or key < best:
                     best, sx, sy = key, x, y
         if best is None:
             raise SystemExit('这张图没有任何可走格 —— 检查 --walk-layer / --solid-layer / --block')
-        print('  出生点 %d,%d（四邻可走=%d，离图心 %.1f 格%s）'
-              % (sx, sy, -best[0], best[1] ** 0.5,
-                 '，水面上' if tset_of[sy][sx] in block_sets else ''))
+        _blk = comp_sizes[comp[sy][sx] - 1] if comp[sy][sx] else 0
+        print('  出生点 %d,%d（四邻可走=%d，离图心 %.1f 格%s；所在连通块 %d/%d 格，全图 %d 块）'
+              % (sx, sy, -best[1], best[3] ** 0.5,
+                 '，水面上' if tset_of[sy][sx] in block_sets else '',
+                 _blk, max(comp_sizes) if comp_sizes else 0, len(comp_sizes)))
+        if comp_sizes and _blk < max(comp_sizes):
+            print('  ⚠ 出生点不在最大连通块（%d < %d）—— 玩家能走的范围会被限制在这一块里'
+                  % (_blk, max(comp_sizes)))
 
     # ---- mask-only：只导可走掩码，供本地批量预览挑图（跳过裁瓦/图集/物件）----
     if getattr(a, 'mask_only', False):
