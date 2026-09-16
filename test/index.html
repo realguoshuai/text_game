@@ -267,6 +267,54 @@
     transition:width .25s}
   .loadpct{font-size:13px;margin-top:8px;color:#8bf3ff;font-family:ui-monospace,Consolas,monospace}
   .loadsub{font-size:11.5px;margin-top:4px;color:#9fb0c8;min-height:15px;word-break:break-all}
+
+  /* ---------- 世界地图总览（Tab 开 / 手机图标开）----------
+   * 全部地图按「来源/主题」聚簇成节点，点节点即传送；当前地图高亮。
+   * 打开时盖全屏浮层，背后游戏暂停移动。缩略图在首次打开时按需绘制，不拖首屏。 */
+  #worldmap{position:fixed;inset:0;z-index:80;display:none;
+    align-items:center;justify-content:center;padding:24px;
+    background:rgba(6,10,20,.82);backdrop-filter:blur(4px)}
+  #worldmap.show{display:flex}
+  #worldmap .wm{width:min(900px,94vw);max-height:88vh;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(18,26,44,.96),rgba(10,16,30,.98));
+    border:1px solid rgba(214,178,96,.6);border-radius:14px;overflow:hidden;
+    box-shadow:0 18px 60px rgba(0,0,0,.6),inset 0 0 40px rgba(214,178,96,.06)}
+  #worldmap .wmh{display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:14px 18px;border-bottom:1px solid rgba(214,178,96,.3)}
+  #worldmap .wmh .tt h2{margin:0;font-size:18px;letter-spacing:3px;
+    background:linear-gradient(180deg,#ffe6a6,#d6b260);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #worldmap .wmh .tt .sub{font-size:12px;color:#9fb0c8}
+  #worldmap .x{cursor:pointer;pointer-events:auto;width:34px;height:34px;border-radius:50%;
+    border:1px solid rgba(214,178,96,.5);background:rgba(30,44,70,.85);color:#f0e3c2;
+    font-size:18px;line-height:1;font-family:inherit;flex:none}
+  #worldmap .x:hover{border-color:#ffd75e;color:#fff}
+  #worldmap .scroll{overflow:auto;padding:14px 18px 20px}
+  #worldmap .region{margin-bottom:16px}
+  #worldmap .region h3{font-size:13px;color:#8bf3ff;letter-spacing:2px;margin:0 0 10px;
+    padding-bottom:6px;border-bottom:1px dashed rgba(139,243,255,.22)}
+  #worldmap .nodes{display:flex;flex-wrap:wrap;gap:12px}
+  #worldmap .node{position:relative;width:108px;cursor:pointer;pointer-events:auto;font-family:inherit;
+    background:rgba(12,20,36,.7);border:1px solid rgba(120,146,190,.4);border-radius:10px;
+    padding:8px 8px 9px;text-align:center;transition:.14s;color:#f0e3c2}
+  #worldmap .node:hover{border-color:#ffd75e;background:rgba(40,60,96,.85);
+    transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  #worldmap .node.on{border-color:#ffd75e;background:linear-gradient(180deg,#3a5a8e,#1d3d5c);
+    box-shadow:0 0 12px rgba(255,215,94,.5)}
+  #worldmap .node canvas{display:block;width:92px;height:64px;margin:0 auto 6px;border-radius:6px;
+    background:rgba(8,12,22,.7);image-rendering:pixelated;border:1px solid rgba(214,178,96,.22)}
+  #worldmap .node .nm{font-size:12.5px;font-weight:600;line-height:1.3;color:#f0e3c2;
+    display:block;max-height:2.6em;overflow:hidden}
+  #worldmap .node .dim{font-size:10px;color:#9fb0c8;margin-top:2px;display:block}
+  /* 打开世界地图的入口：桌面用 Tab，这里给鼠标/手机一个图标入口 */
+  #worldBtn{position:fixed;left:14px;top:60px;z-index:12;width:44px;height:44px;border-radius:50%;
+    pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
+    border:2px solid rgba(226,192,110,.75);box-shadow:0 3px 10px rgba(0,0,0,.45);
+    transition:border-color .15s,box-shadow .15s}
+  #worldBtn:hover{border-color:#ffd24a;box-shadow:0 0 12px rgba(255,210,74,.5)}
+  #worldBtn.on{border-color:#ffd24a;box-shadow:0 0 14px rgba(255,210,74,.6)}
+  #worldBtn svg{display:block}
+  body.touch #worldBtn{top:auto;bottom:14px;left:14px}  /* 手机左下，避开右上面板 */
 </style>
 </head>
 <body>
@@ -290,6 +338,11 @@
     <div class="row">灵石 <b id="stonev">0</b></div>
   </div>
 </div>
+
+<!-- 世界地图入口：桌面 Tab 开关，手机点此图标；点开是诸天万界总览，点节点即传送 -->
+<button id="worldBtn" title="世界地图（Tab 开启）" aria-label="世界地图">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z"/><path d="M9 3v16"/><path d="M15 5v16"/></svg>
+</button>
 
 <div id="rightcol">
 <div id="topright" class="hud panel">
@@ -371,6 +424,17 @@
 
 <div id="joystick"><div id="joy-base"></div><div id="joy-knob"></div></div>
 
+<!-- 世界地图总览浮层：全部地图按来源/主题聚簇成节点，点节点即传送 -->
+<div id="worldmap">
+  <div class="wm">
+    <div class="wmh">
+      <div class="tt"><h2>诸天万界</h2><span class="sub">点地图节点即刻传送 · Tab / Esc 关闭</span></div>
+      <button class="x" id="worldClose" title="关闭">×</button>
+    </div>
+    <div class="scroll" id="worldScroll"></div>
+  </div>
+</div>
+
 <div id="loader">
   <div class="loadbox">
     <div class="loadtitle">仙岛寻踪</div>
@@ -381,6 +445,6 @@
   </div>
 </div>
 
-<script src="js/game.js?v=18"></script>
+<script src="js/game.js?v=19"></script>
 </body>
 </html>

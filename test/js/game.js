@@ -803,6 +803,7 @@
       {
         buildCloudSprite();
         buildButtons();
+        buildWorldMap();        // 世界地图总览（Tab / 图标开）：分组节点浮层，点节点传送
         buildZoomUI();
         mmInit();               // 右上角场景缩略图（折叠开关 + 点击寻路）
         // 底部操作说明：桌面端默认折叠成一行小标签，点一下展开/收起。
@@ -1168,6 +1169,55 @@
               pb = document.createElement('div'); pb.id = 'probe';
               pb.style.display = 'none'; document.body.appendChild(pb);
             }
+            pb.textContent = JSON.stringify(r);
+          }, 60);
+        }
+        if (at === 'worldmap') {
+          // ?autotest=worldmap —— 世界地图总览（分组节点浮层）验收：
+          // 节点数 = 地图数、按 region 分组、打开后浮层显示且节点渲染、点节点即传送并自动关闭、
+          // Tab 键能开/关（桌面入口）。首屏不画缩略图，打开时才画（不拖首屏）。
+          setTimeout(function () {
+            var r = { map: CUR.id, nodes: MAPS.length };
+            var g = {}; MAPS.forEach(function (m) { g[mapRegion(m)] = 1; });
+            r.regions = Object.keys(g).length;
+            var wm = document.getElementById('worldmap');
+            var scroll = document.getElementById('worldScroll');
+            r.scrollExists = !!scroll && scroll.childElementCount > 0;
+            // 打开
+            openWorld();
+            r.opened = worldOpen === true && !!wm && wm.classList.contains('show');
+            r.shownNodes = document.querySelectorAll('#worldmap .node').length;
+            r.thumbCanvases = document.querySelectorAll('#worldmap canvas[data-thumb]').length;
+            r.thumbsDrawn = (function () {
+              var n = 0, cs = document.querySelectorAll('#worldmap canvas[data-thumb]');
+              for (var i = 0; i < cs.length; i++) {
+                var d = cs[i].getContext('2d').getImageData(0, 0, cs[i].width, cs[i].height).data;
+                var any = 0; for (var j = 3; j < d.length; j += 4) any += d[j];
+                if (any > 0) n++;
+              }
+              return n;
+            })();
+            // 点一个「非当前」节点 -> 应传送 + 关闭
+            var targetId = null;
+            document.querySelectorAll('#worldmap .node').forEach(function (nd) {
+              if (!targetId && nd.dataset.id !== CUR.id) targetId = nd.dataset.id;
+            });
+            r.clickTarget = targetId;
+            if (targetId) {
+              var node = document.querySelector('#worldmap .node[data-id="' + targetId + '"]');
+              node.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              sim(0.2);
+              r.afterMap = CUR.id;
+              r.teleported = CUR.id === targetId;
+              r.closedAfterClick = worldOpen === false && !!wm && !wm.classList.contains('show');
+            }
+            // Tab 键开关（桌面入口）
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+            r.tabOpens = worldOpen === true;
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+            r.tabCloses = worldOpen === false;
+            var pb = document.getElementById('probe');
+            if (!pb) { pb = document.createElement('div'); pb.id = 'probe'; pb.style.display = 'none'; document.body.appendChild(pb); }
             pb.textContent = JSON.stringify(r);
           }, 60);
         }
@@ -2044,6 +2094,7 @@
     document.getElementById('mapName').textContent = CUR.name;
     var btns = document.querySelectorAll('#mapBtns button');
     for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.id === CUR.id);
+    refreshWorldOn();        // 世界地图总览里当前节点同步高亮
     var hintEl = document.getElementById('hint');
     if (silent) hintEl.textContent = '踩上青色光门即可切换地图';
     else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试招（J 攻击A / K 重击B / U 御剑诀 / I 雷罡咒 / O 太虚剑域 / 1~6 试动作）';
@@ -2187,6 +2238,9 @@
   var keys = {};
   window.addEventListener('keydown', function (e) {
     var k = e.key;
+    // Tab 开/关世界地图（打开时背后游戏暂停移动）；Esc 仅关闭。都拦掉默认行为避免焦点乱跳。
+    if (k === 'Tab' || (worldOpen && k === 'Escape')) { e.preventDefault(); toggleWorld(); return; }
+    if (worldOpen) return;
     keys[k.toLowerCase()] = 1;
     if (k.indexOf('Arrow') === 0) e.preventDefault();
     // 出手：J / F / 空格 = 攻击 A（普攻）；K = 攻击 B（重击）
@@ -2210,6 +2264,8 @@
   var joyVec = { x: 0, y: 0, run: false };
 
   function inputDir() {
+    // 世界地图打开时背后游戏不动（键盘/摇杆都不接管）
+    if (worldOpen) return { dx: 0, dy: 0 };
     // 摇杆推着的时候优先接管（模拟量 0~1）；松开/没推就走键盘
     if (joyVec.x || joyVec.y) return { dx: joyVec.x, dy: joyVec.y };
     var dx = 0, dy = 0;
@@ -3619,6 +3675,98 @@
     });
   }
 
+  // ---------------- 世界地图总览（Tab / 图标开关，点节点传送） ----------------
+  // 全量发布后地图会很多（140+），原来的「地图速切」按钮列表塞不下，改成分组节点浮层。
+  // 节点缩略图用和右上角缩略图同一套配色（绿=可走 / 蓝=水 / 透明=虚空），首次打开才画，
+  // 不拖首屏；地图表运行时不变，buildWorldMap 只在 boot 跑一次。
+  var worldOpen = false, worldThumbsDone = false;
+  function mapRegion(m) {
+    if (m.region) return m.region;
+    if (m.atlas) {
+      var L = { flare: 'Flare 诸境' };
+      return L[m.atlas] || ('外域 · ' + m.atlas);
+    }
+    return '仙岛本界';
+  }
+  function buildWorldMap() {
+    var scroll = document.getElementById('worldScroll');
+    if (!scroll) return;
+    scroll.innerHTML = '';
+    var groups = {};
+    MAPS.forEach(function (m) { var r = mapRegion(m); (groups[r] = groups[r] || []).push(m); });
+    Object.keys(groups).forEach(function (r) {
+      var sec = document.createElement('div'); sec.className = 'region';
+      var h = document.createElement('h3'); h.textContent = r + '（' + groups[r].length + '）'; sec.appendChild(h);
+      var wrap = document.createElement('div'); wrap.className = 'nodes';
+      groups[r].forEach(function (m) {
+        var b = document.createElement('button'); b.className = 'node'; b.dataset.id = m.id;
+        var cv = document.createElement('canvas'); cv.setAttribute('data-thumb', '1');
+        var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = m.name;
+        var dim = document.createElement('span'); dim.className = 'dim'; dim.textContent = m.w + '×' + m.h;
+        b.appendChild(cv); b.appendChild(nm); b.appendChild(dim);
+        b.onclick = function () { if (CUR.id !== m.id) goTo(m.id); closeWorld(); };
+        wrap.appendChild(b);
+      });
+      sec.appendChild(wrap); scroll.appendChild(sec);
+    });
+    refreshWorldOn();
+  }
+  function refreshWorldOn() {
+    var cur = CUR ? CUR.id : null;
+    var bs = document.querySelectorAll('#worldmap .node');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].dataset.id === cur);
+  }
+  function drawWorldThumb(cv, m) {
+    var gw = m.w, gh = m.h, W2 = 92, H2 = 64;
+    var off = document.createElement('canvas'); off.width = gw; off.height = gh;
+    var o = off.getContext('2d');
+    var img = o.createImageData(gw, gh);
+    var water = '-dhr~', walk = '#,.;';
+    for (var y = 0; y < gh; y++) {
+      var row = m.ground[y] || '';
+      for (var x = 0; x < gw; x++) {
+        var ch = row[x] || ' ', i = (y * gw + x) * 4, col;
+        if (ch === ' ') col = [0, 0, 0, 0];
+        else if (water.indexOf(ch) >= 0) col = [42, 95, 134, 255];
+        else if (walk.indexOf(ch) >= 0) col = [127, 168, 107, 255];
+        else col = [90, 82, 72, 255];
+        img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = col[3];
+      }
+    }
+    o.putImageData(img, 0, 0);
+    cv.width = W2; cv.height = H2;
+    var c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+    c.drawImage(off, 0, 0, W2, H2);
+  }
+  function renderWorldThumbs() {
+    var cvs = document.querySelectorAll('#worldmap canvas[data-thumb]');
+    cvs.forEach(function (cv) {
+      var id = cv.parentNode && cv.parentNode.dataset ? cv.parentNode.dataset.id : null;
+      var m = id && IDX[id]; if (m) drawWorldThumb(cv, m);
+    });
+  }
+  function openWorld() {
+    var wm = document.getElementById('worldmap'); if (!wm) return;
+    wm.classList.add('show'); worldOpen = true;
+    var b = document.getElementById('worldBtn'); if (b) b.classList.add('on');
+    if (!worldThumbsDone) { renderWorldThumbs(); worldThumbsDone = true; }
+    refreshWorldOn();
+  }
+  function closeWorld() {
+    var wm = document.getElementById('worldmap'); if (!wm) return;
+    wm.classList.remove('show'); worldOpen = false;
+    var b = document.getElementById('worldBtn'); if (b) b.classList.remove('on');
+  }
+  function toggleWorld() { if (worldOpen) closeWorld(); else openWorld(); }
+  (function wireWorld() {
+    var btn = document.getElementById('worldBtn');
+    if (btn) btn.onclick = toggleWorld;
+    var x = document.getElementById('worldClose');
+    if (x) x.onclick = closeWorld;
+    var wm = document.getElementById('worldmap');
+    if (wm) wm.addEventListener('click', function (e) { if (e.target === wm) closeWorld(); });
+  })();
+
   function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
@@ -3659,6 +3807,13 @@
     get ready() { return ready; },
     get map() { return CUR ? CUR.id : null; },
     list: function () { return MAPS.map(function (m) { return { id: m.id, name: m.name, w: m.w, h: m.h, objects: m.objects.length, portals: m.portals.map(function (p) { return { x: p.x, y: p.y, to: p.to }; }) }; }); },
+    /** 世界地图总览状态（自测用）：节点数 / 分组数 / 当前节点 */
+    world: function () {
+      var g = {}; MAPS.forEach(function (m) { g[mapRegion(m)] = 1; });
+      return { open: worldOpen, nodes: MAPS.length, regions: Object.keys(g).length, onId: CUR ? CUR.id : null };
+    },
+    openWorld: function () { openWorld(); return worldOpen; },
+    closeWorld: function () { closeWorld(); return worldOpen; },
     state: function () { return { map: CUR && CUR.id, mx: +player.mx.toFixed(2), my: +player.my.toFixed(2), face: player.face, fade: +fadeA.toFixed(2), zoom: +Z.toFixed(3) }; },
     /** 右上角缩略图状态（自测/排查用）：画布尺寸、每格像素、主角在画布上的落点 */
     minimap: function () {

@@ -267,6 +267,17 @@ results.push(run('右上角 缩略图 手机默认收起', 'map=lingquan&touch=1
   !!probe && probe.cv === true && probe.foldedAtStart === true,
 { size: '870,546', budget: 22000 }));
 
+// 9.66) 世界地图总览（分组节点浮层）：?autotest=worldmap 打开浮层、渲染节点、点节点传送、Tab 开关。
+//       这是把「地图速切按钮列表」重做成「Tab/图标开的总览」后的核心回归 —— 节点数必须 = 地图数，
+//       且点节点要真的把人传过去、浮层自动收起；Tab 键开/关桌面入口也得过。
+results.push(run('世界地图总览 节点/传送/Tab', 'map=qingxuan&autotest=worldmap', ({ probe }) =>
+  !!probe && probe.map === 'qingxuan' &&
+  probe.nodes === 6 && probe.regions >= 1 && probe.scrollExists === true &&
+  probe.opened === true && probe.shownNodes === 6 && probe.thumbCanvases > 0 && probe.thumbsDrawn > 0 &&
+  probe.teleported === true && probe.closedAfterClick === true &&
+  probe.tabOpens === true && probe.tabCloses === true,
+{ budget: 22000 }));
+
 // 9.7) 首屏体积：2026-09-16 起策略变了 —— **外来图（远航之岸/殒落港湾）进首屏**，
 //      地宫仍按需。理由是这两张是常驻玩法区，老方案「进游戏 2.5s 后串行预取」会让
 //      点按钮的人正好撞在下载中段。这条同时把「首屏到底背了多少」钉住：谁再把别的
