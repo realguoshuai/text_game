@@ -33,7 +33,11 @@
 
 ---
 
-## 1. `flare_arrival` 远航之岸 — 36×38
+## 1. ⛔ `flare_arrival` 远航之岸 — 36×38（2026-09-17 已下架）
+
+> 下架原因：它是「统一 flare 图集」时代的仅存消费者，改按 (parent,theme) 分图集后
+> 已无对应图集；现役外来图见 §3 起。地形 json `assets/flare_arrival_map.json` 已从仓库删除
+> （备份在 `.workbuddy/bak_orphan_20260917/`），源文件仍在 `sucai/_dl/`，可随时重新导入。
 
 | | |
 |---|---|
@@ -66,7 +70,11 @@
 
 ---
 
-## 2. `flare_harbor` 殒落港湾 — 39×38
+## 2. ⛔ `flare_harbor` 殒落港湾 — 39×38（2026-09-17 已下架）
+
+> 同 §1：随统一 flare 图集一并下架，`assets/flare_harbor_map.json` 已删除（备份同上）。
+> 自测 `?autotest=lazygoto` 的**默认目标已改为 `flare_dungeon_empyrean_campaign_fort_amir`**
+> （原来默认指这张已下架的图，等于空跑）。
 
 | | |
 |---|---|

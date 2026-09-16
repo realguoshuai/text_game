@@ -1289,9 +1289,10 @@
           // ?autotest=lazygoto&preload=0&goto=<id> —— 「运行时按需加载」验收
           // （配合 preload=0 关掉预取，否则预取会先把图集拉下来，测不出"当场补载"）。
           // 模拟用户点地图按钮切过去：图集与地形要当场补上、玩家落在可走的出生点上、
-          // 加载提示要收掉。默认目标 = 远航之岸（外来图，带地形外置）。
+          // 加载提示要收掉。默认目标 = 阿米尔要塞（外来图，独立图集 + 地形外置；
+          // 原默认值 flare_arrival 已随统一图集下架，指过去是空测试）。
           setTimeout(function () {
-            var gid = q.get('goto') || 'flare_arrival';
+            var gid = q.get('goto') || 'flare_dungeon_empyrean_campaign_fort_amir';
             // before = 「点下去之前，目标图要用的图集是否已就绪」。目标图没有独立图集时
             // （地宫/自带图走主 tiles 图集）mapAtlas 返回 undefined —— 旧写法回退到已下架的
             // 统一 'flare' 键，ATLAS['flare'] 是 undefined，.img 直接抛错（自测假失败的真因）。
