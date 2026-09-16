@@ -231,16 +231,18 @@
   body.touch #bottom.faded{opacity:0;transform:translate(-50%,12px);pointer-events:none}
   body.touch #actions .act{padding:11px 16px;font-size:14px}
 
-  /* 右上「地图速切」在手机上会吃掉近半屏（11 个外形按钮 + 缩放条 + 地图按钮），
-     默认折叠成一行标题，点标题展开。桌面端不动。 */
+  /* 右上「地图速切」折叠：桌面 / 触屏通用 —— 点标题条收成一行、再点展开（JS 记住选择，
+     手机默认收起）。手机上它会吃掉近半屏（地图按钮 + 缩放条 + 外形按钮），折叠尤其必要。 */
+  #topright .t{cursor:pointer;user-select:none;pointer-events:auto}
+  #topright .t .tg{color:#8bf3ff;font-size:11px;transition:transform .15s}
+  #topright.folded{padding:6px 12px}
+  #topright.folded .t{margin-bottom:0}
+  #topright.folded .t .tg{transform:rotate(-90deg)}
+  #topright.folded .maps,
+  #topright.folded #zoombar,
+  #topright.folded #herobar{display:none}
   body.touch #topright{max-width:46vw;padding:8px 10px}
-  body.touch #topright .t{cursor:pointer;user-select:none;pointer-events:auto;padding:2px 0}
   body.touch #topright.folded{pointer-events:auto}   /* 折叠后整条都可点，手指不用瞄 */
-  body.touch #topright .t::after{content:' ▾';color:#8bf3ff}
-  body.touch #topright.folded .maps,
-  body.touch #topright.folded #zoombar,
-  body.touch #topright.folded #herobar{display:none}
-  body.touch #topright.folded .t::after{content:' ▸'}
   body.touch #topright .maps button,
   body.touch #topright #herobar .heros button{padding:6px 9px;font-size:12px}
 
@@ -350,7 +352,7 @@
 
 <div id="rightcol">
 <div id="topright" class="hud panel">
-  <div class="t">地图速切（无缝流转）</div>
+  <div class="t" id="trHead" title="点击折叠 / 展开"><span>地图速切（无缝流转）</span><span class="tg" id="trTg">▾</span></div>
   <div class="maps" id="mapBtns"></div>
   <div id="zoombar">
     <div class="t"><span>视图缩放</span><b id="zoomVal">100%</b></div>
@@ -450,6 +452,6 @@
   </div>
 </div>
 
-<script src="js/game.js?v=23"></script>
+<script src="js/game.js?v=24"></script>
 </body>
 </html>

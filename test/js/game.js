@@ -836,6 +836,7 @@
         buildWorldMap();        // 世界地图总览（Tab / 图标开）：分组节点浮层，点节点传送
         buildZoomUI();
         mmInit();               // 右上角场景缩略图（折叠开关 + 点击寻路）
+        initToprightFold();     // 地图速切面板折叠（桌面/触屏通用，记住选择）
         // 底部操作说明：桌面端默认折叠成一行小标签，点一下展开/收起。
         // 手机端（body.touch）走 initMobile 里的精简文案 + 6s 自动收起（点按切 faded），
         // 两套逻辑互斥，这里遇到 touch 直接放手，否则一次点击会同时切 faded 和 folded。
@@ -3703,6 +3704,25 @@
       b.onclick = function () { if (CUR.id !== m.id) goTo(m.id); };
       box.appendChild(b);
     });
+  }
+
+  // 「地图速切」面板折叠：点标题收成一行标题条 / 再点展开。桌面 / 触屏通用。
+  // 旧版只在手机端有（CSS 还在、JS 接线在世界地图 v20 重构时弄丢了），这里补回并升级：
+  // 用户的选择记进 localStorage，下次进游戏保持原样；没选过时手机默认收起、桌面默认展开。
+  function initToprightFold() {
+    var panel = document.getElementById('topright');
+    var head = document.getElementById('trHead');
+    if (!panel || !head) return;
+    var saved = null;
+    try { saved = localStorage.getItem('isles.trFold'); } catch (e) { }
+    // 默认值直接读 body.touch（initMobile 在 boot 前跑，?touch=1 强制结果也写在里面；
+    // 这里若自己再查 matchMedia，?touch=1 的无头验证会漏掉强制场景）。
+    var fold = saved !== null ? saved === '1' : document.body.classList.contains('touch');
+    panel.classList.toggle('folded', fold);
+    head.onclick = function () {
+      var now = panel.classList.toggle('folded');
+      try { localStorage.setItem('isles.trFold', now ? '1' : '0'); } catch (e) { }
+    };
   }
 
   // ---------------- 世界地图总览（Tab / 图标开关，点节点传送） ----------------
