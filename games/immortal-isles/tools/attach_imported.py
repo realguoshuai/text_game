@@ -33,7 +33,10 @@ MANIFEST = os.path.join(ASSETS, 'flare_manifest.json')
 #   旧 flare_arrival/flare_harbor 已被合并进 flare_grass 主题图集、改用新 id 重导，
 #   原 id 不再对应任何 _map.json，顺手清掉避免世界地图出现死链。
 DROP = ['flare_arrival', 'flare_harbor', 'kenney_hall', 'grasstest',
-        'flare_ruins_iron_labyrinth_treasure_room']  # 2026-09-16 用户要求去掉（宝物房太小）
+        'flare_ruins_iron_labyrinth_treasure_room',  # 2026-09-16 用户要求去掉（宝物房太小）
+        'flare_snow_empyrean_campaign_stormrock_pass',  # 2026-09-16 用户要求去掉（雪图卡顿，换其他风格）
+        'flare_snow_empyrean_campaign_lake_kuuma',
+        ]
 
 # 中文名（2026-09-16 用户要求）：按钮 / 世界地图节点都显示 name，英文原名不友好。
 # 没进表的图继续用 import_tmx 起的英文名（Title Case）。
@@ -47,6 +50,12 @@ CN_NAMES = {
     'flare_dungeon_empyrean_campaign_wizards_tower_1': '法师塔·一层',
     'flare_snow_empyrean_campaign_lake_kuuma': '库玛湖',
     'flare_ruins_iron_labyrinth_iron_labyrinth_chasm': '铁迷宫·裂隙',
+    # 2026-09-16 二批：草绿系 3 张（洛赫港同款）+ 换风格 2 张（顶替下架的雪图）
+    'flare_grass_empyrean_campaign_goblin_camp': '哥布林营地',
+    'flare_grass_empyrean_campaign_river_trail': '河畔小径',
+    'flare_grass_empyrean_campaign_lochport_cemetery': '洛赫港墓园',
+    'flare_grass_empyrean_campaign_merrimead_swamp': '梅里米德沼泽',
+    'flare_grass_empyrean_campaign_nazia_highlands': '纳齐亚高地',
 }
 
 

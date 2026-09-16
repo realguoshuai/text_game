@@ -21,9 +21,14 @@ flare_<theme>_<parent> 命名约定懒注册 EXTRA 条目并加载 assets/<prefi
 import os, sys, json, glob, subprocess, xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)                       # .../test
+ROOT = os.path.dirname(HERE)                       # .../games/immortal-isles
 ASSETS = os.path.join(ROOT, 'assets')
-TILED = os.path.abspath(os.path.join(ROOT, '..', '..', 'sucai', '_dl', 'flare', 'tiled'))
+# sucai 在仓库上级 text_game/sucai（2026-09-16 重组后从这里往上 3 级；向上探测防目录再挪）
+_TILED_CANDIDATES = [
+    os.path.abspath(os.path.join(ROOT, '..', '..', 'sucai', '_dl', 'flare', 'tiled')),
+    os.path.abspath(os.path.join(ROOT, '..', '..', '..', 'sucai', '_dl', 'flare', 'tiled')),
+]
+TILED = next((p for p in _TILED_CANDIDATES if os.path.isdir(p)), _TILED_CANDIDATES[0])
 KEEP = os.path.join(ROOT, '.workbuddy', '_flare_thumbs', 'keep_ids.json')
 REGION = {'grass': '主世界', 'cave': '洞窟界', 'dungeon': '地牢界', 'ruins': '遗迹界', 'snow': '雪原界'}
 THEME_ORDER = [('snowplains', 'snow'), ('ruins', 'ruins'), ('dungeon', 'dungeon'),

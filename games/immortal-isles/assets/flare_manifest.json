@@ -1,5 +1,10 @@
 [
  {
+  "id": "flare_arrival",
+  "region": "?",
+  "theme": "arrival"
+ },
+ {
   "id": "flare_cave_empyrean_campaign_mog_caverns",
   "region": "洞窟界",
   "theme": "cave"
@@ -25,9 +30,39 @@
   "theme": "grass"
  },
  {
+  "id": "flare_grass_empyrean_campaign_goblin_camp",
+  "region": "主世界",
+  "theme": "grass"
+ },
+ {
+  "id": "flare_grass_empyrean_campaign_lochport_cemetery",
+  "region": "主世界",
+  "theme": "grass"
+ },
+ {
   "id": "flare_grass_empyrean_campaign_lochport",
   "region": "主世界",
   "theme": "grass"
+ },
+ {
+  "id": "flare_grass_empyrean_campaign_merrimead_swamp",
+  "region": "主世界",
+  "theme": "grass"
+ },
+ {
+  "id": "flare_grass_empyrean_campaign_nazia_highlands",
+  "region": "主世界",
+  "theme": "grass"
+ },
+ {
+  "id": "flare_grass_empyrean_campaign_river_trail",
+  "region": "主世界",
+  "theme": "grass"
+ },
+ {
+  "id": "flare_harbor",
+  "region": "?",
+  "theme": "harbor"
  },
  {
   "id": "flare_ruins_iron_labyrinth_iron_labyrinth_chasm",
