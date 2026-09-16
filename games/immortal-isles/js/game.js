@@ -367,8 +367,8 @@
       { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
       { url: 'assets/foes_atlas.json?v=2', json: true, weight: 2, label: '读取妖兽索引' },
       { url: 'assets/heroes.json?v=1', json: true, weight: 1, label: '读取角色清单' },
-      { url: 'assets/fx_atlas.webp?v=1', atlas: 'fx', weight: 61, label: '载入技能特效' },
-      { url: 'assets/fx_atlas.json?v=1', json: true, weight: 1, label: '读取特效索引' },
+      { url: 'assets/fx_atlas.webp?v=2', atlas: 'fx', weight: 61, label: '载入技能特效' },
+      { url: 'assets/fx_atlas.json?v=2', json: true, weight: 1, label: '读取特效索引' },
       { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' }
     ];
 
@@ -862,7 +862,7 @@
           if (ar) ar.textContent = foldedNow ? '▸' : '▾';
         });
         // 主角外形：?hero=14 指定 > 上次手选记忆 > 默认 1 号
-        buildHeroUI(+q.get('hero') || 0);
+        buildHeroUI(q.get('hero') !== null ? +q.get('hero') : 42);
         // ?z=1.25 可直接以指定缩放打开（同样受 0.62~1.72 限制）
         var zq = parseFloat(q.get('z'));
         if (zq > 0) {
