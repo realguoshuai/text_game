@@ -122,41 +122,72 @@ python tools/import_tmx.py <perdition_harbor.tmx> --prefix flare --id flare_harb
 
 ---
 
-## ★ 按需加载：大图集与外来地形都不进首屏（2026-09-15 晚）
+## ★ 加载策略：外来图进首屏，地宫仍按需（2026-09-16 修订）
 
 加图加爽了会撞上一件事：**每加一张图，所有人的开屏都更慢一点**。
-实测（改之前）：首屏串行加载 11 个文件共 **3.02MB**，其中 `flare_atlas.webp` 940KB
-+ `dungeon_atlas.webp` 547KB —— 这两套只有切到对应地图才用得上，却让
-「只想在山门走两步」的人先等 1.5MB。
+2026-09-15 的版本把「地宫 + 外来图」两套都做成按需，首屏从 3.02MB 压到 1.19MB。
+但 09-16 用户反馈了一个按需方案解决不了的问题：**点「远航之岸 / 殒落港湾」时要等**。
+老方案是「`ready` 之后 2.5 秒起、串行预取」，玩家看一眼地图面板再点过去，正好撞在下载中段。
 
-改法（全在 `js/game.js`）：
+> 先纠正一个容易想当然的成本账：**JSON 走的是 gzip，别按磁盘体积估传输**。
+> 实测线上响应头：`flare_arrival_map.json` 磁盘 131KB → `Content-Length: 8276`（8KB）；
+> 全站 9 个 JSON 合起来磁盘 358KB → 传输 30KB。而 `.webp` 已经压过，gzip 后
+> 910KB → 886KB（等于没压）。**所以「多载两张地形」的真实代价是 16KB，可以忽略；
+> 唯一躲不掉的是那张 910KB 的图集。**
+
+改动（全在 `js/game.js`）：
+- 外来图集走**常驻首屏**：`expandPlan` 里新增 `EAGER_ATLAS = ['flare']`，凡是用到这套图集的地图，
+  它的 `EXTRA.flare.items` **无条件推进首屏池**（不再等 `?map=` 指名、也不再等 2.5s 预取）。
+  两张图共用一套 flare 图集 → 只下一张就覆盖两张，「一起加载」的代价是 +910KB 而非 +1820KB。
+  `queued = true` 同时挡住 `preloadExtras` 重复拉。地宫不在 `EAGER_ATLAS` 里，仍是真按需。
+- `expandPlan` 还做了：**所有带 `src` 的地图，地形一律进首屏**（不再只认 `?map=` 指到的那张）。
+- `goTo` 的直达分支与补载分支统一走同一个 `land()`（落点缺省 = 该图出生点，
+  见下面「⑦ 同步切图分支的坐标缺省」——那是个真 bug）。
+- **进度条权重口径改为「线上真实传输 KB」**：`maps.json` 65→8、地形 133→8、
+  `flare_atlas.json` 10→2……因为下载途中的 `e.loaded/e.total` 拿到的**本身就是压缩后**
+  的字节，两边同口径进度条才匀速；照磁盘体积填会让那几个 JSON 白占一段宽度（假卡）。
 
 | 机制 | 在哪 | 干什么 |
 |---|---|---|
 | `EXTRA` 表 | 文件顶部 | 声明「按需图集」：一套 = 图 + 索引两项，键名对齐 `ATLAS` 的键 |
-| `expandPlan(data)` | boot 里、`maps.json` 到位那一刻 | `?map=` 直接指向该图 → 把它的图集与地形**推进首屏池**（进度条照走） |
-| `preloadExtras()` | `ready` 之后 2.5 秒 | 空闲串行预取 —— 用户点按钮时通常已就绪；`?preload=0` 可关 |
+| `EAGER_ATLAS` | `expandPlan` 上方 | 常驻首屏的图集白名单（现 `['flare']`）—— 进首屏就载、不参与懒加载 |
+| `expandPlan(data)` | boot 里、`maps.json` 到位那一刻 | ①`EAGER_ATLAS` 里的图集 → 无条件进首屏 ②`?map=` 指到的图 → 图集进首屏（给地宫兜底）③**所有** `src` 地图 → 地形进首屏 |
+| `preloadExtras()` | `ready` 之后 2.5 秒 | 空闲串行预取剩下的（只有地宫了）；`?preload=0` 可关 |
 | `goTo(id,…)` | 所有切图入口（按钮/传送门/调试 API） | 切图守卫：目标图资源没就绪就当场补载（屏幕下方小胶囊带百分比），就绪时零开销 |
 | `initCore()` / `applyMapData()` | 同上 | 常量提前装；外置地形并回地图条目 |
 
-地形也一并外置了：`maps.json` 里的外来图只剩**轻条目**
+> ⚠️ 这 910KB 图集**体积极限就在那**：瓦片是原生 120×60、webp 对透明区编码极高效
+> （画布 17.5M 像素但内容仅 1.8M，重打包反而更大——试过），所以「优化」只能在**时机**上做：
+> ① 共享图集（两张图一张下载）② 并行下载（`CONC=3`，弱机不调高）③ 地形 JSON 走 gzip 仅 8KB/张。
+> 想要更省的流量，用 `?preload=0` 关掉后台预取（地宫那套就完全不下了）。
+
+地形仍是外置的：`maps.json` 里的外来图只剩**轻条目**
 （id/name/note/w/h/spawn/home/voidColor/homeFromMap/atlas/src），
 `ground`/`objects` 留在 `<id>_map.json`，`src` 后面挂**内容 md5 前 8 位**当版本号
 （地形一改缓存键自动变，比手改 `?v=` 靠谱）。`attach_imported.py` 负责这个转换。
-于是 `maps.json` 从 **329KB → 63KB**。
+于是 `maps.json` 从 **329KB → 52KB**（含删掉碧霄灵谷那 10KB）。
 
-**结果：首屏 3.02MB → 1.19MB（-61%）。** `?map=dungeon` 这种"首屏就要进那张图"的情况
-是 1.73MB（该载的照载）。
+**成本账（2026-09-16 实测，单位 = 线上传输字节）**：
+
+|| 首屏 | 点外来图时 |
+|---|---|---|
+| 老方案（按需 + 2.5s 后串行预取） | 1107KB | 可能还要等 910KB |
+| 新方案（外来图进首屏） | **2035KB** | **0**（同步切换，一个请求都不发） |
+
+多出来的 910KB 本来也会被后台预取拉走 —— 对「进游戏待一会」的人**总流量一模一样**，
+变的只是「什么时候下」。真要省流量的人仍有 `?preload=0`。
 
 ⚠️ **时序坑（踩过）**：`finishMap` 靠全局 `WALK` 判断可走、`nearWalkable` 靠它兜底找出生点。
 原来这些常量在「全部加载结束」时才赋值，而按需地形可能**更早**到位 —— 于是整张图被算成
 「全不可走」，出生点退化成 `{0,0}`，玩家被吸附到地图角落（实测落在 **5,2**，而不是施工方
 挑的 19,19）。所以 `maps.json` 一到手就先 `initCore()` 装常量，再 `expandPlan()`。
 
-验收三条（都在跑批里）：
-- `首屏体积 不含大图集` —— 自带图首屏 1000~1400KB，且 dungeon/flare 都**未载**
-- `首屏含目标图图集` —— `?map=dungeon` 必须 >1600KB 且 dungeon 已载
-- `按需切图 外来图` / `按需切图 地宫` —— 首屏之后当场补载：图集到位、出生点站得住、提示收掉
+验收四条（都在跑批里）：
+- `首屏含外来图 但不含地宫` —— 1900~2200KB，`flare.loaded=true` 且 `dungeon.loaded=false`
+- `首屏含目标图图集` —— `?map=dungeon` 必须 2400~2800KB 且 dungeon 已载
+- `按需切图 地宫` —— 首屏之后当场补载：图集到位、出生点站得住、提示收掉
+- `外来图 零等待切换` —— `before=true`（点之前图集已就绪）+ 地形已并回（`obj>1000`）
+
 
 ---
 
@@ -345,7 +376,48 @@ python tools/walk_audit.py <地图 id> --overlay _w.png   # 叠色图：绿=能�
 | `?autotest=minimap` | 缩略图程序化验收：画布比例、四类格数、底图非空、主角标记落点、折叠来回切、点缩略图能否走 |
 | `?autotest=crossing` | 「看着有路走不动」验收：可走区必须**全域连通**（`isolated == 0`），并真的跨桥走到最远格 |
 
-两条都进了 `tools/headless_check.js` 跑批（共 32 条）。
+两条都进了 `tools/headless_check.js` 跑批（共 33 条）。
+
+### ⑦ ★ 地图按钮点了没反应 —— 切图分支的坐标缺省（2026-09-16 补，真 bug）
+
+把外来图挪进首屏时被自测逮到的一个**会卡死游戏**的 bug，值得单独记一笔。
+
+`goTo(id, x, y)` 有两条出口：**就绪就直接切**（同步）与**没就绪先补载再切**（异步）。
+两条都写了一遍 `switchTo(m.id, x, y, …)`，但只有异步那条做了缺省
+（`x === undefined ? m.home.x : x`）。而**地图面板的按钮恰恰是 `goTo(m.id)` 不带坐标**：
+
+```
+buildButtons: b.onclick = function () { if (CUR.id !== m.id) goTo(m.id); };
+```
+
+于是：
+- 外来图**按需**时 → 走异步分支 → 缺省生效 → 正常。
+- 外来图**进首屏**后 → 走同步分支 → `undefined` 一路传到
+  `switchTo → snapWalkable → walkable(undefined, undefined) → cellChar` →
+  `CUR.ground[undefined][undefined]` 抛 `TypeError`。
+
+抛在 rAF 循环里 = **渲染循环直接停掉**：画面定在上一帧、点什么都没反应，
+但页面看不出"崩了"（没有报错弹窗、没有白屏）。这正是本仓库最怕的那类故障。
+
+修法两条，都是"让它别再可能发生"：
+1. `goTo` 里把落点归一化抽成一个 `land()`，两条分支共用 —— **缺省只写一处**。
+2. `cellChar` 改成用取反连比 `if (!(x >= 0 && y >= 0 && x < CUR.w && y < CUR.h)) return ' ';`
+   —— 一次挡掉越界、`NaN`、`undefined`（两个 `undefined` 的比较都是 false），
+   并补 `!CUR.ground` 判断：地形还没到的轻条目画空格，而不是打死渲染循环。
+   一帧画空可以查，死画面最难查。
+
+**顺带补的排查设施**：以前自测里任何一处抛错的表现都是「没有 `#probe`」——
+和「用例没过」长得一模一样（`#dbg` 每帧都在写，页面看着还活得好好的），只能翻代码猜。
+现在带 `?autotest=` 时会装 `window.onerror` + `unhandledrejection`，
+把**异常 + 堆栈前 6 帧**写进 `#probe`：
+
+```json
+{"err":"Uncaught TypeError: Cannot read properties of undefined (reading 'undefined')",
+ "at":".../game.js?v=17:249:25",
+ "stack":"... at cellChar (…:249:25) | at walkable (…:253:13) | at snapWalkable (…:2139:9) | at switchTo (…:2007:14) | at goTo (…:558:7)"}
+```
+
+这次就是从这 5 帧直接定位到 `goTo` 的，没走一步弯路。
 
 ### 验收：`?autotest=importmap`
 
@@ -393,16 +465,23 @@ object 层还在误挡（见「静默杀手 ⑤」）。
    图集前缀脚本自己从地图档的 piece 名反推，不用手填）
 6. 挂载：`tools/attach_imported.py` 的 `WANT` 加上 `<id>_map.json`，跑一遍
    （别手写 maps.json：`'k'`、`homeFromMap`、`atlas`、`src` 都由它带进去。
-   它写的是**轻条目** —— 地形留在 `<id>_map.json` 里按需取，见上面「按需加载」那节）
-7. 引擎：在 `js/game.js` 的 `EXTRA` 里声明这套新图集（照 `flare` 那条抄，键名对齐
-   `ATLAS`），**不要** push 进 `LOAD_PLAN` —— 那等于让所有人首屏等它。
-   若这张图和已有的图共用一套图集（导入时带了 `--append`），则什么都不用加。
+   它写的是**轻条目** —— 地形留在 `<id>_map.json` 里，见上面「加载策略」那节）
+7. 加载：**地形不用管**（`expandPlan` 会自动把所有 `src` 地图的地形推进首屏，
+   线上 gzip 后一张 8KB）。**图集要选**：
+   - 当"常驻玩法区"（会反复去、点按钮不能等）→ 在 `boot()` 里
+     `EXTRA.<名>.items.forEach(it => POOL.push(it))` + `queued = true`，进首屏。
+   - 当"偶尔一看的副本"（如地宫）→ 什么都不用做，留在 `EXTRA` 里按需 + 空闲预取。
+   - ⚠ 无论哪种都**别插进 `LOAD_PLAN` 数组**：它的下标被硬编码引用着。
+   - 若这张图和已有的图共用一套图集（导入时带了 `--append`），则什么都不用加。
 8. 版本号：升 `index.html` 的 `game.js?v=`；`maps.json?v=` 也要升（内容变了）。
    图集 `?v=` 只在**图集内容**变了时才升；外来地形的版本号是自动的（内容 md5）。
 9. 验收：`node tools/probe.js "map=<id>&autotest=importmap"` 先单条看 `#probe`，
    再 `node tools/probe.js "map=<id>&autotest=crossing"` 确认**全域连通**（`isolated` 必须 0），
    最后 `node tools/headless_check.js` 跑全套；改过加载链路就顺带跑
-   `?autotest=bootstats` 与 `?autotest=lazygoto&goto=<id>` 确认首屏没变胖、按需能补上。
+   `?autotest=bootstats`（首屏多少 KB）与 `?autotest=lazygoto&goto=<id>`
+   （**外来图应看到 `before=true`** = 点之前就已就绪；地宫才是 `before=false` 的按需）。
+   ⚠ 地图按钮走的是 `goTo(m.id)` **不带坐标**，所以切图务必手工点一次按钮验一遍
+   （见「静默杀手 ⑦」）。
 
 > **截图别用「离线渲染就够了」当借口**：`render_map_json.py` 只验几何，
 > 看不出出生点掉水、走不动、虚空底色这些"引擎侧"的问题。

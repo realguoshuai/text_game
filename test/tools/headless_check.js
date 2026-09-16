@@ -15,31 +15,50 @@ const path = require('path');
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const GAME = 'file:///C:/Users/Lenovo/WorkBuddy/text_game/ImmortalGame/test/index.html';
+// 命令行可选过滤：node headless_check.js "外来图" 只跑 label 含「外来图」的用例，
+// 方便单独复验某一类（尤其弱机/磁盘满时不想把 33 条全跑一遍）。空 = 全跑。
+const FILTER = process.argv[2] || '';
 // 用户数据目录：本次运行独占一个（按 pid 命名），不要跟正在跑的普通 Chrome 抢 Default 配置
 // （singleton 锁会让 headless 直接报错退出）。但也不要「每个用例都新建」——
 // 冷 profile 的首次启动开销在这台弱机上经常顶满 virtual-time-budget，页面停在「加载中」，
 // 表现成随机几条用例 dbg=-。一次运行共用一个热 profile 最稳，跑完删掉。
-const U_DIR = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
+const U_DIR_BASE = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
 
 function readPage(query, budget, size) {
+  // ★ 每条用例用唯一 user-data-dir：否则所有用例抢同一个目录的单例锁，
+  // 前面用例的 chrome 助手进程没退干净时，后面的 chrome 会卡在锁上（整页空白/无限挂起）。
+  // 这是之前「套件跑到第 28 条就卡死」的真因，与游戏改动无关。
+  const uDir = U_DIR_BASE + '_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
   // 输出文件每次都用唯一名：同名重定向会被「另一个程序正在使用此文件」的偶发占用炸掉整个跑批
   const out = path.join(os.tmpdir(), 'wb_dom_' + process.pid + '_' + Date.now() + '_' +
     Math.floor(Math.random() * 1e6) + '.html');
   // 顺手掐掉磁盘缓存：素材/JSON 改过之后旧缓存会让页面加载到上一版数据，
   // 症状是「代码明明改了、自测还是老结果」——这类假失败比真 bug 更耗时间。
   // execSync 偶发失败（profile 锁/临时文件占用）不要炸跑批：返回空，交给 run() 的重试逻辑。
+  // ★ 加硬超时（killSignal SIGKILL）：否则某个用例的 chrome 一旦卡死（页面不退出、
+  //   磁盘写不动、--no-zygote 偶发卡住），execSync 会无限阻塞，整条跑批卡死在半途。
+  //   超时后 chrome 被强杀，这里返回空 → run() 走重试；重试也超时就是真 FAIL，不再挂起。
+  let dom = '';
   try {
     execSync(
       `"${CHROME}" --headless=new --disable-gpu --no-sandbox --allow-file-access-from-files ` +
       `--no-first-run --no-default-browser-check --disk-cache-size=1 --hide-scrollbars ` +
-      `--user-data-dir="${U_DIR}" --virtual-time-budget=${budget || 14000} ` +
+      `--no-zygote ` +
+      `--user-data-dir="${uDir}" --virtual-time-budget=${budget || 14000} ` +
       `--window-size=${size || '1280,800'} --dump-dom "${GAME}?${query}" > "${out}" 2>nul`,
-      { shell: 'cmd.exe' }
+      { shell: 'cmd.exe', timeout: 90000, killSignal: 'SIGKILL' }
     );
+    dom = fs.readFileSync(out, 'utf8');
   } catch (e) {
-    return { dom: '', bodyClass: '', dbg: null, probe: null, mapName: null, loader: null };
+    dom = '';
+  } finally {
+    // 用完即清：无论成功/超时/出错，profile 目录（~30MB）和 DOM 输出文件当场删掉。
+    // 否则 33 条跑完临时盘被塞满（本机 C 盘常年 95%+ 占用），后面用例会因
+    // chrome 写不了 profile 而「页面没加载完」假失败；超时强杀时更会漏清，必须兜底。
+    try { fs.rmSync(uDir, { recursive: true, force: true }); } catch (e) { /* 偶被占用 */ }
+    try { fs.rmSync(out, { force: true }); } catch (e) { /* ignore */ }
   }
-  const dom = fs.readFileSync(out, 'utf8');
+  if (!dom) return { dom: '', bodyClass: '', dbg: null, probe: null, mapName: null, loader: null };
   const pick = (id) => {
     const m = dom.match(new RegExp('id="' + id + '"[^>]*>([^<]*)<'));
     return m ? m[1] : null;
@@ -50,6 +69,7 @@ function readPage(query, budget, size) {
 
 function run(label, query, expect, opts) {
   opts = opts || {};
+  if (FILTER && label.indexOf(FILTER) < 0) return { ok: null, skipped: true };
   // 页面压根没加载出来（map 还停在「加载中」、dbg/probe 都是空）不是断言失败，
   // 是 headless 冷启动没跑完。这种假失败重试，别把结论污染成「回归挂了」。
   let r = readPage(query, opts.budget, opts.size), tries = 1;
@@ -247,36 +267,40 @@ results.push(run('右上角 缩略图 手机默认收起', 'map=lingquan&touch=1
   !!probe && probe.cv === true && probe.foldedAtStart === true,
 { size: '870,546', budget: 22000 }));
 
-// 9.7) 首屏体积：地宫（547KB）与外来图（940KB）都**不在首屏**——它们只在该图要被用到时
-//      才载（?map= 指到它 / 用户点按钮 / 后台空闲预取）。这条把「首屏到底背了多少」钉住：
-//      一旦有人把大图集挪回 LOAD_PLAN，这里立刻红。这种回归的体感是"开屏越来越慢"，
-//      没人会去翻代码，只能靠数字。
-//      自带图首屏 = maps.json 65 + 主图集 1091 + 几个 JSON 29 ≈ 1185KB。
-results.push(run('首屏体积 不含大图集', 'map=qingxuan&autotest=bootstats&preload=0', ({ probe }) =>
+// 9.7) 首屏体积：2026-09-16 起策略变了 —— **外来图（远航之岸/殒落港湾）进首屏**，
+//      地宫仍按需。理由是这两张是常驻玩法区，老方案「进游戏 2.5s 后串行预取」会让
+//      点按钮的人正好撞在下载中段。这条同时把「首屏到底背了多少」钉住：谁再把别的
+//      大图集顺手挪进 LOAD_PLAN，这里立刻红（体感是"开屏越来越慢"，没人会去翻代码）。
+//      ⚠ weight 口径已改成**线上真实传输 KB**（JSON 走 gzip）：
+//      主图集 1091(webp 不可压) + 几个 JSON 17 + 外来图集 910 + 外来索引 2 + 两张地形 16 ≈ 2035KB。
+results.push(run('首屏含外来图 但不含地宫', 'map=qingxuan&autotest=bootstats&preload=0', ({ probe }) =>
   !!probe && probe.map === 'qingxuan' &&
-  probe.total > 1000 && probe.total < 1400 &&
-  probe.extras && probe.extras.dungeon.loaded === false && probe.extras.flare.loaded === false,
-{ budget: 20000 }));
-
-//      反过来：?map= 直接指到那张图时，它**必须**算进首屏 —— 否则进图那一刻才开始下载，
-//      玩家看到的是"进去了但一片空白"。
-results.push(run('首屏含目标图图集', 'map=dungeon&autotest=bootstats&preload=0', ({ probe }) =>
-  !!probe && probe.map === 'dungeon' &&
-  probe.total > 1600 && probe.extras.dungeon.loaded === true,
+  probe.total > 1900 && probe.total < 2200 &&
+  probe.extras && probe.extras.flare.loaded === true && probe.extras.dungeon.loaded === false,
 { budget: 26000 }));
 
-// 9.8) 运行时按需补载：首屏只载自带图，然后模拟用户点地图按钮切过去 ——
-//      图集与地形要当场补上、玩家落在可走格上、载入提示要收掉。
-//      这条覆盖最容易漏的路径：?map= 没指到它，goTo 的补载分支才第一次被执行。
-results.push(run('按需切图 外来图', 'map=qingxuan&autotest=lazygoto&preload=0&goto=flare_arrival', ({ probe }) =>
-  !!probe && probe.map === 'flare_arrival' && probe.before === false &&
-  probe.obj > 1000 && probe.atlas === true &&
-  probe.spawnOnWalkable === true && probe.atSpawn === true && probe.tipGone === true,
-{ budget: 30000 }));
+//      反过来：?map= 直接指到那张图时，它**必须**算进首屏 —— 否则进图那一刻才开始下载，
+//      玩家看到的是"进去了但一片空白"。地宫是最后一套按需图集，这条守着那条路径。
+results.push(run('首屏含目标图图集', 'map=dungeon&autotest=bootstats&preload=0', ({ probe }) =>
+  !!probe && probe.map === 'dungeon' &&
+  probe.total > 2400 && probe.total < 2800 && probe.extras.dungeon.loaded === true,
+{ budget: 32000 }));
 
+// 9.8) 运行时按需补载：首屏只载自带图 + 外来图，然后模拟用户点地图按钮切过去 ——
+//      地形与图集要当场补上、玩家落在可走格上、载入提示要收掉。
+//      这条覆盖最容易漏的路径：?map= 没指到它，goTo 的补载分支才第一次被执行。
 results.push(run('按需切图 地宫', 'map=qingxuan&autotest=lazygoto&preload=0&goto=dungeon', ({ probe }) =>
   !!probe && probe.map === 'dungeon' && probe.before === false &&
   probe.obj > 100 && probe.atlas === true &&
+  probe.spawnOnWalkable === true && probe.atSpawn === true && probe.tipGone === true,
+{ budget: 32000 }));
+
+// 9.85) 外来图「零等待切换」：用户要求「这两张图一起加载，不要点击再加载」的验收。
+//      before=true 说明点下去之前图集已就绪；地形也在首屏池里（m._data 已置位），
+//      所以 goTo 走的是同步分支 —— 一次网络请求都不发，载入提示也不该闪。
+results.push(run('外来图 零等待切换', 'map=qingxuan&autotest=lazygoto&preload=0&goto=flare_harbor', ({ probe }) =>
+  !!probe && probe.map === 'flare_harbor' && probe.before === true &&
+  probe.obj > 1000 && probe.atlas === true &&
   probe.spawnOnWalkable === true && probe.atSpawn === true && probe.tipGone === true,
 { budget: 30000 }));
 
@@ -302,7 +326,10 @@ results.push(run('手机竖屏 横屏提醒', 'map=lingquan&touch=1&autotest=mob
   probe.rotateDismissed === true && probe.headHit === 'skipped-overlay',
 { size: '390,844', budget: 22000 }));
 
-const failed = results.filter((r) => r.ok === false).length;
-console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + results.length + ' 个用例)'));
+const ran = results.filter((r) => r.ok !== null);
+const failed = ran.filter((r) => r.ok === false).length;
+const skipped = results.filter((r) => r.ok === null).length;
+console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + ran.length + ' 个用例)') +
+  (skipped ? '（另有 ' + skipped + ' 个因过滤跳过）' : ''));
 try { fs.rmSync(U_DIR, { recursive: true, force: true }); } catch (e) { /* 目录偶尔被占用，留着不影响结果 */ }
 process.exit(failed ? 1 : 0);

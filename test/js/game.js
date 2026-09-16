@@ -245,7 +245,12 @@
     return { mx: (a + b) / 2, my: (b - a) / 2 };
   }
   function cellChar(x, y) {
-    if (!CUR || x < 0 || y < 0 || x >= CUR.w || y >= CUR.h) return ' ';
+    // 用「取反的连比」一次挡掉越界、NaN、undefined：任何与 NaN 的比较都是 false，
+    // 取反后直接 return，不会走到 ground[NaN] → undefined[NaN] 把渲染循环打死。
+    // 地形还没到的「轻条目」（外来图先出条目、后到地形）也返回空格而不是抛 ——
+    // 一帧画空，好过一个死掉的 rAF 循环（画面还在、点什么都没反应，最难查）。
+    if (!CUR || !CUR.ground) return ' ';
+    if (!(x >= 0 && y >= 0 && x < CUR.w && y < CUR.h)) return ' ';
     return CUR.ground[y][x];
   }
   function isSolid(x, y) { return !!CUR && CUR.solid['' + x + ',' + y]; }
@@ -333,31 +338,45 @@
   // 分母突然变大、进度条倒退。
   // ⚠ 换素材后必须同步这里：填各文件的实际 KB 数，否则会出现「明明在下大图、
   //    进度条却几乎不动」的假卡（曾因 foes 从 155 涨到 1043 没同步而踩过）。
+    // ⚠ weight 填**线上真实传输 KB**，不是磁盘体积 —— 这两者差得很远：
+    //   Pages 对 text/json 自动 gzip，磁盘 131KB 的地形 JSON 实际只走 8KB
+    //   （全站 JSON 合计 358KB → 30KB）。进度条是按 weight 加权的，而下载途中的
+    //   字节进度 e.loaded/e.total 拿到的**本身就是压缩后**的字节，两边同口径，
+    //   进度条才会匀速；填磁盘体积会让那几个 JSON 白白虚占一段宽度（假卡）。
+    //   图集是 webp（已压过），传输≈磁盘，照填磁盘 KB。
+    // ⚠ 数组下标被下面硬编码引用（LOAD_PLAN[0]/[1]/[4]/[5]/[6]/[7]/[8]），
+    //   要往首屏加东西就 push 进 boot 里的 POOL，**别插进这个数组**。
     var LOAD_PLAN = [
-      // ⚠ weight 填**真实体积 KB**：进度条按它加权，填小了会在最后一段卡住不动。
-      //   maps.json 现在只放「游戏自带的 5 张图」+ 外来图的轻条目（地形数据另有文件），
-      //   所以从 322KB 掉到 65KB —— 首屏少背 260KB。
-      { url: 'assets/maps.json?v=14', json: true, weight: 65, label: '读取地图数据', _expand: true },
+      { url: 'assets/maps.json?v=15', json: true, weight: 8, label: '读取地图数据', _expand: true },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },
-      { url: 'assets/tiles_atlas.json?v=5', json: true, weight: 5, label: '读取地貌索引' },
-    { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
-    { url: 'assets/foes_atlas.json?v=2', json: true, weight: 10, label: '读取妖兽索引' },
-    { url: 'assets/heroes.json?v=1', json: true, weight: 2, label: '读取角色清单' },
-    { url: 'assets/beasts.json?v=2', json: true, weight: 11, label: '读取怪物图录' }
-  ];
+      { url: 'assets/tiles_atlas.json?v=5', json: true, weight: 2, label: '读取地貌索引' },
+      { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
+      { url: 'assets/foes_atlas.json?v=2', json: true, weight: 2, label: '读取妖兽索引' },
+      { url: 'assets/heroes.json?v=1', json: true, weight: 1, label: '读取角色清单' },
+      { url: 'assets/beasts.json?v=2', json: true, weight: 2, label: '读取怪物图录' }
+    ];
 
   /* ── 按需图集（懒加载）────────────────────────────────────────────────
-   * 地宫 547KB、外来地图 940KB —— 这两套只有切到对应地图才用得上。
-   * 塞进首屏等于让「只想在山门走两步」的人先等 1.5MB：
-   * 首屏从 3.02MB 降到 1.21MB（-60%）。三条路径覆盖全部情况：
-   *   ① ?map= 直接指向该图 → 计入首屏（见 expandPlan，进度条照走）
+   * 地宫 547KB：只有切到地宫才用得上，走真正的懒加载（三条路径覆盖全部情况）：
+   *   ① ?map= 直接指向该图 → 计入首屏（见 expandPlan 的 ②，进度条照走）
    *   ② 进游戏后空闲预取（见 preloadExtras）—— 用户点按钮时通常已就绪
    *   ③ 手比预取快 → 现场载，屏幕下方给一条小提示（见 goTo）
    * 键名必须与 ATLAS 的键一致：加载完按 item.atlas 直接填进去。
    * · 地宫素材：228 张独立 PNG 已打包成单张（见 tools/build_dungeon_atlas.py）
-   * · 外来地图：Flare 开源 ARPG 战役关卡，tools/import_tmx.py 转出，两张共用一套图集
+   *
+   * ★ 外来地图（远航之岸 / 殒落港湾）2026-09-16 起**首屏就载、不参与懒加载**：
+   *   用户要求「这两张图一起加载，不要点击再加载」。两张图共用一套 flare 图集 ——
+   *   只下一张就覆盖两张，所以"一起加载"的代价是 +910KB 而不是 +1820KB。
+   *   机制：expandPlan 里的 EAGER_ATLAS=['flare'] 把它的图集无条件推进首屏池
+   *   （不再等 ?map= 指名、也不再等 2.5s 预取），点按钮就是同步切换
+   *   （goTo 里 `m._data` 与 extrasReady 都成立，一次网络请求都不发）。
+   *   代价：首屏 1.1MB → 2.0MB（+910KB，全是那张 webp）。之所以敢这么干，是因为
+   *   这 910KB 本来也会被后台预取拉走（老方案对"进游戏待一会"的人流量一模一样）——
+   *   变的只是"什么时候下"，不是"下不下"。地形 JSON 那边线上 gzip 后只 8KB/张，可忽略。
+   *   ⚠ 这 910KB 已是地板：瓦片是原生 120×60、webp 对透明区编码极高效，重打包反而更大；
+   *   唯一能压的是"别让弱机在首屏被它堵住"——所以 CONC 维持 3 不调高。
    * ⚠ 图集内容一变就要升 ?v=，否则浏览器缓存会把旧 webp 喂回来（Pages 的 max-age=600）。
    */
   var EXTRA = {
@@ -372,7 +391,7 @@
       loaded: false, loading: null, queued: false,
       items: [
         { url: 'assets/flare_atlas.webp?v=3', atlas: 'flare', weight: 910, label: '载入外来地图图集' },
-        { url: 'assets/flare_atlas.json?v=3', atlas: 'flare', json: true, weight: 10, label: '读取外来地图索引' }
+        { url: 'assets/flare_atlas.json?v=3', atlas: 'flare', json: true, weight: 2, label: '读取外来地图索引' }
       ]
     }
   };
@@ -544,8 +563,15 @@
     var m = IDX[id] || MAPS[0];
     var an = mapAtlas(m);
     var names = an ? [an] : [];
+    // 落点缺省 = 这张图的出生点。归一化只写这一处，两条分支共用 ——
+    // 曾经只有「补载后切」那条做了缺省，而地图按钮就是 goTo(m.id) 不带坐标：
+    // 外来图一进首屏（走同步分支），点按钮立刻把 undefined 传进
+    // switchTo → snapWalkable → walkable(undefined) 抛异常，rAF 循环当场死掉、画面卡住。
+    function land() {
+      switchTo(m.id, x === undefined ? m.home.x : x, y === undefined ? m.home.y : y, silent);
+    }
     if (!(m.src && !m._data) && extrasReady(names)) {
-      switchTo(m.id, x, y, silent);
+      land();
       return Promise.resolve();
     }
     var base = 0, span = 1;
@@ -559,7 +585,7 @@
       })
       .then(function () {
         mapLoadTip(null);
-        switchTo(m.id, x === undefined ? m.home.x : x, y === undefined ? m.home.y : y, silent);
+        land();
       });
   }
 
@@ -643,6 +669,11 @@
     // 计划池：LOAD_PLAN 是「一定会用到」的；expandPlan 会把「这张图额外要的」也推进来。
     // 池化 + 并发跑，是为了让首屏那 1.2MB 不再一个接一个地排队等。
     var POOL = LOAD_PLAN.slice();
+    // ★ 外来图集进首屏池（不插进 LOAD_PLAN，那会挪动上面硬编码的下标）。
+    //   queued=true 有两个作用：① expandPlan 不会再把它推一遍；② 语义上"已经在计划里"。
+    //   preloadExtras 靠 loaded 判断，loadItems 完成后 fillAtlas('flare') 会把它标上。
+    EXTRA.flare.queued = true;
+    EXTRA.flare.items.forEach(function (it) { POOL.push(it); });
     var W_TOTAL = POOL.reduce(function (a, p) { return a + p.weight; }, 0);
     var got = {};
     function report(label, sub) {
@@ -656,22 +687,43 @@
     /** 把「首屏要进的那张图」额外需要的资源推进池子。
      *  ⚠ 必须在 maps.json 解析完的那一刻**同步**做完：next() 是靠「step 追上池长」
      *  判断收工的，晚一步追加就没人回来取新任务了（next 末尾还有一次兜底）。 */
+    // 常驻图集：首屏就载、不要点击再加载（用户 2026-09-16 要求「这两张图一起加载，
+    // 不要点击再加载」）。外来图（远航之岸 / 殒落港湾）共用一套 flare 图集 —— 只下一张
+    // 就覆盖两张图，所以「一起加载」的代价是 +910KB 而不是 +1820KB。地宫仍按需（只有进去
+    // 才用得到，塞首屏是纯浪费）。
+    var EAGER_ATLAS = ['flare'];
     function expandPlan(data) {
       var q0 = new URLSearchParams(location.search);
-      var want = q0.get('map'), sm = null;
-      (data.maps || []).forEach(function (x) { if (x.id === want) sm = x; });
-      if (!sm) return;                      // 没指定 / 指定的是自带图 → 无需额外资源
-      var an = mapAtlas(sm);
-      if (an && !EXTRA[an].queued) {
-        EXTRA[an].queued = true;
-        EXTRA[an].items.forEach(function (it) {
-          if (POOL.indexOf(it) < 0) { POOL.push(it); W_TOTAL += it.weight; }
-        });
-      }
-      if (sm.src) {
-        POOL.push({ url: sm.src, json: true, weight: 133, label: '读取「' + sm.name + '」地形', _map: sm });
-        W_TOTAL += 133;
-      }
+      var want = q0.get('map');
+      (data.maps || []).forEach(function (x) {
+        // ① 常驻图集：这张图用到的图集在 EAGER_ATLAS 里，就并进首屏池 ——
+        //   不再等 ?map= 指名、也不再等 2.5s 预取，用户点按钮就是同步切换。
+        var an = mapAtlas(x);
+        if (an && EAGER_ATLAS.indexOf(an) >= 0 && !EXTRA[an].queued) {
+          EXTRA[an].queued = true;
+          EXTRA[an].items.forEach(function (it) {
+            if (POOL.indexOf(it) < 0) { POOL.push(it); W_TOTAL += it.weight; }
+          });
+        }
+        // ② 用户直接点名的那张图：保险起见它的图集也进首屏（指到地宫这种按需图时兜底）
+        if (x.id === want) {
+          var an2 = mapAtlas(x);
+          if (an2 && !EXTRA[an2].queued) {
+            EXTRA[an2].queued = true;
+            EXTRA[an2].items.forEach(function (it) {
+              if (POOL.indexOf(it) < 0) { POOL.push(it); W_TOTAL += it.weight; }
+            });
+          }
+        }
+        // ③ 地形数据一律开局顺手带下来（不管用户会不会点它）。
+        //    线上 gzip 后一张只 8KB，与其让玩家点过去时等一个来回，不如现在就下完。
+        if (x.src && !x._queued) {
+          x._queued = true;
+          POOL.push({ url: x.src, json: true, weight: 8,
+            label: '读取「' + x.name + '」地形', _map: x });
+          W_TOTAL += 8;
+        }
+      });
     }
 
     // 并发路数：原先 11 个文件严格串行，最慢的那个决定首屏；现在三条流水并行。
@@ -722,8 +774,9 @@
         var fj = LOAD_PLAN[6].value || {};
         ATLAS.foes.rect = fj.rect || fj;
         ATLAS.foes.anim = fj.anims || {};
-        // 按需图集（地宫 / 外来地图）：只有当 ?map= 指到了那张图，它才会出现在首屏
-        // 池子里。fillAtlas 顺手把 loaded 标上，后台预取就不会再拉一遍。
+        // 按需图集（地宫 / 外来地图）：flare 经 expandPlan 的 EAGER_ATLAS 总是进首屏池，
+        // dungeon 只在 ?map= 指到时进池。无论哪种，到这里的 item 都已加载完，fillAtlas
+        // 顺手把 loaded 标上，后台预取就不会再拉一遍。
         fillAtlas('dungeon'); fillAtlas('flare');
         // 角色清单由 test/tools/build_chars_atlas.py 自动生成。加载失败就沿用内置默认，
         // 不影响启动 —— 只是少了新角色，不会白屏。
@@ -794,6 +847,29 @@
         document.body.appendChild(dbg);
         window.__dbg = dbg;
         var at = q.get('autotest');
+        // 自测期把未捕获异常/未处理的 Promise 拒绝**写进 #probe**。
+        // 没有这一层，用例里任何一处抛错的表现都是「没有 #probe」——和「用例没过」长得
+        // 一模一样（#dbg 每帧都在写，页面上看还"活得好好的"），只能靠翻代码猜。
+        // 只在带 ?autotest= 时装，正常玩家不受影响。
+        if (at) {
+          function probeErr(o) {
+            var pb = document.getElementById('probe');
+            if (!pb) {
+              pb = document.createElement('div'); pb.id = 'probe';
+              pb.style.display = 'none'; document.body.appendChild(pb);
+            }
+            if (!pb.textContent) pb.textContent = JSON.stringify(o);
+          }
+          window.addEventListener('error', function (ev) {
+            var st = String((ev.error && ev.error.stack) || '').split('\n').slice(0, 6).join(' | ');
+            probeErr({ err: String(ev.message || ev.error),
+              at: (ev.filename || '') + ':' + ev.lineno + ':' + ev.colno, stack: st });
+          });
+          window.addEventListener('unhandledrejection', function (ev) {
+            var r = ev.reason;
+            probeErr({ reject: String((r && r.message) || r), stack: String((r && r.stack) || '').slice(0, 400) });
+          });
+        }
         HOLD = q.get('hold') === '1';
         // ?pose=run —— 把主角锁在某个动作上（核对素材/截图用），取值见 ACT_CN
         var pq = q.get('pose');
