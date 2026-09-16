@@ -1,5 +1,5 @@
 {
- "_spec": "由 test/tools/build_beasts_atlas.py 从 test/tools/beast_packs.json 生成，勿手改。",
+ "_spec": "由 games/immortal-isles/tools/build_beasts_atlas.py 从 games/immortal-isles/tools/beast_packs.json 生成，勿手改。",
  "atlas": "foes_atlas.png",
  "keys": [
   "minotaur_a",
@@ -37,6 +37,7 @@
     13
    ],
    "aggro": null,
+   "ranged": null,
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.4779,
@@ -94,6 +95,7 @@
     21
    ],
    "aggro": null,
+   "ranged": null,
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.4514,
@@ -151,6 +153,7 @@
     15
    ],
    "aggro": null,
+   "ranged": null,
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.3892,
@@ -214,6 +217,7 @@
     17
    ],
    "aggro": null,
+   "ranged": null,
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.4779,
@@ -277,6 +281,7 @@
     26
    ],
    "aggro": null,
+   "ranged": null,
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.4887,
@@ -340,6 +345,12 @@
     20
    ],
    "aggro": null,
+   "ranged": {
+    "stop": 4.2,
+    "cd": 2.8,
+    "spd": 5.2,
+    "mul": 0.9
+   },
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.4545,
@@ -403,6 +414,7 @@
     20
    ],
    "aggro": null,
+   "ranged": null,
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.4962,
@@ -466,6 +478,7 @@
     4
    ],
    "aggro": 9,
+   "ranged": null,
    "srcFace": "right",
    "mode": "sheet",
    "ax": 0.4194,
@@ -529,6 +542,7 @@
     23
    ],
    "aggro": 10,
+   "ranged": null,
    "srcFace": "left",
    "mode": "frames",
    "ax": 0.547,

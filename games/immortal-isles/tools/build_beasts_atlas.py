@@ -27,8 +27,9 @@ import os
 import sys
 from PIL import Image
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # ImmortalGame/
-TEST = os.path.join(ROOT, 'test')
+# 2026-09-16 工作区重组：游戏根 = 本文件上两级（games/immortal-isles/），素材根 = ImmortalGame/
+TEST = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(TEST))
 MANIFEST = os.path.join(TEST, 'tools', 'beast_packs.json')
 # ⚠ 增量重建的坑：早先直接在 foes_atlas.png 上叠加，脚本跑第二遍就把 9 只怪又贴了一遍
 #   （图集从 2931 高涨到 5385）。现在固定从 tools/foes_base.* 这份「老妖兽原始图集」重建，
@@ -374,6 +375,7 @@ def finish(m, tag, picked, box, ax, body_h, acts_map, fps, content_h, content_cx
         'fh': fh, 'bodyH': body_h, 'hp': m['hp'], 'atk': m['atk'], 'def': m['def'],
         'exp': m['exp'], 'stones': m['stones'], 'mv': m['mv'],
         'elite': bool(m.get('elite')), 'spawn': m.get('spawn'), 'aggro': m.get('aggro'),
+        'ranged': m.get('ranged'),   # 远程行为参数（stop/cd/spd/mul），引擎 updateFoes 读取
         'srcFace': m.get('srcFace', 'right'), 'mode': 'frames' if frames_mode else 'sheet',
         'ax': round(ax, 4), 'box': list(box), 'contentH': content_h, 'contentCX': round(content_cx, 1),
         'acts': {a: len(picked[a]) for a in picked if not a.startswith('_')},

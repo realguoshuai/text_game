@@ -60,6 +60,7 @@
       "monsters": [
         { "src": "Gorgon_1", "key": "gorgon_a", "cn": "蛇妖·碧鳞", "body": 100,
           "hp": 88, "atk": 16, "def": 8,  "exp": 26, "stones": [6, 13], "mv": 2.5, "spawn": [8, 20],
+          "ranged": { "stop": 4.2, "cd": 2.8, "spd": 5.2, "mul": 0.9 },
           "acts": { "atk": ["Attack_2.png", "Attack_1.png"], "atk2": ["Special.png"] } },
         { "src": "Gorgon_2", "key": "gorgon_b", "cn": "蛇妖·紫鳞", "body": 100,
           "hp": 82, "atk": 18, "def": 7,  "exp": 26, "stones": [6, 13], "mv": 2.8, "spawn": [24, 20],

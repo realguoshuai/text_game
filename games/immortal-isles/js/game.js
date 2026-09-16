@@ -39,18 +39,27 @@
   // 旧版只算距离不算朝向，背对怪物也能砍中，锁定感为零。
   var FACE_ARC = 0.5;
   var FACE_VEC = { right: { x: 1, y: 0 }, left: { x: -1, y: 0 }, down: { x: 0, y: 1 }, up: { x: 0, y: -1 } };
-  /* ---------------- 技能表（右下角技能盘，U / I / O） ----------------
-   * kind：line = 朝面朝方向的直线剑气（穿透）；aoe = 以自身为中心；target = 锁定最近目标落点。
+  /* ---------------- 技能表（右下角技能盘，U / I / O / P） ----------------
+   * kind：line = 朝面朝方向的直线剑气（穿透）；aoe = 以自身为中心；target = 锁定最近目标落点；
+   *       proj = 掷出弹道飞行物（fx），命中第一个目标爆炸，可波及周围（splash/splashR）。
    * mul 是攻击力倍率，伤害仍统一走 rollDamage，所以浮动/暴击/连击一样生效。
-   * act 指定施法动作（素材只有 6 个动作，技能复用攻击动作）。 */
+   * fx/impact 指向 fx_atlas 里的特效组（assets/fx_atlas.json 的 _meta 键）。
+   * act 指定施法动作（素材只有 6 个动作，技能复用攻击动作）。
+   * 按键从 key 字段自动生成映射（SKILL_KEYS），加技能只改这张表。 */
   var SKILLS = [
     { id: 'sword', name: '御剑诀', key: 'u', cd: 4.0, mul: 1.35, reach: 4.2, wide: 0.95,
       kind: 'line', color: '#6fd8ff', act: 'atkA', tip: '前方直线剑气，穿透多个目标' },
     { id: 'thunder', name: '雷罡咒', key: 'i', cd: 9.0, mul: 1.05, reach: 3.0,
-      kind: 'aoe', color: '#ffcf3a', act: 'atkB', knock: 1.1, tip: '以自身为中心雷爆，击退周围妖兽' },
+      kind: 'aoe', color: '#ffcf3a', act: 'atkB', knock: 1.1, fx: 'lightning', tip: '以自身为中心雷爆，击退周围妖兽' },
     { id: 'swordfield', name: '太虚剑域', key: 'o', cd: 20.0, mul: 2.4, reach: 2.8,
-      kind: 'target', color: '#ff8ad0', act: 'atkB', tip: '锁定最近目标落下剑雨，范围重创' }
+      kind: 'target', color: '#ff8ad0', act: 'atkB', tip: '锁定最近目标落下剑雨，范围重创' },
+    { id: 'fireball', name: '炎爆术', key: 'p', cd: 2.5, mul: 1.2, reach: 9, spd: 6.2,
+      kind: 'proj', fx: 'fireball', impact: 'blast', splash: 0.55, splashR: 1.6,
+      color: '#ff9a3d', act: 'atkB', tip: '掷出火球，命中爆炸并波及周围妖兽' }
   ];
+  // 按键 → 技能序号（数据驱动：技能表的 key 字段就是键盘键）
+  var SKILL_KEYS = {};
+  (function () { for (var i = 0; i < SKILLS.length; i++) SKILL_KEYS[SKILLS[i].key] = i; })();
   var RUN_MUL = 1.0;       // 取消冲刺加速（Shift/摇杆推满不再提速）
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
   // 怪物（侧视多动作素材）一次性动作的播放时长（秒）；循环动作 idle/walk/run 按 fps 推进
@@ -170,7 +179,9 @@
     // fh = 目标绘制身高（屏幕像素，Z=1 时）；主角为 128，妖兽略矮，精英石魔接近主角
     assassin: { key: 'assassin', name: '刀影飞镖',     hp: 42,  atk: 14, def: 4,  exp: 12, stones: [3, 7],   mv: 3.2,  fh: 90 },
     golem:    { key: 'golem',    name: '九州震击石魔', hp: 130, atk: 16, def: 12, exp: 32, stones: [8, 16],  mv: 1.55, fh: 124, elite: true },
-    wraith:   { key: 'wraith',   name: '水墨幽魂',     hp: 74,  atk: 17, def: 7,  exp: 22, stones: [5, 11],  mv: 2.2,  fh: 104 },
+    // ranged：远程怪 —— 保持 stop 距离不近身，有视线就定时掷火球弹道（可走位躲开）
+    wraith:   { key: 'wraith',   name: '水墨幽魂',     hp: 74,  atk: 17, def: 7,  exp: 22, stones: [5, 11],  mv: 2.2,  fh: 104,
+                 ranged: { stop: 4.0, cd: 3.0, spd: 5.0, mul: 0.85 } },
     // 训练靶（青玄山门调试场专供）：不移动、不还手、打不死 —— 只用来试攻击与技能
     dummy:    { key: 'golem',    name: '练功石傀',     hp: 99999, atk: 0, def: 0, exp: 0, stones: [0, 0],  mv: 0,    fh: 116, dummy: true }
   };
@@ -212,7 +223,8 @@
         key: b.key, name: b.cn, hp: b.hp, atk: b.atk, def: b.def, exp: b.exp,
         stones: b.stones, mv: b.mv, fh: b.fh, elite: !!b.elite, side: 1,
         // 仇恨半径：不填就跟全局 AGGRO。调大的怪会主动从远处扑过来打人。
-        aggro: b.aggro || 0, srcFace: b.srcFace || 'right'
+        aggro: b.aggro || 0, srcFace: b.srcFace || 'right',
+        ranged: b.ranged || null       // 远程行为参数（beast_packs.json 里登记）
       };
       if (b.spawn) LINGQUAN_SPAWNS.push({ x: b.spawn[0], y: b.spawn[1], t: b.key });
     }
@@ -355,7 +367,9 @@
       { url: 'assets/chars_atlas.json?v=3', json: true, weight: 1, label: '读取人物索引' },
       { url: 'assets/foes_atlas.json?v=2', json: true, weight: 2, label: '读取妖兽索引' },
       { url: 'assets/heroes.json?v=1', json: true, weight: 1, label: '读取角色清单' },
-      { url: 'assets/beasts.json?v=2', json: true, weight: 2, label: '读取怪物图录' }
+      { url: 'assets/fx_atlas.webp?v=1', atlas: 'fx', weight: 61, label: '载入技能特效' },
+      { url: 'assets/fx_atlas.json?v=1', json: true, weight: 1, label: '读取特效索引' },
+      { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' }
     ];
 
   /* ── 按需图集（懒加载）────────────────────────────────────────────────
@@ -1547,6 +1561,34 @@
           var pb = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
           pb.textContent = JSON.stringify({ alive: alive, total: foes.length, exp: player.exp, stones: player.stones, hp: Math.round(player.hp) });
         }
+        if (at === 'ranged') {
+          // ?map=beilin&autotest=ranged —— 远程怪验收：进仇恨圈后停手距离掷弹道，
+          // 玩家站桩挨打（掉血>0）、怪不近身（最小距离保持在近战圈外）、弹道会打完清空
+          var wr = null, bd2 = 1e9;
+          for (var ri = 0; ri < foes.length; ri++) {
+            var rf = foes[ri];
+            if (!rf.def_.ranged || !rf.alive) continue;
+            var rd2 = Math.hypot(rf.x - player.mx, rf.y - player.my);
+            if (rd2 < bd2) { bd2 = rd2; wr = rf; }
+          }
+          var rres = { found: !!wr, shots: 0, hpLost: 0, minDist: 0, endProjs: 0 };
+          var pb3 = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          if (wr) {
+            player.mx = wr.x + 3; player.my = wr.y; player.tx = player.mx; player.ty = player.my;
+            player.path = null; player.invuln = 0;
+            var hp0 = player.hp, fire0 = projFired, dmin = 1e9;
+            for (var rt = 0; rt < 600; rt++) {          // 20s@30fps：足够几轮射击
+              window.ISLES.tick(1 / 30);
+              if (!wr.alive) break;
+              dmin = Math.min(dmin, Math.hypot(wr.x - player.mx, wr.y - player.my));
+            }
+            rres.shots = projFired - fire0;
+            rres.hpLost = Math.round(hp0 - player.hp);
+            rres.minDist = +dmin.toFixed(2);
+            rres.endProjs = projectiles.length;
+          }
+          pb3.textContent = JSON.stringify(rres);
+        }
         if (at === 'foesize') {
           // ?map=beilin&autotest=foesize —— 校验每只怪每个朝向/状态都能解析到帧，且绘制尺寸已归一化
           var rows = window.ISLES.foeDebug();
@@ -1642,6 +1684,11 @@
               setup(); player.skillCd[si3] = 0;
               var ha = tg3.hp, fxA = skillFx.length;
               var ok1 = castSkill(si3);
+              // 弹道技能（proj）的伤害在命中帧才结算：统一 tick 到「动作播完且弹道清空」
+              for (var sfi = 0; sfi < 260; sfi++) {
+                window.ISLES.tick(1 / 60);
+                if (player.actHold <= 0 && projectiles.length === 0) break;
+              }
               res.push({ id: SKILLS[si3].id, cast: !!ok1, dmg: ha - tg3.hp,
                 cd: +player.skillCd[si3].toFixed(2), fx: skillFx.length - fxA });
               setup();
@@ -1649,8 +1696,11 @@
               setup(); player.skillCd[si3] = 0;
               var hb2 = tg3.hp;
               res[si3].recast = !!castSkill(si3);
+              for (var sfj = 0; sfj < 260; sfj++) {
+                window.ISLES.tick(1 / 60);
+                if (player.actHold <= 0 && projectiles.length === 0) break;
+              }
               res[si3].dmg2 = hb2 - tg3.hp;
-              for (var sfi = 0; sfi < 90; sfi++) { window.ISLES.tick(1 / 60); if (player.actHold <= 0) break; }
             }
           }
           pbs.textContent = JSON.stringify({ n: SKILLS.length, skills: res });
@@ -2063,6 +2113,7 @@
       if (it.i === -1) { drawCharacter(); return; }
       paintObj(it.o);
     });
+    drawProjectiles(); // 弹道（火球）画在怪之上、特效之下 —— 爆炸要盖住火球尾焰
     drawSkillFx();    // 技能特效（剑气/雷爆/剑雨）画在飘字下面，别盖住伤害数字
     drawFloaters();   // 伤害飘字 + 击杀粒子（猎场用）
 
@@ -2278,8 +2329,8 @@
     if (k === ' ' || k === 'Spacebar') { e.preventDefault(); attackNearest(); return; }
     if (k === 'j' || k === 'J' || k === 'f' || k === 'F') { e.preventDefault(); attackNearest(); return; }
     if (k === 'k' || k === 'K') { e.preventDefault(); powerAttack(); return; }
-    // 技能：U / I / O —— 与右下角技能盘上三个键一一对应
-    var ski = { u: 0, i: 1, o: 2 }[k];
+    // 技能：按键映射由 SKILLS 表的 key 字段生成（当前 U / I / O / P）
+    var ski = SKILL_KEYS[k.toLowerCase()];
     if (ski !== undefined) { e.preventDefault(); castSkill(ski); return; }
     // 动作试演：1~6 直接切到对应动作，方便逐个核对素材（待机/行走/奔跑/攻击A/攻击B/倒地）
     var demo = { '1': 'idle', '2': 'walk', '3': 'run', '4': 'atkA', '5': 'atkB', '6': 'dead' }[k];
@@ -2436,6 +2487,7 @@
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
     updateCam(dt);
     updateFoes(dt);
+    updateProjectiles(dt);   // 敌我弹道（炎爆术 / 远程怪火球）
     updateFloaters(dt);   // 此前从未被调用 —— 伤害飘字/击杀粒子不会消失
     var posEl = document.getElementById('pos');
     if (posEl) posEl.textContent = Math.round(player.mx) + ', ' + Math.round(player.my);
@@ -2683,6 +2735,107 @@
     }
     return out;
   }
+  /* ---------------- 弹道系统（敌我共用） ----------------
+   * 玩家的炎爆术、远程怪的火球都走这条队列。弹道撞墙消散、命中结算后生成
+   * fx_atlas 里的爆炸精灵图（走 skillFx 的 sprite 分支，跟其它特效一样随时间淡出）。
+   * ?cast= 调试冻结（fxFreeze）时弹道同样停摆，方便逐帧截图核对。 */
+  var projectiles = [];
+  var projFired = 0;                     // 累计发射数（自测用：远程怪是否真的开火）
+  /** fx_atlas 取帧：at === null 按 fps 循环取；at ∈ [0,1) 按进度取（一次性动画）。 */
+  function fxFrame(name, at) {
+    var a = ATLAS.fx; if (!a || !a.img || !a.rect) return null;
+    var meta = a.rect._meta && a.rect._meta[name];
+    if (!meta) return null;
+    var idx = (at === null || at === undefined)
+      ? Math.floor(time * (meta.fps || 10)) % meta.n
+      : Math.min(meta.n - 1, Math.floor((at || 0) * meta.n));
+    var r = a.rect[name + '_' + idx]; if (!r) return null;
+    return { img: a.img, sx: r[0], sy: r[1], sw: r[2], sh: r[3], meta: meta };
+  }
+  /** 在等距屏幕坐标 (px, py 为地面点) 画一个特效帧，绕 screenAng 旋转、按 gscale 缩放 */
+  function drawFxSprite(name, px, py, gscale, screenAng, alpha, at) {
+    var fr = fxFrame(name, (at === undefined) ? null : at);
+    if (!fr) return;
+    var s = gscale * Z;
+    var dw = fr.sw * s, dh = fr.sh * s;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(px, py);
+    if (screenAng) ctx.rotate(screenAng);
+    ctx.drawImage(fr.img, fr.sx, fr.sy, fr.sw, fr.sh, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
+  }
+  /** 爆炸落点特效（一次性动画，进 skillFx 队列随其它特效一起淡出销毁） */
+  function impactFx(x, y, gscale) {
+    skillFx.push({ kind: 'sprite', fx: 'blast', x: x, y: y,
+      life: 0.5, max: 0.5, gscale: gscale || 1, rot: 0 });
+  }
+  function updateProjectiles(dt) {
+    if (fxFreeze) return;                    // ?cast= 调试：弹道和特效一起冻结
+    for (var i = projectiles.length - 1; i >= 0; i--) {
+      var p = projectiles[i];
+      var nx = p.x + p.vx * p.spd * dt, ny = p.y + p.vy * p.spd * dt;
+      p.life -= dt;
+      if (p.life <= 0 || !couldStand(nx, ny)) {      // 撞墙/超程：消散（玩家弹炸开但不伤人）
+        if (p.side === 'player') impactFx(nx, ny, 0.8);
+        projectiles.splice(i, 1);
+        continue;
+      }
+      p.x = nx; p.y = ny;
+      if (p.side === 'player') {
+        for (var j = 0; j < foes.length; j++) {
+          var f = foes[j];
+          if (!f.alive || f.dying > 0) continue;
+          if (Math.hypot(f.x - p.x, f.y - p.y) < 0.55) {
+            projHitFoe(p, f);
+            projectiles.splice(i, 1);
+            break;
+          }
+        }
+      } else if (player.invuln <= 0 && !player.dead &&
+                 Math.hypot(player.mx - p.x, player.my - p.y) < 0.5) {
+        player.hp -= p.dmg; player.flash = 0.25;
+        addFloater(player.mx, player.my - 0.35, '-' + p.dmg, '#ff6b6b');
+        impactFx(p.x, p.y, 0.7);
+        if (player.hp <= 0) playerDown(null);
+        projectiles.splice(i, 1);
+      }
+    }
+  }
+  /** 玩家弹道命中：直击全额 + 爆炸波及周围（splash 倍率、splashR 半径），统一走 rollDamage */
+  function projHitFoe(p, f) {
+    var s = p.skill;
+    var r = rollDamage(player.atk * s.mul, f.def, { heavy: true });
+    f.hp -= r.dmg; f.flash = r.crit ? 0.5 : 0.3;
+    addFloater(f.x, f.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
+      r.crit ? '#ffe66b' : (s.color || '#ffd36b'), { crit: r.crit });
+    if (f.hp <= 0) killFoe(f); else hurtFoe(f);
+    bumpCombo(f);
+    if (r.crit) player.critT = 0.45;
+    if (s.splash) {
+      for (var j = 0; j < foes.length; j++) {
+        var g = foes[j];
+        if (g === f || !g.alive || g.dying > 0) continue;
+        if (Math.hypot(g.x - p.x, g.y - p.y) <= (s.splashR || 1.5)) {
+          var r2 = rollDamage(player.atk * s.mul * s.splash, g.def, {});
+          g.hp -= r2.dmg; g.flash = 0.25;
+          addFloater(g.x, g.y - 0.3, '-' + r2.dmg, s.color || '#ffd36b');
+          if (g.hp <= 0) killFoe(g); else hurtFoe(g);
+        }
+      }
+    }
+    impactFx(p.x, p.y, 1.0);
+  }
+  /** 弹道绘制：火球帧绕「速度方向的屏幕角」旋转；等距投影 (mx,my)→屏幕 = ((mx-my)HW, (mx+my)HH) */
+  function drawProjectiles() {
+    var hw = HW, hh = HH;
+    for (var i = 0; i < projectiles.length; i++) {
+      var p = projectiles[i];
+      var pt = isoToScreen(p.x, p.y);
+      var ang = Math.atan2((p.vx + p.vy) * hh, (p.vx - p.vy) * hw);
+      drawFxSprite(p.fx, pt.x, pt.y + HH * Z - 26 * Z, p.side === 'player' ? 1.0 : 0.85, ang, 1);
+    }
+  }
   function castSkill(i) {
     var s = SKILLS[i];
     if (!s || player.dead) return false;
@@ -2701,12 +2854,23 @@
       if (t) { cx = t.x; cy = t.y; }
       else { cx = player.mx + v.x * 2.2; cy = player.my + v.y * 2.2; }
     }
+    if (s.kind === 'proj') {
+      // 弹道技能：出手只生成弹丸，伤害在命中帧结算（projHitFoe）。自动转向已让 v 对准最近目标。
+      player.skillCd[i] = s.cd;
+      player.act = s.act; player.actT = 0; player.actHold = ACT_DUR[s.act];
+      projectiles.push({ x: player.mx + v.x * 0.4, y: player.my + v.y * 0.4,
+        vx: v.x, vy: v.y, spd: s.spd || 6, life: (s.reach || 9) / (s.spd || 6),
+        side: 'player', fx: s.fx || 'fireball', skill: s });
+      projFired++;
+      if (h0) h0.textContent = s.name + ' 出手，' + s.cd + ' 秒后可再放';
+      return true;
+    }
     var hits = skillTargets(s, cx, cy);
     player.skillCd[i] = s.cd;
     player.act = s.act; player.actT = 0; player.actHold = ACT_DUR[s.act];
     var dur = s.kind === 'target' ? 0.8 : 0.5;
     skillFx.push({ kind: s.kind, x: cx, y: cy, r: s.reach, color: s.color, dir: v, life: dur, max: dur,
-      seed: (Math.random() * 0x7fffffff) | 0 });
+      fx: s.fx, seed: (Math.random() * 0x7fffffff) | 0 });
     if (!hits.length) {
       toast(s.name + ' 落空');
       if (h0) h0.textContent = s.name + ' 落空，' + s.cd + ' 秒后可再放';
@@ -2791,12 +2955,19 @@
           ctx.stroke();
         }
         ctx.restore();
+      } else if (o.kind === 'sprite') {
+        // fx_atlas 精灵图特效（爆炸等一次性动画）：按进度取帧，中心贴地面
+        drawFxSprite(o.fx, p.x, gy - 30 * Z, o.gscale || 1, o.rot || 0,
+          1 - Math.max(0, (k - 0.75) / 0.25) * 0.9, k);
       } else if (o.kind === 'aoe') {
         /* 雷罡咒 —— 落雷 → 爆闪 → 冲击波，三段先后。
          * 旧版是「一圈淡黄椭圆 + 五道几乎看不见的细闪电」，在亮草地上彻底读不出来；
          * 现在先铺一层暗色焦痕给亮色特效做底，落雷走「暗描边 + 主色 + 白芯」三遍描线。 */
         var RR = o.r * TILE_W * 0.5 * Z;
         var die = 1 - Math.max(0, (k - 0.7) / 0.3);
+        // ⓪ fx_atlas 落雷精灵图（o.fx='lightning'）：叠在程序焦痕之上、爆闪同期出现
+        if (o.fx && ATLAS.fx && ATLAS.fx.img)
+          drawFxSprite(o.fx, p.x, gy - RR * 0.72, 1.1, 0, die * 0.95, k * 0.8);
         // ① 地面焦痕（最底层，压住明亮底色）。两层叠出深浅，单层会读成"地上一滩泥"。
         var burnA = 0.40 * Math.min(1, k / 0.2) * die;
         ctx.globalAlpha = burnA * 0.95;
@@ -3053,9 +3224,12 @@
         var sx2 = ux, sy2 = uy;
         // 走到出手距离就停住：引擎原本会一路挤进玩家所在格，画面上整只怪压在主角头上。
         // 停住之后由下面的 MELEE 判定出手，观感才对。
-        if (dist > BEAST_STOP) {
-          // 视野通畅就直接冲（斜向接近更自然）；被石柱/水面挡住才走 BFS 绕行路线
-          var losOk = losClear(Math.round(f.x), Math.round(f.y), Math.round(player.mx), Math.round(player.my));
+        // 远程怪（ranged）停手距离更远：到不了视线就一直逼近（隔墙放空枪没有意义），
+        // 到位后放风筝 —— 玩家贴脸就后撤一步。
+        var rng = f.def_.ranged;
+        var stopAt = rng ? rng.stop : BEAST_STOP;
+        var losOk = losClear(Math.round(f.x), Math.round(f.y), Math.round(player.mx), Math.round(player.my));
+        if (dist > stopAt || (rng && !losOk)) {
           if (losOk) {
             f.bpath = null;
           } else {
@@ -3083,10 +3257,25 @@
           chaseDbg.path = f.bpath ? 1 : 0;
         } else {
           f.bpath = null;
+          // 远程怪放风筝：玩家贴到 2.2 格内就往后撤（能站才挪，别把怪挤进水里）
+          if (rng && dist < stopAt - 2.2) {
+            if (couldStand(f.x - ux * sp, f.y)) { f.x -= ux * sp; moving = true; }
+            if (couldStand(f.x, f.y - uy * sp)) { f.y -= uy * sp; moving = true; }
+          }
         }
         setFaceHys(f, dx, dy);
         // 复活/被击退后的无敌窗口内不结算伤害，否则刚站起来就被连击再倒
-        if (dist < MELEE + 0.15 && f.atkCd <= 0 && player.invuln <= 0) {
+        if (rng) {
+          // 远程怪：有视线且进入射程就掷火球弹道（玩家可以走位躲开）
+          if (losOk && dist <= stopAt + 1.4 && f.atkCd <= 0 && player.invuln <= 0) {
+            f.atkCd = rng.cd || 2.8; f.atkAnim = 0.32;
+            setBeastAnim(f, 'atk');
+            projectiles.push({ x: f.x, y: f.y, vx: dx / (dist || 1), vy: dy / (dist || 1),
+              spd: rng.spd || 5.2, life: 2.6, side: 'foe', fx: 'fireball',
+              dmg: Math.max(1, Math.round(f.atk * (rng.mul || 0.9) - player.def * 0.3)) });
+            projFired++;
+          }
+        } else if (dist < MELEE + 0.15 && f.atkCd <= 0 && player.invuln <= 0) {
           f.atkCd = 1.0; f.atkAnim = 0.32;
           // 精英偶尔放重招（atk2），普通怪只有普通攻击
           setBeastAnim(f, (f.def_.elite && Math.random() < 0.35) ? 'atk2' : 'atk');
@@ -3875,6 +4064,7 @@
     /** 把玩家放到当前地图第 i 个传送门上，下一次 update 即触发切换 */
     stepOnPortal: function (i) { var pt = CUR.portals[i || 0]; player.mx = pt.x; player.my = pt.y; player.tx = pt.x; player.ty = pt.y; player.path = null; portalLock = 0; },
     tick: function (dt) { update(dt || 0.016); render(); },
+    projCount: function () { return projectiles.length; },   // 自测：当前在场弹道数
     attackNearest: function () { attackNearest(); },
     powerAttack: function () { powerAttack(); },
     castSkill: function (i) { return castSkill(i); },
