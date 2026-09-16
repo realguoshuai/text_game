@@ -347,7 +347,7 @@
     // ⚠ 数组下标被下面硬编码引用（LOAD_PLAN[0]/[1]/[4]/[5]/[6]/[7]/[8]），
     //   要往首屏加东西就 push 进 boot 里的 POOL，**别插进这个数组**。
     var LOAD_PLAN = [
-      { url: 'assets/maps.json?v=16', json: true, weight: 8, label: '读取地图数据', _expand: true },
+      { url: 'assets/maps.json?v=17', json: true, weight: 8, label: '读取地图数据', _expand: true },
       { url: 'assets/tiles_atlas.webp?v=5', atlas: 'tiles', weight: 228, label: '载入地貌与建筑' },
       { url: 'assets/chars_atlas.webp?v=1', atlas: 'chars', weight: 183, label: '载入人物动作' },
       { url: 'assets/foes_atlas.webp?v=1', atlas: 'foes', weight: 680, label: '载入妖兽图鉴' },

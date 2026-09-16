@@ -32,7 +32,22 @@ MANIFEST = os.path.join(ASSETS, 'flare_manifest.json')
 # 要下掉的图（旧版 2 张 flare + 早期否掉的 kenney/grasstest）：
 #   旧 flare_arrival/flare_harbor 已被合并进 flare_grass 主题图集、改用新 id 重导，
 #   原 id 不再对应任何 _map.json，顺手清掉避免世界地图出现死链。
-DROP = ['flare_arrival', 'flare_harbor', 'kenney_hall', 'grasstest']
+DROP = ['flare_arrival', 'flare_harbor', 'kenney_hall', 'grasstest',
+        'flare_ruins_iron_labyrinth_treasure_room']  # 2026-09-16 用户要求去掉（宝物房太小）
+
+# 中文名（2026-09-16 用户要求）：按钮 / 世界地图节点都显示 name，英文原名不友好。
+# 没进表的图继续用 import_tmx 起的英文名（Title Case）。
+CN_NAMES = {
+    'flare_grass_empyrean_campaign_black_oak_city': '黑橡城',
+    'flare_cave_empyrean_campaign_mog_caverns': '莫格洞窟',
+    'flare_dungeon_empyrean_campaign_fort_amir': '阿米尔要塞',
+    'flare_snow_empyrean_campaign_stormrock_pass': '风暴岩隘口',
+    'flare_grass_empyrean_campaign_lochport': '洛赫港',
+    'flare_cave_empyrean_campaign_underworld': '冥土洞窟',
+    'flare_dungeon_empyrean_campaign_wizards_tower_1': '法师塔·一层',
+    'flare_snow_empyrean_campaign_lake_kuuma': '库玛湖',
+    'flare_ruins_iron_labyrinth_iron_labyrinth_chasm': '铁迷宫·裂隙',
+}
 
 
 def _want():
@@ -85,6 +100,9 @@ def main():
         # 去掉 ground/objects（占这张图 99% 的体积），其余元信息全留 ——
         # 引擎要 name/note/w/h 建按钮，要 spawn/home/voidColor/homeFromMap 定初始站位与底色。
         light = {k: v for k, v in mp.items() if k not in ('ground', 'objects')}
+        # 中文显示名（CN_NAMES 没收录的保持英文原名）
+        if light.get('name'):
+            light['name'] = CN_NAMES.get(mp['id'], light['name'])
         # 图集名 = 瓦片键的前缀（'flare_grass/xxx.png' -> 'flare_grass'），引擎按它决定进图前补载哪套图集
         pre = (mp.get('objects') or [{}])[0].get('piece', '')
         light['atlas'] = pre.split('/')[0] if '/' in pre else 'flare'

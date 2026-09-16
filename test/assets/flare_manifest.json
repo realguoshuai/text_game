@@ -5,7 +5,17 @@
   "theme": "cave"
  },
  {
+  "id": "flare_cave_empyrean_campaign_underworld",
+  "region": "洞窟界",
+  "theme": "cave"
+ },
+ {
   "id": "flare_dungeon_empyrean_campaign_fort_amir",
+  "region": "地牢界",
+  "theme": "dungeon"
+ },
+ {
+  "id": "flare_dungeon_empyrean_campaign_wizards_tower_1",
   "region": "地牢界",
   "theme": "dungeon"
  },
@@ -15,9 +25,19 @@
   "theme": "grass"
  },
  {
-  "id": "flare_ruins_iron_labyrinth_treasure_room",
+  "id": "flare_grass_empyrean_campaign_lochport",
+  "region": "主世界",
+  "theme": "grass"
+ },
+ {
+  "id": "flare_ruins_iron_labyrinth_iron_labyrinth_chasm",
   "region": "遗迹界",
   "theme": "ruins"
+ },
+ {
+  "id": "flare_snow_empyrean_campaign_lake_kuuma",
+  "region": "雪原界",
+  "theme": "snow"
  },
  {
   "id": "flare_snow_empyrean_campaign_stormrock_pass",
