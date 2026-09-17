@@ -4129,10 +4129,11 @@
   }
   var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；银两不入包）
   var bagDirty = true;       // HUD 脏标记（数量变了才碰 DOM）
-  /* ★ 状态行（v40 起常显）：面板标题栏直接打印脚本侧的真实状态 —— 五格数量、
-   * 银两、首格类名/滤镜、最近拾取。跟"你眼睛看到的画面"对照，一张截图就能
-   * 分清是**数据没进来**还是**样式没生效**。
-   * （v39 及以前靠 ?bagdbg=1 开启 —— 但用户只会发截图、不会带 query 参数，等于白做。） */
+  /* ★ 状态行（v43 起默认收起）：正常时只显示「银两 N」，玩家视角干净；
+   * ?bagdbg=1 或页面出过错（window.__lastErr，左下角 ⚠ 同源）时自动切调试行
+   * —— 排查判据常备（bt/d/r/失联/拾/错），但不再打扰正常游戏。
+   * 强刷逻辑保留：银两显示依然是 0.5s 实时（v42 的兜底轮询不动）。 */
+  var BAG_DEBUG = /(^|[?&])bagdbg=1(&|$)/.test(location.search);
   var __lastPickup = '';     // 最近一次入包（状态行排查用）
   var __bagOrphan = 0;       // 失联格子数：bagCells 里有、但已不在页面 DOM 里的数量
   function bagDebugLine() {
@@ -4166,7 +4167,7 @@
     var it = ITEMS[key];
     if (!it || it.kind !== 'heal') return false;
     if (player.dead) { toast('已经倒下了，先等回魂'); return false; }
-    if (!bag[key]) { toast('行囊里没有' + it.cn); return false; }
+    if (!bag[key]) { toast('背包里没有' + it.cn); return false; }
     if (player.hp >= player.maxhp) { toast('气血已满，留着'); return false; }
     if (healCd > 0) return false;
     healCd = HEAL_CD;
@@ -4374,9 +4375,8 @@
       if (it.kind === 'heal') hasHeal += n;
     });
     var sv = document.getElementById('bagStones');
-    // ★ 状态行常显（v40）：一行打包"脚本认为的状态"——五格数量、银两、首格类名/滤镜、
-    //   最近拾取。用户发一张截图就自带全部判据，不用再猜"到底卡在哪一环"。
-    if (sv) sv.textContent = bagDebugLine();
+    // v43 起默认只显示「银两 N」；?bagdbg=1 或出过错时才切调试行（判据常备不常扰）
+    if (sv) sv.textContent = (BAG_DEBUG || window.__lastErr) ? bagDebugLine() : ('银两 ' + player.stones);
     // 入口按钮上的小红点：有药就提示"可以嗑"
     var btn = document.getElementById('bagBtn'), dot = document.getElementById('bagDot');
     if (btn) btn.classList.toggle('hasnew', hasHeal > 0 && !bagOpen);
@@ -4425,9 +4425,38 @@
     }
   }
   /** 挨打时的受击反馈：有 hurt 动作就播一下（0.3 秒内不可被移动状态改写） */
+  /* ---------------- 怪物头顶小字台词（v43） ----------------
+   * 氛围向：随机冒一句短话。三条克制原则 ——
+   * ① 句子短（≤8 字）② 同屏最多 2 只在说 ③ 节奏按序号错开，不整齐划一。
+   * 按怪名前缀匹配种族池，没匹配上走通用池；受击有专属短叫（打断闲聊）。 */
+  var FOE_SAY_IDLE = {
+    '小僵尸': ['脑子…好想吃', '好冷…', '咕…咕……', '别跑嘛…'],
+    '牛魔':   ['哞——！', '俺的角不是摆设', '谁来过两招', '这山头是俺的'],
+    '蛇妖':   ['嘶嘶…', '小哥过来呀', '我的毒可不认人', '今天风里有香味'],
+    '铠甲卫': ['站住！何人', '军令如山', '守阵到死', '别逼我动手'],
+    '游方':   ['此路是我开', '留下买路财', '月黑风高夜', '今儿收成不错'],
+    '石魔':   ['…石头也有心事', '别敲了', '睡个好觉'],
+    '*':      ['……', '哼。', '（打了个哈欠）', '风大，别吹跑了', '今天无事发生']
+  };
+  var FOE_SAY_HURT = ['哎哟！', '好胆！', '疼疼疼！', '找死！', '记仇了！', '来啊！'];
+  function foeSayIdleLine(f) {
+    var pool = FOE_SAY_IDLE['*'];
+    for (var k in FOE_SAY_IDLE) {
+      if (k !== '*' && (f.name || '').indexOf(k) >= 0) { pool = FOE_SAY_IDLE[k]; break; }
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function foeSay(f, text, dur) {
+    f.say = text; f.sayT = dur; f.sayDur = dur;
+    f.sayCd = 8 + Math.random() * 10;          // 说过这句后隔久一点再排下次
+  }
   function hurtFoe(f) {
     if (f.dying > 0) return;
     if (ATLAS.foes.anim && ATLAS.foes.anim[f.key]) setBeastAnim(f, 'hurt');
+    /* 挨打短叫：只在上一句快说完时才覆盖 —— 连招时不会一直刷屏 */
+    if (f.sayT === undefined || f.sayT < 0.6) {
+      foeSay(f, FOE_SAY_HURT[Math.floor(Math.random() * FOE_SAY_HURT.length)], 1.4);
+    }
   }
   function respawnFoe(f) {
     var s = snapWalkable(CUR, f.home.x, f.home.y);
@@ -4485,6 +4514,23 @@
       }
       if (f.flash > 0) f.flash = Math.max(0, f.flash - dt);
       if (f.atkAnim > 0) f.atkAnim = Math.max(0, f.atkAnim - dt);
+      /* 头顶台词计时（v43）：到点随机来一句；全局同时说话 ≤2 只，同屏不吵。
+       * 初始冷却按序号错开（i*0.6s），避免一群怪同时开口。 */
+      if (f.sayT > 0) f.sayT = Math.max(0, f.sayT - dt);
+      if (f.sayCd === undefined) {
+        f.sayCd = 3 + Math.random() * 8 + i * 0.6;
+      } else {
+        f.sayCd -= dt;
+        if (f.sayCd <= 0) {
+          var talking = 0;
+          for (var si = 0; si < foes.length; si++) if (foes[si].sayT > 0) talking++;
+          if (talking < 2 && Math.random() < 0.6) {
+            foeSay(f, foeSayIdleLine(f), 2.2 + Math.random() * 1.2);
+          } else {
+            f.sayCd = 4 + Math.random() * 5;   // 这轮没轮上，稍后再试
+          }
+        }
+      }
       if (f.def_.dummy) { setBeastAnim(f, 'idle'); continue; }   // 训练靶：不追、不打、不移动
       var dx = player.mx - f.x, dy = player.my - f.y, dist = Math.hypot(dx, dy);
       f.atkCd -= dt;
@@ -4729,6 +4775,47 @@
       ctx.fillRect(bx, by, bw * Math.max(0, f.hp / f.maxhp), bh);
       ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1 * Z; ctx.strokeRect(bx, by, bw, bh);
     }
+    /* 头顶小字台词（v43）：淡入 0.22s / 结束前 0.35s 淡出；
+     * 近处的怪有名字+血条，气泡自动抬高避让。 */
+    if (f.sayT > 0 && f.say) {
+      var nearF = (player.targetFoe === f || dist < 3.0);
+      var sy2 = dy - (nearF ? 24 : 8) * Z;
+      var aSay = Math.min(1, (f.sayDur - f.sayT) / 0.22) * Math.min(1, f.sayT / 0.35);
+      drawSpeechBubble(p.x, sy2, f.say, aSay, Z);
+    }
+  }
+  /** 台词气泡：半透明圆角底 + 向下小尾巴 + 单行小字（描边保证亮背景也可读） */
+  function drawSpeechBubble(x, y, text, alpha, z) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold ' + (10.5 * z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    var tw = ctx.measureText(text).width;
+    var pw = tw + 12 * z, ph = 15 * z;
+    var bx = x - pw / 2, by = y - ph - 4 * z;
+    ctx.fillStyle = 'rgba(10,16,28,.74)';
+    roundRectPath(bx, by, pw, ph, 5 * z); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,224,150,.4)'; ctx.lineWidth = 1 * z; ctx.stroke();
+    ctx.beginPath();                                  // 小尾巴指向头顶
+    ctx.moveTo(x - 3.5 * z, by + ph - 0.5);
+    ctx.lineTo(x + 3.5 * z, by + ph - 0.5);
+    ctx.lineTo(x, y - 1 * z);
+    ctx.closePath(); ctx.fill();
+    var ty2 = y - 9.5 * z;
+    ctx.lineWidth = 3 * z; ctx.strokeStyle = 'rgba(6,12,24,.85)';
+    ctx.strokeText(text, x, ty2);
+    ctx.fillStyle = '#ffe9c2';
+    ctx.fillText(text, x, ty2);
+    ctx.restore();
+  }
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
   }
   // 点击行走的目标指示：落地菱形 + 扩散圈，淡出 0.7s，让玩家明确知道点到了哪格。
   // bad=true 是"这一格去不了"的红色叉号 —— 外来大图里常有"看着有路、其实被水/断崖隔开"的格子，
@@ -5398,8 +5485,6 @@
       if (!bagBuilt || __bagOrphan > 0) buildBagUI();   // 构建标志没了/格子失联 → 先重建
       bagDirty = true;                                  // 强制走一次完整刷新
       renderBag();
-      var sv = document.getElementById('bagStones');
-      if (sv) sv.textContent = bagDebugLine();          // 判据实时（renderBag 若再被挡，这里兜住）
     }
     if (window.__dbg && CUR) {
       window.__dbg.textContent = JSON.stringify({
