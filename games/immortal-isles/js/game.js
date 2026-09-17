@@ -4439,6 +4439,17 @@
     '*':      ['……', '哼。', '（打了个哈欠）', '风大，别吹跑了', '今天无事发生']
   };
   var FOE_SAY_HURT = ['哎哟！', '好胆！', '疼疼疼！', '找死！', '记仇了！', '来啊！'];
+  /* 亮相台词：第一次进入玩家视野必说的招牌句（v43.1，用户点名要游方进图就喊）
+   * —— 随机闲聊池轮不上固定那句，所以招牌句单独走 intro。 */
+  var FOE_SAY_INTRO = {
+    '小僵尸': '脑子…好想吃',
+    '牛魔': '哞——！此山是俺的',
+    '蛇妖': '嘶嘶…来者何人',
+    '铠甲卫': '站住！何人闯阵',
+    '游方': '此路是我开！留下买路财',
+    '石魔': '…别敲了',
+    '*': '……'
+  };
   function foeSayIdleLine(f) {
     var pool = FOE_SAY_IDLE['*'];
     for (var k in FOE_SAY_IDLE) {
@@ -4533,6 +4544,16 @@
       }
       if (f.def_.dummy) { setBeastAnim(f, 'idle'); continue; }   // 训练靶：不追、不打、不移动
       var dx = player.mx - f.x, dy = player.my - f.y, dist = Math.hypot(dx, dy);
+      /* 亮相台词（v43.1）：第一次进入视野（6.5 格内）必报招牌句，不受全局
+       * 「同屏 ≤2 只」限制 —— 玩家走近就该听见，这才是「一见面就说」。 */
+      if (!f.introDone && dist < 6.5) {
+        f.introDone = true;
+        var intro = FOE_SAY_INTRO['*'];
+        for (var ik in FOE_SAY_INTRO) {
+          if (ik !== '*' && (f.name || '').indexOf(ik) >= 0) { intro = FOE_SAY_INTRO[ik]; break; }
+        }
+        foeSay(f, intro, 2.8);
+      }
       f.atkCd -= dt;
       var moving = false;
       var radius = f.def_.aggro || AGGRO;      // 每只怪可以用登记表里的 aggro 覆盖默认仇恨半径
