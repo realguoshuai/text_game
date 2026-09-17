@@ -51,6 +51,47 @@
   #topleft #foetarget .ftbar{height:7px;border-radius:4px;background:rgba(0,0,0,.4);overflow:hidden;
     border:1px solid rgba(255,120,120,.4)}
   #topleft #foetarget .ftfill{height:100%;width:100%;background:linear-gradient(90deg,#ff3b3b,#ff7a4a)}
+  /* ---------- 快捷药栏（常驻：不开背包，点一下直接服药）----------
+   * 药品是唯一「挨打时要立刻吃到」的东西：开背包 = 一次点击 + 一次瞄准，血条见底时
+   * 这两下往往就是死亡本身。所以三种丹药另开一条常驻横条，挂在**血条正下方** ——
+   * 掉血 → 顺手点旁边，视线不用离开血量。
+   * ⚠ 它**不能放进 .tlfold**：面板折叠时也得在，藏起来等于没做。
+   * ⚠ 三格顺序与背包前三格、数字键 1/2/3 完全一致（金创药 / 小还丹 / 大还丹）。 */
+  #topleft .qheal{display:flex;gap:7px;margin-top:7px;padding-top:7px;
+    border-top:1px solid rgba(214,178,96,.3)}
+  #topleft .qheal .qc{position:relative;width:42px;height:42px;flex:none;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s;
+    background:rgba(8,14,26,.72);border:1px solid rgba(255,150,190,.55);
+    box-shadow:inset 0 0 12px rgba(255,120,170,.14)}
+  #topleft .qheal .qc > canvas.ico{display:block;transition:filter .15s,opacity .15s}
+  /* ★ 图标滤镜同样只留**一处**按优先级分派（原因见 #bag .cell 那条长注释）：
+   *   有货（正常） > 有货但刚按下（冷却） > 空格。顺序写反就会「永远灰」。 */
+  #topleft .qheal .qc:not(.empty){border-color:rgba(255,214,130,.85);
+    background:linear-gradient(180deg,rgba(38,30,16,.92),rgba(14,18,30,.92));
+    box-shadow:inset 0 0 12px rgba(255,196,90,.22),0 0 7px rgba(255,190,80,.2)}
+  #topleft .qheal .qc:not(.empty) > canvas{filter:brightness(1.22) saturate(1.1) drop-shadow(0 0 3px rgba(255,210,120,.5))}
+  #topleft .qheal .qc.cool:not(.empty) > canvas{filter:saturate(.55) brightness(.86)}
+  #topleft .qheal .qc.empty > canvas{filter:grayscale(1) brightness(.5);opacity:.4}
+  #topleft .qheal .qc:hover{border-color:#ff9ec4;box-shadow:0 0 12px rgba(255,140,190,.45)}
+  #topleft .qheal .qc:active{transform:translateY(1px)}
+  /* 残血时药格自己招手：金边转红 + 呼吸光，提醒「该嗑了」 */
+  #topleft .qheal .qc.need{border-color:#ff6b6b;animation:qcpulse 1.15s ease-in-out infinite}
+  @keyframes qcpulse{0%,100%{box-shadow:0 0 0 rgba(255,90,90,0)}
+    50%{box-shadow:0 0 13px rgba(255,90,90,.72)}}
+  /* 数量角标：溢出到格子右下角外（与背包同款），所以整条下面要留出 5px 余量 */
+  #topleft .qheal .qc .n{position:absolute;right:-3px;bottom:-4px;z-index:3;
+    min-width:17px;height:17px;line-height:17px;text-align:center;font-size:12px;font-weight:700;
+    padding:0 3px;border-radius:9px;color:#2a1c05;
+    background:linear-gradient(180deg,#ffd977,#f5b13c);border:1px solid rgba(90,58,10,.75);
+    text-shadow:0 1px 0 rgba(255,240,200,.55);font-family:ui-monospace,Consolas,monospace;
+    box-shadow:0 1px 4px rgba(0,0,0,.7)}
+  #topleft .qheal .qc.empty .n{display:none}
+  #topleft .qheal .qc .kb{position:absolute;left:2px;top:1px;z-index:2;font-size:9.5px;color:#cfe0f4;
+    background:rgba(0,0,0,.55);border-radius:4px;padding:0 3px;line-height:1.35}
+  /* 背包面板展开时它会压在左上这块（两者都在 left:14），药格让位 ——
+     背包里本来就有同样的三格，功能不缺。 */
+  body.bagopen #topleft .qheal{display:none}
+  body.touch #topleft .qheal .qc{width:46px;height:46px}   /* 手指比鼠标粗 */
 
   #topright{top:14px;right:14px;padding:10px 12px}
   #topright .t{font-size:12px;color:#c9bda0;margin-bottom:7px;letter-spacing:1px}
@@ -487,6 +528,8 @@
     <div class="row" id="expv">炼气期 · 修为 0</div>
     <div class="row">银两 <b id="stonev">0</b></div>
   </div>
+  <!-- 快捷药栏：常驻可见，点一下直接服用（不用先开背包）。格子由脚本按 ITEMS 生成 -->
+  <div class="qheal" id="quickHeal"></div>
 </div>
 
 <!-- 背包入口：桌面 B 键开关，手机点此图标。格子里的图标是程序化绘制的 items_atlas。 -->
@@ -548,7 +591,7 @@
   点击格子移动　·　<span class="hl">滚轮 / +/-</span> 缩放视图（0.62~1.72 倍）　·　
   走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）　·　
   走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
-  <span class="hl">Shift</span> 奔跑　·　<span class="hl">B</span> 背包　·　<span class="hl">1 / 2 / 3</span> 服金创药 / 小还丹 / 大还丹　·　
+  <span class="hl">Shift</span> 奔跑　·　<span class="hl">B</span> 背包　·　<span class="hl">1 / 2 / 3</span> 或直接点左上药格 服金创药 / 小还丹 / 大还丹　·　
   击杀妖兽会 <span class="hl">掉落物品</span>，走近自动拾取　·　<span class="hl">Alt+1~6</span> 试动作
   </div>
 </div>
@@ -698,6 +741,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=46"></script>
+<script src="js/game.js?v=47"></script>
 </body>
 </html>

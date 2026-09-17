@@ -4280,27 +4280,31 @@
    *      平移每格偏 `PAD*sc`，累积到第 6 格移出取景框 —— 静默错位。drawImage 没有这个漂移。
    *   ② 图还没解码完（naturalWidth=0）时先不画，等 load 后重建；否则缩放系数是 Infinity。
    */
-  function bagIconEl(pz, cn) {
+  function bagIconEl(pz, cn, size) {
+    var S = size || BAG_ICON;                    // 背包格子 46px、左上角快捷药格 40px，同一份画法
     var nw = pz.img.naturalWidth || pz.img.width || 0;
     var nh = pz.img.naturalHeight || pz.img.height || 0;
     if (!pz.w || !nw || !nh) {                   // 图未解码完 → 挂 load 后重建
       if (pz.img && !pz.img._bagHooked) {
         pz.img._bagHooked = true;
-        pz.img.addEventListener('load', function () { bagBuilt = false; buildBagUI(); });
+        // ★ 两处 UI 都要重建：只翻 bagBuilt 的话，快捷药栏会停在"没图"的空白态
+        pz.img.addEventListener('load', function () {
+          bagBuilt = false; quickBuilt = false; buildBagUI();
+        });
       }
       return null;
     }
     var cv = document.createElement('canvas');
     cv.className = 'ico';
-    cv.width = cv.height = BAG_ICON;
+    cv.width = cv.height = S;
     cv.title = cn;
     cv.style.cssText =
       'position:absolute;left:50%;top:50%;' +
-      'width:' + BAG_ICON + 'px;height:' + BAG_ICON + 'px;' +
-      'margin:' + (-BAG_ICON / 2) + 'px 0 0 ' + (-BAG_ICON / 2) + 'px;' +
+      'width:' + S + 'px;height:' + S + 'px;' +
+      'margin:' + (-S / 2) + 'px 0 0 ' + (-S / 2) + 'px;' +
       'pointer-events:none;image-rendering:auto';
     try {
-      cv.getContext('2d').drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, 0, 0, BAG_ICON, BAG_ICON);
+      cv.getContext('2d').drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, 0, 0, S, S);
     } catch (e) {
       return null;                               // 画失败就退回文字首字，至少不是空白格
     }
@@ -4345,7 +4349,105 @@
     });
     bagBuilt = true;
     bagDirty = true;
+    buildQuickUI();   // 快捷药栏同源同步建（同一张图集、同一批药品，避免两边不同步）
     renderBag();      // 立刻刷一遍：否则要等下一帧循环才上 .use / 计数，中间有一帧是"半成品"
+  }
+
+  /* ---------------- 快捷药栏（v47）----------------
+   * 药品是**唯一得在挨打时立刻吃到**的东西：开一次背包 = 一次点击 + 一次瞄准，
+   * 血条见底时这两下往往就是死亡本身。所以三种丹药另开一条常驻横条，
+   * 挂在左上状态面板里（血条正下方），点一下直接服用，不用开背包。
+   *
+   * 设计上刻意"共用一切、只换容器"：
+   *   同一张 items_atlas（走 bagIconEl）、同一份 ITEMS、同一组数字键 1/2/3、
+   *   同一个 bagDirty 脏标记、同一套三态（有货 / 冷却 / 空）。
+   * 这样两边不可能出现"背包 3 个、快捷栏 5 个"这类打架 —— 数据源只有一份。
+   */
+  var QUICK_ORDER = ['jinchuang', 'xiaohuan', 'dahuan'];
+  var QUICK_ICON = 40;
+  var quickCells = {};
+  var quickBuilt = false;              // ★ 声明在 bagIconEl 之前用到它，必须提前（var 提升 + 赋值时机）
+  var quickRebuildTries = 0;
+
+  function buildQuickUI() {
+    var g = document.getElementById('quickHeal');
+    if (!g) return;                    // 容器不在（老缓存页面）就安静退出，不报错
+    g.innerHTML = ''; quickCells = {};
+    QUICK_ORDER.forEach(function (key) {
+      var it = ITEMS[key];
+      if (!it || it.kind !== 'heal') return;
+      var c = document.createElement('div');
+      c.className = 'qc empty';
+      c.title = it.cn + '：点一下服用（或按 ' + (BAG_KEYS[key] || '?') + '）· ' + it.desc;
+      var pz = piece(it.icon + '_big') || piece(it.icon);
+      var ico = pz ? bagIconEl(pz, it.cn, QUICK_ICON) : null;
+      if (ico) {
+        c.appendChild(ico);
+      } else {
+        var s = document.createElement('span');
+        s.style.cssText = 'font-size:17px;color:#ffe6a6';
+        s.textContent = it.cn.charAt(0);
+        c.appendChild(s);
+      }
+      var n = document.createElement('b'); n.className = 'n'; c.appendChild(n);
+      if (BAG_KEYS[key]) {
+        var kb = document.createElement('span'); kb.className = 'kb';
+        kb.textContent = BAG_KEYS[key]; c.appendChild(kb);
+      }
+      var fire = function (ev) {
+        // ★ 必须 stopPropagation：药格在 #topleft 面板里，冒泡上去会把状态面板折叠掉
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        useHeal(key);
+        bagDirty = true; renderQuick();     // 立刻反馈（冷却灰/数量 -1），不等下一帧
+      };
+      c.addEventListener('click', fire);
+      c.addEventListener('touchstart', fire, { passive: false });
+      g.appendChild(c);
+      quickCells[key] = c;
+    });
+    quickBuilt = true;
+  }
+
+  /** 刷新快捷药栏：数量 / 灰化 / 冷却三态与背包格子完全一致（同一份数据源） */
+  function renderQuick() {
+    if (!quickBuilt) return;
+    /* 失联自愈（与背包同款）：容器被别处重建过，quickCells 还指着游离节点 →
+     * 数据全对、屏幕不动、控制台干净。检测到就重建一次，最多 3 次防死循环。 */
+    var orphan = 0;
+    QUICK_ORDER.forEach(function (k) {
+      var c = quickCells[k];
+      if (c && !document.body.contains(c)) orphan++;
+    });
+    if (orphan > 0) {
+      if (quickRebuildTries < 3) { quickRebuildTries++; buildQuickUI(); }
+      return;
+    }
+    quickRebuildTries = 0;
+    var low = player && player.maxhp > 0 && player.hp < player.maxhp * 0.4;   // 残血：格子自己招手
+    QUICK_ORDER.forEach(function (key) {
+      var c = quickCells[key]; if (!c) return;
+      var n = bag[key] || 0;
+      c.classList.toggle('empty', n <= 0);
+      c.classList.toggle('cool', healCd > 0 && key === healUsed);
+      c.classList.toggle('need', n > 0 && low);
+      var nb = c.querySelector('.n');
+      if (nb) nb.textContent = n > 0 ? (n > 99 ? '99+' : n) : '';
+      /* ★ 兜底依旧写行内样式（理由见 renderBag 同款注释）：
+       * 行内样式优先级高于任何选择器，结构上不可能被覆盖或匹配不到。 */
+      var cv3 = c.querySelector('canvas.ico');
+      if (cv3) {
+        if (n <= 0) {
+          cv3.style.filter = 'grayscale(1) brightness(.5)';
+          cv3.style.opacity = '.4';
+        } else if (healCd > 0 && key === healUsed) {
+          cv3.style.filter = 'saturate(.55) brightness(.86)';
+          cv3.style.opacity = '1';
+        } else {
+          cv3.style.filter = 'brightness(1.22) saturate(1.1) drop-shadow(0 0 3px rgba(255,210,120,.5))';
+          cv3.style.opacity = '1';
+        }
+      }
+    });
   }
 
   /** 刷新背包（脏标记驱动，不是每帧都碰 DOM） */
@@ -4418,6 +4520,7 @@
     var btn = document.getElementById('bagBtn'), dot = document.getElementById('bagDot');
     if (btn) btn.classList.toggle('hasnew', hasHeal > 0 && !bagOpen);
     if (dot) dot.textContent = hasHeal > 99 ? '99+' : hasHeal;
+    renderQuick();       // 快捷药栏同源刷新（放在这里 = 两边永远同一帧同步）
   }
 
   function bagToggle(open) {
@@ -4426,8 +4529,11 @@
     if (el) el.classList.toggle('open', bagOpen);
     var b = document.getElementById('bagBtn');
     if (b) b.classList.toggle('on', bagOpen);
+    // 背包面板也在 left:14，展开时会压住左上这块（快捷药栏就在那里）→ 让药栏先收起来
+    document.body.classList.toggle('bagopen', bagOpen);
     bagDirty = true;
     if (bagOpen) renderBag();
+    else renderQuick();  // 关背包时立刻把药栏画回来（它刚才是 display:none 的）
   }
 
   function killFoe(f) {
@@ -5566,8 +5672,10 @@
      * 5 个格子的 DOM 同步成本可忽略。 */
     if (ready && (++bagDbgTick % 30 === 0)) {
       if (!bagBuilt || __bagOrphan > 0) buildBagUI();   // 构建标志没了/格子失联 → 先重建
+      if (!quickBuilt) buildQuickUI();                  // 快捷药栏（左上常驻）同样兜底重建
       bagDirty = true;                                  // 强制走一次完整刷新
       renderBag();
+      renderQuick();                                    // 心跳：不依赖任何事件也保证药栏是对的
     }
     if (window.__dbg && CUR) {
       window.__dbg.textContent = JSON.stringify({
