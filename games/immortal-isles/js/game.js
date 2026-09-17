@@ -1087,35 +1087,14 @@
         // ★ 必须排在上面那对异常监听器**之后** —— 它随 UI 改动随时可能抛错，
         //   早一步调用就会在「没人监听」的空窗里把 boot 的 then 链整条打断，
         //   连 #dbg 都建不出来，现场不留任何痕迹（2026-09-16 就因此瞎猜了一轮）。
-        if (window.__mobileAudit) window.__mobileAudit();
+        if (window.__mobileAudit) try { window.__mobileAudit(); } catch (e) {
+          // 自测辅助不该有能力打断 boot 链（2026-09-17 v41 加保险：它抛错=链断=版本号等收尾全跳过）
+          window.__showErr && window.__showErr('mobileAudit: ' + String((e && e.message) || e).slice(0, 80));
+        }
         HOLD = q.get('hold') === '1';
-        /* ★★ 版本号屏上可见（2026-09-17 第 5 次排查"行囊还是灰的"时加）
-         * 背景：index.html 在 GitHub Pages 上有 max-age=600 的缓存；若用户的标签页
-         * 一直开着没关，跑的永远是**进页那一刻**的旧 JS —— 我这边推多少版都看不到。
-         * 所以把"当前实际在跑的版本"直接印在游戏里：
-         *   ① 浏览器标签页标题 → 仙岛寻踪 v NN
-         *   ② 屏幕右下角一枚极小的角标
-         * 用户只要看一眼角标，就能断定"我跑的是不是最新版"，不用开任何调试工具。
-         * 版本号从本文件自己的 <script src="...?v=NN"> 里解析 —— 永远与实际加载的代码一致。 */
-        var VTAG = (function () {
-          var ss = document.getElementsByTagName('script');
-          for (var vi = 0; vi < ss.length; vi++) {
-            var mm = /[?&]v=([0-9]+)/.exec(ss[vi].src || '');
-            if (mm && /game\.js/.test(ss[vi].src || '')) return mm[1];
-          }
-          return '?';
-        })();
-        document.title = '仙岛寻踪 v' + VTAG;
-        window.__VTAG = VTAG;                      // 给 bagDebugLine 用
-        try {
-          var vb = document.createElement('div');
-          vb.id = 'verTag';
-          vb.textContent = 'v' + VTAG;
-          vb.style.cssText = 'position:fixed;right:6px;bottom:4px;z-index:37;pointer-events:none;' +
-            'font:600 10px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.5px;' +
-            'color:rgba(240,227,194,.42);text-shadow:0 1px 2px rgba(0,0,0,.6)';
-          document.body.appendChild(vb);
-        } catch (e) { /* 角标失败无所谓，标题还有一份 */ }
+        /* 版本号（title / 右下角角标 / window.__VTAG）v41 起改在**脚本顶层**设置 ——
+         * 原来（v39/v40）放在这条 then 链里：链若在收尾段静默断掉，版本判据
+         * 跟着一起消失（用户截图状态行 v? 就是这么来的）。顶层版本与 boot 存亡解耦。 */
         // ?pose=run —— 把主角锁在某个动作上（核对素材/截图用），取值见 ACT_CN
         var pq = q.get('pose');
         if (pq && ACT_CN[pq]) { poseLock = pq; player.act = pq; player.actT = 0.05; }
@@ -4163,10 +4142,11 @@
     var cls0 = c0 ? c0.className.replace('cell', '').trim() : '?';
     var f0 = cv0 ? (cv0.style.filter || '(none)').replace(/drop-shadow\([^)]*\)/, 'ds()') : '?';
     return 'v' + (window.__VTAG || '?') + ' ' + parts.join(' ') +
-           ' | 银' + player.stones +
+           ' | 银' + player.stones + ' 杀' + (window.__kills || 0) + ' 地' + lootDrops.length +
            ' | jc[' + cls0 + '] ' + f0.slice(0, 40) +
            (__bagOrphan ? ' 失联' + __bagOrphan : '') +
-           (__lastPickup ? ' | 拾:' + __lastPickup : ' | 未拾');
+           (__lastPickup ? ' | 拾:' + __lastPickup : ' | 未拾') +
+           (window.__lastErr ? ' | 错:' + window.__lastErr : '');
   }
   var healHinted = false;    // 药品用法是否已提示过
   var healCd = 0;            // 服药公共冷却（防止一口气连嗑）
@@ -4419,6 +4399,7 @@
     }
     if (f.dying > 0) return;            // 已经在倒地过程中，别重复结算
     f.hp = 0;
+    window.__kills = (window.__kills || 0) + 1;   // 击杀计数（状态行判据：杀0=没怪死过）
     player.exp += f.exp;
     var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
     player.stones += st;
@@ -5399,6 +5380,7 @@
   resize();
 
   var last = 0;
+  var bagDbgTick = 0;   // 状态行强刷计数：每 30 帧（≈0.5s）重写一次
   function loop(ts) {
     if (!last) last = ts;
     var dt = Math.min(0.05, (ts - last) / 1000);
@@ -5406,6 +5388,13 @@
     if (!held) update(dt);
     if (ready) updateHUD();
     render();
+    /* ★ 状态行实时化（v41）：原来它走 bagDirty 快照 —— boot 早期写入的
+     * 「v? 全0 未拾」若之后没有任何拾取事件就一直停在屏上，看起来像"数据全空"。
+     * 现在每 0.5s 直接重算一次，永远是当下真值。 */
+    if (ready && (++bagDbgTick % 30 === 0)) {
+      var sv = document.getElementById('bagStones');
+      if (sv) sv.textContent = bagDebugLine();
+    }
     if (window.__dbg && CUR) {
       window.__dbg.textContent = JSON.stringify({
         map: CUR.id, fade: +fadeA.toFixed(2), held: held,
@@ -5698,5 +5687,72 @@
     if (!tq || new URLSearchParams(location.search).get('autotest') !== 'mobileui') delete window.__mobileAudit;
   })();
 
-  boot();
+  /* ══ v41 顶层保险丝（三道）══
+   * 背景：2026-09-17 用户截图 —— 状态行 v?、数据全零，而格子图标正常。
+   * v39/v40 的版本号设置在 boot 的 then 链收尾段，且：
+   *  · boot() 返回的 Promise 没有 .catch —— 链上任何一步抛错 = 静默死亡；
+   *  · onerror / unhandledrejection 只在 ?autotest= 时才装 —— 正常玩家零留痕；
+   *  · 状态行走 bagDirty 快照 —— boot 早期写入的内容可能永远停在屏上。
+   * 用户环境一旦出这种错，我这边收到的只有"没变化"三个字。
+   * 三道保险全部放在**脚本顶层**，与 boot 链的存亡彻底解耦。 */
+  function __showErr(msg) {
+    try {
+      window.__lastErr = String(msg).slice(0, 110);
+      var t = document.getElementById('errTag');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'errTag';
+        t.style.cssText = 'position:fixed;left:6px;bottom:4px;z-index:37;pointer-events:none;max-width:70vw;' +
+          'font:600 10px/1.4 ui-monospace,Consolas,monospace;color:#ff9d9d;' +
+          'text-shadow:0 1px 2px rgba(0,0,0,.7)';
+        document.body.appendChild(t);
+      }
+      t.textContent = '⚠ ' + window.__lastErr;
+    } catch (e) { /* 留痕失败别再抛 */ }
+  }
+  window.__showErr = __showErr;
+  window.addEventListener('error', function (ev) {
+    __showErr((ev.message || '脚本错误') + ' @' + (ev.lineno || '?'));
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason;
+    __showErr('promise: ' + String((r && r.message) || r).slice(0, 90));
+  });
+
+  /* 版本号顶层解析：同步执行时 document.currentScript 就是本文件，?v=NN 直接可取。
+   * v39/v40 把这段放 boot 链里，链断即失（用户截图 v? 的来源）；放顶层后永远成立。 */
+  (function () {
+    var src = '';
+    try {
+      if (document.currentScript && document.currentScript.src) src = document.currentScript.src;
+      else {
+        var ss = document.getElementsByTagName('script');
+        for (var vi = ss.length - 1; vi >= 0; vi--) {
+          if (/game\.js/.test(ss[vi].src || '')) { src = ss[vi].src; break; }
+        }
+      }
+    } catch (e) {}
+    var mm = /[?&]v=([0-9]+)/.exec(src);
+    var VTAG = mm ? mm[1] : '?';
+    window.__VTAG = VTAG;
+    try { document.title = '仙岛寻踪 v' + VTAG; } catch (e) {}
+    try {
+      var vb = document.createElement('div');
+      vb.id = 'verTag';
+      vb.textContent = 'v' + VTAG;
+      vb.style.cssText = 'position:fixed;right:6px;bottom:4px;z-index:37;pointer-events:none;' +
+        'font:600 10px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.5px;' +
+        'color:rgba(240,227,194,.42);text-shadow:0 1px 2px rgba(0,0,0,.6)';
+      document.body.appendChild(vb);
+    } catch (e) { /* 角标失败无所谓，标题还有一份 */ }
+  })();
+
+  try {
+    var __bootP = boot();
+    if (__bootP && __bootP.catch) __bootP.catch(function (e) {
+      __showErr('boot: ' + String((e && e.message) || e).slice(0, 90));
+    });
+  } catch (e) {
+    __showErr('boot 同步: ' + String((e && e.message) || e).slice(0, 90));
+  }
 })();
