@@ -22,6 +22,9 @@ const FILTER = process.argv[2] || '';
 // （singleton 锁会让 headless 直接报错退出）。但也不要「每个用例都新建」——
 // 冷 profile 的首次启动开销在这台弱机上经常顶满 virtual-time-budget，页面停在「加载中」，
 // 表现成随机几条用例 dbg=-。一次运行共用一个热 profile 最稳，跑完删掉。
+const TEMP = os.tmpdir();
+// 本次运行累计清掉的 scoped_dir 个数，收尾时打印 —— 让「清理有没有生效」变成可观测的。
+let freed = 0;
 const U_DIR_BASE = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
 
 function readPage(query, budget, size) {
@@ -38,6 +41,11 @@ function readPage(query, budget, size) {
   // ★ 加硬超时（killSignal SIGKILL）：否则某个用例的 chrome 一旦卡死（页面不退出、
   //   磁盘写不动、--no-zygote 偶发卡住），execSync 会无限阻塞，整条跑批卡死在半途。
   //   超时后 chrome 被强杀，这里返回空 → run() 走重试；重试也超时就是真 FAIL，不再挂起。
+  // ★ Chrome 还会在系统 TEMP 下另建 scoped_dir*（~40MB/个），--user-data-dir 管不到它，
+  //   进程被 SIGKILL 时更不会自清 —— 实测一轮 39 条跑批能堆 435 个 / 17GB，直接把 C 盘写满。
+  //   所以这里按「本次调用新增的」做差集清理：只删这次 chrome 自己建的那几个，
+  //   不碰别的 Chrome（含 WorkBuddy 预览）正在用的目录。
+  const before = new Set(fs.readdirSync(TEMP).filter((n) => /^scoped_dir/.test(n)));
   let dom = '';
   try {
     execSync(
@@ -57,6 +65,14 @@ function readPage(query, budget, size) {
     // chrome 写不了 profile 而「页面没加载完」假失败；超时强杀时更会漏清，必须兜底。
     try { fs.rmSync(uDir, { recursive: true, force: true }); } catch (e) { /* 偶被占用 */ }
     try { fs.rmSync(out, { force: true }); } catch (e) { /* ignore */ }
+    // 清本次 chrome 新建的 scoped_dir*（只删差集，别的进程在用的一概不碰）
+    try {
+      for (const n of fs.readdirSync(TEMP)) {
+        if (!/^scoped_dir/.test(n) || before.has(n)) continue;
+        try { fs.rmSync(path.join(TEMP, n), { recursive: true, force: true }); freed++; }
+        catch (e) { /* 被占用就跳过 */ }
+      }
+    } catch (e) { /* 读不了 TEMP 就算了 */ }
   }
   if (!dom) return { dom: '', bodyClass: '', dbg: null, probe: null, mapName: null, loader: null };
   const pick = (id) => {
@@ -417,5 +433,7 @@ const failed = ran.filter((r) => r.ok === false).length;
 const skipped = results.filter((r) => r.ok === null).length;
 console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + ran.length + ' 个用例)') +
   (skipped ? '（另有 ' + skipped + ' 个因过滤跳过）' : ''));
+// 让清理可观测：以前 scoped_dir 悄悄堆到 17GB 也没人知道。
+console.log('本次顺带清掉 Chrome 临时目录 scoped_dir* ' + freed + ' 个');
 try { fs.rmSync(U_DIR, { recursive: true, force: true }); } catch (e) { /* 目录偶尔被占用，留着不影响结果 */ }
 process.exit(failed ? 1 : 0);
