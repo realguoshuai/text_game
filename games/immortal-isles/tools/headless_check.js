@@ -25,6 +25,9 @@ const FILTER = process.argv[2] || '';
 const TEMP = os.tmpdir();
 // 本次运行累计清掉的 scoped_dir 个数，收尾时打印 —— 让「清理有没有生效」变成可观测的。
 let freed = 0;
+// 本轮删不掉的个数（chrome 被强杀后目录句柄短暂占用）。stuck>0 说明该手动跑一次
+// .workbuddy/clean_chrome_tmp.js 兜底，但绝不会再出现「悄悄堆到 17GB」。
+let stuck = 0;
 const U_DIR_BASE = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
 
 function readPage(query, budget, size) {
@@ -45,7 +48,8 @@ function readPage(query, budget, size) {
   //   进程被 SIGKILL 时更不会自清 —— 实测一轮 39 条跑批能堆 435 个 / 17GB，直接把 C 盘写满。
   //   所以这里按「本次调用新增的」做差集清理：只删这次 chrome 自己建的那几个，
   //   不碰别的 Chrome（含 WorkBuddy 预览）正在用的目录。
-  const before = new Set(fs.readdirSync(TEMP).filter((n) => /^scoped_dir/.test(n)));
+  const isJunk = (n) => /^scoped_dir/.test(n) || /^wb_headless_/.test(n) || /^HeadlessChrome/.test(n);
+  const before = new Set(fs.readdirSync(TEMP).filter(isJunk));
   let dom = '';
   try {
     execSync(
@@ -65,13 +69,21 @@ function readPage(query, budget, size) {
     // chrome 写不了 profile 而「页面没加载完」假失败；超时强杀时更会漏清，必须兜底。
     try { fs.rmSync(uDir, { recursive: true, force: true }); } catch (e) { /* 偶被占用 */ }
     try { fs.rmSync(out, { force: true }); } catch (e) { /* ignore */ }
-    // 清本次 chrome 新建的 scoped_dir*（只删差集，别的进程在用的一概不碰）
+    // 清本次 chrome 新建的 scoped_dir*（只删差集，别的进程在用的一概不碰）。
+    // 第一遍删不掉（chrome 刚被 SIGKILL、目录句柄还没释放）时退避重试一轮，
+    // 仍失败则记 stuck —— 以前这种「半删残壳」被静默吞掉，下次跑批就变成前人的垃圾。
     try {
-      for (const n of fs.readdirSync(TEMP)) {
-        if (!/^scoped_dir/.test(n) || before.has(n)) continue;
-        try { fs.rmSync(path.join(TEMP, n), { recursive: true, force: true }); freed++; }
-        catch (e) { /* 被占用就跳过 */ }
-      }
+      const mine = () => fs.readdirSync(TEMP).filter((n) => isJunk(n) && !before.has(n));
+      const sweep = () => {
+        for (const n of mine()) {
+          for (let k = 0; k < 3; k++) {
+            try { fs.rmSync(path.join(TEMP, n), { recursive: true, force: true, maxRetries: 1 }); freed++; break; }
+            catch (e) { if (k === 2) { stuck++; console.log('  ⚠ 清不掉（下次跑批重试）: ' + n); } }
+          }
+        }
+      };
+      sweep();
+      if (mine().length) { execSync('ping -n 2 127.0.0.1 >nul', { shell: 'cmd.exe' }); sweep(); }
     } catch (e) { /* 读不了 TEMP 就算了 */ }
   }
   if (!dom) return { dom: '', bodyClass: '', dbg: null, probe: null, mapName: null, loader: null };
@@ -434,6 +446,8 @@ const skipped = results.filter((r) => r.ok === null).length;
 console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + ran.length + ' 个用例)') +
   (skipped ? '（另有 ' + skipped + ' 个因过滤跳过）' : ''));
 // 让清理可观测：以前 scoped_dir 悄悄堆到 17GB 也没人知道。
-console.log('本次顺带清掉 Chrome 临时目录 scoped_dir* ' + freed + ' 个');
+if (stuck) console.log('⚠ 另有 ' + stuck + ' 个本轮删不掉（占用中），建议跑 node .workbuddy/clean_chrome_tmp.js 兜底');
+console.log('本次顺带清掉 Chrome 临时目录 ' + freed + ' 个（scoped_dir / wb_headless 等）' +
+  (freed + stuck ? '' : '—— 目标目录在跑批前已清理，无新增残留'));
 try { fs.rmSync(U_DIR, { recursive: true, force: true }); } catch (e) { /* 目录偶尔被占用，留着不影响结果 */ }
 process.exit(failed ? 1 : 0);
