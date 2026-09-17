@@ -373,9 +373,15 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
     && probe.healCdBlock === true                      // 冷却期间不生效
     && probe.crafted.cells === 5                       // 背包 5 格
     && probe.crafted.healUseCells === 3                // 其中 3 格可点服用
-    && probe.crafted.ghostImgs === 0                   // 不再用 <img> 塞图标（改用 background 取帧）
-    && probe.geo && probe.geo.n === 5                  // ★ 5 格的取景框都在
-    && probe.geo.miss.length === 0                     // ★ 且帧的可见区间正好覆盖 [0,46]×[0,46]
+    && probe.crafted.ghostImgs === 0                   // 不再用 <img> 塞图标
+    && probe.geo && probe.geo.n === 5                  // ★ 5 格图标都画出来了
+    // ★★★ 唯一真判据（2026-09-17 两轮教训）：canvas 里必须真的有不透明像素。
+    //   ① 只断言"帧解析到/计数对" → 图标全空白也过（第 1 轮）；
+    //   ② 改断言"可见区间 = [0,46]²" → 全绿但用户仍看不到（CSS background 引用了
+    //      已 revoke 的 blob URL，二次取像素静默失败，inline style 字符串照样规整）。
+    //   miss 为空即每格 ink 占比 > 0.25，说明取到像素并真的画进 canvas 了。
+    && probe.geo.miss.length === 0
+    && probe.atlasNatural === '782x198'                // 图集本身解码正常（对比参考）
     && probe.atlas && probe.atlas.img && probe.atlas.rectKeys === 6
     && probe.atlas.bigKeys === 6;                      // 图集三张表都到位
 }, { budget: 20000 }));

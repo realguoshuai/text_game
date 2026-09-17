@@ -2084,33 +2084,36 @@
           R.crafted.cells = document.querySelectorAll('#bagGrid .cell').length;
           R.crafted.healUseCells = document.querySelectorAll('#bagGrid .cell.use').length;
           R.crafted.ghostImgs = document.querySelectorAll('#bagGrid .cell img').length;
-          // ★★ 图标落位几何（2026-09-17 加）：只查「帧能不能解析到」是不够的 ——
-          //   曾经出现"帧全在、计数也对，但图标一个都看不见"：图集里帧的**步进**是
-          //   `帧宽 + PAD`，若按"帧宽缩放 + sx 平移"写，每格累积 PAD*sc 的漂移，
-          //   到第 6 格整块移出取景框。全程不报错，只有把「帧在框内的可见区间」
-          //   算出来才看得见。判据：可见区间必须**正好**覆盖 [0,CELL]，误差 < 0.5px。
+          // ★★★ 图标可见性断言（2026-09-17 两轮教训合并后的**唯一**判据）
+          //
+          // 教训链：几何对 ≠ 图标可见。
+          //   第 1 轮只断言"帧能解析到 + 计数对" → 图标全是空白的也过。
+          //   第 2 轮改断言"帧在取景框内的可见区间 = [0,46]×[0,46]" → 全绿，用户还是看不到；
+          //          因为当时用 CSS background 取帧，URL 是已被 revokeObjectURL 的 blob，
+          //          浏览器二次取像素静默失败。inline style 字符串写得再规整也没用。
+          // 所以现在只认一件事：**canvas 里真的画上了非透明像素**。
+          //   ① 取每格 <canvas class="ico">，尺寸必须是 BAG_ICON×BAG_ICON（否则被 CSS 拉伸或没画）；
+          //   ② getImageData 跑一遍，统计 alpha>0 的像素数 —— 必须占满帧的大半（图标有实心区域）；
+          //   ③ 顺便确认没有任何 <img>（历史幽灵节点）。
           var CELL2 = BAG_ICON, geoMiss = [], geoCells = [];
-          var boxes = document.querySelectorAll('#bagGrid .cell i.ico');
+          var boxes = document.querySelectorAll('#bagGrid .cell canvas.ico');
           for (var gi = 0; gi < boxes.length; gi++) {
-            var bx = boxes[gi], st = bx.style;
-            var sc2 = CELL2 / 128;                     // _big 帧恒为 128
-            var mPos = /(-?[\d.]+)px (-?[\d.]+)px/.exec(st.backgroundPosition || '');
-            if (!mPos) { geoMiss.push('pos#' + gi); continue; }
-            var L = parseFloat(mPos[1]), T = parseFloat(mPos[2]);
-            var r2 = null;
-            for (var kk in ATLAS.items.big) {
-              var rr = ATLAS.items.big[kk];
-              if (Math.abs(-rr[0] * sc2 - L) < 0.01 && Math.abs(-rr[1] * sc2 - T) < 0.01) { r2 = rr; break; }
-            }
-            if (!r2) { geoMiss.push('rect#' + gi); continue; }
-            var ix0 = Math.max(0, L + r2[0] * sc2), ix1 = Math.min(CELL2, L + (r2[0] + r2[2]) * sc2);
-            var iy0 = Math.max(0, T + r2[1] * sc2), iy1 = Math.min(CELL2, T + (r2[1] + r2[3]) * sc2);
-            var okGeo = Math.abs(ix0) < 0.5 && Math.abs(ix1 - CELL2) < 0.5 &&
-                        Math.abs(iy0) < 0.5 && Math.abs(iy1 - CELL2) < 0.5;
-            geoCells.push({ x: +ix0.toFixed(1), X: +ix1.toFixed(1), y: +iy0.toFixed(1), Y: +iy1.toFixed(1), ok: okGeo });
-            if (!okGeo) geoMiss.push(gi);
+            var bx = boxes[gi];
+            if (bx.width !== CELL2 || bx.height !== CELL2) { geoMiss.push('size#' + gi + ':' + bx.width + 'x' + bx.height); continue; }
+            var ink = 0, rows = 0;
+            try {
+              var dd = bx.getContext('2d').getImageData(0, 0, CELL2, CELL2).data;
+              for (var pi = 3; pi < dd.length; pi += 4) if (dd[pi] > 8) ink++;
+            } catch (e) { geoMiss.push('read#' + gi + ':' + e.name); continue; }
+            var frac = ink / (CELL2 * CELL2);
+            // 阈值取 0.10：图标是"边框+主体"的线面混合，最"瘦"的一瓶金创药实测 0.248，
+            // 而真正的故障态（CSS 背景/URL 取不到像素）是 **0.000**。0.10 把二者分得很开。
+            geoCells.push({ ink: +frac.toFixed(3), ok: frac > 0.10 });
+            if (!(frac > 0.10)) geoMiss.push('blank#' + gi + ':' + frac.toFixed(3));
           }
           R.geo = { n: geoCells.length, miss: geoMiss, cells: geoCells };
+          // 图集本身解码是否正常（对比参考，不参与判据）
+          R.atlasNatural = ATLAS.items.img ? (ATLAS.items.img.naturalWidth + 'x' + ATLAS.items.img.naturalHeight) : '-';
           pbold.textContent = JSON.stringify(R);
         }
         if (at === 'ranged') {
@@ -4093,46 +4096,59 @@
   var bagBuilt = false;
   var BAG_ICON = 46;         // 图标在格子里的显示边长（px）
 
-  /* ★★ 从图集里"取一帧"的**唯一**正确写法（2026-09-17 用户报「背包里不显示药品图标」的治本修复）
+  /* ★★ 从图集里"取一帧"的**唯一**正确写法
    *
-   * 语义必须与 canvas 的 drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh) 完全一致：
-   *   ① 先把**整张图**按 sc 等比放大 → 用 background-size 声明整图的显示尺寸；
-   *   ② 再把整图**平移**到 `-sx*sc, -sy*sc` → 用 background-position；
-   *   ③ 外层 overflow:hidden 当取景框，露出目标帧那一块。
+   * ══ 2026-09-17 第二轮修复（用户第二次报「拾取物品后，背包里还是没有」）══
+   * 上一版用 CSS background 取帧：background-size(整图×sc) + background-position(-sx*sc,-sy*sc)。
+   * 几何上完全正确（自动化断言逐格算可见区间全部 [0,46] 通过），**但图标依然一格都不显示**。
+   * 实测根因（`?autotest=loot` 探针输出）：
+   *   bgUrl     = "blob:file:///a4eb0591-..."   ← bagIconEl 写进 CSS 的那个 URL
+   *   atlasSrc  = "blob:file:///a4eb0591-..."   ← ATLAS.items.img.src，同一个 blob
+   *   atlasNatural = "782x198"                  ← 图片元素本身解码正常
+   *   bgLoads   = "FAIL(onerror)"               ← ★ 拿这个 URL 新建 Image() 直接失败
    *
-   * ⛔ 绝不可以用 <img> + left/top 去"对齐帧"：
-   *   图集里帧的**步进**是 `帧宽 + PAD`（本图集 128+2=130），不是帧宽（128）。
-   *   只要用"按帧宽缩放 + 按 sx 平移"的写法，每往右一格就多偏 `PAD*sc`，
-   *   累积到第 6 格整块图标已移出取景框 —— 且**全程不报错**，
-   *   表现就是"第一格有图、后面几格空白"（用户看到的就是这个）。
-   *   background-position 走的是同一张图的同一坐标系，从结构上没有这个漂移。
+   * 为什么：图集是 fetch → Blob → URL.createObjectURL → Image() 加载的，
+   * 而 blobImage() 在 im.onload 里**立刻** URL.revokeObjectURL(url)。
+   *   · <img src="blob:..."> 元素：像素在 revoke 之前已解码进元素 → 之后 drawImage 一直正常；
+   *   · CSS background-image:url("blob:...")：**惰性取像素**，revoke 之后浏览器再去取 → 取不到
+   *     → 背景为空 → 图标空白，**且不报任何错、控制台干净**。
+   * 所以上一轮的几何断言全绿也没用：它只读了 inline style 字符串，
+   * 从没验证过"这串声明在浏览器里能不能真的取到像素"。
+   *
+   * ⛔ 结论（治本）：**不要用 pz.img.src（blob URL）当任何 CSS 的 URL**。
+   * 改用 <canvas> + ctx.drawImage(已解码的 <img> 元素, sx, sy, w, h, 0, 0, 46, 46) ——
+   * 直接消费已解码的图片元素，语义与 drawImage 完全一致，从结构上不可能踩到 URL 生命周期问题。
+   *
+   * 附带保留的两条老教训：
+   *   ① 图集帧的**步进**是 `帧宽 + PAD`（本图集 128+2=130），不是帧宽。用 <img>+left/top 按帧宽
+   *      平移每格偏 `PAD*sc`，累积到第 6 格移出取景框 —— 静默错位。drawImage 没有这个漂移。
+   *   ② 图还没解码完（naturalWidth=0）时先不画，等 load 后重建；否则缩放系数是 Infinity。
    */
   function bagIconEl(pz, cn) {
-    var box = document.createElement('i');       // <i> 无语义，纯取景框
-    box.className = 'ico';
     var nw = pz.img.naturalWidth || pz.img.width || 0;
     var nh = pz.img.naturalHeight || pz.img.height || 0;
-    // 图还没解码完（naturalWidth=0）时先不画，等 decode 后再来一遍 —— 否则 sc 算出 Infinity，
-    // background-size 变成非法值，浏览器**静默丢弃**这条声明 → 图标一格都看不见。
-    if (!pz.w || !nw || !nh) {
+    if (!pz.w || !nw || !nh) {                   // 图未解码完 → 挂 load 后重建
       if (pz.img && !pz.img._bagHooked) {
         pz.img._bagHooked = true;
         pz.img.addEventListener('load', function () { bagBuilt = false; buildBagUI(); });
       }
       return null;
     }
-    var sc = BAG_ICON / pz.w;                    // 帧是正方形（64/128），用宽即可
-    box.title = cn;
-    box.style.cssText =
+    var cv = document.createElement('canvas');
+    cv.className = 'ico';
+    cv.width = cv.height = BAG_ICON;
+    cv.title = cn;
+    cv.style.cssText =
       'position:absolute;left:50%;top:50%;' +
       'width:' + BAG_ICON + 'px;height:' + BAG_ICON + 'px;' +
       'margin:' + (-BAG_ICON / 2) + 'px 0 0 ' + (-BAG_ICON / 2) + 'px;' +
-      'overflow:hidden;pointer-events:none;' +
-      'background-image:url("' + pz.img.src + '");' +
-      'background-repeat:no-repeat;' +
-      'background-size:' + (nw * sc).toFixed(3) + 'px ' + (nh * sc).toFixed(3) + 'px;' +
-      'background-position:' + (-pz.sx * sc).toFixed(3) + 'px ' + (-pz.sy * sc).toFixed(3) + 'px';
-    return box;
+      'pointer-events:none;image-rendering:auto';
+    try {
+      cv.getContext('2d').drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, 0, 0, BAG_ICON, BAG_ICON);
+    } catch (e) {
+      return null;                               // 画失败就退回文字首字，至少不是空白格
+    }
+    return cv;
   }
 
   function buildBagUI() {
