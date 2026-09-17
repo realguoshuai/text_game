@@ -2822,7 +2822,12 @@
       // 所以攻击/倒地一律用 sideFace（最近的水平朝向），保证永远是个侧面挥砍。
       var oneShot = (act === 'atkA' || act === 'atkB' || act === 'dead');
       var f = oneShot ? player.sideFace : player.face;
-      opts.flip = (f === 'left');
+      /* ★ 倒走修复（v45）：等距 4 轴对应屏幕 4 个**斜向** ——
+       *   down=屏幕左下、up=屏幕右上、right=屏幕右下、left=屏幕左上。
+       * 侧视素材只有左右两版，斜向移动应面朝其**水平分量**：
+       *   往屏幕左下走（face=down）必须面朝左、往右上走（face=up）面朝右。
+       * 旧版只有 left 翻转 → 往左下走时面朝右，正是用户看到的「倒着走」。 */
+      opts.flip = (f === 'left' || f === 'down');
       frame = sideFrame(act);
     } else {
       // 等距素材只有 4 个朝向行、没有独立动作行，只能近似：
@@ -3765,8 +3770,9 @@
       return false;
     }
     if (player.actHold > 0 || player.attackCd > 0) return false;   // 上一刀没播完，别掐断
-    // 自动转向锁定目标，避免面朝空地放空招
-    var t = nearestFoe(AGGRO * 1.8);
+    // 自动锁定（v45）：半径取「技能射程」与默认仇恨的较大者 —— **技能范围内有怪必选中**，
+    // 并自动转向它；范围内没怪则保持当前朝向，朝角色正前方释放。
+    var t = nearestFoe(Math.max(AGGRO * 1.8, (s.reach || 0) + 1.2));
     if (t) setFaceFromDelta(t.x - player.mx, t.y - player.my);
     var v = FACE_VEC[player.face] || FACE_VEC.down;
     var cx = player.mx, cy = player.my;
@@ -3775,14 +3781,20 @@
       else { cx = player.mx + v.x * 2.2; cy = player.my + v.y * 2.2; }
     }
     if (s.kind === 'proj') {
-      // 弹道技能：出手只生成弹丸，伤害在命中帧结算（projHitFoe）。自动转向已让 v 对准最近目标。
+      // 弹道技能（v45）：选中目标时**精确制导**——直飞怪所在方向（不再用四向 face 的
+      // 45° 近似，斜方向的怪以前会打偏擦过）；没有目标时朝角色正前方飞。
+      var pvx = v.x, pvy = v.y;
+      if (t) {
+        var pdx = t.x - player.mx, pdy = t.y - player.my, pd = Math.hypot(pdx, pdy) || 1;
+        pvx = pdx / pd; pvy = pdy / pd;
+      }
       player.skillCd[i] = s.cd;
       player.act = s.act; player.actT = 0; player.actHold = ACT_DUR[s.act];
-      projectiles.push({ x: player.mx + v.x * 0.4, y: player.my + v.y * 0.4,
-        vx: v.x, vy: v.y, spd: s.spd || 6, life: (s.reach || 9) / (s.spd || 6),
+      projectiles.push({ x: player.mx + pvx * 0.4, y: player.my + pvy * 0.4,
+        vx: pvx, vy: pvy, spd: s.spd || 6, life: (s.reach || 9) / (s.spd || 6),
         side: 'player', fx: s.fx || 'fireball', skill: s });
       projFired++;
-      if (h0) h0.textContent = s.name + ' 出手，' + s.cd + ' 秒后可再放';
+      if (h0) h0.textContent = s.name + (t ? ' 锁定 ' + (t.name || '目标') + ' 出手，' : ' 出手，') + s.cd + ' 秒后可再放';
       return true;
     }
     var hits = skillTargets(s, cx, cy);
@@ -4662,7 +4674,13 @@
     }
   }
   function updateFloaters(dt) {
-    if (clickMark) { clickMark.life -= dt; if (clickMark.life <= 0) clickMark = null; }
+    if (clickMark) {
+      clickMark.life -= dt;
+      // v45：角色已走到目标格附近 → 标记立刻转入 0.25 秒快速淡出，别再空转 2.4 秒
+      if (!clickMark.bad && Math.hypot(player.mx - clickMark.mx, player.my - clickMark.my) < 0.25)
+        clickMark.life = Math.min(clickMark.life, 0.25);
+      if (clickMark.life <= 0) clickMark = null;
+    }
     for (var i = floaters.length - 1; i >= 0; i--) {
       var f = floaters[i]; f.life -= dt; f.off += (f.rise || 34) * dt; if (f.life <= 0) floaters.splice(i, 1);
     }
@@ -4860,10 +4878,29 @@
       return;
     }
     var r = TILE_W * 0.5 * (0.4 + grow * 0.8) * Z;
-    ctx.globalAlpha = t * 0.8; ctx.strokeStyle = '#8bf3ff'; ctx.lineWidth = 2.5 * Z;
-    ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.5, 0, 0, 6.2832); ctx.stroke();
-    ctx.globalAlpha = t * 0.9; ctx.fillStyle = 'rgba(139,243,255,.30)'; ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 1.5 * Z;
-    var dw = HW * Z, dh = HH * Z;
+    /* v45 重做：移动目标特效 = 菱形光斑持续呼吸 + 每 0.9s 一轮外扩涟漪。
+     * 生命 2.4s（到达自动提前淡出），开头 0.15s 淡入、结尾 0.3s 淡出，
+     * 让玩家全程看得见"要走到哪"，而不是一闪就没。 */
+    var age = clickMark.max - clickMark.life;
+    var fadeIn = Math.min(1, age / 0.15);
+    var fadeOut = Math.min(1, Math.max(0, clickMark.life) / 0.3);
+    var a0 = 0.85 * fadeIn * fadeOut;
+    var nowSec = ((window.performance && performance.now) ? performance.now() : Date.now()) / 1000;
+    var pulse = 0.72 + 0.28 * Math.sin(nowSec * 6.5);
+    // —— 外扩涟漪（等距椭圆，随周期扩大并变淡）——
+    var cyc = (age % 0.9) / 0.9;
+    var rr = TILE_W * (0.28 + cyc * 0.55) * Z;
+    ctx.globalAlpha = a0 * (1 - cyc) * 0.55;
+    ctx.strokeStyle = '#8bf3ff'; ctx.lineWidth = 2 * Z;
+    ctx.beginPath(); ctx.ellipse(cx, cy, rr, rr * 0.5, 0, 0, 6.2832); ctx.stroke();
+    // —— 底部淡光晕 ——
+    ctx.globalAlpha = a0 * 0.35;
+    ctx.fillStyle = 'rgba(139,243,255,.22)';
+    ctx.beginPath(); ctx.ellipse(cx, cy, rr * 0.9, rr * 0.45, 0, 0, 6.2832); ctx.fill();
+    // —— 落点菱形光斑（呼吸缩放）——
+    var dw = HW * Z * pulse, dh = HH * Z * pulse;
+    ctx.globalAlpha = a0;
+    ctx.fillStyle = 'rgba(139,243,255,.38)'; ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 2 * Z;
     ctx.beginPath();
     ctx.moveTo(cx, cy - dh); ctx.lineTo(cx + dw, cy); ctx.lineTo(cx, cy + dh); ctx.lineTo(cx - dw, cy); ctx.closePath();
     ctx.fill(); ctx.stroke();
@@ -5188,7 +5225,7 @@
     }
     player.targetFoe = null;
     var tx = Math.round(cx), ty = Math.round(cy);
-    if (setTargetCell(tx, ty)) clickMark = { mx: tx, my: ty, life: 0.7, max: 0.7 };
+    if (setTargetCell(tx, ty)) clickMark = { mx: tx, my: ty, life: 2.4, max: 2.4 };
   }
   canvas.addEventListener('mousedown', function (e) { if (e.button === 0) onClick(e); });
 
