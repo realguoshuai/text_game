@@ -311,7 +311,11 @@
   };
   var lootDrops = [];        // 地上的掉落物 { mx,my,key,n,life,tossT,vy,vx,pop }
   var LOOT_LIFE = 42;        // 掉落物停留秒数（够你打完这波再回头捡）
-  var PICK_R = 0.72;         // 拾取半径（格）—— 比一格略小，走到跟前才捡
+  /* 拾取半径（格）。原来是 0.72 —— 比一格还小，用户反馈「拾取不方便」：
+   * 斜向走过去、或贴边绕过那格，距离就永远差一点点，东西明明在脚边却捡不起来。
+   * 调到 1.15（一格多一点）：**站在相邻格也能捡到**，手感立刻松快，
+   * 又不会大到"隔着怪就隔空吸走"，仍要求真的走过去。 */
+  var PICK_R = 1.15;
   var lootSeq = 0;           // 掉落序号（给浮动相位错开用，免得同批掉落的图标同步晃）
 
   var camX = 0, camY = 0, time = 0;
@@ -2602,7 +2606,13 @@
     var pop = L.pop < 1 ? (1 - L.pop) : 0;
     var bob = Math.sin(t) * 2.2 * Z - pop * 26 * Z;
     var cx = p.x, cy = baseY + bob;
-    var size = 30 * Z * (1 - pop * 0.25);
+    // 图标比原来大一圈（30→36）：用户反馈「物品很小、不好捡」，先让人看得见。
+    var size = 36 * Z * (1 - pop * 0.25);
+
+    // 按物品类别配色：药=粉、材料=青、稀有=金。整段绘制都复用这一组色。
+    var it = ITEMS[L.key];
+    var gc = it && it.kind === 'heal' ? '255,150,190'
+           : it && it.kind === 'rare' ? '255,214,130' : '150,235,205';
 
     // ① 地面投影（跟着浮动缩放：离地越高影子越小越淡）
     var shR = (9 - bob / (6 * Z)) * Z;
@@ -2615,27 +2625,55 @@
       ctx.fill();
       ctx.restore();
     }
-    // ③ 柔光（按物品类别配色：药=粉、材料=青、稀有=金）
-    var it = ITEMS[L.key];
-    var gc = it && it.kind === 'heal' ? '255,150,190'
-           : it && it.kind === 'rare' ? '255,214,130' : '150,235,205';
+
+    /* ★★ 地面光圈（2026-09-17 用户：「拾取不是很方便，物品很小，这个可以在物品下
+     * 加一个小的圆圈或者发光显示一下」）——固定画在**脚下地面**，不随浮动上下晃，
+     * 这样它读起来就是"这里有个东西"，而不是另一团飘着的光。
+     * 三层叠加：外扩脉冲环（呼吸感）+ 实心环（边界清晰）+ 中心淡填充（跟地面拉开对比）。 */
+    var ringR = 13 * Z;                       // 环的基准半径
+    var breathe = 0.5 + 0.5 * Math.sin(time * 2.6 + L.phase);
+    ctx.save();
+    // 外扩脉冲环：半径随时间涨出去、同时淡出，制造"在吸引你过去"的感觉
+    ctx.globalAlpha = (0.40 - 0.28 * breathe) * (L.blink ? (0.4 + 0.6 * Math.abs(Math.sin(time * 9))) : 1);
+    ctx.strokeStyle = 'rgba(' + gc + ',1)';
+    ctx.lineWidth = 2.2 * Z;
+    ctx.beginPath();
+    ctx.ellipse(cx, baseY + 1 * Z, ringR * (1 + breathe * 0.55), ringR * 0.5 * (1 + breathe * 0.55), 0, 0, 6.2832);
+    ctx.stroke();
+    // 实心环：等距视角下压扁成椭圆，贴合地面
+    ctx.globalAlpha = (0.62 + 0.24 * breathe) * (L.blink ? (0.4 + 0.6 * Math.abs(Math.sin(time * 9))) : 1);
+    ctx.strokeStyle = 'rgba(' + gc + ',1)';
+    ctx.lineWidth = 2.6 * Z;
+    ctx.beginPath();
+    ctx.ellipse(cx, baseY + 1 * Z, ringR, ringR * 0.5, 0, 0, 6.2832);
+    ctx.stroke();
+    // 中心淡填充：把环里的地面稍稍提亮，小图标在草地/石板上的对比度立马够用
+    ctx.globalAlpha = (0.16 + 0.10 * breathe) * (L.blink ? (0.4 + 0.6 * Math.abs(Math.sin(time * 9))) : 1);
+    ctx.fillStyle = 'rgba(' + gc + ',1)';
+    ctx.beginPath();
+    ctx.ellipse(cx, baseY + 1 * Z, ringR * 0.92, ringR * 0.46, 0, 0, 6.2832);
+    ctx.fill();
+    ctx.restore();
+
+    // ② 柔光（跟着图标浮动）
     ctx.save();
     var pulse = 0.42 + 0.20 * Math.sin(time * 3.1 + L.phase);
-    var rg = ctx.createRadialGradient(cx, cy, 1, cx, cy, 22 * Z);
+    var rg = ctx.createRadialGradient(cx, cy, 1, cx, cy, 24 * Z);
     rg.addColorStop(0, 'rgba(' + gc + ',' + pulse.toFixed(3) + ')');
     rg.addColorStop(0.55, 'rgba(' + gc + ',' + (pulse * 0.32).toFixed(3) + ')');
     rg.addColorStop(1, 'rgba(' + gc + ',0)');
     ctx.fillStyle = rg;
-    ctx.beginPath(); ctx.arc(cx, cy, 22 * Z, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 24 * Z, 0, 6.2832); ctx.fill();
     ctx.restore();
 
-    // ② 图标本体
+    // ③ 图标本体（描一圈深色边，避免浅色图标贴在浅色地面上"糊"掉）
     ctx.save();
     ctx.globalAlpha = L.blink ? (0.45 + 0.55 * Math.abs(Math.sin(time * 5.2 + L.phase))) : 1;
     ctx.imageSmoothingEnabled = true;      // 图标是手绘风，插值放大比方块好看
-    ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
-                  Math.round(cx - size / 2), Math.round(cy - size / 2),
-                  Math.round(size), Math.round(size));
+    var ix = Math.round(cx - size / 2), iy = Math.round(cy - size / 2);
+    ctx.shadowColor = 'rgba(4,8,16,.85)';
+    ctx.shadowBlur = 4 * Z;
+    ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, ix, iy, Math.round(size), Math.round(size));
     ctx.restore();
 
     // 数量角标（>1 才画，单件就不啰嗦）
@@ -2971,7 +3009,7 @@
     else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 ' + LINGQUAN_SPAWNS.length + ' 只（J 普攻 / K 重击 / U·I·O 三招技能，Shift 奔跑）';
     else if (CUR.id === 'dungeon') hintEl.textContent = '幽冥地宫 · 尸气弥漫：小僵尸 ' + DUNGEON_SPAWNS.length + ' 只盘踞各处，南/西/东三门分别通往青玄山门 / 灵泉灵瀑 / 碑林石阵';
     else if (CUR.id === 'flare_grass_empyrean_campaign_lochport')
-      hintEl.textContent = '洛赫港 · 绿林劫道：游方 / 牛魔 / 蛇妖 共 ' + LOCHPORT_SPAWNS.length + ' 只散落全港（最近两只离出生点 9 格开外，不扎堆）。J 普攻 / K 重击 / U·I·O 三招技能 / Shift 奔跑';
+      hintEl.textContent = '洛赫港 · 绿林劫道：游方 / 牛魔 / 蛇妖 共 ' + LOCHPORT_SPAWNS.length + ' 只散落全港（最近两只离出生点 9 格开外，不扎堆）。J 普攻 / K 重击 / U·I·O 三招技能 / Shift 奔跑 · 地上带光圈的都是掉落物，走过去自动拾取';
     else if (CUR.id === 'flare_grass_empyrean_campaign_lochport_cemetery')
       hintEl.textContent = '洛赫港墓园 · 尸气盘桓：' + CEMETERY_SPAWNS.length + ' 只（小僵尸成群 + 牛魔守陵），越往里越硬';
     else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
@@ -4203,10 +4241,12 @@
       var it = ITEMS[key];
       var n = bag[key] || 0;
       c.classList.toggle('empty', n <= 0);
+      c.classList.toggle('has', n > 0);          // ★ 有货 → 提亮/描金边/角标显现
       c.classList.toggle('use', it.kind === 'heal');
       c.classList.toggle('cool', healCd > 0);
       var nb = c.querySelector('.n');
-      if (nb) nb.textContent = n > 0 ? n : '';
+      // ★ 数量角标只在有货时显示（CSS 靠 .has 控制显隐），且 99 以上折成 99+
+      if (nb) nb.textContent = n > 0 ? (n > 99 ? '99+' : n) : '';
       total += n;
       if (it.kind === 'heal') hasHeal += n;
     });
