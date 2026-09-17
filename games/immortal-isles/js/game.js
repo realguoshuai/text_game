@@ -4143,6 +4143,7 @@
     var f0 = cv0 ? (cv0.style.filter || '(none)').replace(/drop-shadow\([^)]*\)/, 'ds()') : '?';
     return 'v' + (window.__VTAG || '?') + ' ' + parts.join(' ') +
            ' | 银' + player.stones + ' 杀' + (window.__kills || 0) + ' 地' + lootDrops.length +
+           ' bt' + (bagBuilt ? 1 : 0) + ' d' + (bagDirty ? 1 : 0) + ' r' + (window.__bagRenders || 0) +
            ' | jc[' + cls0 + '] ' + f0.slice(0, 40) +
            (__bagOrphan ? ' 失联' + __bagOrphan : '') +
            (__lastPickup ? ' | 拾:' + __lastPickup : ' | 未拾') +
@@ -4312,6 +4313,7 @@
   /** 刷新背包（脏标记驱动，不是每帧都碰 DOM） */
   var bagRebuildTries = 0;   // 失联自愈的重建计数（防 bagGrid 本身不在 DOM 时无限递归）
   function renderBag() {
+    window.__bagRenders = (window.__bagRenders || 0) + 1;   // 执行计数（状态行 r 判据：在涨=真的在跑）
     if (!bagBuilt) return;
     if (!bagDirty) return;
     bagDirty = false;
@@ -5388,12 +5390,16 @@
     if (!held) update(dt);
     if (ready) updateHUD();
     render();
-    /* ★ 状态行实时化（v41）：原来它走 bagDirty 快照 —— boot 早期写入的
-     * 「v? 全0 未拾」若之后没有任何拾取事件就一直停在屏上，看起来像"数据全空"。
-     * 现在每 0.5s 直接重算一次，永远是当下真值。 */
+    /* ★ 背包兜底轮询（v42）：事件驱动的 dirty 链只要**任何一环**死过
+     * （dirty 丢标 / bagBuilt 翻转 / 格子失联 / 赋值中断），格子就永远停在过去。
+     * 这里每 0.5s 无条件把整条链拉回正确状态 —— 类似心跳包，不依赖任何事件。
+     * 5 个格子的 DOM 同步成本可忽略。 */
     if (ready && (++bagDbgTick % 30 === 0)) {
+      if (!bagBuilt || __bagOrphan > 0) buildBagUI();   // 构建标志没了/格子失联 → 先重建
+      bagDirty = true;                                  // 强制走一次完整刷新
+      renderBag();
       var sv = document.getElementById('bagStones');
-      if (sv) sv.textContent = bagDebugLine();
+      if (sv) sv.textContent = bagDebugLine();          // 判据实时（renderBag 若再被挡，这里兜住）
     }
     if (window.__dbg && CUR) {
       window.__dbg.textContent = JSON.stringify({
