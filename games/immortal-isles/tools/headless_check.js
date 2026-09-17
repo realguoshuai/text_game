@@ -30,6 +30,44 @@ let freed = 0;
 let stuck = 0;
 const U_DIR_BASE = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
 
+// ---------------- 全局统计 / 磁盘快照 ----------------
+// 为什么要有这些：2026-09-17 排查「C 盘被写满」时发现，跑批只报「用例 PASS 几条」，
+// 没人看它留下了多少垃圾、磁盘涨了多少 —— 没有观测就没有预警，等发现时已经堆了 17GB。
+// 所以三个数必须每轮报出来：清理个数(freed/stuck)、Temp 大小、C 盘可用。
+const RUN = {
+  done: 0,          // 已完成的用例数（用于卡死熔断）
+  retries: 0,       // 累计重试次数
+  startMs: Date.now(),
+  tempBeforeMB: -1, // 跑批开始时 TEMP 占用
+  freeBeforeGB: -1, // 跑批开始时 C 盘可用
+  aborted: false,   // 触发熔断
+};
+
+// ⚠ 单位诚实：本函数返回**字节**。之前叫 dirMB 却返回字节，
+//   调用方按 MB 直接格式化 → Temp 显示成 982170 GB。命名错一个单位就会骗过所有人。
+const dirBytes = (p) => {
+  let t = 0;
+  let ents;
+  try { ents = fs.readdirSync(p, { withFileTypes: true }); } catch (e) { return 0; }
+  for (const e of ents) {
+    const fp = path.join(p, e.name);
+    try {
+      // lstat：不跟符号链接（跟随可能绕进循环，把统计量算成天文数字）
+      const st = fs.lstatSync(fp);
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) t += dirBytes(fp);
+      else t += st.size;
+    } catch (x) { /* 被占用/已删，跳过 */ }
+  }
+  return t;
+};
+const dirMB = (p) => Math.round(dirBytes(p) / 1048576);
+const diskFreeMB = () => {
+  try { const s = fs.statfsSync('C:////'); return Math.round(s.bavail * s.bsize / 1048576); }
+  catch (e) { return -1; }
+};
+const fmtMB = (mb) => (mb < 0 ? 'n/a' : mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb + ' MB');
+
 function readPage(query, budget, size) {
   // ★ 每条用例用唯一 user-data-dir：否则所有用例抢同一个目录的单例锁，
   // 前面用例的 chrome 助手进程没退干净时，后面的 chrome 会卡在锁上（整页空白/无限挂起）。
@@ -95,9 +133,45 @@ function readPage(query, budget, size) {
   return { dom, bodyClass, dbg: pick('dbg'), probe: pick('probe'), mapName: pick('mapName'), loader: pick('loader') };
 }
 
+// 熔断阈值：这台机器慢，但「慢」和「卡死」要能区分开。
+// 判据不是「总耗时」（39 条正常就要几十分钟），而是**连续重试次数** ——
+// 连续 5 次重试用尽说明页面根本起不来，继续磨只会：越卡越慢 → 重试越多 →
+// scoped_dir 垃圾越多 → 磁盘越满 → 更卡（2026-09-17 那个「运行 14 小时」的僵尸任务就是这么来的）。
+const MAX_CONSEC_RETRY = 5;
+let consecRetry = 0;
+
+function bail(reason) {
+  RUN.aborted = true;
+  console.log('');
+  console.log('✗ 中止跑批：' + reason);
+  console.log('  已跑 ' + RUN.done + ' 条、累计重试 ' + RUN.retries + ' 次、耗时 ' +
+    Math.round((Date.now() - RUN.startMs) / 1000) + 's');
+  console.log('  这台机器当前扛不住这轮跑批。建议：');
+  console.log('    a) 用关键词只跑相关几条，例如 node headless_check.js "视口"');
+  console.log('    b) 关掉占资源的程序（微信/飞书/钉钉/DingTalk/游戏）再试');
+  console.log('    c) 确认磁盘有余量：df -h /c，必要时 node .workbuddy/clean_chrome_tmp.js');
+  reportEnv();
+  process.exit(2);
+}
+
+function reportEnv() {
+  const tempMB = dirMB(TEMP);
+  const freeMB = diskFreeMB();
+  let line = '  TEMP 占用 ' + fmtMB(tempMB) + '（跑批前 ' + fmtMB(RUN.tempBeforeMB) + '，Δ' +
+    (RUN.tempBeforeMB < 0 ? 'n/a' : (tempMB - RUN.tempBeforeMB >= 0 ? '+' : '') + (tempMB - RUN.tempBeforeMB) + ' MB') + '）';
+  line += '   C 盘可用 ' + fmtMB(freeMB);
+  if (RUN.freeBeforeGB >= 0) {
+    const d = (freeMB - RUN.freeBeforeGB * 1024) / 1024;
+    line += '（Δ' + (d >= 0 ? '+' : '') + d.toFixed(2) + ' GB）';
+  }
+  console.log(line);
+  console.log('  清理：本轮清掉 ' + freed + ' 个临时目录' + (stuck ? '，' + stuck + ' 个删不掉（建议手动兜底）' : ''));
+}
+
 function run(label, query, expect, opts) {
   opts = opts || {};
   if (FILTER && label.indexOf(FILTER) < 0) return { ok: null, skipped: true };
+  if (RUN.aborted) return { ok: null, skipped: true };
   // 页面压根没加载出来（map 还停在「加载中」、dbg/probe 都是空）不是断言失败，
   // 是 headless 冷启动没跑完。这种假失败重试，别把结论污染成「回归挂了」。
   let r = readPage(query, opts.budget, opts.size), tries = 1;
@@ -109,6 +183,25 @@ function run(label, query, expect, opts) {
     execSync('ping -n 2 127.0.0.1 >nul', { shell: 'cmd.exe' });   // 约 1 秒，且不依赖 sleep
     budget = (budget || 14000) * 1.6;
     r = readPage(query, budget, opts.size); tries++;
+  }
+  RUN.done++;
+  RUN.retries += (tries - 1);
+  // 一条用例把重试预算耗尽 = 页面起不来。注意这里按「**连续起不来的次数**」累加
+  // （一次失败的用例贡献 tries-1 次），而不是「连续几条用例」——
+  // 否则「只跑 1 条却卡死」这种最该熔断的场景永远够不到阈值（2026-09-17 实测踩到）。
+  if (!r.dbg && !r.probe && tries >= 4) {
+    consecRetry += (tries - 1);
+    if (consecRetry >= MAX_CONSEC_RETRY) {
+      bail('连续 ' + consecRetry + ' 次启动都起不来（页面加载不出，#dbg/#probe 全空）');
+    }
+  } else if (r.dbg || r.probe) {
+    consecRetry = 0;   // 只要有一条真的跑起来了，就认为机器还活着，计数归零
+  }
+  if (r.dbg || r.probe) {
+    const free = diskFreeMB();
+    // 磁盘红线：低于 500MB 时 chrome 会开始写不动 profile → 假失败 → 重试 → 更多垃圾。
+    // 与其滑进这个死亡螺旋，不如当场停手（这比「等它自己挂掉」有用得多）。
+    if (free >= 0 && free < 500) bail('C 盘可用仅 ' + free + ' MB（< 500MB），再跑下去会导致假失败与垃圾堆积');
   }
   let dbg = null;
   try { dbg = r.dbg ? JSON.parse(r.dbg) : null; } catch (e) { /* ignore */ }
@@ -126,6 +219,10 @@ function run(label, query, expect, opts) {
   else if (!dbg) console.log('      （页面没加载完：loader="' + String(r.loader).slice(0, 20) + '" 文件名=' + r.mapName + '）');
   return { ok: verdict, dbg, probe };
 }
+
+// 跑批基线：收尾时要拿它做差，报出「这轮跑批到底留下了多少」。
+RUN.tempBeforeMB = dirMB(TEMP);
+RUN.freeBeforeGB = diskFreeMB() / 1024;
 
 // ---------------- 用例 ----------------
 const results = [];
@@ -446,8 +543,10 @@ const skipped = results.filter((r) => r.ok === null).length;
 console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + ran.length + ' 个用例)') +
   (skipped ? '（另有 ' + skipped + ' 个因过滤跳过）' : ''));
 // 让清理可观测：以前 scoped_dir 悄悄堆到 17GB 也没人知道。
-if (stuck) console.log('⚠ 另有 ' + stuck + ' 个本轮删不掉（占用中），建议跑 node .workbuddy/clean_chrome_tmp.js 兜底');
-console.log('本次顺带清掉 Chrome 临时目录 ' + freed + ' 个（scoped_dir / wb_headless 等）' +
-  (freed + stuck ? '' : '—— 目标目录在跑批前已清理，无新增残留'));
+console.log('\n—— 跑批体检 ——');
+console.log('  用例 ' + ran.length + ' 条（跳过 ' + skipped + '），累计重试 ' + RUN.retries +
+  ' 次，耗时 ' + Math.round((Date.now() - RUN.startMs) / 1000) + 's');
+reportEnv();
+console.log('  ↑ 若 C 盘 Δ 大幅为负或清理数异常，说明机器当时很吃紧，结果可信度下降');
 try { fs.rmSync(U_DIR, { recursive: true, force: true }); } catch (e) { /* 目录偶尔被占用，留着不影响结果 */ }
 process.exit(failed ? 1 : 0);
