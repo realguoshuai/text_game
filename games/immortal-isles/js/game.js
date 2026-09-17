@@ -478,7 +478,10 @@
       { url: 'assets/foes_atlas.json?v=2', json: true, weight: 2, label: '读取妖兽索引' },
       { url: 'assets/heroes.json?v=1', json: true, weight: 1, label: '读取角色清单' },
       { url: 'assets/fx_atlas.webp?v=2', atlas: 'fx', weight: 61, label: '载入技能特效' },
-      { url: 'assets/fx_atlas.json?v=2', json: true, weight: 1, label: '读取特效索引' },
+      // ⚠ atlas 字段两张都要写（同 items 的教训）：boot 按 p.atlas==='fx' 接值，
+      //   首版漏了 json 这张 → fx_atlas.json 下载了却没人接 → ATLAS.fx.rect 恒 null
+      //   → fxFrame 'noRect' 全灭 → 火球/爆炸/落雷全部静默不画（炎爆术没特效的真根因）。
+      { url: 'assets/fx_atlas.json?v=2', json: true, atlas: 'fx', weight: 1, label: '读取特效索引' },
       { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' },
       { url: 'assets/items_atlas.png?v=2', atlas: 'items', weight: 23, label: '载入物品图标' },
       // ⚠ atlas 字段两张都要写：boot 里是按 `p.atlas === 'items'` 把值填进 ATLAS.items 的。
@@ -981,6 +984,15 @@
           if (p.json) ATLAS.items.rect = p.value; else ATLAS.items.img = p.value;
         });
         splitItemsJson(ATLAS.items);
+        // 技能特效图集（fx_atlas）：同 items 的教训 —— 排进 LOAD_PLAN 只是「下载」，
+        // 还必须有人把结果接进 ATLAS，否则 fxFrame 首行 !a.img → return null，
+        // 火球弹道 / 命中爆炸 blast / 雷咒落雷 lightning 全部静默不画（2026-09-17
+        // 用户报「炎爆术没有特效」的根因：fx 只排队、没人接值）。ATLAS 预置无 fx 槽位，懒注册。
+        LOAD_PLAN.forEach(function (p) {
+          if (p.atlas !== 'fx' || !p.value) return;
+          ATLAS.fx = ATLAS.fx || { img: null, rect: null };
+          if (p.json) ATLAS.fx.rect = p.value; else ATLAS.fx.img = p.value;
+        });
         // 首屏池里排过的按需图集（地宫 / 开局这张外来图的图集）此刻都已下载完 ——
         // 逐个把图与索引填进 ATLAS（fillAtlas 内部会把 loaded 置位），后台预取也不会再拉一遍。
         // ⚠ 以前只写死 fillAtlas('dungeon')：开局图一旦换成外来图，它的图集虽然排进了池子，
@@ -2294,7 +2306,10 @@
               res[si3].dmg2 = hb2 - tg3.hp;
             }
           }
-          pbs.textContent = JSON.stringify({ n: SKILLS.length, skills: res });
+          pbs.textContent = JSON.stringify({ n: SKILLS.length, skills: res,
+            fxDrawn: (window.__fxDrawn || 0),   // 真实画帧数（≥4 = 四招特效真的上屏，不是只入队）
+            fxMissWhy: window.__fxMissWhy || null,
+            fxImg: !!(ATLAS.fx && ATLAS.fx.img), fxRect: !!(ATLAS.fx && ATLAS.fx.rect) });
         }
         if (at === 'cull') {
           // ?map=<图>&autotest=cull —— 「视口裁剪没画漏」验收（2026-09-17 加）。
@@ -3666,21 +3681,31 @@
    * ?cast= 调试冻结（fxFreeze）时弹道同样停摆，方便逐帧截图核对。 */
   var projectiles = [];
   var projFired = 0;                     // 累计发射数（自测用：远程怪是否真的开火）
-  /** fx_atlas 取帧：at === null 按 fps 循环取；at ∈ [0,1) 按进度取（一次性动画）。 */
+  /** fx_atlas 取帧：at === null 按 fps 循环取；at ∈ [0,1) 按进度取（一次性动画）。
+   *  ⚠ 失败分支全部留痕（__fxMissWhy）：这条链曾经全灭且不报错（fx_atlas 下载了
+   *  但没人接进 ATLAS.fx，2026-09-17 炎爆术没特效），判据必须能说出死在哪一层。 */
   function fxFrame(name, at) {
-    var a = ATLAS.fx; if (!a || !a.img || !a.rect) return null;
+    var a = ATLAS.fx;
+    if (!a || !a.img || !a.rect) {
+      window.__fxMissWhy = !a ? 'noSlot' : (!a.img ? 'noImg' : 'noRect');
+      return null;
+    }
     var meta = a.rect._meta && a.rect._meta[name];
-    if (!meta) return null;
+    if (!meta) { window.__fxMissWhy = 'noMeta:' + name; return null; }
     var idx = (at === null || at === undefined)
       ? Math.floor(time * (meta.fps || 10)) % meta.n
       : Math.min(meta.n - 1, Math.floor((at || 0) * meta.n));
-    var r = a.rect[name + '_' + idx]; if (!r) return null;
+    var r = a.rect[name + '_' + idx];
+    if (!r) { window.__fxMissWhy = 'noFrame:' + name + '_' + idx; return null; }
     return { img: a.img, sx: r[0], sy: r[1], sw: r[2], sh: r[3], meta: meta };
   }
   /** 在等距屏幕坐标 (px, py 为地面点) 画一个特效帧，绕 screenAng 旋转、按 gscale 缩放 */
   function drawFxSprite(name, px, py, gscale, screenAng, alpha, at) {
     var fr = fxFrame(name, (at === undefined) ? null : at);
     if (!fr) return;
+    // 真画出帧才计数（fxFrame 取不到时静默 return，恰是「特效全灭且不报错」的故障形态，
+    // 2026-09-17 炎爆术没特效的根因）：线上判据 = window.__fxDrawn，autotest=skill 的 probe 会带出。
+    window.__fxDrawn = (window.__fxDrawn || 0) + 1;
     var s = gscale * Z;
     var dw = fr.sw * s, dh = fr.sh * s;
     ctx.save();

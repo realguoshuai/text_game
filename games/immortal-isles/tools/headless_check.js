@@ -427,6 +427,10 @@ results.push(run('战斗 手感三件套', 'map=qingxuan&autotest=combat', ({ pr
 results.push(run('技能 全招与冷却', 'map=qingxuan&autotest=skill', ({ probe }) => {
   if (!probe || !Array.isArray(probe.skills) || probe.skills.length < 4) return false;
   if (probe.n !== probe.skills.length) return false;
+  // fxDrawn = drawFxSprite 真画出帧的次数（≥4：四招特效真的上屏）。
+  // ⚠ 旧断言只看 s.fx（skillFx 入队数）—— 2026-09-17 fx_atlas 没人接进 ATLAS.fx，
+  //   火球/爆炸全部静默不画，入队照样 ≥1，这条用例当时根本抓不住（假绿）。
+  if (!(probe.fxDrawn >= 4)) return false;
   return probe.skills.every((s) => s.cast === true && s.dmg > 0 && s.blocked === true
     && s.recast === true && s.dmg2 > 0 && s.fx >= 1 && s.cd > 0);
 }, { budget: 24000 }
