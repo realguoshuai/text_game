@@ -29,6 +29,8 @@ let freed = 0;
 // .workbuddy/clean_chrome_tmp.js 兜底，但绝不会再出现「悄悄堆到 17GB」。
 let stuck = 0;
 const U_DIR_BASE = path.join(os.tmpdir(), 'wb_headless_' + process.pid);
+// 兜扫保护的"自己人"前缀（不带路径）。见 sweepAllJunk 里的说明。
+const U_DIR_BASE_NAME = 'wb_headless_' + process.pid;
 
 // ---------------- 全局统计 / 磁盘快照 ----------------
 // 为什么要有这些：2026-09-17 排查「C 盘被写满」时发现，跑批只报「用例 PASS 几条」，
@@ -87,6 +89,39 @@ function readPage(query, budget, size) {
   //   所以这里按「本次调用新增的」做差集清理：只删这次 chrome 自己建的那几个，
   //   不碰别的 Chrome（含 WorkBuddy 预览）正在用的目录。
   const isJunk = (n) => /^scoped_dir/.test(n) || /^wb_headless_/.test(n) || /^HeadlessChrome/.test(n);
+  // ★★ 判据演进（2026-09-17，三轮实测踩出来的）★★
+  // 最初用「本次新增」差集：只删这次 chrome 自己建的，绝不碰别人的。
+  //   实测漏洞：chrome 被强杀 → 残壳留到下次跑批 → 下次跑批把它拍进 before 快照 →
+  //   从此被当成"别人正在用"，**永远清不掉**。这正是堆积到 17GB 的原始路径。
+  // 第二版加「年龄 > STALE_MIN 分钟」兜底：能清老孤儿，但"刚强杀的残壳"（1 分钟前）
+  //   照样漏 —— 而强杀恰恰是最常见的产生方式。
+  // 第三版（当前）改用**进程探活**：目录名里带 pid 的（scoped_dir<PID>_xxx）直接
+  //   process.kill(pid,0) 问一句"那货还活着吗"。死了 = 纯垃圾，立刻清，不看年龄也不看快照。
+  //   这是唯一能精确区分「孤儿」与「别人在用」的办法 —— 不用猜。
+  // 探不了 pid 的（HeadlessChrome<时间戳>）退回「尝试删 + 删失败即视为占用」：
+  //   Windows 上被独占的目录删不掉，删的成功与否本身就是探活结果。
+  const pidAlive = (pid) => {
+    if (!pid || !Number.isFinite(pid) || pid <= 0) return false;
+    try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+  };
+  // 从目录名抽 chrome pid：scoped_dir36796_xxx → 36796。抽不到返回 0（走删除探测）。
+  const junkPid = (n) => {
+    const m = n.match(/^scoped_dir(\d+)_/);
+    return m ? Number(m[1]) : 0;
+  };
+  // 孤儿 = 目录名带 pid 且那个 pid 已经死了。这类无条件清，与快照/年龄无关。
+  const orphans = new Set(
+    fs.readdirSync(TEMP).filter((n) => isJunk(n) && junkPid(n) && !pidAlive(junkPid(n)))
+  );
+  // 老残渣兜底：无 pid 可探的同类目录，靠年龄（> STALE_MIN 分钟）判为遗留物。
+  const STALE_MIN = 60;
+  const staleBefore = new Set(
+    fs.readdirSync(TEMP).filter((n) => {
+      if (!isJunk(n) || junkPid(n)) return false; // 带 pid 的走探活，不走年龄
+      try { return Date.now() - fs.statSync(path.join(TEMP, n)).mtimeMs > STALE_MIN * 60000; }
+      catch (e) { return false; }
+    })
+  );
   const before = new Set(fs.readdirSync(TEMP).filter(isJunk));
   let dom = '';
   try {
@@ -111,17 +146,32 @@ function readPage(query, budget, size) {
     // 第一遍删不掉（chrome 刚被 SIGKILL、目录句柄还没释放）时退避重试一轮，
     // 仍失败则记 stuck —— 以前这种「半删残壳」被静默吞掉，下次跑批就变成前人的垃圾。
     try {
-      const mine = () => fs.readdirSync(TEMP).filter((n) => isJunk(n) && !before.has(n));
+      // 三个来源合并：本次新建（差集）∪ 已死掉的孤儿（探活）∪ 无 pid 的老残渣（年龄）。
+      // 无 pid 且年轻、又在 before 里的（如刚强杀留下的 HeadlessChrome*）不在这三类里 ——
+      // 交给「末轮兜扫」（sweepAllJunk，跑批收尾时调用）处理。
+      const mineNow = () => fs.readdirSync(TEMP).filter((n) =>
+        isJunk(n) && (!before.has(n) || orphans.has(n) || staleBefore.has(n)));
       const sweep = () => {
-        for (const n of mine()) {
+        for (const n of mineNow()) {
+          // 二次保护：万一 pid 被系统回收、新进程恰好占用了这个号，探活会误判"活着"。
+          // 所以删之前再问一次 —— 探活说还活着就跳过，宁可漏清也不误删别人正在用的。
+          const p = junkPid(n);
+          if (p && before.has(n) && pidAlive(p)) continue;
           for (let k = 0; k < 3; k++) {
-            try { fs.rmSync(path.join(TEMP, n), { recursive: true, force: true, maxRetries: 1 }); freed++; break; }
-            catch (e) { if (k === 2) { stuck++; console.log('  ⚠ 清不掉（下次跑批重试）: ' + n); } }
+            // ⚠ 不靠"抛出与否"判断成功：Windows 上 rmSync 删被独占占用的文件时可能**不抛异常**
+            //   却把删不掉的留下（force:true 吞部分错误）→ 目录成半删残壳、报告还说清理成功。
+            //   所以删完必须**复核**：目录还在就是没删干净。这是"假成功"的唯一识别方法。
+            try { fs.rmSync(path.join(TEMP, n), { recursive: true, force: true, maxRetries: 1 }); } catch (e) { /* 留给复核判定 */ }
+            if (!fs.existsSync(path.join(TEMP, n))) { freed++; break; }
+            if (k === 2) {
+              stuck++;
+              console.log('  ⚠ 清不掉（可能被占用，下次跑批会重试）: ' + n);
+            }
           }
         }
       };
       sweep();
-      if (mine().length) { execSync('ping -n 2 127.0.0.1 >nul', { shell: 'cmd.exe' }); sweep(); }
+      if (mineNow().length) { execSync('ping -n 2 127.0.0.1 >nul', { shell: 'cmd.exe' }); sweep(); }
     } catch (e) { /* 读不了 TEMP 就算了 */ }
   }
   if (!dom) return { dom: '', bodyClass: '', dbg: null, probe: null, mapName: null, loader: null };
@@ -150,8 +200,37 @@ function bail(reason) {
   console.log('    a) 用关键词只跑相关几条，例如 node headless_check.js "视口"');
   console.log('    b) 关掉占资源的程序（微信/飞书/钉钉/DingTalk/游戏）再试');
   console.log('    c) 确认磁盘有余量：df -h /c，必要时 node .workbuddy/clean_chrome_tmp.js');
+  sweepAllJunk();
   reportEnv();
   process.exit(2);
+}
+
+// ---------------- 末轮兜扫：清掉所有「没人在用」的同前缀临时目录 ----------------
+// 为什么还要单独来一遍（前面的 per-use 差集 + 探活已经够多）：2026-09-17 实测发现，
+// 刚被强杀的 chrome 会留下没 pid 前缀的 HeadlessChrome<时间戳>（profile 全量，几十 MB）。
+// 它既不在「本次新建」差集里（强杀发生在跑批外/上一条用例），也没有 pid 可探活 ——
+// 只能靠「试着删」来判定：Windows 会锁住正在使用的目录，**删得掉就等于没人在用**。
+// 所以跑批收尾时对全部同前缀目录试删一遍，删不掉的只记数不报错（可能是 WorkBuddy
+// 预览等真实进程在用）。这样孤儿不再有"永远清不掉"的死角。
+// 可用 HEADLESS_KEEP_TMP=1 关闭，方便需要保留现场排查时使用。
+function sweepAllJunk() {
+  if (process.env.HEADLESS_KEEP_TMP === '1') return;
+  let names;
+  try { names = fs.readdirSync(TEMP); } catch (e) { return; }
+  for (const n of names) {
+    if (!/^(scoped_dir|wb_headless_|HeadlessChrome)/.test(n)) continue;
+    // 绝不碰本进程正在用的 profile 前缀（U_DIR_BASE = wb_headless_<自己pid>_*）：
+    // 它不匹配下面的 scoped_dir\d+_ 探活，会直落删除分支，把自己的工作目录端了。
+    if (n.indexOf(U_DIR_BASE_NAME) === 0) continue;
+    const p = path.join(TEMP, n);
+    // 带 pid 的先探活：还活着的直接跳过（正在被真实 chrome 使用，碰不得）。
+    const pid = (n.match(/^scoped_dir(\d+)_/) || [])[1];
+    if (pid) { try { process.kill(Number(pid), 0); continue; } catch (e) { /* 已死，可清 */ } }
+    // 无 pid 或探活说已死的：试着删。Windows 会锁住真正在用的目录 ——
+    // 删失败本身就是"有人在用"的证据，比任何猜测都准。删完复核，还在就不计数。
+    try { fs.rmSync(p, { recursive: true, force: true, maxRetries: 1 }); } catch (e) { /* 占用中，正常 */ }
+    if (!fs.existsSync(p)) freed++;
+  }
 }
 
 function reportEnv() {
@@ -546,6 +625,9 @@ console.log('\n' + (failed ? failed + ' 个用例失败' : '全部通过 (' + ra
 console.log('\n—— 跑批体检 ——');
 console.log('  用例 ' + ran.length + ' 条（跳过 ' + skipped + '），累计重试 ' + RUN.retries +
   ' 次，耗时 ' + Math.round((Date.now() - RUN.startMs) / 1000) + 's');
+// 先兜扫再报数：这样体检里的「清理 N 个」和 TEMP 占用都包含兜扫成果，
+// 数字与实际清完后的状态一致（否则报告说清了 3 个、TEMP 却还挂着 28MB 的残壳）。
+sweepAllJunk();
 reportEnv();
 console.log('  ↑ 若 C 盘 Δ 大幅为负或清理数异常，说明机器当时很吃紧，结果可信度下降');
 try { fs.rmSync(U_DIR, { recursive: true, force: true }); } catch (e) { /* 目录偶尔被占用，留着不影响结果 */ }
