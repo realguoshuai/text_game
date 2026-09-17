@@ -269,21 +269,31 @@
   #bag .cell{position:relative;width:52px;height:52px;border-radius:9px;
     background:rgba(8,14,26,.72);border:1px solid rgba(214,178,96,.38);
     display:flex;align-items:center;justify-content:center;transition:.12s}
-  /* ★ .empty 只压**图标本身**，不要给整格 opacity —— 
-     整格透明度会连带把数量角标、快捷键一起压暗，捡到东西后看着还是"暗的"。 */
-  #bag .cell.empty > canvas{filter:grayscale(1) brightness(.5);opacity:.42}
   #bag .cell > canvas.ico{display:block;transition:filter .15s,opacity .15s}
-  /* ★ 有货（未 .empty）的格子：图标提亮 + 描金边 + 微光晕，一眼看出"这格有东西" */
+  /* ★★★ 图标滤镜只在这**一处**按状态分派（2026-09-17 第三次修复）
+   *
+   * 之前分解成 .empty / .has / .cool 三条规则各自写 filter，结果三者的**特异性完全相同**
+   * （都是 .cell.X > canvas），后写的赢 —— 而 `.cool` 在文件里排在最后，
+   * 于是它那条 `saturate(.4) brightness(.72)`（灰调）把 `.has` 的提亮**整个盖掉**了。
+   * 更糟的是 .cool 在 renderBag 里是**无条件**设的（`toggle('cool', healCd>0)`，
+   * 不分格），用一次药全场格子灰 0.6 秒，用户看到的自然"永远是灰的"。
+   *
+   * 现在只留一条 filter 规则、按优先级从上到下写清楚：
+   *   有货（正常） > 有货但冷却中 > 空格 …
+   * 并在 renderBag 里把 .cool 限定到**真的按下去的那一格**。
+   */
+  #bag .cell:not(.empty) > canvas{filter:brightness(1.22) saturate(1.1) drop-shadow(0 0 3px rgba(255,210,120,.5))}
+  #bag .cell.cool:not(.empty) > canvas{filter:saturate(.55) brightness(.86)}
+  #bag .cell.empty > canvas{filter:grayscale(1) brightness(.5);opacity:.42}
+  /* ★ 有货（未 .empty）的格子：描金边 + 暖底 + 微光晕，一眼看出"这格有东西" */
   #bag .cell:not(.empty){border-color:rgba(255,214,130,.85);
     background:linear-gradient(180deg,rgba(38,30,16,.92),rgba(14,18,30,.92));
     box-shadow:inset 0 0 12px rgba(255,196,90,.22),0 0 7px rgba(255,190,80,.20)}
-  #bag .cell:not(.empty) > canvas{filter:brightness(1.22) saturate(1.1) drop-shadow(0 0 3px rgba(255,210,120,.5))}
   #bag .cell.use{cursor:pointer;border-color:rgba(255,150,190,.6);
     box-shadow:inset 0 0 14px rgba(255,120,170,.16)}
   #bag .cell.use:hover{background:rgba(46,26,50,.9);border-color:#ff9ec4;
     box-shadow:0 0 12px rgba(255,140,190,.45)}
   #bag .cell.use:active{transform:translateY(1px)}
-  #bag .cell.cool > canvas{filter:saturate(.4) brightness(.72)}
   /* ★ 数量角标：压在右下、大号黑底金字，保证"捡到了几个"一眼可读 */
   #bag .cell .n{position:absolute;right:-2px;bottom:-3px;z-index:3;
     min-width:17px;height:17px;line-height:17px;text-align:center;
@@ -308,7 +318,7 @@
   body.touch #bag .grid{grid-template-columns:repeat(3,46px)}
   body.touch #bag .cell{width:46px;height:46px}
 
-  /* 居中事件提示（被击退/折损灵石等） */
+  /* 居中事件提示（被击退/折损银两等） */
   #toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-6px);z-index:60;
     padding:10px 20px;border-radius:10px;pointer-events:none;max-width:82vw;text-align:center;
     background:linear-gradient(180deg,rgba(120,26,26,.94),rgba(70,14,14,.96));
@@ -475,7 +485,7 @@
     <div class="row">坐标 <b id="pos">—</b></div>
     <div class="row" id="hint">踩上青色光门即可切换地图</div>
     <div class="row" id="expv">炼气期 · 修为 0</div>
-    <div class="row">灵石 <b id="stonev">0</b></div>
+    <div class="row">银两 <b id="stonev">0</b></div>
   </div>
 </div>
 
@@ -487,7 +497,7 @@
 
 <!-- 背包面板：格子由脚本按 ITEMS 表动态生成（图标取自 items_atlas 的 2× 高清版） -->
 <div id="bag" class="hud panel">
-  <div class="t"><span>行囊</span><span class="stones" id="bagStones">灵石 0</span></div>
+  <div class="t"><span>行囊</span><span class="stones" id="bagStones">银两 0</span></div>
   <div class="grid" id="bagGrid"></div>
   <div class="tip">点<b>粉色边框</b>的格子服药（或按 <b>1</b>/<b>2</b>/<b>3</b>）</div>
 </div>
@@ -688,6 +698,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=36"></script>
+<script src="js/game.js?v=37"></script>
 </body>
 </html>

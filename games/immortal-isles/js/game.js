@@ -268,22 +268,22 @@
 
   /* ---------------- 物品与掉落（2026-09-17 新增） ----------------
    * 设计取舍，先写清楚免得后面改歪：
-   *   ① **只有 heal 类需要手动用**。妖丹/灵石/玄铁令是「捡到即结算」——
-   *      材料类还要开背包点一下太碎，破坏打怪节奏。灵石直接进账，妖丹进背包攒着。
+   *   ① **只有 heal 类需要手动用**。妖丹/银两/玄铁令是「捡到即结算」——
+   *      材料类还要开背包点一下太碎，破坏打怪节奏。银两直接进账，妖丹进背包攒着。
    *   ② **药品是「战斗中自救」的手段**，所以要能在挨打时用（倒地时不行，那已经是惩罚）。
    *   ③ 掉落概率整体偏慷慨：这是练级场不是硬核游戏，捡不到东西等于系统白做。
-   *      灵石必掉（本来就是必掉的），妖丹 45%，药品 22%+ ，玄铁令只从精英身上出 8%。
+   *      银两必掉（本来就是必掉的），妖丹 45%，药品 22%+ ，玄铁令只从精英身上出 8%。
    *
    * ITEMS 的键必须与 tools/gen_items_atlas.py 的 SPEC 一致（图标名 = 键名）。
-   * val 对 heal 类是「回复最大气血的百分比」，对 mat 类是「折算灵石数」。
+   * val 对 heal 类是「回复最大气血的百分比」，对 mat 类是「折算银两数」。
    */
   var ITEMS = {
-    lingshi:   { cn: '灵石',   kind: 'mat',  icon: 'lingshi',   val: 0,    desc: '通用货币，拾取即入账' },
-    yaodan:    { cn: '妖丹',   kind: 'mat',  icon: 'yaodan',    val: 12,   desc: '妖兽内丹，可折算灵石' },
+    lingshi:   { cn: '银两',   kind: 'mat',  icon: 'lingshi',   val: 0,    desc: '通用货币，拾取即入账' },
+    yaodan:    { cn: '妖丹',   kind: 'mat',  icon: 'yaodan',    val: 12,   desc: '妖兽内丹，可折算银两' },
     jinchuang: { cn: '金创药', kind: 'heal', icon: 'jinchuang', val: 0.35, desc: '回复 35% 气血' },
     xiaohuan:  { cn: '小还丹', kind: 'heal', icon: 'xiaohuan',  val: 0.55, desc: '回复 55% 气血' },
     dahuan:    { cn: '大还丹', kind: 'heal', icon: 'dahuan',    val: 1.00, desc: '回满气血' },
-    xuantie:   { cn: '玄铁令', kind: 'rare', icon: 'xuantie',   val: 60,   desc: '江湖信物，可折算大笔灵石' }
+    xuantie:   { cn: '玄铁令', kind: 'rare', icon: 'xuantie',   val: 60,   desc: '江湖信物，可折算大笔银两' }
   };
   /* 掉落表：<怪种> → [[物品键, 概率(0~1), 最少, 最多], ...]
    * 没登记的怪走 DEFAULT_LOOT。精英（def_.elite）额外掷一次 ELITE_LOOT。
@@ -2116,6 +2116,27 @@
             if (!(frac > 0.10)) geoMiss.push('blank#' + gi + ':' + frac.toFixed(3));
           }
           R.geo = { n: geoCells.length, miss: geoMiss, cells: geoCells };
+
+          /* ★ 背包「有货 / 空格」是否真的在视觉上分得开（2026-09-17 用户第三次反馈：
+           *   「拾取后背包图标还是灰的，没有的是灰的可以理解，有的必须能区别出来」）。
+           * 上一轮我只是写了 .empty / .has 两条 CSS，从没验证过**浏览器算出来的样式**。
+           * 这里读 computedStyle 的 filter 与 opacity —— 它是"最终生效值"，
+           * 能抓到"选择器匹配不上 / 被更高优先级覆盖"这类静默失效。 */
+          var bagStates = [];
+          for (var bi = 0; bi < BAG_ORDER.length; bi++) {
+            var bk = BAG_ORDER[bi], bc = bagCells[bk];
+            if (!bc) continue;
+            var cv2 = bc.querySelector('canvas.ico');
+            var cs = cv2 ? getComputedStyle(cv2) : null;
+            bagStates.push({
+              k: bk, n: bag[bk] || 0,
+              cls: (bc.className || '').replace('cell', '').trim(),
+              has: bc.classList.contains('has'),
+              filter: cs ? cs.filter : '(no canvas)',
+              op: cs ? cs.opacity : '-'
+            });
+          }
+          R.bagStates = bagStates;
           // 图集本身解码是否正常（对比参考，不参与判据）
           R.atlasNatural = ATLAS.items.img ? (ATLAS.items.img.naturalWidth + 'x' + ATLAS.items.img.naturalHeight) : '-';
           pbold.textContent = JSON.stringify(R);
@@ -2688,6 +2709,27 @@
       ctx.fillText('×' + L.n, tx, ty);
       ctx.restore();
     }
+
+    /* ★ 物品名称小字（2026-09-17 用户：「物品掉落后需要显示小字的名称」）
+     * 画在**地面光圈下方**（baseY + 一格），贴着地面读起来才像"这东西的标签"，
+     * 挂到浮动图标边上会跟着上下晃、认起来累。
+     * 两级描边（粗黑描边 + 细描边）保证在草地/石板/水面任何底色上都读得清 ——
+     * 只靠 fillText 在浅色地面上会糊掉。文字做对比增强不做纯白，避免刺眼。 */
+    var nm = (it && it.cn) ? it.cn : L.key;
+    var fs = Math.round(11 * Z);
+    ctx.save();
+    ctx.font = 'bold ' + fs + 'px "PingFang SC","Microsoft YaHei",ui-monospace,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    var lx = cx, ly = baseY + 15 * Z;
+    ctx.globalAlpha = L.blink ? (0.45 + 0.55 * Math.abs(Math.sin(time * 5.2 + L.phase))) : 1;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3.4 * Z; ctx.strokeStyle = 'rgba(6,12,24,.92)';
+    ctx.strokeText(nm, lx, ly);
+    ctx.lineWidth = 1.2 * Z; ctx.strokeStyle = 'rgba(' + gc + ',.85)';
+    ctx.strokeText(nm, lx, ly);
+    ctx.fillStyle = '#fff6df';
+    ctx.fillText(nm, lx, ly);
+    ctx.restore();
   }
   /** 掉落物图标取件（小图，64×64）。带缓存，免得每帧翻图集。 */
   var _lootPz = {};
@@ -3023,7 +3065,7 @@
     else if (CUR.id === 'flare_grass_empyrean_campaign_lochport_cemetery') { foes = makeFoes(CEMETERY_SPAWNS); }
     else { foes = []; floaters = []; particles = []; player.targetFoe = null; }
     // 地上的掉落物是「这张图的」，换图一律清掉 —— 不然坐标会飘到新图的地上。
-    // 背包（bag）与灵石是**角色**的，跨图保留。
+    // 背包（bag）与银两是**角色**的，跨图保留。
     lootDrops = [];
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
@@ -3450,7 +3492,7 @@
       particles.push({ mx: mx, my: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5, life: 0.6, max: 0.6, color: '#ffe1a0' });
     }
   }
-  // 居中提示条：把"被击退/折损灵石"这类事件说清楚，避免玩家只看到画面一跳却没有解释
+  // 居中提示条：把"被击退/折损银两"这类事件说清楚，避免玩家只看到画面一跳却没有解释
   var toastEl = null, toastTimer = 0;
   function toast(msg) {
     if (!toastEl) {
@@ -4028,7 +4070,7 @@
       });
     }
   }
-  /** 拾取判定：走到跟前自动捡。heal 进背包，mat 类灵石直接入账、妖丹/玄铁令进背包。 */
+  /** 拾取判定：走到跟前自动捡。heal 进背包，mat 类银两直接入账、妖丹/玄铁令进背包。 */
   function updateLoot(dt) {
     for (var i = lootDrops.length - 1; i >= 0; i--) {
       var L = lootDrops[i];
@@ -4044,7 +4086,7 @@
       lootDrops.splice(i, 1);
     }
   }
-  /** 真正入账。灵石是货币（走 player.stones），其余进背包。 */
+  /** 真正入账。银两是货币（走 player.stones），其余进背包。 */
   function pickUp(L) {
     var it = ITEMS[L.key];
     if (!it) return;
@@ -4056,7 +4098,7 @@
     if (!it) return;
     if (key === 'lingshi') {
       player.stones += n;                      // 货币：直接入账
-      addFloater(mx, my - 0.3, '+' + n + ' 灵石', '#8bf3ff');
+      addFloater(mx, my - 0.3, '+' + n + ' 银两', '#8bf3ff');
       return;
     }
     bag[key] = (bag[key] || 0) + n;
@@ -4069,11 +4111,12 @@
       toast('拾得 ' + it.cn + ' —— 按 1 / 2 / 3 或点背包格子即可服用');
     }
   }
-  var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；灵石不入包）
+  var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；银两不入包）
   var bagDirty = true;       // HUD 脏标记（数量变了才碰 DOM）
   var healHinted = false;    // 药品用法是否已提示过
   var healCd = 0;            // 服药公共冷却（防止一口气连嗑）
   var HEAL_CD = 0.6;
+  var healUsed = '';         // 刚服下的那一格（只有它该显示冷却灰，不是全场一起灰）
   var bagOpen = false;       // 背包面板是否展开
 
   /* ---------------- 药品服用 ----------------
@@ -4091,6 +4134,7 @@
     if (player.hp >= player.maxhp) { toast('气血已满，留着'); return false; }
     if (healCd > 0) return false;
     healCd = HEAL_CD;
+    healUsed = key;                          // 只灰这一格（见 renderBag 的 .cool 注释）
     var before = player.hp;
     player.hp = Math.min(player.maxhp, player.hp + player.maxhp * it.val);
     var got = Math.round(player.hp - before);
@@ -4243,7 +4287,10 @@
       c.classList.toggle('empty', n <= 0);
       c.classList.toggle('has', n > 0);          // ★ 有货 → 提亮/描金边/角标显现
       c.classList.toggle('use', it.kind === 'heal');
-      c.classList.toggle('cool', healCd > 0);
+      /* ★ .cool 只给**刚按下去的那一格**上（healUsed）。原来写的是无条件
+       *   `toggle('cool', healCd>0)` —— 用一次药全场格子一起灰 0.6 秒，
+       *   叠上 filter 的优先级问题，用户看到的就是"背包永远是灰的"。 */
+      c.classList.toggle('cool', healCd > 0 && key === healUsed);
       var nb = c.querySelector('.n');
       // ★ 数量角标只在有货时显示（CSS 靠 .has 控制显隐），且 99 以上折成 99+
       if (nb) nb.textContent = n > 0 ? (n > 99 ? '99+' : n) : '';
@@ -4251,7 +4298,7 @@
       if (it.kind === 'heal') hasHeal += n;
     });
     var sv = document.getElementById('bagStones');
-    if (sv) sv.textContent = '灵石 ' + player.stones;
+    if (sv) sv.textContent = '银两 ' + player.stones;
     // 入口按钮上的小红点：有药就提示"可以嗑"
     var btn = document.getElementById('bagBtn'), dot = document.getElementById('bagDot');
     if (btn) btn.classList.toggle('hasnew', hasHeal > 0 && !bagOpen);
@@ -4279,7 +4326,7 @@
     player.exp += f.exp;
     var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
     player.stones += st;
-    addFloater(f.x, f.y - 0.4, '+' + st + ' 灵石', '#8bf3ff');
+    addFloater(f.x, f.y - 0.4, '+' + st + ' 银两', '#8bf3ff');
     // 掉落结算：在倒地动画开始的同时就把东西撒下去 ——
     // 等动画播完再掉会让玩家以为"没掉东西"而提前走开。
     spawnLoot(f, rollLoot(f));
@@ -4333,7 +4380,7 @@
     player.flash = 0.5;
     screenFlash = 0.55;
     addFloater(player.mx, player.my - 0.4, '倒地！', '#ff8080');
-    toast('气血耗尽倒地，折损灵石 ' + lost + (pushed ? '' : '（退路被阻）'));
+    toast('气血耗尽倒地，折损银两 ' + lost + (pushed ? '' : '（退路被阻）'));
     var h = document.getElementById('hint');
     if (h) h.textContent = '倒地中，' + ACT_DUR.dead + ' 秒后起身（起身有 2 秒无敌）';
   }

@@ -381,6 +381,25 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
     //      已 revoke 的 blob URL，二次取像素静默失败，inline style 字符串照样规整）。
     //   miss 为空即每格 ink 占比 > 0.25，说明取到像素并真的画进 canvas 了。
     && probe.geo.miss.length === 0
+    // ★★★ 有货 / 空格必须在**浏览器实算样式**上真的分得开（2026-09-17 第三次修复）。
+    //   之前 .empty / .has / .cool 三条 filter 规则特异性相同、后写的赢，
+    //   `.cool` 那条灰调把 `.has` 的提亮整个盖掉了 —— 而且 .cool 还是无条件设的，
+    //   于是用户看到"背包图标永远是灰的"。这类失效**读 inline style 抓不到**，
+    //   只有读 getComputedStyle 的最终值才看得见。
+    //   判据分两种合法态：
+    //     · 有货且**不在冷却** → 必须 brightness(1.22) 提亮（证明 .has 没被 .cool 盖掉）
+    //     · 有货但**正在冷却**（只有刚服下那一格）→ 允许轻微变暗，但**绝不能是 grayscale**
+    //       （grayscale 是"空格"的语义，有货变灰正是用户抱怨的那个观感）
+    //     · 空格 → 必须 grayscale
+    && probe.bagStates && probe.bagStates.length === 5
+    && probe.bagStates.every(function (s) {
+         if (s.n > 0) {
+           if (s.has !== true) return false;
+           if (s.filter.indexOf('grayscale') >= 0) return false;
+           return /cool/.test(s.cls) || s.filter.indexOf('brightness(1.22)') >= 0;
+         }
+         return s.has === false && s.filter.indexOf('grayscale') >= 0;
+       })
     && probe.atlasNatural === '782x198'                // 图集本身解码正常（对比参考）
     && probe.atlas && probe.atlas.img && probe.atlas.rectKeys === 6
     && probe.atlas.bigKeys === 6;                      // 图集三张表都到位
