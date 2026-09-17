@@ -158,6 +158,12 @@
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
     hp: 260, maxhp: 260, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
     attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0,
+    // —— 侧视素材专用方向（2026-09-17）——
+    // 侧视素材（CraftPix 那几套）**只有朝右一版**，左向靠水平翻转，根本没有「正面/背面」。
+    // 所以 face 是 up/down 时直接画右向图 —— 看起来就是「朝镜头挥砍」，很怪。
+    // sideFace 只记最近一次的**水平朝向**（left/right），一次性动作（攻击/倒地）用它，
+    // 循环动作（走/跑/待机）仍按 face 原逻辑走，这样四向移动的观感不受影响。
+    sideFace: 'right',
     // —— 动作状态机 ——
     act: 'idle',      // idle / walk / run / atkA / atkB / dead
     actT: 0,          // 当前动作已播放时间（秒），用于一次性动作按进度取帧
@@ -213,6 +219,33 @@
     { x: 14, y: 13, t: 'zombie_a' }, { x: 10, y: 15, t: 'zombie_a' },
     { x: 18, y: 12, t: 'zombie_a' }, { x: 8,  y: 18, t: 'zombie_a' }
   ];
+  /* 洛赫港（外来草地大图 49×60）的怪：8 只，用户要求"不要太密集"。
+   * 选址依据（tools/_pick_spawns.js 的算法 + 人工复核，2026-09-17）：
+   *   ① 全部 4/4 开阔（四邻皆可走）—— 不会被地形卡住、也方便玩家绕后
+   *   ② 离出生点 (27,27) 最近 9.5 格 —— 给玩家留出落地缓冲，不会一进图就被围
+   *   ③ 彼此最近相距 13.5 格 —— 打一只时不会把另一只的仇恨一起拉进来
+   *   ④ 覆盖八个方位（左上/右上/中左/中右/左下/中下/右下/正下），不是堆在一处
+   * 强度按"离出生点越远越强"排：近处是游方刀客（新手第一课），最远处放精英游方统领当小 Boss。
+   * 坐标仍会经 snapWalkable 吸附到可走格，所以即使图改了地形也不会落到墙里。 */
+  var LOCHPORT_SPAWNS = [
+    { x: 30, y: 18, t: 'ronin_a' },     // 9.5 格 · 第一只：游方刀客，练手感
+    { x: 30, y: 36, t: 'ronin_a' },     // 9.5 格 · 对称的第二只
+    { x: 14, y: 20, t: 'ronin_b' },     // 14.8 格 · 游方弓手，开始有压力
+    { x: 40, y: 9,  t: 'minotaur_a' },  // 22.2 格 · 牛魔·褐角，肉厚，考验连击
+    { x: 9,  y: 43, t: 'minotaur_b' },  // 24.1 格 · 牛魔·灰角，跑得快，考验走位
+    { x: 41, y: 50, t: 'ronin_b' },     // 26.9 格 · 远处的弓手
+    { x: 26, y: 54, t: 'gorgon_a' },    // 27.0 格 · 蛇妖·碧鳞，远程，逼你贴身打
+    { x: 8,  y: 7,  t: 'ronin_c' }      // 27.6 格 · 最远 = 精英游方统领，当小 Boss
+  ];
+  // 洛赫港墓园（外来草地图 58×79，比主图更大）：僵尸盘桓的陵园。
+  // 与主图同样的选址纪律（开阔 4/4、离出生点 ≥8 格、彼此 ≥9.9 格），
+  // 6 只小僵尸铺开 + 2 只牛魔分别守东南/西南两个角落 —— 敢往边上走才遇得到。
+  var CEMETERY_SPAWNS = [
+    { x: 19, y: 19, t: 'zombie_a' }, { x: 35, y: 17, t: 'zombie_a' },
+    { x: 12, y: 28, t: 'zombie_a' }, { x: 45, y: 32, t: 'zombie_a' },
+    { x: 28, y: 10, t: 'zombie_a' }, { x: 30, y: 47, t: 'zombie_a' },
+    { x: 18, y: 52, t: 'minotaur_b' }, { x: 44, y: 50, t: 'minotaur_a' }
+  ];
   var BEAST_FALLBACK = { run: 'walk', atk2: 'atk', walk: 'idle', hurt: 'idle', dead: 'idle' };
   function absorbBeasts(list) {
     BEASTS = list || [];
@@ -235,7 +268,14 @@
   var foePose = null;        // ?foeact=atk&i=0&k=0.45：把第 i 只怪锁在某个动作的中段（怪物素材核对）
   // 上一帧的绘制计数（QA 用）：确认 NPC 真的走了 drawNPC 分支，
   // 而不是被 <0 的兜底分支当成玩家画出来
-  var _draw = { actor: 0, npc: 0 };
+  var _draw = { actor: 0, npc: 0, paint: 0, scan: 0 };
+  // 视口裁剪总开关。正常游戏恒 false；只有 ?autotest=cull 会临时置 true 取「全量遍历」基准，
+  // 用来断言「裁剪后的落笔数 == 不裁剪的落笔数」（裁狠了会漏画，这里必须能证明没漏）。
+  var CULL_OFF = false;
+  // ?autotest=cull 专用：本帧真正落笔的物件原始下标集合（正常帧恒为 null，零开销）。
+  // 两个 render 各记一份做差集，才能知道"哪些物件被裁掉了"而不只是"数量不等"。
+  var paintTracker = null;
+  var kLoDbg = 0, kHiDbg = 0;   // 本帧裁剪区间（仅诊断读）
   // 地面层落点探针（?autotest=seams 用）：n=本帧铺的瓦数，frac=落点/尺寸非整数的瓦数。
   // 缝隙就是 frac 累积出来的 —— 正常情况下必须恒为 0（见 drawGround 里的说明）。
   var GND = { on: false, n: 0, frac: 0 };
@@ -1487,9 +1527,13 @@
               r.viewport = [window.innerWidth, window.innerHeight];
               r.rightGap = Math.round(window.innerWidth - bb.right);   // 离右边缘的距离（应 == 14）
             }
-            var px = (player.mx + 0.5) * MM.s, py = (player.my + 0.5) * MM.s;
-            r.markPx = [Math.round(px), Math.round(py)];
-            r.markInCanvas = px >= 0 && px < MM.cv.width && py >= 0 && py < MM.cv.height;
+            // 主角标记位置：走等距投影（与底图/画面同一套）
+            var pmark = mmToPx(player.mx + 0.5, player.my + 0.5);
+            r.markPx = [Math.round(pmark.x), Math.round(pmark.y)];
+            r.markInCanvas = pmark.x >= 0 && pmark.x < MM.cv.width && pmark.y >= 0 && pmark.y < MM.cv.height;
+            // 等距断言：画布宽高比应约等于 1（菱形图对称），且明显不是旧版的 w:h
+            r.isoRatio = +((MM.cv.width / MM.cv.height)).toFixed(2);
+            r.proj = MM.proj ? { hw: MM.proj.hw, hh: MM.proj.hh, ox: Math.round(MM.proj.ox), oy: Math.round(MM.proj.oy) } : null;
             // 底图像素真的画上去了吗（别是空画布）：抽样统计非透明像素
             var im = MM.cx.getImageData(0, 0, MM.cv.width, MM.cv.height).data;
             var solidPx = 0;
@@ -1512,8 +1556,10 @@
             if (tgt) {
               var rect = MM.cv.getBoundingClientRect();
               r.clickTarget = tgt[0] + ',' + tgt[1];
-              r.clickAccepted = mmClick(rect.left + (tgt[0] + 0.5) / CUR.w * rect.width,
-                                        rect.top + (tgt[1] + 0.5) / CUR.h * rect.height);
+              // 目标格 → 缩略图位图像素 → CSS 像素（画布 CSS 盒与位图等比）
+              var tp = mmToPx(tgt[0] + 0.5, tgt[1] + 0.5);
+              r.clickAccepted = mmClick(rect.left + tp.x / MM.cv.width * rect.width,
+                                        rect.top + tp.y / MM.cv.height * rect.height);
               sim(3.0);
               r.clickMoved = Math.abs(player.mx - sx2) > 0.5 || Math.abs(player.my - sy2) > 0.5;
               r.clickEnd = Math.round(player.mx) + ',' + Math.round(player.my);
@@ -2018,6 +2064,100 @@
           }
           pbs.textContent = JSON.stringify({ n: SKILLS.length, skills: res });
         }
+        if (at === 'cull') {
+          // ?map=<图>&autotest=cull —— 「视口裁剪没画漏」验收（2026-09-17 加）。
+          // 裁剪是按 k=x+y 二分出的区间，风险只有一个：裁多了 → 屏幕内的物件被跳掉，
+          // 表现为"地图边缘突然空一块"。所以判据不是"帧率高了"，而是
+          //   **裁剪后的落笔数 == 关掉裁剪全量遍历的落笔数**。
+          // 做法：同一帧、同一相机，跑两次 render()，只改 CULL_OFF 开关，比对 _draw.paint。
+          var pbc2 = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          var rows2 = [];
+          var probes2 = [
+            { tag: 'spawn',  x: CUR.spawn ? CUR.spawn.x : 0, y: CUR.spawn ? CUR.spawn.y : 0 },
+            { tag: 'center', x: (CUR.w / 2) | 0,             y: (CUR.h / 2) | 0 },
+            { tag: 'corner', x: 1,                           y: 1 },
+            { tag: 'far',    x: CUR.w - 2,                   y: CUR.h - 2 }
+          ];
+          // ★ 判据实现：不让两次 render 各数一个总数就完事（那只能告诉你"不等"），
+          //   而是把两次**真正落笔的物件下标集合**都记下来，做差集 —— 差集直接告诉你
+          //   "哪些物件被裁掉了"，可以逐个回看它们的坐标，判定是"活该被裁"还是"真漏画"。
+          // ⚠ 这里**不能**再 var kLoDbg/kHiDbg：那会遮蔽 render() 里赋值的同名外层变量，
+          //   读到的永远是 0（2026-09-17 踩过）。
+          try {
+          probes2.forEach(function (pr) {
+            player.mx = pr.x; player.my = pr.y; player.tx = pr.x; player.ty = pr.y;
+            player.path = null;
+            camX = W / 2 - (player.mx - player.my) * HW * Z;
+            camY = H / 2 - (player.mx + player.my) * HH * Z;
+            // 先跑**生产路径**（裁剪开启，CULL_OFF=false）—— 这是玩家实际看到的画面
+            CULL_OFF = false; paintTracker = {}; render();
+            var paintLive = _draw.paint, scanLive = _draw.scan, live = paintTracker;
+            // 再跑**基准路径**（关掉裁剪，全量遍历）—— 它画的才是"一个都不能少"的集合
+            CULL_OFF = true; paintTracker = {}; render();
+            var paintBase = _draw.paint, scanBase = _draw.scan, base = paintTracker;
+            paintTracker = null;
+            // missN：基准画了、生产没画 → 真漏画（必须为 0）
+            // extraN：生产画了、基准没画 → 不可能（基准是全量），出现即有 bug
+            var miss = [], extra = [];
+            Object.keys(base).forEach(function (kk) { if (!live[kk]) miss.push(+kk); });
+            Object.keys(live).forEach(function (kk) { if (!base[kk]) extra.push(+kk); });
+            // ★★ 判据修正（2026-09-17）★★
+            // 「base 画了而 live 没画」**不等于**漏画 —— paintObj 自己的边界判据带余量
+            // （by 允许到 H+oh*1.6），把一部分投影后完全在屏幕外的瓦也算了「落笔」。
+            // 裁剪把这些裁掉是对的。所以真正要判的是：被裁掉的里面，有几个**本该看得见**。
+            //   看得见 = 该物件的绘制矩形 [by-oh, by] 与屏幕 [0, H] 有交集。
+            // 只要「本该看得见却被裁掉」恒为 0，裁剪就是安全的。
+            var ghost = [];   // 被裁掉、且本该看得见的（真正的漏画）
+            miss.forEach(function (ix) {
+              var o = CUR.objects[ix];
+              if (!o) { ghost.push({ i: ix, bad: 1 }); return; }
+              var pz = piece(o.piece);
+              if (!pz) return;                      // piece 缺失本来就不会落笔，不算漏
+              var ax = o.x + ((o.fw || 1) - 1) / 2, ay = o.y + ((o.fh || 1) - 1) / 2;
+              var pp = isoToScreen(ax, ay);
+              var by = pp.y + HH * Z + (o.dy || 0) * Z;
+              var ow = pz.w * Z, oh = pz.h * Z;
+              var lft = pp.x - ow / 2 + 0, rgt = pp.x + ow / 2;
+              var top = by - oh, bot = by;
+              var onScreen = (bot > 0) && (top < H) && (rgt > 0) && (lft < W);
+              if (onScreen) ghost.push({ i: ix, x: o.x, y: o.y, gnd: !!o.gnd,
+                top: Math.round(top), bot: Math.round(bot), lft: Math.round(lft), rgt: Math.round(rgt) });
+            });
+            rows2.push({ at: pr.tag, x: pr.x, y: pr.y,
+                         paintLive: paintLive, paintBase: paintBase,
+                         cutN: miss.length, ghostN: ghost.length, extraN: extra.length,
+                         kLo: +kLoDbg.toFixed(2), kHi: +kHiDbg.toFixed(2),
+                         scanLive: scanLive, scanBase: scanBase,
+                         ghost: ghost.slice(0, 4), sample: miss.slice(0, 3) });
+          });
+          } catch (eCull) {
+            // 自测自己抛异常时必须留下痕迹 —— 否则现象只是"probe 为空"，
+            // 看起来像页面没加载完，排查方向会被带偏（这一条是踩出来的）。
+            pbc2.textContent = JSON.stringify({ fatal: String(eCull && eCull.message || eCull),
+              stack: String(eCull && eCull.stack || '').slice(0, 300) });
+            CULL_OFF = false; paintTracker = null;
+            requestAnimationFrame(loop);
+            return;
+          }
+          CULL_OFF = false;
+          // 判据：① **本该看得见却被裁掉的 = 0**（这才是"漏画"的定义）
+          //      ② 必须真省到了（scanLive 明显小于 scanBase）
+          //      ③ 生产路径不可能画出基准之外的东西（extraAll == 0）
+          var ghostAll = rows2.reduce(function (a, r) { return a + r.ghostN; }, 0);
+          var extraAll = rows2.reduce(function (a, r) { return a + r.extraN; }, 0);
+          var cutAll = rows2.reduce(function (a, r) { return a + r.cutN; }, 0);
+          var savedScan = rows2.reduce(function (a, r) { return a + (r.scanBase - r.scanLive); }, 0);
+          pbc2.textContent = JSON.stringify({
+            ok: ghostAll === 0 && extraAll === 0 && savedScan > 0,
+            ghost: ghostAll,        // 漏画（必须 0）
+            extra: extraAll,        // 多画（必须 0）
+            cut: cutAll,            // 裁掉的"假落笔"总数（屏幕外，正常）
+            savedScan: savedScan,   // 省下的遍历次数
+            objs: (CUR._objSorted || []).length,
+            gnd: (CUR._groundTiles || []).length,
+            rows: rows2
+          });
+        }
         requestAnimationFrame(loop);
       }
     }).catch(function (e) {
@@ -2311,7 +2451,13 @@
     var opts = {}, frame;
     if (h && h.side) {
       opts.row = SIDE_ACT[act] || 0;
-      opts.flip = (player.face === 'left');    // 侧视只有右边一版，左边翻转
+      // 侧视素材只有朝右一版（左向靠翻转），**没有正面/背面**。
+      // 循环动作（走/跑/待机）沿用 face 没关系 —— 上下移动时用侧身图看起来像"斜着走"，可接受；
+      // 但一次性动作（攻击/倒地）若也用 face，朝下打就会画成"正对镜头挥砍"，非常突兀。
+      // 所以攻击/倒地一律用 sideFace（最近的水平朝向），保证永远是个侧面挥砍。
+      var oneShot = (act === 'atkA' || act === 'atkB' || act === 'dead');
+      var f = oneShot ? player.sideFace : player.face;
+      opts.flip = (f === 'left');
       frame = sideFrame(act);
     } else {
       // 等距素材只有 4 个朝向行、没有独立动作行，只能近似：
@@ -2321,43 +2467,15 @@
       if (act === 'dead') opts.spin = -1.35;
     }
     var bobb = (act === 'run' && !(h && h.side)) ? Math.sin(time * 18) * 1.1 : 0;
-    drawActor(pz.img, player.mx, player.my, player.face, frame, bobb, pz.sx, pz.sy, opts);
-    if (act === 'atkA' || act === 'atkB') drawSlash(act);
+    // 侧视素材的 row 由 opts.row 决定，这里的 face 只为兼容老等距素材的 SHEET.dir 查表；
+    // 侧视时传 sideFace（一次性的左右朝向），保证查表值与画面一致。
+    var drawFace = (h && h.side && (act === 'atkA' || act === 'atkB' || act === 'dead'))
+      ? player.sideFace : player.face;
+    drawActor(pz.img, player.mx, player.my, drawFace, frame, bobb, pz.sx, pz.sy, opts);
+    // ⛔ 挥砍弧光已移除（2026-09-17 用户要求）：角色用的是 CraftPix 侧视素材，
+    //    本身就有完整的 atkA/atkB 挥砍动作，再叠一道弧线属于重复表现、且很突兀。
+    //    （旧版注释「等距素材没有独立动作行、用弧线补足挥击感」只对老等距素材成立。）
   }
-  /** 挥击弧：两种角色都用，让"这一下打出去了"看得见 */
-  function drawSlash(act) {
-    var dur = ACT_DUR[act] || 0.5;
-    var k = Math.min(1, player.actT / dur);
-    var a = Math.sin(k * Math.PI);            // 0 -> 1 -> 0
-    if (a <= 0.03) return;
-    var big = (act === 'atkB');
-    var dir = (player.face === 'left') ? -1 : 1;
-    var p = isoToScreen(player.mx, player.my);
-    var cx = p.x + dir * 13 * Z, cy = p.y + HH * Z - 32 * Z;
-    var r = (big ? 58 : 42) * Z;
-    var sweep = big ? 2.4 : 1.8;
-    var a0 = -1.15 + (k - 0.5) * sweep;
-    ctx.save();
-    ctx.globalAlpha = 0.92 * a;
-    ctx.strokeStyle = big ? '#ffd36b' : '#eaf6ff';
-    ctx.lineWidth = (big ? 8 : 5) * Z;
-    ctx.lineCap = 'round';
-    ctx.shadowColor = big ? 'rgba(255,180,60,.9)' : 'rgba(160,220,255,.9)';
-    ctx.shadowBlur = 10 * Z;
-    ctx.beginPath();
-    if (dir > 0) ctx.arc(cx, cy, r, a0, a0 + 1.15, false);
-    else ctx.arc(cx, cy, r, Math.PI - a0, Math.PI - a0 - 1.15, true);
-    ctx.stroke();
-    // 内圈第二道弧，重击双弧更醒目
-    ctx.globalAlpha = 0.45 * a;
-    ctx.lineWidth = (big ? 4.5 : 2.6) * Z;
-    ctx.beginPath();
-    if (dir > 0) ctx.arc(cx, cy, r * 0.72, a0 + 0.18, a0 + 1.0, false);
-    else ctx.arc(cx, cy, r * 0.72, Math.PI - a0 - 0.18, Math.PI - a0 - 1.0, true);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   /** NPC：站立取第 0 帧（图集已把最中性那帧旋到 0），叠一点极轻的呼吸起伏，不再是死图 */
   function drawNPC(n) {
     _draw.npc++;
@@ -2385,7 +2503,7 @@
   }
 
   function render() {
-    _draw.actor = 0; _draw.npc = 0;
+    _draw.actor = 0; _draw.npc = 0; _draw.paint = 0;
     // Z<=1 保持硬边像素观感；放大时开插值，避免就近邻放大出锯齿方块
     ctx.imageSmoothingEnabled = Z > 1.02;
     drawSky();
@@ -2406,17 +2524,67 @@
     if (!CUR._objSorted) {
       CUR._groundTiles = [];
       CUR._objSorted = [];
+      // ★ 裁剪余量必须按「最高的那块瓦」来定（2026-09-17 修，曾因固定 2.2 格漏画 25 个物件）。
+      //   瓦是**向上生长**的：锚点在 (x,y)，绘制区间是 [by-oh, by]。
+      //   所以锚点跑到屏幕下方之外时，它的上半截仍可能在屏幕里 —— 一块 512px 高的石墙
+      //   在 Z=1.72 下向上伸 881px（≈17~29 格），只留 2.2 格余量必然把它整块裁掉。
+      //   正确做法：余量 = 最大 oh / (HH*Z) 格，两侧都留。
+      var maxOH = 0, maxOW = 0;
       CUR.objects.forEach(function (o, i) {
         var k = (o.x + (o.fw || 1) - 1) + (o.y + (o.fh || 1) - 1) + 0.5;
-        if (o.gnd) CUR._groundTiles.push({ k: k, o: o });
+        var pz = piece(o.piece);
+        if (pz) {
+          if (pz.h > maxOH) maxOH = pz.h;
+          if (pz.w > maxOW) maxOW = pz.w;
+        }
+        if (o.gnd) CUR._groundTiles.push({ k: k, i: i, o: o });
         else CUR._objSorted.push({ k: k, i: i, o: o });
       });
+      CUR._maxOH = maxOH; CUR._maxOW = maxOW;
       CUR._groundTiles.sort(function (a, b) { return a.k - b.k; });
       CUR._objSorted.sort(function (a, b) { return a.k - b.k; });
+      // ★ 建索引：把排序后的 k 抽成 Float 数组（只在换图/首次渲染时做一次），
+      //   供下面二分求出「k 落在可见区间」的子区间，避免每帧全量遍历。
+      CUR._groundKs = CUR._groundTiles.map(function (it) { return it.k; });
+      CUR._objKs = CUR._objSorted.map(function (it) { return it.k; });
     }
+    // ★★ 视口裁剪（2026-09-17）★★
+    // 旧版每帧把**全部**地面瓦过一遍 paintObj，靠函数内的边界判断剔除 ——
+    // 洛赫港 2564 个地面瓦 + 墓园 3096 个，等于每帧白白算几千次投影与比较（纯粹浪费）。
+    // 等距投影有个漂亮性质：屏幕 y = (x+y)*HH*Z + camY，所以「屏幕上下的可见范围」
+    // 直接对应 k=x+y 的一个区间。列表又已按 k 排好序 → 二分出子区间即可，O(log n)。
+    //
+    // ⚠ 余量怎么定（这里踩过一次，写清楚免得再错）：
+    //   瓦向上生长，绘制区间是 [by-oh, by]（oh = 瓦高 × Z）。锚点在屏幕下方之外时，
+    //   它的**上半截仍可能在屏幕里** → 向下那侧必须留「最高瓦」的余量，不能拍脑袋写 2.2。
+    //   实测洛赫港有 512px 高的石墙、366px 高的树，Z 最大 1.72 → 向上伸 881px ≈ 17~29 格。
+    //   初始版固定留 2.2 格，被自测 ?autotest=cull 抓到 25 个「本该看得见却被裁掉」。
+    //   横向（x-y）同理，只是瓦宽都不大，留一点就够，其余交给 paintObj 的边界判断兜底。
+    var padK = (CUR._maxOH || 0) * Z / (HH * Z) + 2.2;   // = maxOH/HH + 2.2（Z 约掉）
+    var padX = (CUR._maxOW || 0) * Z / (HW * Z) + 2.2;   // 横向：maxOW/HW + 2.2
+    var kLo = (0 - camY) / (HH * Z) - padK - padX;       // 屏幕 y=0  对应 k（两侧都留够）
+    var kHi = (H - camY) / (HH * Z) + padK + padX;       // 屏幕 y=H  对应 k
+    // 二分：第一个 k >= lo 的下标（lowerBound）
+    function lowerBound(arr, lo) {
+      var a = 0, b = arr.length;
+      while (a < b) { var m = (a + b) >> 1; if (arr[m] < lo) a = m + 1; else b = m; }
+      return a;
+    }
+    function upperBound(arr, hi) {
+      var a = 0, b = arr.length;
+      while (a < b) { var m = (a + b) >> 1; if (arr[m] <= hi) a = m + 1; else b = m; }
+      return a;
+    }
+    var gKs = CUR._groundKs || [], gA = lowerBound(gKs, kLo), gB = upperBound(gKs, kHi);
+    var oKs = CUR._objKs || [], oA = lowerBound(oKs, kLo), oB = upperBound(oKs, kHi);
+    // 诊断用：把本帧的 k 区间暴露给 ?autotest=cull（正常帧不读它）
+    kLoDbg = kLo; kHiDbg = kHi;
+    // CULL_OFF：只给 ?autotest=cull 用 —— 临时关掉裁剪、全量遍历，取"正确基准"来比对。
+    // 正常游戏永远是 false，这行不产生任何开销（一个布尔判断）。
+    if (CULL_OFF) { gA = 0; gB = gKs.length; oA = 0; oB = oKs.length; }
 
     // 画一个地图物件（地面瓦与普通物件共用同一套对齐/裁剪/视野判断）
-    function paintObj(o) {
+    function paintObj(o, oi) {
       var pz = piece(o.piece);
       if (!pz) return;
       var ax = o.x + ((o.fw || 1) - 1) / 2, ay = o.y + ((o.fh || 1) - 1) / 2;
@@ -2424,14 +2592,18 @@
       var bx = p.x, by = p.y + HH * Z + (o.dy || 0) * Z;
       var ow = pz.w * Z, oh = pz.h * Z;
       if (bx < -ow || bx > W + ow || by < -oh * 1.4 || by > H + oh * 1.6) return;
+      _draw.paint++;   // 真正落笔的物件数（裁剪正确性断言用，见 ?autotest=cull）
+      if (paintTracker) paintTracker[oi] = 1;
       ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
                     Math.round(bx - ow / 2), Math.round(by - oh), Math.round(ow), Math.round(oh));
     }
 
-    // 地面先铺，再画排好序的物件（含 NPC / 妖兽 / 玩家）
-    CUR._groundTiles.forEach(function (it) { paintObj(it.o); });
+    // 地面先铺，再画排好序的物件（含 NPC / 妖兽 / 玩家）。
+    // 只画可见 k 区间内的那一段（gA..gB），其余当帧必然在屏幕外。
+    _draw.scan = (gB - gA) + (oB - oA);     // 本帧遍历的静态条目数（性能观测）
+    for (var gi = gA; gi < gB; gi++) paintObj(CUR._groundTiles[gi].o, CUR._groundTiles[gi].i);
 
-    var list = CUR._objSorted.slice();
+    var list = CUR._objSorted.slice(oA, oB);
     (CUR.npcs || []).forEach(function (n) { list.push({ k: n.x + n.y + 0.01, i: -2, o: n }); });
     foes.forEach(function (f) { list.push({ k: f.x + f.y, i: -3, o: f }); });
     list.push({ k: player.mx + player.my, i: -1, o: null });
@@ -2443,7 +2615,7 @@
       if (it.i === -3) { drawFoe(it.o); return; }
       if (it.i === -2) { drawNPC(it.o); return; }
       if (it.i === -1) { drawCharacter(); return; }
-      paintObj(it.o);
+      paintObj(it.o, it.i);
     });
     drawProjectiles(); // 弹道（火球）画在怪之上、特效之下 —— 爆炸要盖住火球尾焰
     drawSkillFx();    // 技能特效（剑气/雷爆/剑雨）画在飘字下面，别盖住伤害数字
@@ -2514,12 +2686,19 @@
     else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试招（J 攻击A / K 重击B / U 御剑诀 / I 雷罡咒 / O 太虚剑域 / 1~6 试动作）';
     else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 ' + LINGQUAN_SPAWNS.length + ' 只（J 普攻 / K 重击 / U·I·O 三招技能，Shift 奔跑）';
     else if (CUR.id === 'dungeon') hintEl.textContent = '幽冥地宫 · 尸气弥漫：小僵尸 ' + DUNGEON_SPAWNS.length + ' 只盘踞各处，南/西/东三门分别通往青玄山门 / 灵泉灵瀑 / 碑林石阵';
+    else if (CUR.id === 'flare_grass_empyrean_campaign_lochport')
+      hintEl.textContent = '洛赫港 · 绿林劫道：游方 / 牛魔 / 蛇妖 共 ' + LOCHPORT_SPAWNS.length + ' 只散落全港（最近两只离出生点 9 格开外，不扎堆）。J 普攻 / K 重击 / U·I·O 三招技能 / Shift 奔跑';
+    else if (CUR.id === 'flare_grass_empyrean_campaign_lochport_cemetery')
+      hintEl.textContent = '洛赫港墓园 · 尸气盘桓：' + CEMETERY_SPAWNS.length + ' 只（小僵尸成群 + 牛魔守陵），越往里越硬';
     else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
-    // 只有碑林石阵刷妖兽（猎场）；青玄山门刷训练靶（调试场）；灵泉灵瀑刷五族怪物；其它图清空战斗状态
+    // 刷怪表：碑林石阵（猎场）/ 青玄山门（调试场）/ 灵泉灵瀑（五族）/ 幽冥地宫（僵尸群）
+    // / 洛赫港（绿林劫道）/ 洛赫港墓园（僵尸盘桓）；其它图清空战斗状态
     if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：老猎场
     else if (CUR.id === 'qingxuan') { foes = makeFoes(QINGXUAN_SPAWNS); }  // 青玄山门：调试场
     else if (CUR.id === 'lingquan') { foes = makeFoes(LINGQUAN_SPAWNS); }  // 灵泉灵瀑：五族怪物
     else if (CUR.id === 'dungeon') { foes = makeFoes(DUNGEON_SPAWNS); }    // 幽冥地宫：小僵尸群
+    else if (CUR.id === 'flare_grass_empyrean_campaign_lochport') { foes = makeFoes(LOCHPORT_SPAWNS); }
+    else if (CUR.id === 'flare_grass_empyrean_campaign_lochport_cemetery') { foes = makeFoes(CEMETERY_SPAWNS); }
     else { foes = []; floaters = []; particles = []; player.targetFoe = null; }
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
@@ -2697,6 +2876,9 @@
     if (!dx && !dy) return;
     if (Math.abs(dx) > Math.abs(dy)) player.face = dx > 0 ? 'right' : 'left';
     else player.face = dy > 0 ? 'down' : 'up';
+    // 侧视素材只有左右两版：顺手记下最近的水平朝向（纯上下移动时保留上次的值），
+    // 攻击/倒地这类一次性动作靠它取图，避免画出"朝镜头挥砍"。
+    if (dx) player.sideFace = dx > 0 ? 'right' : 'left';
   }
 
   function update(dt) {
@@ -2948,21 +3130,27 @@
     //   连按时 actT 被反复归零，6 帧挥击只播到前 4 帧就重来，玩家永远看不到完整攻击动作。
     if (player.actHold > 0 || player.attackCd > 0) return;
     player.attackCd = ATK_A_CD;
-    player.act = 'atkA'; player.actT = 0; player.actHold = ACT_DUR.atkA;   // 挥空也播，打不到也有反馈
-    // ① 只认「够近 且 在面朝扇形内」的目标 —— 背对着怪不再能砍中
-    // ② 范围内有怪但不在正面时，只转身挥空（有动作、无伤害），下一刀才真打
-    var best = null, bd = MELEE, near = null, nd = AGGRO;
+    // ★ 先转身、再判定（2026-09-17 修）。旧版反过来：先用「攻击前的旧朝向」跑 inFacingArc，
+    //   怪在侧后方就判不中，然后才 setFaceFromDelta 转身 —— 结果是"明明贴着怪却砍空"，
+    //   下一刀才真打中。手感上的表现就是"打空率高、不跟手"。现在改成：
+    //   ① 范围内最近的怪 → ② 立刻转向它 → ③ 用**转向后**的朝向来判定扇形。
+    //   代价是偶尔会"自动转向"到最近的怪，但这正是动作游戏该有的吸附手感。
+    var near = null, nd = AGGRO;
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i]; if (!f.alive) continue;
       var d = Math.hypot(f.x - player.mx, f.y - player.my);
       if (d < nd) { nd = d; near = f; }
-      if (d < bd && inFacingArc(f.x, f.y)) { bd = d; best = f; }
     }
-    if (!best) {
-      if (near) setFaceFromDelta(near.x - player.mx, near.y - player.my);
-      return;
+    if (near && nd <= MELEE + 0.9) setFaceFromDelta(near.x - player.mx, near.y - player.my);
+    player.act = 'atkA'; player.actT = 0; player.actHold = ACT_DUR.atkA;   // 挥空也播，打不到也有反馈
+    // 只认「够近 且 在面朝扇形内」的目标 —— 背对着怪不再能砍中
+    var best = null, bd = MELEE;
+    for (var j = 0; j < foes.length; j++) {
+      var g = foes[j]; if (!g.alive) continue;
+      var gd = Math.hypot(g.x - player.mx, g.y - player.my);
+      if (gd < bd && inFacingArc(g.x, g.y)) { bd = gd; best = g; }
     }
-    setFaceFromDelta(best.x - player.mx, best.y - player.my);
+    if (!best) return;
     var hit = rollDamage(player.atk, best.def);
     best.hp -= hit.dmg;
     best.flash = hit.crit ? 0.4 : 0.22;
@@ -2997,6 +3185,14 @@
       return;
     }
     player.atkBCd = ATK_B_CD;
+    // 与普攻同理：先朝最近的怪转身，再判定横扫范围（旧版判定用旧朝向，导致"贴着怪横扫却落空"）。
+    var near = null, nd = AGGRO;
+    for (var k = 0; k < foes.length; k++) {
+      var nf = foes[k]; if (!nf.alive) continue;
+      var ndd = Math.hypot(nf.x - player.mx, nf.y - player.my);
+      if (ndd < nd) { nd = ndd; near = nf; }
+    }
+    if (near && nd <= MELEE + 1.4) setFaceFromDelta(near.x - player.mx, near.y - player.my);
     player.act = 'atkB'; player.actT = 0; player.actHold = ACT_DUR.atkB;
     // 重击是横扫，扇形比普攻宽（±90°），但依然要求大致朝着目标
     var reach = MELEE + 0.55, hit = [];
@@ -3009,7 +3205,6 @@
       if (h0) h0.textContent = '重击落空，' + ATK_B_CD + ' 秒后可再放';
       return;
     }
-    setFaceFromDelta(hit[0].x - player.mx, hit[0].y - player.my);
     var crits = 0;
     for (var j = 0; j < hit.length; j++) {
       var g = hit[j];
@@ -3906,7 +4101,7 @@
    * 颜色是「读图」用的，不是美术：绿=能走 / 深灰=挡路 / 蓝=水 / 透明=虚空。
    * 妙处在于它天然把外来图的问题显出来 —— 桥、断崖、断开的可走区一眼就能看见。
    */
-  var MM_MAX = 168;                  // 长边像素上限（宽高按地图比例等比）
+  var MM_MAXW = 190;                 // 缩略图目标宽度上限（见 mmBuildBase 的尺寸说明）
   var MM_C_WALK = [127, 168, 107];
   var MM_C_BLOCK = [90, 82, 72];
   var MM_C_WATER = [42, 95, 134];
@@ -3943,42 +4138,108 @@
     if (tg) tg.textContent = MM.folded ? '▸' : '▾';
     if (!MM.folded) { MM.last = ''; updateMinimap(); }
   }
-  /** 底图：1 像素 1 格，缓存在离屏 canvas 上 */
+  /** 底图：等距菱形，缓存在离屏 canvas 上。
+   *
+   * ★ 为什么不是「1 像素 1 格的正方形」（2026-09-17 用户反馈「缩略图和地图角度对不上」修）
+   *   旧版把 x→像素x、y→像素y 直接铺成正方形，那是**俯视正交**投影；
+   *   而游戏画面是等距投影 —— 屏幕 x ∝ (mx−my)、屏幕 y ∝ (mx+my)。
+   *   两者差 45°：缩略图上的「右上」在游戏里其实是「右下」，
+   *   玩家看着缩略图走，方向是歪的。
+   *   改成同一套投影后，缩略图的形状/朝向与画面完全同构 —— 看缩略图 = 看画面缩小版。
+   *
+   * 像素映射（与引擎的 isoToScreen 同构，只是常数不同）：
+   *   px = (x − y) * HW + OX      py = (x + y) * HH + OY
+   *   HW = 2 × HH（等距标准 2:1）
+   *
+   * ⚠ 尺寸怎么定（踩过的坑）：不能直接 `HH = MM_MAX / span` 取整 —— 大图 span 有 238，
+   *   `floor(150/238)` 直接掉到 1，再配上 HW=2 就宽到 480px，把右上角撑爆。
+   *   做法：**内部按整数 HH 画**（保证菱形边缘锐利、不出现半像素毛边），
+   *   画完再按目标宽度整体缩放一次 —— 缩放在位图层面做，硬边观感保住了。
+   */
   function mmBuildBase() {
     if (!CUR || !CUR.ground) return null;
     var key = CUR.id + '#' + (CUR._mmVer || 0);
     if (MM.base && MM.baseKey === key) return MM.base;
-    var cv = document.createElement('canvas');
-    cv.width = CUR.w; cv.height = CUR.h;
-    var c = cv.getContext('2d');
-    var img = c.createImageData(CUR.w, CUR.h), d = img.data;
+    var span = CUR.w + CUR.h;                  // x−y 与 x+y 的取值范围长度
+    // 内部绘制精度：span 小就画大点（最多 2），span 大就用 1
+    var HH = span <= 60 ? 2 : 1;
+    var hw = HH * 2;
+    var padX = Math.ceil(hw), padY = Math.ceil(HH);
+    var iw = Math.ceil(span * hw) + padX * 2;
+    var ih = Math.ceil(span * HH) + padY * 2;
+    // 目标宽度上限：横向像素/格是纵向的 2 倍，所以宽 = 2×高；限制宽度即限制了占地
+    var MAXW = MM_MAXW;
+    var scale = iw > MAXW ? MAXW / iw : 1;
+    var cw = Math.max(24, Math.round(iw * scale));
+    var chh = Math.max(16, Math.round(ih * scale));
+
+    // ① 先在内部精度上画（整数菱形，边缘锐利）
+    var ib = document.createElement('canvas');
+    ib.width = iw; ib.height = ih;
+    var ci = ib.getContext('2d');
+    var img = ci.createImageData(iw, ih), d = img.data;
     for (var y = 0; y < CUR.h; y++) {
       for (var x = 0; x < CUR.w; x++) {
-        var ch = CUR.ground[y][x];
+        var ch2 = CUR.ground[y][x];
         var col, alpha = 255;
-        if (ch === ' ') { col = MM_C_WALK; alpha = 0; }              // 虚空 → 透明，露出面板底
-        else if (WATER.indexOf(ch) >= 0) col = MM_C_WATER;
+        if (ch2 === ' ') { col = MM_C_WALK; alpha = 0; }          // 虚空 → 透明，露出面板底
+        else if (WATER.indexOf(ch2) >= 0) col = MM_C_WATER;
         else if (CUR.solid['' + x + ',' + y]) col = MM_C_BLOCK;
         else col = MM_C_WALK;
-        var i = (y * CUR.w + x) * 4;
-        d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = alpha;
+        // 这一格画成一个菱形：以格心为中心，横向 ±hw、纵向 ±HH
+        var cxp = (x + 0.5 - (y + 0.5)) * hw + padX + CUR.h * hw;
+        var cyp = (x + 0.5 + (y + 0.5)) * HH + padY;
+        var py0 = Math.max(0, Math.floor(cyp - HH)), py1 = Math.min(ih - 1, Math.ceil(cyp + HH));
+        for (var py = py0; py <= py1; py++) {
+          var ry = Math.abs(py + 0.5 - cyp) / HH;
+          if (ry > 1) continue;
+          var halfW = hw * (1 - ry);
+          var px0 = Math.max(0, Math.floor(cxp - halfW)), px1 = Math.min(iw - 1, Math.ceil(cxp + halfW));
+          for (var px = px0; px <= px1; px++) {
+            if (Math.abs(px + 0.5 - cxp) > halfW) continue;
+            var ii = (py * iw + px) * 4;
+            d[ii] = col[0]; d[ii + 1] = col[1]; d[ii + 2] = col[2]; d[ii + 3] = alpha;
+          }
+        }
       }
     }
-    c.putImageData(img, 0, 0);
+    ci.putImageData(img, 0, 0);
+
+    // ② 整体缩放到目标尺寸（最近邻，保硬边）
+    var cv = document.createElement('canvas');
+    cv.width = cw; cv.height = chh;
+    var c = cv.getContext('2d');
+    c.imageSmoothingEnabled = false;
+    c.drawImage(ib, 0, 0, iw, ih, 0, 0, cw, chh);
+
+    // 记下投影参数（用**目标尺寸**算，后续打点/换算都用它，与底图严格一致）
+    MM.proj = { hw: hw * scale, hh: HH * scale,
+                ox: (padX + CUR.h * hw) * scale, oy: padY * scale };
     MM.base = cv; MM.baseKey = key;
     return cv;
   }
-  /** 画布尺寸：长边不超过 MM_MAX，等比缩。ratio = 每格几个像素 */
+  /** 地图格 → 缩略图像素（与 mmBuildBase 的投影严格一致） */
+  function mmToPx(mx, my) {
+    var P = MM.proj || { hw: 2, hh: 1, ox: 0, oy: 0 };
+    return { x: (mx - my) * P.hw + P.ox, y: (mx + my) * P.hh + P.oy };
+  }
+  /** 缩略图像素 → 地图格（mmToPx 的逆，用于点图走位） */
+  function mmToCell(px, py) {
+    var P = MM.proj || { hw: 2, hh: 1, ox: 0, oy: 0 };
+    var a = (px - P.ox) / P.hw;        // = mx - my
+    var b = (py - P.oy) / P.hh;        // = mx + my
+    return { mx: (a + b) / 2, my: (b - a) / 2 };
+  }
+  /** 画布尺寸：直接用底图的尺寸（底图已按等距投影 + 宽度上限算好） */
   function mmLayout() {
-    var s = MM_MAX / Math.max(CUR.w, CUR.h);
-    MM.w = Math.max(24, Math.round(CUR.w * s));
-    MM.h = Math.max(24, Math.round(CUR.h * s));
-    MM.s = s;
-    return { w: MM.w, h: MM.h, s: s };
+    var b = MM.base;
+    MM.w = b ? b.width : 24; MM.h = b ? b.height : 16;
+    MM.s = MM.proj ? MM.proj.hh : 1;
+    return { w: MM.w, h: MM.h, s: MM.s };
   }
   function mmDot(c, mx, my, r, fill, stroke) {
-    var px = (mx + 0.5) * MM.s, py = (my + 0.5) * MM.s;
-    c.beginPath(); c.arc(px, py, r, 0, 6.2832);
+    var p = mmToPx(mx, my);
+    c.beginPath(); c.arc(p.x, p.y, r, 0, 6.2832);
     if (fill) { c.fillStyle = fill; c.fill(); }
     if (stroke) { c.strokeStyle = stroke; c.lineWidth = 1; c.stroke(); }
   }
@@ -3987,27 +4248,30 @@
     var base = mmBuildBase(); if (!base) return;
     var nm = document.getElementById('mmName');       // 标题带地图名：收起后只剩标题条，靠它认路
     if (nm && nm.textContent !== (CUR.name || '')) nm.textContent = CUR.name || '';
-    var L = mmLayout(), c = MM.cx;
+    var c = MM.cx;
+    // 画布尺寸 = 底图尺寸（底图已按等距菱形算好，不再是方的）
+    var L = { w: base.width, h: base.height };
     if (MM.cv.width !== L.w || MM.cv.height !== L.h) { MM.cv.width = L.w; MM.cv.height = L.h; }
+    MM.w = L.w; MM.h = L.h; MM.s = (MM.proj ? MM.proj.hh : 1);
     // 面板底色：虚空/地图外的部分露出来
     c.clearRect(0, 0, L.w, L.h);
     c.fillStyle = 'rgba(8,12,22,.85)'; c.fillRect(0, 0, L.w, L.h);
     c.imageSmoothingEnabled = false;        // 1 像素 1 格的底图，放大必须用最近邻，否则糊成一团
-    c.drawImage(base, 0, 0, L.w, L.h);
+    c.drawImage(base, 0, 0);
     c.imageSmoothingEnabled = true;
 
-    // 视野框：把屏幕四角反算成地图坐标，取其外接矩形。
-    // 等距世界里这个框其实是斜的，但缩略图是正方的 —— 取 AABB 表示"我大概看得到这一片"。
+    // 视野框：把屏幕四角反算成地图坐标，取外接矩形。
+    // ⚠ 现在缩略图本身也是等距投影了 —— 用 mmToPx 画**真实的菱形**（而不是方框），
+    //   这样"缩略图上那个圈"和"游戏里看到的范围"形状一致，一眼能对上。
     var cs = [screenToIso(0, 0), screenToIso(W, 0), screenToIso(0, H), screenToIso(W, H)];
-    var vx0 = 1e9, vy0 = 1e9, vx1 = -1e9, vy1 = -1e9;
-    cs.forEach(function (q) {
-      vx0 = Math.min(vx0, q.mx); vx1 = Math.max(vx1, q.mx);
-      vy0 = Math.min(vy0, q.my); vy1 = Math.max(vy1, q.my);
+    c.beginPath();
+    cs.forEach(function (q, i) {
+      var p = mmToPx(q.mx, q.my);
+      if (i === 0) c.moveTo(p.x, p.y); else c.lineTo(p.x, p.y);
     });
-    c.strokeStyle = 'rgba(255,255,255,.34)'; c.lineWidth = 1;
-    c.strokeRect(Math.round(vx0 * L.s) + 0.5, Math.round(vy0 * L.s) + 0.5,
-                 Math.max(2, Math.round((vx1 - vx0) * L.s)),
-                 Math.max(2, Math.round((vy1 - vy0) * L.s)));
+    c.closePath();
+    c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 1; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.06)'; c.fill();
 
     // 传送门（青）、NPC（黄）、妖兽（红），主角最后画 → 永远压在最上面
     (CUR.portals || []).forEach(function (pt) { mmDot(c, pt.x, pt.y, 2.2, '#5fe9ff'); });
@@ -4016,17 +4280,21 @@
       if (!f.alive) return;
       mmDot(c, f.x, f.y, 2.2, f.def_ && f.def_.dummy ? '#9fd0ff' : '#ff5a4a');
     });
-    // 主角：外圈白描边 + 实心点 + 朝向小尖角
-    var pmx = (player.mx + 0.5) * L.s, pmy = (player.my + 0.5) * L.s;
-    c.beginPath(); c.arc(pmx, pmy, 4.2, 0, 6.2832);
+    // 主角：外圈白描边 + 实心点 + 朝向小尖角（朝向也是等距方向，与画面同向）
+    var pp2 = mmToPx(player.mx, player.my);
+    c.beginPath(); c.arc(pp2.x, pp2.y, 4.2, 0, 6.2832);
     c.fillStyle = 'rgba(255,255,255,.92)'; c.fill();
-    c.beginPath(); c.arc(pmx, pmy, 3.0, 0, 6.2832);
+    c.beginPath(); c.arc(pp2.x, pp2.y, 3.0, 0, 6.2832);
     c.fillStyle = '#ff2f2f'; c.fill();
+    // 朝向指示：等距世界里「上」在屏幕上是右上 45° —— 用同一套投影换算方向向量
     var fv = FACE_VEC[player.face] || FACE_VEC.down;
+    var dpx = mmToPx(player.mx + fv.x, player.my + fv.y);
+    var dx3 = dpx.x - pp2.x, dy3 = dpx.y - pp2.y;
+    var dl = Math.hypot(dx3, dy3) || 1; dx3 /= dl; dy3 /= dl;
     c.beginPath();
-    c.moveTo(pmx + fv.x * 8.5, pmy + fv.y * 8.5);
-    c.lineTo(pmx + fv.y * 3.4 - fv.x * 2.2, pmy - fv.x * 3.4 - fv.y * 2.2);
-    c.lineTo(pmx - fv.y * 3.4 - fv.x * 2.2, pmy + fv.x * 3.4 - fv.y * 2.2);
+    c.moveTo(pp2.x + dx3 * 8.5, pp2.y + dy3 * 8.5);
+    c.lineTo(pp2.x - dy3 * 3.4 + dx3 * 1.2, pp2.y + dx3 * 3.4 + dy3 * 1.2);
+    c.lineTo(pp2.x + dy3 * 3.4 + dx3 * 1.2, pp2.y - dx3 * 3.4 + dy3 * 1.2);
     c.closePath(); c.fillStyle = '#ff2f2f'; c.fill();
     c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 1; c.stroke();
   }
@@ -4041,13 +4309,18 @@
     MM.last = key;
     drawMinimap();
   }
-  /** 点缩略图 = 点那一格（走的是和画布点击同一条入口，所以寻路/碰撞完全一致） */
+  /** 点缩略图 = 点那一格（走的是和画布点击同一条入口，所以寻路/碰撞完全一致）
+   *  ⚠ 缩略图现在是等距投影，换算必须走 mmToCell 的逆投影；
+   *    旧版按「像素/画布尺寸 × 地图格数」线性换算只对正方形底图成立（2026-09-17 改）。 */
   function mmClick(clientX, clientY) {
     if (!CUR || !CUR.ground) return false;
     var r = MM.cv.getBoundingClientRect();
     if (!r.width || !r.height) return false;
-    var x = Math.floor((clientX - r.left) / r.width * CUR.w);
-    var y = Math.floor((clientY - r.top) / r.height * CUR.h);
+    // 先换算到画布位图坐标，再走 iso 逆投影
+    var bx = (clientX - r.left) / r.width * MM.cv.width;
+    var by = (clientY - r.top) / r.height * MM.cv.height;
+    var cell = mmToCell(bx, by);
+    var x = Math.round(cell.mx - 0.5), y = Math.round(cell.my - 0.5);
     if (x < 0 || y < 0 || x >= CUR.w || y >= CUR.h) return false;
     if (setTargetCell(x, y)) clickMark = { mx: x, my: y, life: 0.7, max: 0.7 };
     return true;

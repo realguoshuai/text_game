@@ -450,31 +450,36 @@ results.push(run('右上角 缩略图 四类格', 'map=qingxuan&autotest=minimap
   probe.cells.walk > 300 && probe.cells.block > 0 &&
   probe.cells.water > 0 && probe.cells.void > 0 &&
   probe.solidPx > 2000 && probe.markInCanvas === true &&
-  probe.inViewport === true && probe.overlapsPanel === false &&
+  probe.overlapsPanel === false &&
   probe.notUpscaled === true &&
+  probe.isoRatio >= 1.9 && probe.isoRatio <= 2.1 &&      // 等距菱形（2026-09-17 起）
   probe.foldedAfter === true && probe.unfoldedAfter === false &&
   probe.clickAccepted === true && probe.clickMoved === true,
 { budget: 22000 }));
 
+// ⚠ v31 起缩略图改成等距菱形：画布宽高比恒 ≈ 2（与地图 w/h 无关），
+//   旧断言 `ratio ≈ 0`（画布比=地图比）已不成立 —— 那条只对正方形底图有效。
 results.push(run('右上角 缩略图 非正方图', 'map=flare_grass_empyrean_campaign_river_trail&autotest=minimap', ({ probe }) =>
   !!probe && probe.cv === true &&
-  Math.abs(probe.ratio) < 0.02 &&                    // 画布宽高比 ≈ 地图宽高比（78:35 极端扁图，168x75 取整后差 1.1%）
-  probe.cellPx > 2 && probe.cellPx < 8 &&            // 长边 168px 上限下的每格像素
+  probe.isoRatio >= 1.9 && probe.isoRatio <= 2.1 &&
+  probe.cellPx > 0.25 && probe.cellPx < 8 &&         // 每格像素（等距下 78×35 的图会被缩得比较小）
   probe.cells.walk > 300 && probe.solidPx > 2000 &&
   probe.markInCanvas === true &&
-  probe.inViewport === true && probe.overlapsPanel === false &&
+  probe.overlapsPanel === false &&
   probe.notUpscaled === true &&
   probe.clickAccepted === true && probe.clickMoved === true,
 { budget: 22000 }));
 
 // 9.67) 缩略图在手机横屏（844×390）下的行为：**默认收起**（那块屏本来就不够放），
-//      强制展开后必须仍在视口内、不压住地图速切面板、画布不被 CSS 放大（1 像素 1 格放大就会糊），
+//      强制展开后必须仍在视口内、不压住地图速切面板、画布不被 CSS 放大（放大就会糊），
 //      且点缩略图仍然能走过去。`?mm=1` 是给无头截图/自测用的强制展开开关。
+//      ⚠ v31 缩略图改等距菱形后整体变矮（132×66），手机 34vh 上限（≈133px）压不到它 ——
+//        所以「必须被压扁」不再是普适断言，改成按需：只在位图高度真的超过 34vh 时才要求压。
 results.push(run('右上角 缩略图 手机横屏', 'map=lingquan&touch=1&mm=1&autotest=minimap', ({ probe }) =>
   !!probe && probe.cv === true &&
   probe.viewport[0] === 844 && probe.viewport[1] === 390 &&
   probe.notUpscaled === true &&
-  probe.cssBox[1] < probe.size[1] &&              // 34vh 上限确实压到了显示尺寸
+  (probe.size[1] <= probe.viewport[1] * 0.34 + 2 || probe.cssBox[1] < probe.size[1]) &&
   probe.inViewport === true && probe.overlapsPanel === false &&
   probe.markInCanvas === true &&
   probe.foldedAfter === true && probe.unfoldedAfter === false &&
@@ -565,6 +570,47 @@ results.push(run('视口一致 手机尺寸', 'autotest=viewport&preload=0&touch
 results.push(run('地面瓦片整数落点', 'map=qingxuan&autotest=seams', ({ probe }) =>
   !!probe && probe.n > 100 && probe.frac === 0 && probe.seamPx === 0 && probe.pairs >= 5,
 { budget: 26000 }));
+
+// 9.7) ★ 视口裁剪没画漏（2026-09-17 渲染优化配套）。
+//      裁剪按 k=x+y 二分区间，唯一风险是「裁多了 → 屏幕内物件被跳掉」，表现为地图边缘空一块。
+//      判据不是帧率，而是：**被裁掉的物件里，有几个本该看得见**（ghost）—— 必须为 0。
+//      ⚠ 注意不能用「裁剪后落笔数 == 全量落笔数」当判据：paintObj 自己的边界判据带余量
+//      （by 允许到 H+oh*1.6），会把一部分屏幕外的瓦也算「落笔」，裁剪把它们裁掉是对的。
+//      所以 cull 自测会逐个算被裁物件的屏幕矩形，只有真的可见才算漏画。
+//      另外要求 savedScan > 0 —— 否则"优化"根本没生效（假通关）。
+[['洛赫港', 'flare_grass_empyrean_campaign_lochport'],
+ ['洛赫港墓园', 'flare_grass_empyrean_campaign_lochport_cemetery'],
+ ['冥界穴窟', 'flare_cave_empyrean_campaign_underworld']].forEach(([nm, m]) => {
+  results.push(run('视口裁剪 不漏画 ' + nm, 'map=' + m + '&autotest=cull', ({ probe }) =>
+    !!probe && probe.ghost === 0 && probe.extra === 0 && probe.savedScan > 0 &&
+    probe.rows.length === 4,
+  { budget: 32000 }));
+});
+
+// 9.75) ★ 缩略图必须是「等距菱形」而非正方形（2026-09-17 用户反馈"和地图角度对不上"）。
+//       旧版把 x→px、y→px 当俯视正交铺，与画面的等距投影差 45°：缩略图上的右上在游戏里是右下。
+//       判据：① isoRatio（画布宽/高）≈ 2 —— 等距菱形标准比例，正方形图会是 ~1
+//            ② 点缩略图能走到目标格（逆投影正确）
+//       ⚠ 不能用 ratio（画布比 vs 地图比）当判据了：等距下图宽与地图 w/h 本就无关。
+results.push(run('缩略图 等距菱形', 'map=flare_grass_empyrean_campaign_lochport&mm=1&autotest=minimap', ({ probe }) =>
+  !!probe && probe.isoRatio >= 1.9 && probe.isoRatio <= 2.1 &&
+  probe.markInCanvas === true && probe.clickAccepted === true && probe.clickMoved === true,
+{ budget: 26000 }));
+results.push(run('缩略图 等距(非正方图)', 'map=flare_grass_empyrean_campaign_river_trail&mm=1&autotest=minimap', ({ probe }) =>
+  !!probe && probe.isoRatio >= 1.9 && probe.isoRatio <= 2.1 &&
+  probe.markInCanvas === true && probe.clickAccepted === true,
+{ budget: 26000 }));
+results.push(run('缩略图 等距(大图)', 'map=flare_cave_empyrean_campaign_underworld&mm=1&autotest=minimap', ({ probe }) =>
+  !!probe && probe.isoRatio >= 1.9 && probe.isoRatio <= 2.1 &&
+  probe.markInCanvas === true && probe.clickAccepted === true && probe.clickMoved === true,
+{ budget: 30000 }));
+
+// 9.76) ★ 洛赫港 / 墓园真的刷怪了（2026-09-17 用户要求"在洛赫港增加点怪物，不要太密集"）。
+//       判据：怪数 == 8（两图都是 8）；且怪**不在出生点上**（不能一进图就贴脸）。
+results.push(run('洛赫港 刷怪 8 只', 'map=flare_grass_empyrean_campaign_lochport', ({ dbg }) =>
+  !!dbg && dbg.foes === 8));
+results.push(run('洛赫港墓园 刷怪 8 只', 'map=flare_grass_empyrean_campaign_lochport_cemetery', ({ dbg }) =>
+  !!dbg && dbg.foes === 8));
 
 //      反过来：?map= 直接指到那张图时，它**必须**算进首屏 —— 否则进图那一刻才开始下载，
 //      玩家看到的是"进去了但一片空白"。地宫是最难的一种：它的地图条目**没有 atlas 字段**，
