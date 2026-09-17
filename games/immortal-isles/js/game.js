@@ -4137,7 +4137,7 @@
     var col = it.kind === 'heal' ? '#ffb3c8' : (it.kind === 'rare' ? '#ffdf9b' : '#9fe8c8');
     addFloater(mx, my - 0.3, '拾取 ' + it.cn + (n > 1 ? ' ×' + n : ''), col);
     bagDirty = true;
-    /* ★ 拾取留痕（?bagdbg=1 排查用）：记录最近一次真正入包的物品与时间。
+    /* ★ 拾取留痕（状态行排查用）：记录最近一次真正入包的物品与时间。
      * 若用户报"捡了但包里没有"，看这行就知道**入包逻辑到底跑没跑到** ——
      * 没有这行 = pickUp/collectItem 根本没执行（拾取判定问题）；
      * 有这行 = 入包了，问题在渲染层。 */
@@ -4150,11 +4150,12 @@
   }
   var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；银两不入包）
   var bagDirty = true;       // HUD 脏标记（数量变了才碰 DOM）
-  /* ?bagdbg=1 —— 真机自检开关。用户第二次报"行囊没变化"时，本地 headless 的
-   * computedStyle 全对，无法复现；于是在面板标题栏直接打印脚本侧的真实状态，
-   * 让用户截一眼就能判断卡在哪一环（数量？类名？还是滤镜）。 */
-  var BAG_DEBUG = /(^|[?&])bagdbg=1(&|$)/.test(location.search);
-  var __lastPickup = '';     // 最近一次入包（bagdbg 排查用）
+  /* ★ 状态行（v40 起常显）：面板标题栏直接打印脚本侧的真实状态 —— 五格数量、
+   * 银两、首格类名/滤镜、最近拾取。跟"你眼睛看到的画面"对照，一张截图就能
+   * 分清是**数据没进来**还是**样式没生效**。
+   * （v39 及以前靠 ?bagdbg=1 开启 —— 但用户只会发截图、不会带 query 参数，等于白做。） */
+  var __lastPickup = '';     // 最近一次入包（状态行排查用）
+  var __bagOrphan = 0;       // 失联格子数：bagCells 里有、但已不在页面 DOM 里的数量
   function bagDebugLine() {
     var parts = [];
     BAG_ORDER.forEach(function (k) { parts.push(k.slice(0, 4) + ':' + (bag[k] || 0)); });
@@ -4162,7 +4163,9 @@
     var cls0 = c0 ? c0.className.replace('cell', '').trim() : '?';
     var f0 = cv0 ? (cv0.style.filter || '(none)').replace(/drop-shadow\([^)]*\)/, 'ds()') : '?';
     return 'v' + (window.__VTAG || '?') + ' ' + parts.join(' ') +
+           ' | 银' + player.stones +
            ' | jc[' + cls0 + '] ' + f0.slice(0, 40) +
+           (__bagOrphan ? ' 失联' + __bagOrphan : '') +
            (__lastPickup ? ' | 拾:' + __lastPickup : ' | 未拾');
   }
   var healHinted = false;    // 药品用法是否已提示过
@@ -4327,10 +4330,30 @@
   }
 
   /** 刷新背包（脏标记驱动，不是每帧都碰 DOM） */
+  var bagRebuildTries = 0;   // 失联自愈的重建计数（防 bagGrid 本身不在 DOM 时无限递归）
   function renderBag() {
     if (!bagBuilt) return;
     if (!bagDirty) return;
     bagDirty = false;
+    /* ★★ 失联自愈（2026-09-17 第五轮）：bagCells 里的格子若已不在页面 DOM 里
+     * （某处重建/清空过背包容器，bagCells 却还指着旧节点），renderBag 就一直在
+     * 更新"游离节点"——数据全对、屏幕永远不动、控制台干净。正好同时解释
+     * "图标永远灰"和"银两永远 0"两桩怪事。检测到就重建格子再刷。 */
+    var orphan = 0;
+    BAG_ORDER.forEach(function (key) {
+      var c0 = bagCells[key];
+      if (c0 && !document.body.contains(c0)) orphan++;
+    });
+    __bagOrphan = orphan;
+    if (orphan > 0) {
+      if (bagRebuildTries < 3) {           // 重建后仍失联（容器本身没了）就别再试，交给状态行示警
+        bagRebuildTries++;
+        buildBagUI();                      // 内部会再调 renderBag —— 最多递归 3 层，有界
+        return;
+      }
+    } else {
+      bagRebuildTries = 0;                 // 恢复正常后重置，留出下次自愈余量
+    }
     var total = 0, hasHeal = 0;
     BAG_ORDER.forEach(function (key) {
       var c = bagCells[key]; if (!c) return;
@@ -4369,10 +4392,9 @@
       if (it.kind === 'heal') hasHeal += n;
     });
     var sv = document.getElementById('bagStones');
-    // ★ 临时自检（?bagdbg=1）：把"脚本认为的状态"直接写进面板标题栏，
-    //   跟"你眼睛看到的画面"对照 —— 一眼就能分清是**数据没进来**还是**样式没生效**。
-    //   按用户要求不跑本地截图，靠这一行在真机上直接读。
-    if (sv) sv.textContent = (BAG_DEBUG ? bagDebugLine() : ('银两 ' + player.stones));
+    // ★ 状态行常显（v40）：一行打包"脚本认为的状态"——五格数量、银两、首格类名/滤镜、
+    //   最近拾取。用户发一张截图就自带全部判据，不用再猜"到底卡在哪一环"。
+    if (sv) sv.textContent = bagDebugLine();
     // 入口按钮上的小红点：有药就提示"可以嗑"
     var btn = document.getElementById('bagBtn'), dot = document.getElementById('bagDot');
     if (btn) btn.classList.toggle('hasnew', hasHeal > 0 && !bagOpen);
@@ -4401,6 +4423,7 @@
     var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
     player.stones += st;
     addFloater(f.x, f.y - 0.4, '+' + st + ' 银两', '#8bf3ff');
+    bagDirty = true;                         // ★ 行囊里的银两行要跟着动（原来漏了）
     // 掉落结算：在倒地动画开始的同时就把东西撒下去 ——
     // 等动画播完再掉会让玩家以为"没掉东西"而提前走开。
     spawnLoot(f, rollLoot(f));
