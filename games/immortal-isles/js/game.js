@@ -339,6 +339,13 @@
   // 幅度刻意收窄在 0.62~1.72（约 ±40%）：再小地图碎成蚂蚁、再大贴图糊成色块
   var Z = 1, Zt = 1, ZMIN = 0.62, ZMAX = 1.72, zAx = 0, zAy = 0, zAnchor = false;
   var ZSTEP = 1.10;   // 每次滚轮/按键的步进（约 10%，手感温和）
+  /* ★ 默认缩放 & 「缩放只归人管」（v48）
+   * 手机屏就那么大：100% 下视野只够看两三步，怪从画面外摸上来都不知道 ——
+   * 所以触屏默认拉到**最广**（ZMIN，等于把视角抬到最高）。
+   *   · ZDEF = 「复位」按钮/0 键的目标：桌面 100%、触屏最广。
+   *   · zLock = 默认值定完立刻上锁，此后**只有 byUser 入口**能改 Zt。
+   *     战斗里任何"自动镜头"都动不了它（现在没有，将来谁加也过不了这道闸）。 */
+  var ZDEF = 1, zLock = false;
   var fadeA = 0, fadeDir = 0, pending = null, portalLock = 0;
   var HOLD = false, held = false;
   var cloudCv = null;
@@ -382,14 +389,20 @@
   }
 
   // ---------------- 视口缩放 ----------------
-  function setZoom(nz, ax, ay) {
+  /** byUser=true 表示"这是人主动调的"：上锁之后只有它能改，并且记进 localStorage
+   * （下次进游戏沿用他自己调的值）。remember=false 用于「复位」—— 那是回到默认，不该被记住。 */
+  function setZoom(nz, ax, ay, byUser, remember) {
+    if (zLock && !byUser) return;            // ★ 非人主动 → 直接忽略，一个像素都不动
     nz = Math.max(ZMIN, Math.min(ZMAX, nz));
     if (ax !== undefined) { zAx = ax; zAy = ay; zAnchor = true; }
     if (!zAnchor) { zAx = W / 2; zAy = H / 2; zAnchor = true; }
     Zt = nz;
+    if (byUser && remember !== false) {
+      try { localStorage.setItem('isles.zoom', String(Math.round(Zt * 100))); } catch (e) { }
+    }
     updateZoomUI();
   }
-  function zoomBy(f, ax, ay) { setZoom(Zt * f, ax, ay); }
+  function zoomBy(f, ax, ay) { setZoom(Zt * f, ax, ay, true); }
   function updateZoomUI() {
     var el = document.getElementById('zoomVal');
     if (el) el.textContent = Math.round(Zt * 100) + '%';
@@ -398,17 +411,23 @@
     var zi = document.getElementById('zIn'), zo = document.getElementById('zOut');
     if (zi) zi.disabled = Zt >= ZMAX - 1e-6;
     if (zo) zo.disabled = Zt <= ZMIN + 1e-6;
+    // 「复位」按钮上的数字跟着平台默认走（桌面 100% / 触屏最广），别再写死 100%
+    var zrb = document.getElementById('zReset');
+    if (zrb) zrb.textContent = Math.round(ZDEF * 100) + '%';
   }
   function buildZoomUI() {
     var zin = document.getElementById('zIn'), zout = document.getElementById('zOut'),
       zr = document.getElementById('zReset'), rg = document.getElementById('zRange');
     if (zin) zin.onclick = function () { zoomBy(ZSTEP, W / 2, H / 2); };
     if (zout) zout.onclick = function () { zoomBy(1 / ZSTEP, W / 2, H / 2); };
-    if (zr) zr.onclick = function () { setZoom(1, W / 2, H / 2); };
+    if (zr) zr.onclick = function () {          // 复位 = 回到平台默认，并抹掉手调记忆
+      try { localStorage.removeItem('isles.zoom'); } catch (e) { }
+      setZoom(ZDEF, W / 2, H / 2, true, false);
+    };
     if (rg) {
       rg.min = Math.round(ZMIN * 100); rg.max = Math.round(ZMAX * 100);
       rg.value = Math.round(Zt * 100);
-      rg.oninput = function () { setZoom(this.value / 100, W / 2, H / 2); };
+      rg.oninput = function () { setZoom(this.value / 100, W / 2, H / 2, true); };
     }
     updateZoomUI();
     // 左上面板折叠开关：默认收成迷你条，点一下展开详情
@@ -1043,13 +1062,20 @@
         });
         // 主角外形：?hero=14 指定 > 上次手选记忆 > 默认 1 号
         buildHeroUI(q.get('hero') !== null ? +q.get('hero') : 42);
-        // ?z=1.25 可直接以指定缩放打开（同样受 0.62~1.72 限制）
+        /* ★ 初始缩放（v48）：?z= > 上次手调的记忆 > 平台默认
+         *   触屏默认 = ZMIN（视角拉到最高、视野最广）：手机屏小，100% 下只看得见脚边
+         *   两三步，怪从画面外摸上来都不知道。桌面保持 100%。
+         *   注意 Z/Zt 要在 switchTo 之前定好 —— 相机居中是按当前 Z 算的。 */
         var zq = parseFloat(q.get('z'));
-        if (zq > 0) {
-          Z = Zt = Math.max(ZMIN, Math.min(ZMAX, zq));
-          zAnchor = true; zAx = W / 2; zAy = H / 2;
-          updateZoomUI();
-        }
+        if (document.body.classList.contains('touch')) ZDEF = ZMIN;
+        var zInit = ZDEF, zMem = null;
+        try { zMem = localStorage.getItem('isles.zoom'); } catch (e) { }
+        if (zq > 0) zInit = zq;                                  // URL 指定最优先
+        else if (zMem !== null && +zMem > 0) zInit = +zMem / 100; // 其次是他自己上次调的
+        Z = Zt = Math.max(ZMIN, Math.min(ZMAX, zInit));
+        zAnchor = true; zAx = W / 2; zAy = H / 2;
+        updateZoomUI();
+        zLock = true;      // ★ 默认值定完就上锁：此后只有「人主动拉」的入口能改 Z
         var start = IDX[q.get('map')] ? q.get('map') : data.start.map;
         var m = IDX[start] || MAPS[0];
         // 没显式给坐标时：起点图用 maps.json 里写好的 start（山门广场），
@@ -3255,7 +3281,10 @@
     // 键盘缩放：+ / - 步进，0 复位
     if (k === '+' || k === '=') zoomBy(ZSTEP, W / 2, H / 2);
     else if (k === '-' || k === '_') zoomBy(1 / ZSTEP, W / 2, H / 2);
-    else if (k === '0') setZoom(1, W / 2, H / 2);
+    else if (k === '0') {                       // 0 = 复位到平台默认（桌面 100% / 触屏最广）
+      try { localStorage.removeItem('isles.zoom'); } catch (e) { }
+      setZoom(ZDEF, W / 2, H / 2, true, false);
+    }
   });
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = 0; });
 
@@ -5455,9 +5484,14 @@
     zoomBy(f, localX(e.clientX, r), localY(e.clientY, r));
   }, { passive: false });
 
-  // 触屏双指捏合缩放
-  // ⚠ touchDist 是**两点距离之比**（pinchD 比 d），两数在同一坐标系里，缩放因子约掉
-  //   → 不需要过 ptX；touchMid 是**绝对值**（拿去当 zoomBy 的锚点）→ 必须换算，否则放大后锚点飘。
+  /* 触屏双指捏合缩放 —— ★ v48 起**默认关掉**
+   * 为什么关：战斗时是「一指压着摇杆走位 + 另一指点技能」，画布上很容易同时出现两个
+   * 触点，被当成捏合 → 打着打着画面自己拉近/推远（用户反馈："别自己动相机"）。
+   * 缩放改走右上角面板里的 ± / 滑块：那是明确的"我要调"，不会被误触。
+   * 想临时开回来：URL 加 ?pinch=1。
+   * ⚠ touchDist 是**两点距离之比**（pinchD 比 d），两数在同一坐标系里，缩放因子约掉
+   *   → 不需要过 ptX；touchMid 是**绝对值**（拿去当 zoomBy 的锚点）→ 必须换算，否则放大后锚点飘。 */
+  var PINCH_ZOOM = /[?&]pinch=1/.test(location.search);
   function touchDist(e) {
     var a = e.touches[0], b = e.touches[1];
     return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -5468,15 +5502,21 @@
   }
   var pinchD = 0;
   canvas.addEventListener('touchstart', function (e) {
-    if (e.touches.length >= 2) { pinchD = touchDist(e); e.preventDefault(); return; }
+    // ★ 两指时**不再起步捏合**（默认关闭）：只拦掉浏览器的页面缩放，游戏内 Z 保持不动
+    if (e.touches.length >= 2) {
+      if (PINCH_ZOOM) pinchD = touchDist(e);
+      e.preventDefault(); return;
+    }
     if (e.touches[0]) onClick(e.touches[0]);
     e.preventDefault();
   }, { passive: false });
   canvas.addEventListener('touchmove', function (e) {
     if (e.touches.length >= 2) {
-      var d = touchDist(e);
-      if (pinchD > 0 && d > 0) { var m = touchMid(e); zoomBy(d / pinchD, m.x, m.y); }
-      pinchD = d;
+      if (PINCH_ZOOM) {
+        var d = touchDist(e);
+        if (pinchD > 0 && d > 0) { var m = touchMid(e); zoomBy(d / pinchD, m.x, m.y); }
+        pinchD = d;
+      }
     }
     e.preventDefault();
   }, { passive: false });
@@ -5712,7 +5752,8 @@
     mmFold: function (f) { mmFold(f); return MM.folded; },
     /** 等价于鼠标点击第 (x,y) 格：走的是 onClick 同一条设置目标格的路径 */
     clickCell: function (x, y) { return setTargetCell(x, y); },
-    setZoom: function (z) { setZoom(z, W / 2, H / 2); return Zt; },
+    // 调试接口也算"人主动调"（自测里它就是模拟用户拉滑块）
+    setZoom: function (z) { setZoom(z, W / 2, H / 2, true); return Zt; },
     heroes: function () { return HERO_OPTIONS.map(function (h) { return { n: h.n, src: h.file }; }); },
     setHero: function (n) { setHero(HERO_OPTIONS.filter(function (h) { return h.n === n; })[0]); return PLAYER_SRC; },
     goto: function (id, x, y) { return goTo(id, x, y, false); },
