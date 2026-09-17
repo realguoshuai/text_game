@@ -253,6 +253,43 @@
   #actbar button:hover{background:rgba(52,78,124,.95);border-color:#8bf3ff;color:#fff}
   #actbar button:active{transform:translateY(1px)}
   #actbar button.on{background:linear-gradient(180deg,#2f5f86,#1d3d5c);border-color:#8bf3ff;color:#fff}
+  /* ---------- 背包栏（B 键 / 点左上的行囊圆钮） ----------
+     格子用 items_atlas 的高清帧（<key>_big）画在 46px 的格子里。
+     格子是「用一次药」的按钮：heal 类可点，mat / rare 只展示（点了没用）。
+     ★ 挂左边、不挂右边：右侧整条被 #rightcol（地图速切 + 缩放 + 主角外形 + 缩略图）
+       占满了，背包塞过去会和它叠在一起。左边只有两个 44px 圆钮，下面是空的。 */
+  #bag{left:14px;top:168px;padding:10px 11px;display:none;z-index:36}
+  #bag.open{display:block}
+  #bag .t{font-size:12px;color:#c9bda0;letter-spacing:1px;margin-bottom:8px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px}
+  #bag .t .stones{color:#8bf3ff;font-family:ui-monospace,Consolas,monospace;font-weight:600}
+  #bag .grid{display:grid;grid-template-columns:repeat(3,52px);gap:7px;pointer-events:auto}
+  #bag .cell{position:relative;width:52px;height:52px;border-radius:9px;
+    background:rgba(8,14,26,.72);border:1px solid rgba(214,178,96,.38);
+    display:flex;align-items:center;justify-content:center;transition:.12s}
+  #bag .cell.empty{opacity:.34}
+  #bag .cell.empty > div{filter:grayscale(1)}   /* 空的时候图标灰掉：一眼看出来"这格没货" */
+  #bag .cell.use{cursor:pointer;border-color:rgba(255,150,190,.6);
+    box-shadow:inset 0 0 14px rgba(255,120,170,.16)}
+  #bag .cell.use:hover{background:rgba(46,26,50,.9);border-color:#ff9ec4;
+    box-shadow:0 0 12px rgba(255,140,190,.45)}
+  #bag .cell.use:active{transform:translateY(1px)}
+  #bag .cell.cool{filter:saturate(.4) brightness(.72)}
+  #bag .cell .n{position:absolute;right:3px;bottom:1px;z-index:2;font-size:11.5px;font-weight:700;
+    color:#ffe6a6;text-shadow:0 1px 3px #000,0 0 6px #000;font-family:ui-monospace,Consolas,monospace}
+  #bag .cell .kb{position:absolute;left:3px;top:2px;z-index:2;font-size:9.5px;color:#cfe0f4;
+    background:rgba(0,0,0,.55);border-radius:4px;padding:0 3px;line-height:1.35}
+  #bag .tip{font-size:11px;color:#9fb3d0;margin-top:8px;line-height:1.6;max-width:162px}
+  #bag .tip b{color:#ff9ec4;font-weight:600}
+  /* 触屏：面板缩一点、挪到**屏幕中下方**。
+     为什么不贴右边：右下是技能盘（right:14/bottom:14）、右上是一排面板，都占满了。
+     为什么不贴左下：摇杆是"按哪出现在哪"的浮动盘，左下正是它最常出现的位置。 */
+  body.touch #bag{left:50%;top:auto;bottom:12px;transform:translateX(-50%) scale(.86);
+    transform-origin:center bottom}
+  body.touch #bag .tip{display:none}
+  body.touch #bag .grid{grid-template-columns:repeat(3,46px)}
+  body.touch #bag .cell{width:46px;height:46px}
+
   /* 居中事件提示（被击退/折损灵石等） */
   #toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-6px);z-index:60;
     padding:10px 20px;border-radius:10px;pointer-events:none;max-width:82vw;text-align:center;
@@ -379,6 +416,21 @@
   #worldBtn svg{display:block}
   body.touch #worldBtn{top:auto;bottom:14px;left:14px}  /* 手机左下，避开右上面板 */
 
+  /* 背包入口按钮：与左上面的「世界地图」同款圆形，竖排在它下面；手机移到右下（摇杆在左下） */
+  #bagBtn{position:fixed;left:14px;top:112px;z-index:12;width:44px;height:44px;border-radius:50%;
+    pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
+    border:2px solid rgba(226,192,110,.75);box-shadow:0 3px 10px rgba(0,0,0,.45);
+    transition:border-color .15s,box-shadow .15s;font-family:inherit}
+  #bagBtn:hover{border-color:#ff9ec4;box-shadow:0 0 12px rgba(255,158,196,.5)}
+  #bagBtn.on{border-color:#ff9ec4;box-shadow:0 0 14px rgba(255,158,196,.6)}
+  #bagBtn svg{display:block}
+  #bagBtn .dot{position:absolute;right:2px;top:2px;min-width:16px;height:16px;border-radius:8px;
+    background:#ff5a8a;color:#fff;font-size:10.5px;line-height:16px;text-align:center;
+    padding:0 3px;font-family:ui-monospace,Consolas,monospace;display:none}
+  #bagBtn.hasnew .dot{display:block}
+  body.touch #bagBtn{top:auto;bottom:68px;left:14px}  /* 手机：在「世界地图」圆钮正上方 */
+
   /* 缩放兜底出口：拦截脚本在部分机/浏览器上拦不住时，页面真被放大 → 显示这个按钮彻底复位 */
   #viewfix{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:90;display:none;
     font-family:inherit;font-size:12px;padding:7px 14px;border-radius:20px;cursor:pointer;
@@ -407,6 +459,19 @@
     <div class="row" id="expv">炼气期 · 修为 0</div>
     <div class="row">灵石 <b id="stonev">0</b></div>
   </div>
+</div>
+
+<!-- 背包入口：桌面 B 键开关，手机点此图标。格子里的图标是程序化绘制的 items_atlas。 -->
+<button id="bagBtn" title="背包（B 开启）" aria-label="背包">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.2 11.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+  <span class="dot" id="bagDot"></span>
+</button>
+
+<!-- 背包面板：格子由脚本按 ITEMS 表动态生成（图标取自 items_atlas 的 2× 高清版） -->
+<div id="bag" class="hud panel">
+  <div class="t"><span>行囊</span><span class="stones" id="bagStones">灵石 0</span></div>
+  <div class="grid" id="bagGrid"></div>
+  <div class="tip">点<b>粉色边框</b>的格子服药（或按 <b>1</b>/<b>2</b>/<b>3</b>）</div>
 </div>
 
 <!-- 世界地图入口：桌面 Tab 开关，手机点此图标；点开是诸天万界总览，点节点即传送 -->
@@ -455,7 +520,8 @@
   点击格子移动　·　<span class="hl">滚轮 / +/-</span> 缩放视图（0.62~1.72 倍）　·　
   走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）　·　
   走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
-  <span class="hl">Shift</span> 奔跑　·　<span class="hl">1~6</span> 试动作（待机/行走/奔跑/攻击A/攻击B/倒地）
+  <span class="hl">Shift</span> 奔跑　·　<span class="hl">B</span> 背包　·　<span class="hl">1 / 2 / 3</span> 服金创药 / 小还丹 / 大还丹　·　
+  击杀妖兽会 <span class="hl">掉落物品</span>，走近自动拾取　·　<span class="hl">Alt+1~6</span> 试动作
   </div>
 </div>
 
@@ -604,6 +670,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=32"></script>
+<script src="js/game.js?v=33"></script>
 </body>
 </html>

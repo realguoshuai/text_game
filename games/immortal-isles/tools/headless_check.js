@@ -352,6 +352,32 @@ results.push(run('碑林 刷怪', 'map=beilin', ({ dbg }) => !!dbg && dbg.foes >
 results.push(run('战斗 击杀掉落', 'map=beilin&autotest=fight', ({ probe }) =>
   !!probe && probe.exp > 0 && probe.stones > 0));
 
+// 8.4) 掉落 / 拾取 / 服药 / 背包 全链路（2026-09-17 加）。
+//      四件事各自"看起来对"很容易，接在一起才暴露真问题：
+//      ① 每个 ITEMS 条目都要能在图集里解析到帧（缺图 = 背包里是空白格）
+//      ② 掉落掷骰实际命中率（rollLoot 是独立掷骰，可能全不中）
+//      ③ 每件掉落都要落在可走格上（溅到墙里的图标玩家永远捡不到）
+//      ④ 走近必须真的入包、服药必须真的回血，且满血不消耗、冷却期间不生效
+// ⚠ 断言必须用「花括号体 + return」写，**不能**图省事写成裸表达式再跟 `, { budget }`：
+//   `=> a && b, { budget: X }` 里那个逗号会被解析成**逗号运算符**（还是箭头函数的体），
+//   整条断言变成恒真的 `{budget:X}`，跑批就永远 PASS —— 一个测试自己的静默失效。
+results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ probe }) => {
+  if (!probe) return false;
+  return probe.defs === 6 && probe.healDefs === 3      // 6 种物品、3 种药
+    && probe.iconMiss.length === 0                     // 图标全部能解析
+    && probe.rolls > 0 && probe.dropped > 0            // 400 次掷骰、真的掉出过东西
+    && probe.landed > 0 && probe.onWall === 0          // 撒下的每一件都在可走格
+    && probe.picked >= 1                               // 走近真的捡起来了
+    && probe.healOk === true                           // 服药回血且数量 -1
+    && probe.healFull === true                         // 满血不消耗
+    && probe.healCdBlock === true                      // 冷却期间不生效
+    && probe.crafted.cells === 5                       // 背包 5 格
+    && probe.crafted.healUseCells === 3                // 其中 3 格可点服用
+    && probe.crafted.ghostImgs === 5                   // 5 格都有图标
+    && probe.atlas && probe.atlas.img && probe.atlas.rectKeys === 6
+    && probe.atlas.bigKeys === 6;                      // 图集三张表都到位
+}, { budget: 20000 }));
+
 // 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）
 //      ② 伤害不再恒定（有浮动/暴击/连击）③ 背对目标砍不中、挥空自动转身。
 //      50 刀逐帧推进，预算要给足。

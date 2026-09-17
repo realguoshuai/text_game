@@ -148,7 +148,10 @@
       // dungeon: 地宫素材图集（原 228 张独立 PNG 打包成 1 张，见 tools/build_dungeon_atlas.py）
       // flare: 外来地图图集（Flare 开源 ARPG 的战役关卡，由 tools/import_tmx.py 转出）
       dungeon: { img: null, rect: null },
-      flare: { img: null, rect: null }
+      flare: { img: null, rect: null },
+      // items: 物品图标（程序化生成，见 tools/gen_items_atlas.py）。
+      //        rect 里除了 64×64 的小图，还有 <name>_big 的 128×128 高清版给背包格子用。
+      items: { img: null, rect: null, big: null, defs: null }
     };
   function atlasReady(a) { return !!(a.img && a.rect); }
 
@@ -262,6 +265,55 @@
       if (b.spawn) LINGQUAN_SPAWNS.push({ x: b.spawn[0], y: b.spawn[1], t: b.key });
     }
   }
+
+  /* ---------------- 物品与掉落（2026-09-17 新增） ----------------
+   * 设计取舍，先写清楚免得后面改歪：
+   *   ① **只有 heal 类需要手动用**。妖丹/灵石/玄铁令是「捡到即结算」——
+   *      材料类还要开背包点一下太碎，破坏打怪节奏。灵石直接进账，妖丹进背包攒着。
+   *   ② **药品是「战斗中自救」的手段**，所以要能在挨打时用（倒地时不行，那已经是惩罚）。
+   *   ③ 掉落概率整体偏慷慨：这是练级场不是硬核游戏，捡不到东西等于系统白做。
+   *      灵石必掉（本来就是必掉的），妖丹 45%，药品 22%+ ，玄铁令只从精英身上出 8%。
+   *
+   * ITEMS 的键必须与 tools/gen_items_atlas.py 的 SPEC 一致（图标名 = 键名）。
+   * val 对 heal 类是「回复最大气血的百分比」，对 mat 类是「折算灵石数」。
+   */
+  var ITEMS = {
+    lingshi:   { cn: '灵石',   kind: 'mat',  icon: 'lingshi',   val: 0,    desc: '通用货币，拾取即入账' },
+    yaodan:    { cn: '妖丹',   kind: 'mat',  icon: 'yaodan',    val: 12,   desc: '妖兽内丹，可折算灵石' },
+    jinchuang: { cn: '金创药', kind: 'heal', icon: 'jinchuang', val: 0.35, desc: '回复 35% 气血' },
+    xiaohuan:  { cn: '小还丹', kind: 'heal', icon: 'xiaohuan',  val: 0.55, desc: '回复 55% 气血' },
+    dahuan:    { cn: '大还丹', kind: 'heal', icon: 'dahuan',    val: 1.00, desc: '回满气血' },
+    xuantie:   { cn: '玄铁令', kind: 'rare', icon: 'xuantie',   val: 60,   desc: '江湖信物，可折算大笔灵石' }
+  };
+  /* 掉落表：<怪种> → [[物品键, 概率(0~1), 最少, 最多], ...]
+   * 没登记的怪走 DEFAULT_LOOT。精英（def_.elite）额外掷一次 ELITE_LOOT。
+   * ⚠ 概率是「独立掷骰」，不是权重归一 —— 所以同一只怪可以同时掉好几样。 */
+  var DEFAULT_LOOT = [
+    ['yaodan', 0.45, 1, 1],
+    ['jinchuang', 0.16, 1, 1],
+    ['xiaohuan', 0.06, 1, 1]
+  ];
+  var ELITE_LOOT = [
+    ['xuantie', 0.30, 1, 1],
+    ['dahuan', 0.22, 1, 1],
+    ['xiaohuan', 0.35, 1, 2],
+    ['yaodan', 0.60, 1, 3]
+  ];
+  var LOOT_BY_KEY = {
+    zombie_a:   [['yaodan', 0.30, 1, 1], ['jinchuang', 0.20, 1, 1]],
+    ronin_a:    [['yaodan', 0.45, 1, 2], ['jinchuang', 0.18, 1, 1]],
+    ronin_b:    [['yaodan', 0.45, 1, 2], ['xiaohuan', 0.14, 1, 1]],
+    minotaur_a: [['yaodan', 0.55, 1, 2], ['xiaohuan', 0.18, 1, 1], ['dahuan', 0.05, 1, 1]],
+    minotaur_b: [['yaodan', 0.55, 1, 2], ['xiaohuan', 0.18, 1, 1]],
+    gorgon_a:   [['yaodan', 0.50, 1, 2], ['xiaohuan', 0.16, 1, 1]],
+    gorgon_b:   [['yaodan', 0.50, 1, 2], ['jinchuang', 0.20, 1, 1]],
+    knight_a:   [['yaodan', 0.50, 1, 2], ['xiaohuan', 0.20, 1, 1]]
+  };
+  var lootDrops = [];        // 地上的掉落物 { mx,my,key,n,life,tossT,vy,vx,pop }
+  var LOOT_LIFE = 42;        // 掉落物停留秒数（够你打完这波再回头捡）
+  var PICK_R = 0.72;         // 拾取半径（格）—— 比一格略小，走到跟前才捡
+  var lootSeq = 0;           // 掉落序号（给浮动相位错开用，免得同批掉落的图标同步晃）
+
   var camX = 0, camY = 0, time = 0;
   var lastActShown = null;   // 动作试演面板的高亮同步（变化时才碰 DOM）
   var poseLock = null;       // ?pose=atkA 之类：把主角锁在某个动作上，用于核对素材/截图
@@ -423,7 +475,11 @@
       { url: 'assets/heroes.json?v=1', json: true, weight: 1, label: '读取角色清单' },
       { url: 'assets/fx_atlas.webp?v=2', atlas: 'fx', weight: 61, label: '载入技能特效' },
       { url: 'assets/fx_atlas.json?v=2', json: true, weight: 1, label: '读取特效索引' },
-      { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' }
+      { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' },
+      { url: 'assets/items_atlas.png?v=1', atlas: 'items', weight: 23, label: '载入物品图标' },
+      // ⚠ atlas 字段两张都要写：boot 里是按 `p.atlas === 'items'` 把值填进 ATLAS.items 的。
+      //   首版漏了 json 这张，导致 json 下载了却没人接（ATLAS.items.rect 恒 null）。
+      { url: 'assets/items_atlas.json?v=1', atlas: 'items', json: true, weight: 1, label: '读取物品图录' }
     ];
 
   /* ── 按需图集（懒加载）────────────────────────────────────────────────
@@ -470,9 +526,33 @@
       if (!p.value) return;
       if (p.json) A.rect = p.value; else A.img = p.value;
     });
+    splitItemsJson(A);
     var ok = !!(A.img && A.rect);
     if (ok) e.loaded = true;
     return ok;
+  }
+
+  /** items 图集的 json 里除了帧矩形，还夹着 items（物品定义）与 _meta，
+   *  而 rect 现在是「含 <name>_big 键」的扁平表 —— 拆出来各归各位，
+   *  免得 piece('jinchuang_big') 之类被当普通瓦片找到（背包走 big 字段取 2× 图）。
+   *
+   *  ⚠ 单独抽成函数是因为它有**两条调用路径**：EXTRA 那条（fillAtlas）和 LOAD_PLAN 那条
+   *  （boot 里按 url 填完 ATLAS.items 后直接调）。2026-09-17 首次接入时就漏了第二条 ——
+   *  LOAD_PLAN 里的 items 没有对应的 EXTRA 条目，fillAtlas 直接 return false，
+   *  json 从没被拆过：piece() 取 rect 里的 'items'（那是定义表不是矩形）当坐标，
+   *  背包图标与地上掉落物全画不出来。 */
+  function splitItemsJson(A) {
+    if (!A || !A.rect || A._split) return;
+    var raw = A.rect, flat = {}, big = {};
+    for (var k in raw) {
+      if (k === 'items') A.defs = raw[k];
+      else if (k === '_meta') A.meta = raw[k];
+      else if (/_big$/.test(k)) big[k] = raw[k];
+      else flat[k] = raw[k];
+    }
+    A.rect = flat; A.big = big; A._split = true;
+    _lootPz = {};        // 图集换了，精灵缓存作废（否则还指着旧图）
+    bagBuilt = false;    // 背包格子重建成新的高清图（buildBagUI 由 boot 再调一次）
   }
 
   /** 按需注册一套「按命名约定推导 URL」的 Flare 图集：
@@ -887,6 +967,16 @@
         var fj = LOAD_PLAN[6].value || {};
         ATLAS.foes.rect = fj.rect || fj;
         ATLAS.foes.anim = fj.anims || {};
+        // 物品图标（items_atlas）：★ 必须按 url 取，**不能写死下标** ——
+        // 2026-09-17 加这两项时就是忘了这一步：LOAD_PLAN 里排了队、网络也真下了，
+        // 但没人把 p.value 填进 ATLAS.items，piece('jinchuang_big') 恒 null →
+        // 背包格子全是文字首字、地上掉落物画不出来（?autotest=loot 抓到的）。
+        // 填完还要跑一遍 fillAtlas('items')，让它把 json 拆成 rect / big / defs 三份。
+        LOAD_PLAN.forEach(function (p) {
+          if (p.atlas !== 'items' || !p.value) return;
+          if (p.json) ATLAS.items.rect = p.value; else ATLAS.items.img = p.value;
+        });
+        splitItemsJson(ATLAS.items);
         // 首屏池里排过的按需图集（地宫 / 开局这张外来图的图集）此刻都已下载完 ——
         // 逐个把图与索引填进 ATLAS（fillAtlas 内部会把 loaded 置位），后台预取也不会再拉一遍。
         // ⚠ 以前只写死 fillAtlas('dungeon')：开局图一旦换成外来图，它的图集虽然排进了池子，
@@ -955,6 +1045,7 @@
         document.getElementById('loader').style.display = 'none';
         ready = true;
         window.__ready = true;
+        buildBagUI();          // 背包格子（依赖 items_atlas 已进 ATLAS，必须等 initAtlas 之后）
         // 首屏只载了「这一张图要用的」；其余按需图集趁空闲在后台补上，
         // 用户点地图按钮时通常已经就绪（见 preloadExtras 注释）。
         // ?preload=0 关掉按需图集的后台预取（省流量/弱网，也让 lazygoto 自测能测到真·按需）
@@ -1916,6 +2007,85 @@
           var pb = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
           pb.textContent = JSON.stringify({ alive: alive, total: foes.length, exp: player.exp, stones: player.stones, hp: Math.round(player.hp) });
         }
+        if (at === 'loot') {
+          // ?map=<图>&autotest=loot —— 掉落 / 拾取 / 服药 / 背包 全链路验收（2026-09-17 加）。
+          // 为什么值得单独立一条：这四件事各自都能"看起来对"，但接在一起才暴露真问题 ——
+          //   ① 掉落掷骰的**实际**命中率 vs 配置概率（rollLoot 是独立掷骰，可能全不中）
+          //   ② 掉落物是否真的被 repath 到可走格（溅到墙里的图标玩家永远捡不到）
+          //   ③ 走近后是否真的入包（距离判定用 PICK_R，差一点点就永远悬在那儿）
+          //   ④ 服药是否真的回血、且**满血不消耗**、冷却期间不生效
+          var pbold = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          var R = { defs: 0, healDefs: 0, iconOk: 0, iconMiss: [], rolls: 0, dropped: 0, byKey: {},
+                    landed: 0, onWall: 0, picked: 0, bagAfter: {}, healOk: false, healFull: false,
+                    healCdBlock: false, crafted: {} };
+          // 图集自检：三张表都要到位（任一缺失都会让图标静默变成空白格，不报错）
+          R.atlas = {
+            img: !!(ATLAS.items && ATLAS.items.img),
+            rectKeys: ATLAS.items && ATLAS.items.rect ? Object.keys(ATLAS.items.rect).length : -1,
+            bigKeys: ATLAS.items && ATLAS.items.big ? Object.keys(ATLAS.items.big).length : -1,
+            defsKeys: ATLAS.items && ATLAS.items.defs ? Object.keys(ATLAS.items.defs).length : -1
+          };
+          // ① 物品表与图标：每个 ITEMS 条目都要能在图集里解析到帧（缺图 = 背包里是空白格）
+          Object.keys(ITEMS).forEach(function (k) {
+            R.defs++;
+            if (ITEMS[k].kind === 'heal') R.healDefs++;
+            if (piece(ITEMS[k].icon) && piece(ITEMS[k].icon + '_big')) R.iconOk++;
+            else R.iconMiss.push(k);
+          });
+          // ② 掉落掷骰：跑 400 次统计实际命中分布（配置概率只是期望，实测才有意义）
+          var f1 = foes[0];
+          if (f1) {
+            for (var q1 = 0; q1 < 400; q1++) {
+              var got = rollLoot(f1);
+              R.rolls++;
+              if (got.length) R.dropped++;
+              got.forEach(function (g) { R.byKey[g.key] = (R.byKey[g.key] || 0) + g.n; });
+            }
+            // ③ 落点：强制撒 200 次，检查每一件都落在可走格上（不该有图标嵌在墙/水里）
+            lootDrops = [];
+            for (var q2 = 0; q2 < 200; q2++) spawnLoot(f1, [{ key: 'yaodan', n: 1 }]);
+            R.landed = lootDrops.length;
+            for (var q3 = 0; q3 < lootDrops.length; q3++) {
+              if (!couldStand(lootDrops[q3].mx, lootDrops[q3].my)) R.onWall++;
+            }
+          }
+          // ④ 拾取：把玩家瞬移到第一件掉落物脚下，跑一帧看是否入包
+          if (lootDrops.length) {
+            var L0 = lootDrops[0];
+            player.mx = L0.mx; player.my = L0.my; player.tx = L0.mx; player.ty = L0.my;
+            player.path = null; player.dead = false;
+            var before = lootDrops.length;
+            window.ISLES.tick(1 / 30);
+            R.picked = before - lootDrops.length;
+            Object.keys(bag).forEach(function (k) { R.bagAfter[k] = bag[k]; });
+          }
+          // ⑤ 服药：先塞满三种药，低血 → 服 → 应回血且数量 -1；满血 → 应不消耗；冷却中 → 应不生效
+          bag.jinchuang = bag.jinchuang || 0; bag.jinchuang += 5;
+          bag.xiaohuan = bag.xiaohuan || 0; bag.xiaohuan += 5;
+          bag.dahuan = bag.dahuan || 0; bag.dahuan += 5;
+          healCd = 0; healFx = 0;
+          player.hp = Math.round(player.maxhp * 0.2);
+          var hpA = player.hp, nA = bag.jinchuang;
+          R.healOk = useHeal('jinchuang') && player.hp > hpA && bag.jinchuang === nA - 1;
+          R.crafted.jinchuangHeal = Math.round(player.hp - hpA);
+          // 满血不消耗
+          player.hp = player.maxhp; healCd = 0;
+          var nB = bag.xiaohuan;
+          useHeal('xiaohuan');
+          R.healFull = (bag.xiaohuan === nB);
+          // 冷却拦截：立刻再服（healCd 应为 0.6 刚被上一次设过值 —— 用满血那次不算，所以先造低血）
+          player.hp = Math.round(player.maxhp * 0.3);
+          healCd = HEAL_CD;                       // 手工置于冷却中
+          var nC = bag.dahuan;
+          useHeal('dahuan');
+          R.healCdBlock = (bag.dahuan === nC && player.hp < player.maxhp * 0.5);
+          // ⑥ 背包 UI：格子数 = BAG_ORDER 长度，且 heal 格带可点标记
+          buildBagUI();
+          R.crafted.cells = document.querySelectorAll('#bagGrid .cell').length;
+          R.crafted.healUseCells = document.querySelectorAll('#bagGrid .cell.use').length;
+          R.crafted.ghostImgs = document.querySelectorAll('#bagGrid .cell img').length;
+          pbold.textContent = JSON.stringify(R);
+        }
         if (at === 'ranged') {
           // ?map=beilin&autotest=ranged —— 远程怪验收：进仇恨圈后停手距离掷弹道，
           // 玩家站桩挨打（掉血>0）、怪不近身（最小距离保持在近战圈外）、弹道会打完清空
@@ -2234,7 +2404,10 @@
       // 遍历所有图集，不写死顺序 —— 接第一张外来地图（dungeon）时这里是按名字硬写的，
       // 再加第二、三张就会变成一坨 if。以后新增图集只要在 LOAD_PLAN 里 push 两项。
       for (var k in ATLAS) {
-        var a = ATLAS[k], r = a.rect && a.rect[name];
+        var a = ATLAS[k];
+        // rect 是主表；items 图集另有 big 表（<icon>_big 的 2× 高清版，背包格子用）。
+        // 两张表共用同一个 <img>，所以只取矩形，图仍是 a.img。
+        var r = (a.rect && a.rect[name]) || (a.big && a.big[name]);
         if (a.img && r) return { img: a.img, sx: r[0], sy: r[1], w: r[2], h: r[3] };
       }
       // 独立 PNG 回退：用于测试/接入未入图集的新素材（如 Kenney 地牢包）
@@ -2381,6 +2554,81 @@
     ctx.strokeText(label, cx, cy - 46 * Z);
     ctx.fillStyle = '#9df6ff';
     ctx.fillText(label, cx, cy - 46 * Z);
+  }
+
+  /* 画一件掉落物。
+   * 三个「让人一眼看出地上有东西」的视觉手段（缺一个都会变成背景杂点）：
+   *   ① 地面上的椭圆投影 —— 没有它图标像贴在屏幕上，看不出落在地上；
+   *   ② 上下浮动 + 刚落地时的弹跳（tossT）—— 静止的图标会被当成地图装饰；
+   *   ③ 图标底下的一圈柔光 —— 战场本身很花，光晕把道具从背景里抠出来。
+   * 数值都乘 Z，缩放时比例不跑偏。缓存的 lootImg 见下面 lootSprite()。 */
+  function drawLoot(L) {
+    var pz = lootSprite(L.key);
+    if (!pz) return;
+    var p = isoToScreen(L.mx, L.my);
+    var baseY = p.y + HH * Z;
+    var t = time * 2.4 + L.phase;
+    // 弹出：刚落地时从上方落下 + 轻微压扁，之后转成匀速浮动
+    var pop = L.pop < 1 ? (1 - L.pop) : 0;
+    var bob = Math.sin(t) * 2.2 * Z - pop * 26 * Z;
+    var cx = p.x, cy = baseY + bob;
+    var size = 30 * Z * (1 - pop * 0.25);
+
+    // ① 地面投影（跟着浮动缩放：离地越高影子越小越淡）
+    var shR = (9 - bob / (6 * Z)) * Z;
+    if (shR > 2) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0.06, 0.30 - bob / (60 * Z)) * (L.blink ? (0.5 + 0.5 * Math.sin(time * 9)) : 1);
+      ctx.fillStyle = '#0b1018';
+      ctx.beginPath();
+      ctx.ellipse(cx, baseY + 1 * Z, Math.max(2, shR), Math.max(1, shR * 0.5), 0, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+    }
+    // ③ 柔光（按物品类别配色：药=粉、材料=青、稀有=金）
+    var it = ITEMS[L.key];
+    var gc = it && it.kind === 'heal' ? '255,150,190'
+           : it && it.kind === 'rare' ? '255,214,130' : '150,235,205';
+    ctx.save();
+    var pulse = 0.42 + 0.20 * Math.sin(time * 3.1 + L.phase);
+    var rg = ctx.createRadialGradient(cx, cy, 1, cx, cy, 22 * Z);
+    rg.addColorStop(0, 'rgba(' + gc + ',' + pulse.toFixed(3) + ')');
+    rg.addColorStop(0.55, 'rgba(' + gc + ',' + (pulse * 0.32).toFixed(3) + ')');
+    rg.addColorStop(1, 'rgba(' + gc + ',0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(cx, cy, 22 * Z, 0, 6.2832); ctx.fill();
+    ctx.restore();
+
+    // ② 图标本体
+    ctx.save();
+    ctx.globalAlpha = L.blink ? (0.45 + 0.55 * Math.abs(Math.sin(time * 5.2 + L.phase))) : 1;
+    ctx.imageSmoothingEnabled = true;      // 图标是手绘风，插值放大比方块好看
+    ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h,
+                  Math.round(cx - size / 2), Math.round(cy - size / 2),
+                  Math.round(size), Math.round(size));
+    ctx.restore();
+
+    // 数量角标（>1 才画，单件就不啰嗦）
+    if (L.n > 1) {
+      ctx.save();
+      ctx.font = 'bold ' + (12 * Z).toFixed(1) + 'px ui-monospace,Consolas,monospace';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      var tx = cx + size * 0.30, ty = cy + size * 0.28;
+      ctx.lineWidth = 3 * Z; ctx.strokeStyle = 'rgba(6,12,24,.9)';
+      ctx.strokeText('×' + L.n, tx, ty);
+      ctx.fillStyle = '#ffe9a8';
+      ctx.fillText('×' + L.n, tx, ty);
+      ctx.restore();
+    }
+  }
+  /** 掉落物图标取件（小图，64×64）。带缓存，免得每帧翻图集。 */
+  var _lootPz = {};
+  function lootSprite(key) {
+    if (_lootPz[key] !== undefined) return _lootPz[key];
+    var it = ITEMS[key];
+    var pz = it ? piece(it.icon) : null;
+    _lootPz[key] = pz || null;
+    return _lootPz[key];
   }
 
   /** 画一个角色（影子 + 按朝向/帧取图）。玩家与 NPC 共用同一套绘制，规格完全一致。
@@ -2605,13 +2853,17 @@
 
     var list = CUR._objSorted.slice(oA, oB);
     (CUR.npcs || []).forEach(function (n) { list.push({ k: n.x + n.y + 0.01, i: -2, o: n }); });
+    // 掉落物也用 k 排序参与遮挡 —— 掉在树后要能被树挡住，不然会「浮」在画面上。
+    // i=-4：排在妖兽（-3）之前判断，避免落到下面那个 i===-1 的玩家分支。
+    lootDrops.forEach(function (L) { list.push({ k: L.mx + L.my - 0.02, i: -4, o: L }); });
     foes.forEach(function (f) { list.push({ k: f.x + f.y, i: -3, o: f }); });
     list.push({ k: player.mx + player.my, i: -1, o: null });
     list.sort(function (a, b) { return a.k - b.k; });
 
     list.forEach(function (it) {
-      // 注意顺序：妖兽 i=-3、NPC i=-2、玩家 i=-1，三者都 <0。
-      // 必须先判 -3/-2 再判 -1，否则会被当成玩家/物件错画。
+      // 注意顺序：掉落物 i=-4、妖兽 i=-3、NPC i=-2、玩家 i=-1，都 <0。
+      // 必须先判 -4/-3/-2 再判 -1，否则会被当成玩家/物件错画。
+      if (it.i === -4) { drawLoot(it.o); return; }
       if (it.i === -3) { drawFoe(it.o); return; }
       if (it.i === -2) { drawNPC(it.o); return; }
       if (it.i === -1) { drawCharacter(); return; }
@@ -2660,9 +2912,11 @@
       ctx.fillStyle = 'rgba(7,12,26,' + fadeA.toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }
+    drawHealFx();      // 服药的脚下涟漪（没在服药时零开销）
     updateHUD();
     updateSkillUI();   // 技能冷却遮罩与倒计时
     updateMinimap();   // 右上角缩略图（内部有脏检查，不是每帧都重画）
+    renderBag();       // 背包格子（脏标记驱动，不是每帧都碰 DOM）
   }
 
   // ---------------- 逻辑 ----------------
@@ -2700,6 +2954,9 @@
     else if (CUR.id === 'flare_grass_empyrean_campaign_lochport') { foes = makeFoes(LOCHPORT_SPAWNS); }
     else if (CUR.id === 'flare_grass_empyrean_campaign_lochport_cemetery') { foes = makeFoes(CEMETERY_SPAWNS); }
     else { foes = []; floaters = []; particles = []; player.targetFoe = null; }
+    // 地上的掉落物是「这张图的」，换图一律清掉 —— 不然坐标会飘到新图的地上。
+    // 背包（bag）与灵石是**角色**的，跨图保留。
+    lootDrops = [];
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
     player.dead = false;
@@ -2843,9 +3100,21 @@
     // 技能：按键映射由 SKILLS 表的 key 字段生成（当前 U / I / O / P）
     var ski = SKILL_KEYS[k.toLowerCase()];
     if (ski !== undefined) { e.preventDefault(); castSkill(ski); return; }
-    // 动作试演：1~6 直接切到对应动作，方便逐个核对素材（待机/行走/奔跑/攻击A/攻击B/倒地）
-    var demo = { '1': 'idle', '2': 'walk', '3': 'run', '4': 'atkA', '5': 'atkB', '6': 'dead' }[k];
-    if (demo) { e.preventDefault(); playAct(demo); return; }
+    // 背包：B 开关
+    if (k === 'b' || k === 'B') { e.preventDefault(); bagToggle(); return; }
+    // 服药：1 / 2 / 3 对应 金创药 / 小还丹 / 大还丹（1~3 是玩家最顺手的键位，给药不亏）
+    if (k === '1' || k === '2' || k === '3') {
+      e.preventDefault();
+      useHeal({ '1': 'jinchuang', '2': 'xiaohuan', '3': 'dahuan' }[k]);
+      return;
+    }
+    // 动作试演：Alt+1~6 直接切到对应动作，方便逐个核对素材（待机/行走/奔跑/攻击A/攻击B/倒地）
+    // ★ 2026-09-17 从裸 1~6 改成 Alt+：裸数字键已让给「服药」（战斗中最常按、必须零门槛），
+    //   试演是开发期核对素材用的，加个修饰键不碍事。
+    if (e.altKey) {
+      var demo = { '1': 'idle', '2': 'walk', '3': 'run', '4': 'atkA', '5': 'atkB', '6': 'dead' }[k];
+      if (demo) { e.preventDefault(); playAct(demo); return; }
+    }
     // 键盘缩放：+ / - 步进，0 复位
     if (k === '+' || k === '=') zoomBy(ZSTEP, W / 2, H / 2);
     else if (k === '-' || k === '_') zoomBy(1 / ZSTEP, W / 2, H / 2);
@@ -2915,6 +3184,9 @@
       }
     }
     if (player.atkBCd > 0) player.atkBCd = Math.max(0, player.atkBCd - dt);
+    if (healCd > 0) { healCd = Math.max(0, healCd - dt); bagDirty = true; }   // 冷却结束要立刻解除格子的灰化
+    if (healFx > 0) healFx = Math.max(0, healFx - dt);
+    updateLoot(dt);            // 掉落物：老化 + 拾取判定
     for (var sk = 0; sk < player.skillCd.length; sk++) {
       if (player.skillCd[sk] > 0) player.skillCd[sk] = Math.max(0, player.skillCd[sk] - dt);
     }
@@ -3656,6 +3928,236 @@
     var h = document.getElementById('hint');
     if (h) h.textContent = '动作试演：' + (ACT_CN[act] || act) + '（' + (player.actHold) + ' 秒）';
   }
+  /** 掷一只怪的掉落（独立掷骰，可同时掉多样）。返回落地的条目数组。 */
+  function rollLoot(f) {
+    var tbl = LOOT_BY_KEY[f.key] || DEFAULT_LOOT;
+    var got = [];
+    function roll2(list) {
+      for (var i = 0; i < list.length; i++) {
+        var it = list[i];
+        if (Math.random() < it[1]) {
+          var n = it[2] + Math.floor(Math.random() * (it[3] - it[2] + 1));
+          got.push({ key: it[0], n: n });
+        }
+      }
+    }
+    roll2(tbl);
+    if (f.def_ && f.def_.elite) roll2(ELITE_LOOT);
+    return got;
+  }
+  /** 把掉落物撒在怪倒地处周围（偏移一圈，叠在一起看不出是几件）。 */
+  function spawnLoot(f, list) {
+    if (!list.length || !CUR) return;
+    for (var i = 0; i < list.length; i++) {
+      var ang = Math.random() * 6.2832;
+      var rr = 0.22 + Math.random() * 0.42;
+      var mx = f.x + Math.cos(ang) * rr, my = f.y + Math.sin(ang) * rr;
+      // 落到不可走处就退回怪脚下（不然图标会飘在墙里）
+      if (!couldStand(mx, my)) { mx = f.x; my = f.y; }
+      lootDrops.push({
+        mx: mx, my: my, key: list[i].key, n: list[i].n,
+        life: LOOT_LIFE, phase: (lootSeq++) * 1.37, pop: 0, tossT: 0.28
+      });
+    }
+  }
+  /** 拾取判定：走到跟前自动捡。heal 进背包，mat 类灵石直接入账、妖丹/玄铁令进背包。 */
+  function updateLoot(dt) {
+    for (var i = lootDrops.length - 1; i >= 0; i--) {
+      var L = lootDrops[i];
+      L.life -= dt;
+      if (L.pop < 1) L.pop = Math.min(1, L.pop + dt / 0.22);   // 弹出动画
+      if (L.tossT > 0) L.tossT = Math.max(0, L.tossT - dt);
+      // 快消失时开始闪烁提示（最后 6 秒）
+      L.blink = L.life < 6;
+      if (L.life <= 0) { lootDrops.splice(i, 1); continue; }
+      if (player.dead) continue;
+      if (Math.hypot(player.mx - L.mx, player.my - L.my) > PICK_R) continue;
+      pickUp(L);
+      lootDrops.splice(i, 1);
+    }
+  }
+  /** 真正入账。灵石是货币（走 player.stones），其余进背包。 */
+  function pickUp(L) {
+    var it = ITEMS[L.key];
+    if (!it) return;
+    collectItem(L.key, L.n, L.mx, L.my);
+  }
+  /** 统一的「获得物品」入口（掉落、调试、以后的任务奖励都走这里）。 */
+  function collectItem(key, n, mx, my) {
+    var it = ITEMS[key];
+    if (!it) return;
+    if (key === 'lingshi') {
+      player.stones += n;                      // 货币：直接入账
+      addFloater(mx, my - 0.3, '+' + n + ' 灵石', '#8bf3ff');
+      return;
+    }
+    bag[key] = (bag[key] || 0) + n;
+    var col = it.kind === 'heal' ? '#ffb3c8' : (it.kind === 'rare' ? '#ffdf9b' : '#9fe8c8');
+    addFloater(mx, my - 0.3, '拾取 ' + it.cn + (n > 1 ? ' ×' + n : ''), col);
+    bagDirty = true;
+    // 药品第一次进背包时提示一句用法（只提示一次，别每次捡都刷屏）
+    if (it.kind === 'heal' && !healHinted) {
+      healHinted = true;
+      toast('拾得 ' + it.cn + ' —— 按 1 / 2 / 3 或点背包格子即可服用');
+    }
+  }
+  var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；灵石不入包）
+  var bagDirty = true;       // HUD 脏标记（数量变了才碰 DOM）
+  var healHinted = false;    // 药品用法是否已提示过
+  var healCd = 0;            // 服药公共冷却（防止一口气连嗑）
+  var HEAL_CD = 0.6;
+  var bagOpen = false;       // 背包面板是否展开
+
+  /* ---------------- 药品服用 ----------------
+   * 只做三件事：确认能用（冷却/满血/有货）→ 回血 → 给反馈。
+   * 三条设计取舍写在前面，免得以后被"优化"掉：
+   *   ① 满血时**不消耗**，只提示。否则手滑点一下就白丢一瓶药。
+   *   ② 服药**能在战斗中**（挨打时也想自救），只有倒地不许（player.dead）。
+   *   ③ 有公共冷却 HEAL_CD，防止按住数字键一口气嗑光整包。
+   */
+  function useHeal(key) {
+    var it = ITEMS[key];
+    if (!it || it.kind !== 'heal') return false;
+    if (player.dead) { toast('已经倒下了，先等回魂'); return false; }
+    if (!bag[key]) { toast('行囊里没有' + it.cn); return false; }
+    if (player.hp >= player.maxhp) { toast('气血已满，留着'); return false; }
+    if (healCd > 0) return false;
+    healCd = HEAL_CD;
+    var before = player.hp;
+    player.hp = Math.min(player.maxhp, player.hp + player.maxhp * it.val);
+    var got = Math.round(player.hp - before);
+    bag[key]--;
+    if (bag[key] <= 0) delete bag[key];
+    bagDirty = true;
+    // 飘字 + 环形涟漪都发一次：数字说明「回了多少」，涟漪说明「药生效了」
+    addFloater(player.mx, player.my - 0.5, '+' + got, '#7dff9b');
+    healFx = 0.55;
+    toast('服下' + it.cn + '，气血 +' + got);
+    return true;
+  }
+  /** 服药时的地面涟漪（在主角脚下扩散一圈绿光） */
+  var healFx = 0;
+  function drawHealFx() {
+    if (healFx <= 0) return;
+    var p = isoToScreen(player.mx, player.my);
+    var q = healFx / 0.55;                    // 1 → 0
+    var rr = (1 - q) * 46 * Z + 8 * Z;
+    ctx.save();
+    ctx.globalAlpha = q * 0.75;
+    ctx.strokeStyle = '#7dff9b'; ctx.lineWidth = 2.4 * Z;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + HH * Z, rr, rr * 0.5, 0, 0, 6.2832);
+    ctx.stroke();
+    ctx.globalAlpha = q * 0.28;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + HH * Z, rr * 0.6, rr * 0.3, 0, 0, 6.2832);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ---------------- 背包栏 ----------------
+   * 格子按 ITEMS 的 key 顺序固定生成（不按持有量排序）——
+   * 位置稳定才能让「1/2/3 对应哪瓶药」变成肌肉记忆，图标乱跑反而难用。
+   * 三种药固定占前三格（金创药 / 小还丹 / 大还丹），材料类排后面只展示。
+   */
+  var BAG_ORDER = ['jinchuang', 'xiaohuan', 'dahuan', 'yaodan', 'xuantie'];
+  var BAG_KEYS = { jinchuang: '1', xiaohuan: '2', dahuan: '3' };
+  var bagCells = {};         // key → cell 元素（增量更新计数，不重建 DOM）
+  var bagBuilt = false;
+
+  function buildBagUI() {
+    var g = document.getElementById('bagGrid');
+    if (!g) return;
+    g.innerHTML = ''; bagCells = {};
+    BAG_ORDER.forEach(function (key) {
+      var it = ITEMS[key]; if (!it) return;
+      var c = document.createElement('div');
+      c.className = 'cell';
+      c.title = it.cn + '：' + it.desc;
+      // 图标：优先高清大图（items_atlas.json 里的 <icon>_big，128px 帧降到 46px 显示），
+      // 没图集就退回文字首字 —— 至少还能玩，不是空白格。
+      var pz = piece(it.icon + '_big') || piece(it.icon);
+      if (pz) {
+        // 所有图标共用同一张图集 <img>：不能直接塞 <img> 进格子（那会显示整张图）。
+        // 用一个裁剪容器 + 位移，把目标帧对齐到格子左上 —— 比逐格 toDataURL 便宜得多，
+        // 而且浏览器只下载一次图集（缓存里就这一张）。
+        var box = document.createElement('div');
+        box.style.cssText = 'position:absolute;inset:0;overflow:hidden;border-radius:8px';
+        var im = document.createElement('img');
+        var sc = 46 / pz.h;                        // 把一帧放大到 46px 高
+        im.alt = it.cn;
+        im.src = pz.img.src;
+        im.draggable = false;
+        im.style.cssText =
+          'position:absolute;left:' + (-pz.sx * sc).toFixed(1) + 'px;' +
+          'top:' + (-pz.sy * sc).toFixed(1) + 'px;' +
+          'width:' + ((pz.img.naturalWidth || pz.img.width) * sc).toFixed(1) + 'px;' +
+          'height:' + ((pz.img.naturalHeight || pz.img.height) * sc).toFixed(1) + 'px;' +
+          'max-width:none;image-rendering:auto;pointer-events:none';
+        box.appendChild(im);
+        c.appendChild(box);
+      } else {
+        var s = document.createElement('span');
+        s.style.cssText = 'font-size:19px;color:#ffe6a6';
+        s.textContent = it.cn.charAt(0);
+        c.appendChild(s);
+      }
+      var n = document.createElement('b'); n.className = 'n'; c.appendChild(n);
+      if (BAG_KEYS[key]) {
+        var kb = document.createElement('span'); kb.className = 'kb';
+        kb.textContent = BAG_KEYS[key]; c.appendChild(kb);
+      }
+      var fire = function (ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        if (it.kind === 'heal') useHeal(key);
+        else toast(it.cn + '：' + it.desc);
+      };
+      c.addEventListener('click', fire);
+      c.addEventListener('touchstart', fire, { passive: false });
+      g.appendChild(c);
+      bagCells[key] = c;
+    });
+    bagBuilt = true;
+    bagDirty = true;
+    renderBag();      // 立刻刷一遍：否则要等下一帧循环才上 .use / 计数，中间有一帧是"半成品"
+  }
+
+  /** 刷新背包（脏标记驱动，不是每帧都碰 DOM） */
+  function renderBag() {
+    if (!bagBuilt) return;
+    if (!bagDirty) return;
+    bagDirty = false;
+    var total = 0, hasHeal = 0;
+    BAG_ORDER.forEach(function (key) {
+      var c = bagCells[key]; if (!c) return;
+      var it = ITEMS[key];
+      var n = bag[key] || 0;
+      c.classList.toggle('empty', n <= 0);
+      c.classList.toggle('use', it.kind === 'heal');
+      c.classList.toggle('cool', healCd > 0);
+      var nb = c.querySelector('.n');
+      if (nb) nb.textContent = n > 0 ? n : '';
+      total += n;
+      if (it.kind === 'heal') hasHeal += n;
+    });
+    var sv = document.getElementById('bagStones');
+    if (sv) sv.textContent = '灵石 ' + player.stones;
+    // 入口按钮上的小红点：有药就提示"可以嗑"
+    var btn = document.getElementById('bagBtn'), dot = document.getElementById('bagDot');
+    if (btn) btn.classList.toggle('hasnew', hasHeal > 0 && !bagOpen);
+    if (dot) dot.textContent = hasHeal > 99 ? '99+' : hasHeal;
+  }
+
+  function bagToggle(open) {
+    bagOpen = (open === undefined) ? !bagOpen : !!open;
+    var el = document.getElementById('bag');
+    if (el) el.classList.toggle('open', bagOpen);
+    var b = document.getElementById('bagBtn');
+    if (b) b.classList.toggle('on', bagOpen);
+    bagDirty = true;
+    if (bagOpen) renderBag();
+  }
+
   function killFoe(f) {
     if (f.def_.dummy) {                 // 训练靶打不死：立刻满血重置，方便反复试
       f.hp = f.maxhp; f.flash = 0.25;
@@ -3668,6 +4170,9 @@
     var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
     player.stones += st;
     addFloater(f.x, f.y - 0.4, '+' + st + ' 灵石', '#8bf3ff');
+    // 掉落结算：在倒地动画开始的同时就把东西撒下去 ——
+    // 等动画播完再掉会让玩家以为"没掉东西"而提前走开。
+    spawnLoot(f, rollLoot(f));
     spawnParticles(f.x, f.y);
     if (player.targetFoe === f) player.targetFoe = null;
     // 有倒地素材就播倒地（新怪物包取自 Dead.png，老妖兽用图集里的 _death_N 帧），
@@ -4600,6 +5105,8 @@
   (function wireWorld() {
     var btn = document.getElementById('worldBtn');
     if (btn) btn.onclick = toggleWorld;
+    var bb = document.getElementById('bagBtn');
+    if (bb) bb.onclick = function () { bagToggle(); };
     var x = document.getElementById('worldClose');
     if (x) x.onclick = closeWorld;
     var sb = document.getElementById('worldSearch');

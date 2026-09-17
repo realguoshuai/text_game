@@ -36,6 +36,9 @@ _analysis/
 games/immortal-isles/_analysis/
 # 妖兽单帧裁切源（策展中间物；运行时只用 assets/foes_atlas.png/.json）
 games/immortal-isles/assets/foes/
+# 物品图标的 2× 高清预览（只是给 tools/gen_items_atlas.py 人工核对用的中间物；
+# 背包格子直接用 items_atlas.png 里 64px 帧放大，不读这张）
+games/immortal-isles/assets/items_atlas_big.png
 
 # 外来地图的中间瓦片（tools/import_tmx.py 产物；运行时只用 <prefix>_atlas.webp/.json）
 games/immortal-isles/assets/imported/
