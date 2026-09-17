@@ -1089,6 +1089,33 @@
         //   连 #dbg 都建不出来，现场不留任何痕迹（2026-09-16 就因此瞎猜了一轮）。
         if (window.__mobileAudit) window.__mobileAudit();
         HOLD = q.get('hold') === '1';
+        /* ★★ 版本号屏上可见（2026-09-17 第 5 次排查"行囊还是灰的"时加）
+         * 背景：index.html 在 GitHub Pages 上有 max-age=600 的缓存；若用户的标签页
+         * 一直开着没关，跑的永远是**进页那一刻**的旧 JS —— 我这边推多少版都看不到。
+         * 所以把"当前实际在跑的版本"直接印在游戏里：
+         *   ① 浏览器标签页标题 → 仙岛寻踪 v NN
+         *   ② 屏幕右下角一枚极小的角标
+         * 用户只要看一眼角标，就能断定"我跑的是不是最新版"，不用开任何调试工具。
+         * 版本号从本文件自己的 <script src="...?v=NN"> 里解析 —— 永远与实际加载的代码一致。 */
+        var VTAG = (function () {
+          var ss = document.getElementsByTagName('script');
+          for (var vi = 0; vi < ss.length; vi++) {
+            var mm = /[?&]v=([0-9]+)/.exec(ss[vi].src || '');
+            if (mm && /game\.js/.test(ss[vi].src || '')) return mm[1];
+          }
+          return '?';
+        })();
+        document.title = '仙岛寻踪 v' + VTAG;
+        window.__VTAG = VTAG;                      // 给 bagDebugLine 用
+        try {
+          var vb = document.createElement('div');
+          vb.id = 'verTag';
+          vb.textContent = 'v' + VTAG;
+          vb.style.cssText = 'position:fixed;right:6px;bottom:4px;z-index:37;pointer-events:none;' +
+            'font:600 10px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.5px;' +
+            'color:rgba(240,227,194,.42);text-shadow:0 1px 2px rgba(0,0,0,.6)';
+          document.body.appendChild(vb);
+        } catch (e) { /* 角标失败无所谓，标题还有一份 */ }
         // ?pose=run —— 把主角锁在某个动作上（核对素材/截图用），取值见 ACT_CN
         var pq = q.get('pose');
         if (pq && ACT_CN[pq]) { poseLock = pq; player.act = pq; player.actT = 0.05; }
@@ -4100,12 +4127,21 @@
     if (key === 'lingshi') {
       player.stones += n;                      // 货币：直接入账
       addFloater(mx, my - 0.3, '+' + n + ' 银两', '#8bf3ff');
+      /* ★ 银两入账也要标脏（2026-09-17 修复）：行囊标题那行「银两 N」只在
+       * renderBag 里刷新，原来这里提前 return 不设 bagDirty —— 光捡银两
+       * 面板数字永远不动（用户实测：「背包的银两也没有增加」）。 */
+      bagDirty = true;
       return;
     }
     bag[key] = (bag[key] || 0) + n;
     var col = it.kind === 'heal' ? '#ffb3c8' : (it.kind === 'rare' ? '#ffdf9b' : '#9fe8c8');
     addFloater(mx, my - 0.3, '拾取 ' + it.cn + (n > 1 ? ' ×' + n : ''), col);
     bagDirty = true;
+    /* ★ 拾取留痕（?bagdbg=1 排查用）：记录最近一次真正入包的物品与时间。
+     * 若用户报"捡了但包里没有"，看这行就知道**入包逻辑到底跑没跑到** ——
+     * 没有这行 = pickUp/collectItem 根本没执行（拾取判定问题）；
+     * 有这行 = 入包了，问题在渲染层。 */
+    __lastPickup = it.cn + '×' + n + ' ' + new Date().toTimeString().slice(0, 8);
     // 药品第一次进背包时提示一句用法（只提示一次，别每次捡都刷屏）
     if (it.kind === 'heal' && !healHinted) {
       healHinted = true;
@@ -4118,13 +4154,16 @@
    * computedStyle 全对，无法复现；于是在面板标题栏直接打印脚本侧的真实状态，
    * 让用户截一眼就能判断卡在哪一环（数量？类名？还是滤镜）。 */
   var BAG_DEBUG = /(^|[?&])bagdbg=1(&|$)/.test(location.search);
+  var __lastPickup = '';     // 最近一次入包（bagdbg 排查用）
   function bagDebugLine() {
     var parts = [];
     BAG_ORDER.forEach(function (k) { parts.push(k.slice(0, 4) + ':' + (bag[k] || 0)); });
     var c0 = bagCells.jinchuang, cv0 = c0 && c0.querySelector('canvas.ico');
     var cls0 = c0 ? c0.className.replace('cell', '').trim() : '?';
     var f0 = cv0 ? (cv0.style.filter || '(none)').replace(/drop-shadow\([^)]*\)/, 'ds()') : '?';
-    return 'DBG ' + parts.join(' ') + ' | jc[' + cls0 + '] ' + f0.slice(0, 46);
+    return 'v' + (window.__VTAG || '?') + ' ' + parts.join(' ') +
+           ' | jc[' + cls0 + '] ' + f0.slice(0, 40) +
+           (__lastPickup ? ' | 拾:' + __lastPickup : ' | 未拾');
   }
   var healHinted = false;    // 药品用法是否已提示过
   var healCd = 0;            // 服药公共冷却（防止一口气连嗑）
