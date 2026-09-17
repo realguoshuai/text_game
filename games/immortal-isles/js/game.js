@@ -2133,6 +2133,7 @@
               cls: (bc.className || '').replace('cell', '').trim(),
               has: bc.classList.contains('has'),
               filter: cs ? cs.filter : '(no canvas)',
+              inlineFilter: cv2 ? (cv2.style.filter || '') : '',   // 行内兜底是否写上了
               op: cs ? cs.opacity : '-'
             });
           }
@@ -4113,6 +4114,18 @@
   }
   var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；银两不入包）
   var bagDirty = true;       // HUD 脏标记（数量变了才碰 DOM）
+  /* ?bagdbg=1 —— 真机自检开关。用户第二次报"行囊没变化"时，本地 headless 的
+   * computedStyle 全对，无法复现；于是在面板标题栏直接打印脚本侧的真实状态，
+   * 让用户截一眼就能判断卡在哪一环（数量？类名？还是滤镜）。 */
+  var BAG_DEBUG = /(^|[?&])bagdbg=1(&|$)/.test(location.search);
+  function bagDebugLine() {
+    var parts = [];
+    BAG_ORDER.forEach(function (k) { parts.push(k.slice(0, 4) + ':' + (bag[k] || 0)); });
+    var c0 = bagCells.jinchuang, cv0 = c0 && c0.querySelector('canvas.ico');
+    var cls0 = c0 ? c0.className.replace('cell', '').trim() : '?';
+    var f0 = cv0 ? (cv0.style.filter || '(none)').replace(/drop-shadow\([^)]*\)/, 'ds()') : '?';
+    return 'DBG ' + parts.join(' ') + ' | jc[' + cls0 + '] ' + f0.slice(0, 46);
+  }
   var healHinted = false;    // 药品用法是否已提示过
   var healCd = 0;            // 服药公共冷却（防止一口气连嗑）
   var HEAL_CD = 0.6;
@@ -4294,11 +4307,33 @@
       var nb = c.querySelector('.n');
       // ★ 数量角标只在有货时显示（CSS 靠 .has 控制显隐），且 99 以上折成 99+
       if (nb) nb.textContent = n > 0 ? (n > 99 ? '99+' : n) : '';
+      /* ★★ 兜底：把状态**同时写成行内样式**（2026-09-17 第四次修复）
+       * 用户第三次反馈"行囊依旧没有变化"，但那时的 CSS 与 getComputedStyle 实测
+       * 全部正确 —— 说明某些环境下（旧缓存 / 浏览器对 :not() 链式选择器的处理差异）
+       * 那份 CSS 没能作用到 canvas 上。行内样式的优先级高于任何选择器，
+       * 从**结构上**不可能再被覆盖或匹配不到，所以这里直接把最终滤镜写死。
+       * CSS 仍保留（降级/首帧用），行内样式是"最终裁决"。 */
+      var cv3 = c.querySelector('canvas.ico');
+      if (cv3) {
+        if (n <= 0) {
+          cv3.style.filter = 'grayscale(1) brightness(.5)';
+          cv3.style.opacity = '.42';
+        } else if (healCd > 0 && key === healUsed) {
+          cv3.style.filter = 'saturate(.55) brightness(.86)';
+          cv3.style.opacity = '1';
+        } else {
+          cv3.style.filter = 'brightness(1.22) saturate(1.1) drop-shadow(0 0 3px rgba(255,210,120,.5))';
+          cv3.style.opacity = '1';
+        }
+      }
       total += n;
       if (it.kind === 'heal') hasHeal += n;
     });
     var sv = document.getElementById('bagStones');
-    if (sv) sv.textContent = '银两 ' + player.stones;
+    // ★ 临时自检（?bagdbg=1）：把"脚本认为的状态"直接写进面板标题栏，
+    //   跟"你眼睛看到的画面"对照 —— 一眼就能分清是**数据没进来**还是**样式没生效**。
+    //   按用户要求不跑本地截图，靠这一行在真机上直接读。
+    if (sv) sv.textContent = (BAG_DEBUG ? bagDebugLine() : ('银两 ' + player.stones));
     // 入口按钮上的小红点：有药就提示"可以嗑"
     var btn = document.getElementById('bagBtn'), dot = document.getElementById('bagDot');
     if (btn) btn.classList.toggle('hasnew', hasHeal > 0 && !bagOpen);

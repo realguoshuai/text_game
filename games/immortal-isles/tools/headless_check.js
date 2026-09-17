@@ -393,6 +393,9 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
     //     · 空格 → 必须 grayscale
     && probe.bagStates && probe.bagStates.length === 5
     && probe.bagStates.every(function (s) {
+         // ★ 行内兜底必须写上（第四次修复）：某些环境下那份 CSS 没能作用到 canvas，
+         //   行内样式优先级最高，从结构上不可能被覆盖/匹配不到。
+         if (!s.inlineFilter) return false;
          if (s.n > 0) {
            if (s.has !== true) return false;
            if (s.filter.indexOf('grayscale') >= 0) return false;
