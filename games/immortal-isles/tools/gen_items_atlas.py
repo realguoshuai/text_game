@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """仙岛寻踪 · 程序化生成物品图标图集（不依赖任何外部素材）。
 
-六种物品，各画一帧 64×64 图标（另存一份 2× 高清给背包 UI 用）：
+六种物品，各画一帧 64×64 图标：
     jinchuang  金创药    回复 35% 气血    小怪常见
     xiaohuan   小还丹    回复 55% 气血    中怪
     dahuan     大还丹    回复 100% 气血   精英 / 稀有小怪
@@ -9,9 +9,17 @@
     lingshi    灵石      货币（现有）     所有怪
     xuantie    玄铁令    稀有贵重         精英
 
-输出
-    assets/items_atlas.{png,webp,json}
-        json = { "_meta": {...}, "items": {...}, "<name>": [x,y,w,h], "<name>_big": [...] }
+输出（**单张图**，两种倍率上下两行）
+    assets/items_atlas.png / .webp  —— 尺寸 398×205：第 0 行 1×（64px，地上掉落物用），
+                                       第 1 行起 2×（128px，背包格子用）
+    assets/items_atlas.json         —— { "_meta": {...}, "items": {...},
+                                          "<name>": [x,y,64,64], "<name>_big": [x,y,128,128] }
+
+★★ 为什么两种倍率必须**同图**（别改回两张文件）
+   第一版是 `items_atlas.png`(1×) + `items_atlas_big.png`(2×) 两张，json 的 `_big` 矩形按
+   2× 图坐标空间写。但运行时只会下 1× 那张 —— 代码拿 2× 的矩形去裁 1× 图，于是帧高按 128
+   算而图里只有 64（图标压成一半高）、第二格起 sx 直接越界裁到隔壁。**全程不报错**，
+   只表现为「背包里图标不对/像没显示」。合并成一张 = 从结构上消灭"两套坐标系"。
 
 ★ 三条硬约束（第一版踩过，改前先读）
   ① **内容框必须统一到 ~44px**。第一版各画各的（22~43px），放进背包格子大小乱跳。
@@ -363,41 +371,60 @@ def main():
         img, size = normalize(raw)
         frames.append((name, img, cn, kind, val, note, size))
 
+    # ★★ 两种倍率**打包进同一张图**（第 0 行 1× 给地上掉落，第 1 行 2× 给背包格子）。
+    #
+    # 为什么必须合并（2026-09-17 用户报「拾取药品，背包中不显示」的真因）：
+    #   第一版把 1× 存 `items_atlas.png`、2× 另存 `items_atlas_big.png`，而 json 里的
+    #   `<name>_big` 矩形是按 **2× 图** 的坐标空间写的。运行时 LOAD_PLAN 只下 1× 那张，
+    #   代码却拿 `_big` 的矩形去裁 1× 图 —— 于是：
+    #     · 帧高按 128 算、实际图里只有 64 → 图标被压成一半高（46px 格子塞进 24px 图）
+    #     · 第二格起 sx=136/268… 早已超出 398 宽的合理范围，裁出来是隔壁图或空白
+    #   表现就是「背包里图标不对 / 像没显示」，而且**不报任何错**。
+    #   拆成两张文件等于埋了「两套坐标系」的雷，合并成一张从结构上消灭它，
+    #   顺带少一次网络请求。
     BIG = 2
-    cw = S + PAD
-    W = cw * len(frames) + PAD
-    H = S + PAD * 2
+    cw = S + PAD                 # 1× 行里每帧的步进
+    cwB = S * BIG + PAD          # 2× 行里每帧的步进
+    W = max(cw * len(frames) + PAD, cwB * len(frames) + PAD)
+    rowH_small = S + PAD
+    H = rowH_small + (S * BIG + PAD * 2)      # 上：1× 行  下：2× 行
     canvas = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    canvas_big = Image.new('RGBA', (W * BIG, H * BIG), (0, 0, 0, 0))
     rect, rect_big = {}, {}
-    x = PAD
+    x, xb = PAD, PAD
     for name, img, cn, kind, val, note, size in frames:
         canvas.alpha_composite(img, (x, PAD))
         rect[name] = [x, PAD, S, S]
         big = img.resize((S * BIG, S * BIG), Image.NEAREST)
-        canvas_big.alpha_composite(big, (x * BIG, PAD * BIG))
-        rect_big[name + '_big'] = [x * BIG, PAD * BIG, S * BIG, S * BIG]
+        canvas.alpha_composite(big, (xb, rowH_small + PAD))
+        rect_big[name + '_big'] = [xb, rowH_small + PAD, S * BIG, S * BIG]
         x += cw
+        xb += cwB
 
     items = {name: {'cn': cn, 'kind': kind, 'val': val, 'note': note}
              for name, img, cn, kind, val, note, size in frames}
     out = {'_meta': {'size': S, 'big': BIG, 'box': TARGET_BOX,
+                     'rowBig': rowH_small + PAD, 'atlasH': H,
                      'note': '程序化生成，见 tools/gen_items_atlas.py'},
            'items': items}
     out.update(rect)
     out.update(rect_big)
 
+    # 只用这一张（png 给运行时，webp 给小体积备选）—— 不再产出 items_atlas_big.png，
+    # 从源头杜绝"两套坐标系"。旧文件若还在，下面收尾时删掉。
     canvas.save(os.path.join(ASSETS, 'items_atlas.png'), optimize=True)
-    canvas_big.save(os.path.join(ASSETS, 'items_atlas_big.png'), optimize=True)
     canvas.save(os.path.join(ASSETS, 'items_atlas.webp'), 'WEBP', quality=92, method=6)
     json.dump(out, open(os.path.join(ASSETS, 'items_atlas.json'), 'w', encoding='utf-8'),
               ensure_ascii=False, separators=(',', ':'))
+    stale = os.path.join(ASSETS, 'items_atlas_big.png')
+    if os.path.exists(stale):
+        os.remove(stale)
+        print('  已删除过期的 items_atlas_big.png（已合并进单张图集）')
 
     print('=== 输出 ===')
-    for f in ('items_atlas.png', 'items_atlas_big.png', 'items_atlas.webp', 'items_atlas.json'):
+    for f in ('items_atlas.png', 'items_atlas.webp', 'items_atlas.json'):
         p = os.path.join(ASSETS, f)
         print('  %-22s %7.1fKB' % (f, os.path.getsize(p) / 1024))
-    print('小图 %dx%d   大图 %dx%d' % (W, H, W * BIG, H * BIG))
+    print('单张图集 %dx%d（上 1× / 下 2×）' % (W, H))
     print('=== 逐帧自检（内容框应统一为 %d 附近）===' % TARGET_BOX)
     ok = True
     for name, img, cn, kind, val, note, size in frames:

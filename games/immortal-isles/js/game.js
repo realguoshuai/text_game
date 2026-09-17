@@ -476,10 +476,10 @@
       { url: 'assets/fx_atlas.webp?v=2', atlas: 'fx', weight: 61, label: '载入技能特效' },
       { url: 'assets/fx_atlas.json?v=2', json: true, weight: 1, label: '读取特效索引' },
       { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' },
-      { url: 'assets/items_atlas.png?v=1', atlas: 'items', weight: 23, label: '载入物品图标' },
+      { url: 'assets/items_atlas.png?v=2', atlas: 'items', weight: 23, label: '载入物品图标' },
       // ⚠ atlas 字段两张都要写：boot 里是按 `p.atlas === 'items'` 把值填进 ATLAS.items 的。
       //   首版漏了 json 这张，导致 json 下载了却没人接（ATLAS.items.rect 恒 null）。
-      { url: 'assets/items_atlas.json?v=1', atlas: 'items', json: true, weight: 1, label: '读取物品图录' }
+      { url: 'assets/items_atlas.json?v=2', atlas: 'items', json: true, weight: 1, label: '读取物品图录' }
     ];
 
   /* ── 按需图集（懒加载）────────────────────────────────────────────────
@@ -2084,6 +2084,33 @@
           R.crafted.cells = document.querySelectorAll('#bagGrid .cell').length;
           R.crafted.healUseCells = document.querySelectorAll('#bagGrid .cell.use').length;
           R.crafted.ghostImgs = document.querySelectorAll('#bagGrid .cell img').length;
+          // ★★ 图标落位几何（2026-09-17 加）：只查「帧能不能解析到」是不够的 ——
+          //   曾经出现"帧全在、计数也对，但图标一个都看不见"：图集里帧的**步进**是
+          //   `帧宽 + PAD`，若按"帧宽缩放 + sx 平移"写，每格累积 PAD*sc 的漂移，
+          //   到第 6 格整块移出取景框。全程不报错，只有把「帧在框内的可见区间」
+          //   算出来才看得见。判据：可见区间必须**正好**覆盖 [0,CELL]，误差 < 0.5px。
+          var CELL2 = BAG_ICON, geoMiss = [], geoCells = [];
+          var boxes = document.querySelectorAll('#bagGrid .cell i.ico');
+          for (var gi = 0; gi < boxes.length; gi++) {
+            var bx = boxes[gi], st = bx.style;
+            var sc2 = CELL2 / 128;                     // _big 帧恒为 128
+            var mPos = /(-?[\d.]+)px (-?[\d.]+)px/.exec(st.backgroundPosition || '');
+            if (!mPos) { geoMiss.push('pos#' + gi); continue; }
+            var L = parseFloat(mPos[1]), T = parseFloat(mPos[2]);
+            var r2 = null;
+            for (var kk in ATLAS.items.big) {
+              var rr = ATLAS.items.big[kk];
+              if (Math.abs(-rr[0] * sc2 - L) < 0.01 && Math.abs(-rr[1] * sc2 - T) < 0.01) { r2 = rr; break; }
+            }
+            if (!r2) { geoMiss.push('rect#' + gi); continue; }
+            var ix0 = Math.max(0, L + r2[0] * sc2), ix1 = Math.min(CELL2, L + (r2[0] + r2[2]) * sc2);
+            var iy0 = Math.max(0, T + r2[1] * sc2), iy1 = Math.min(CELL2, T + (r2[1] + r2[3]) * sc2);
+            var okGeo = Math.abs(ix0) < 0.5 && Math.abs(ix1 - CELL2) < 0.5 &&
+                        Math.abs(iy0) < 0.5 && Math.abs(iy1 - CELL2) < 0.5;
+            geoCells.push({ x: +ix0.toFixed(1), X: +ix1.toFixed(1), y: +iy0.toFixed(1), Y: +iy1.toFixed(1), ok: okGeo });
+            if (!okGeo) geoMiss.push(gi);
+          }
+          R.geo = { n: geoCells.length, miss: geoMiss, cells: geoCells };
           pbold.textContent = JSON.stringify(R);
         }
         if (at === 'ranged') {
@@ -4064,6 +4091,49 @@
   var BAG_KEYS = { jinchuang: '1', xiaohuan: '2', dahuan: '3' };
   var bagCells = {};         // key → cell 元素（增量更新计数，不重建 DOM）
   var bagBuilt = false;
+  var BAG_ICON = 46;         // 图标在格子里的显示边长（px）
+
+  /* ★★ 从图集里"取一帧"的**唯一**正确写法（2026-09-17 用户报「背包里不显示药品图标」的治本修复）
+   *
+   * 语义必须与 canvas 的 drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh) 完全一致：
+   *   ① 先把**整张图**按 sc 等比放大 → 用 background-size 声明整图的显示尺寸；
+   *   ② 再把整图**平移**到 `-sx*sc, -sy*sc` → 用 background-position；
+   *   ③ 外层 overflow:hidden 当取景框，露出目标帧那一块。
+   *
+   * ⛔ 绝不可以用 <img> + left/top 去"对齐帧"：
+   *   图集里帧的**步进**是 `帧宽 + PAD`（本图集 128+2=130），不是帧宽（128）。
+   *   只要用"按帧宽缩放 + 按 sx 平移"的写法，每往右一格就多偏 `PAD*sc`，
+   *   累积到第 6 格整块图标已移出取景框 —— 且**全程不报错**，
+   *   表现就是"第一格有图、后面几格空白"（用户看到的就是这个）。
+   *   background-position 走的是同一张图的同一坐标系，从结构上没有这个漂移。
+   */
+  function bagIconEl(pz, cn) {
+    var box = document.createElement('i');       // <i> 无语义，纯取景框
+    box.className = 'ico';
+    var nw = pz.img.naturalWidth || pz.img.width || 0;
+    var nh = pz.img.naturalHeight || pz.img.height || 0;
+    // 图还没解码完（naturalWidth=0）时先不画，等 decode 后再来一遍 —— 否则 sc 算出 Infinity，
+    // background-size 变成非法值，浏览器**静默丢弃**这条声明 → 图标一格都看不见。
+    if (!pz.w || !nw || !nh) {
+      if (pz.img && !pz.img._bagHooked) {
+        pz.img._bagHooked = true;
+        pz.img.addEventListener('load', function () { bagBuilt = false; buildBagUI(); });
+      }
+      return null;
+    }
+    var sc = BAG_ICON / pz.w;                    // 帧是正方形（64/128），用宽即可
+    box.title = cn;
+    box.style.cssText =
+      'position:absolute;left:50%;top:50%;' +
+      'width:' + BAG_ICON + 'px;height:' + BAG_ICON + 'px;' +
+      'margin:' + (-BAG_ICON / 2) + 'px 0 0 ' + (-BAG_ICON / 2) + 'px;' +
+      'overflow:hidden;pointer-events:none;' +
+      'background-image:url("' + pz.img.src + '");' +
+      'background-repeat:no-repeat;' +
+      'background-size:' + (nw * sc).toFixed(3) + 'px ' + (nh * sc).toFixed(3) + 'px;' +
+      'background-position:' + (-pz.sx * sc).toFixed(3) + 'px ' + (-pz.sy * sc).toFixed(3) + 'px';
+    return box;
+  }
 
   function buildBagUI() {
     var g = document.getElementById('bagGrid');
@@ -4077,25 +4147,9 @@
       // 图标：优先高清大图（items_atlas.json 里的 <icon>_big，128px 帧降到 46px 显示），
       // 没图集就退回文字首字 —— 至少还能玩，不是空白格。
       var pz = piece(it.icon + '_big') || piece(it.icon);
-      if (pz) {
-        // 所有图标共用同一张图集 <img>：不能直接塞 <img> 进格子（那会显示整张图）。
-        // 用一个裁剪容器 + 位移，把目标帧对齐到格子左上 —— 比逐格 toDataURL 便宜得多，
-        // 而且浏览器只下载一次图集（缓存里就这一张）。
-        var box = document.createElement('div');
-        box.style.cssText = 'position:absolute;inset:0;overflow:hidden;border-radius:8px';
-        var im = document.createElement('img');
-        var sc = 46 / pz.h;                        // 把一帧放大到 46px 高
-        im.alt = it.cn;
-        im.src = pz.img.src;
-        im.draggable = false;
-        im.style.cssText =
-          'position:absolute;left:' + (-pz.sx * sc).toFixed(1) + 'px;' +
-          'top:' + (-pz.sy * sc).toFixed(1) + 'px;' +
-          'width:' + ((pz.img.naturalWidth || pz.img.width) * sc).toFixed(1) + 'px;' +
-          'height:' + ((pz.img.naturalHeight || pz.img.height) * sc).toFixed(1) + 'px;' +
-          'max-width:none;image-rendering:auto;pointer-events:none';
-        box.appendChild(im);
-        c.appendChild(box);
+      var ico = pz ? bagIconEl(pz, it.cn) : null;
+      if (ico) {
+        c.appendChild(ico);
       } else {
         var s = document.createElement('span');
         s.style.cssText = 'font-size:19px;color:#ffe6a6';

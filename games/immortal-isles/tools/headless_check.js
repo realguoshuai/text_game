@@ -373,7 +373,9 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
     && probe.healCdBlock === true                      // 冷却期间不生效
     && probe.crafted.cells === 5                       // 背包 5 格
     && probe.crafted.healUseCells === 3                // 其中 3 格可点服用
-    && probe.crafted.ghostImgs === 5                   // 5 格都有图标
+    && probe.crafted.ghostImgs === 0                   // 不再用 <img> 塞图标（改用 background 取帧）
+    && probe.geo && probe.geo.n === 5                  // ★ 5 格的取景框都在
+    && probe.geo.miss.length === 0                     // ★ 且帧的可见区间正好覆盖 [0,46]×[0,46]
     && probe.atlas && probe.atlas.img && probe.atlas.rectKeys === 6
     && probe.atlas.bigKeys === 6;                      // 图集三张表都到位
 }, { budget: 20000 }));
