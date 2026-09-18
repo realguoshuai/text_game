@@ -6031,6 +6031,14 @@
       ctx.globalAlpha = 0.3; ctx.fillStyle = '#000';
       ctx.beginPath(); ctx.ellipse(p.x, baseY + 2 * Z, w * 0.62, hb * 0.32, 0, 0, 6.2832); ctx.fill();
       ctx.globalAlpha = 1;
+      // 背后金色光晕（呼吸，让宝箱在暗地形中"发光"）★ v47.3 闪光特效
+      var glow = 0.18 + 0.12 * Math.sin(time * 4 + n.pulse);
+      var ggx = p.x, ggy = by + hb * 0.15;
+      var ggrad = ctx.createRadialGradient(ggx, ggy, 2 * Z, ggx, ggy, 22 * Z);
+      ggrad.addColorStop(0, 'rgba(255,224,138,' + (glow + 0.10).toFixed(3) + ')');
+      ggrad.addColorStop(1, 'rgba(255,224,138,0)');
+      ctx.globalAlpha = 1; ctx.fillStyle = ggrad;
+      ctx.beginPath(); ctx.arc(ggx, ggy, 22 * Z, 0, 6.2832); ctx.fill();
       // 箱体（木色 + 正面竖纹）
       ctx.fillStyle = '#7a4a22'; ctx.fillRect(bx, by, w, hb);
       ctx.strokeStyle = 'rgba(60,36,18,.55)'; ctx.lineWidth = 1 * Z;
@@ -6061,6 +6069,17 @@
       // 顶部呼吸微光
       ctx.globalAlpha = 0.55 * br; ctx.fillStyle = '#ffe9a8';
       ctx.beginPath(); ctx.arc(p.x, by - hg, 2 * Z, 0, 6.2832); ctx.fill();
+      // 闪点：5 颗金点绕宝箱上方错相闪现 ★ v47.3 闪光特效
+      for (var sp = 0; sp < 5; sp++) {
+        var ph = n.pulse + sp * 1.27;
+        var fl = Math.max(0, Math.sin(time * 3.2 + ph));
+        if (fl < 0.35) continue;
+        var ang = ph, rad = 13 * Z + (sp % 3) * 3 * Z;
+        var sx = p.x + Math.cos(ang) * rad;
+        var sy = by - Math.abs(Math.sin(ang)) * 9 * Z - 3 * Z;
+        ctx.globalAlpha = fl * 0.95; ctx.fillStyle = '#fff6cf';
+        ctx.beginPath(); ctx.arc(sx, sy, (1.4 + fl) * Z, 0, 6.2832); ctx.fill();
+      }
     }
     ctx.restore();
   }
