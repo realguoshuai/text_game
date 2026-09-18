@@ -250,6 +250,7 @@
       toast('境界突破 · ' + player.realmName + '\n攻 ' + player.atk + ' · 御 ' + player.def +
         ' · 气血 ' + player.maxhp);
     }
+    quest.breaks++; checkQuest();   // ★4 任务：突破进度
     bagDirty = true;
     return up;
   }
@@ -309,6 +310,28 @@
   // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
   // 严格模式下这些必须先用 var 声明，否则 switchTo 里 `foes=…` 会抛 ReferenceError 直接卡死启动。
   var foes = [], floaters = [], particles = [], clickMark = null;
+  var screenShake = 0;   // ★2 震屏强度（0=不抖）：暴击/受击/击杀触发，loop 每帧衰减并应用到 canvas CSS transform
+  var pauseOpen = false;   // ★3 暂停态：暂停时 loop 停 update，Esc/按钮切换
+  // ★4 新手任务链：击杀→采集→突破，常驻追踪。奖励全走银两（进坊市消耗方），不造新物品无底洞
+  var QUESTS = [
+    { id: 'kill', key: 'kills', need: 5, text: '击杀妖兽' },
+    { id: 'gather', key: 'gather', need: 3, text: '采集资源' },
+    { id: 'break', key: 'breaks', need: 1, text: '突破境界' }
+  ];
+  var quest = { kills: 0, gather: 0, breaks: 0, step: 0, done: false };
+  function checkQuest() {
+    if (quest.done) return;
+    var q = QUESTS[quest.step];
+    if (!q) { quest.done = true; toast('新手任务已全部完成，少侠前途无量！'); return; }
+    if ((quest[q.key] || 0) >= q.need) {
+      quest.step++;
+      if (q.id === 'kill') { player.stones += 60; toast('任务达成：击杀妖兽 ×5，奖励 60 银两'); }
+      else if (q.id === 'gather') { player.stones += 50; toast('任务达成：采集 ×3，奖励 50 银两'); }
+      else if (q.id === 'break') { player.stones += 100; toast('任务达成：突破 ×1，奖励 100 银两'); }
+      bagDirty = true;
+      checkQuest();   // 可能一步连过两阶段
+    }
+  }
   var nodes = [];   // 地图采集点 / 宝箱（v47：探索与随机）：{x,y,type:'herb'|'ore'|'chest',pulse}
   var MELEE = 1.45, AGGRO = 6.5;   // 近身出手半径 / 妖兽仇恨半径（格）
   var FOE_DEFS = {
@@ -4781,6 +4804,7 @@
    *      Esc 顺手把它收掉 = 玩家"想关地图，结果把小地图也弄没了"，还得自己找回来。
    */
   function escLayer() {
+    if (pauseOpen) { closePause(); return 'pause'; }
     if (confirmOpen()) { closeConfirm(false); return 'confirm'; }
     if (cardOpen()) { closeGearCard(); return 'card'; }
     if (shopOpen()) { closeShop(); return 'shop'; }
@@ -4793,7 +4817,7 @@
     /* Esc 统一入口：必须在下面几个"模态吞按键"分支**之前**，否则会先被它们吞掉。
      * 另外这里必须 return —— 原来 Esc 会一路掉进 keys['escape']=1，
      * 表现就是"浮层开着、角色还在背后正常走位"。 */
-    if (k === 'Escape') { e.preventDefault(); escLayer(); return; }
+    if (k === 'Escape') { e.preventDefault(); if (!escLayer()) openPause(); return; }
     /* 确认框开着时所有按键归它：Enter = 确定，其余一律吞掉。
      * 不做这层拦截的话，弹窗浮在上面、人在背后还在走位出手 —— 点个确认回来已经死了。 */
     if (confirmOpen()) {
@@ -5105,9 +5129,15 @@
   }
 
   // ---------------- 妖兽战斗逻辑 ----------------
+  // ★5 Boss/精英名册：这些 key 强制视为 Boss（红血条 + 读条大招）。精英走 def_.elite。
+  var BOSS_FOE_KEYS = { golem: 1 };
   function makeFoes(list) {
     return (list || BEILIN_SPAWNS).map(function (s) {
       var d = FOE_DEFS[s.t];
+      // ★5 Boss/精英机制：把名册里的特定怪强制升为 Boss（直接改写共享 def，
+      // 让 drawFoe 的红/橙血条也能识别），数据覆盖层不带 boss 字段也照样生效。
+      if (BOSS_FOE_KEYS[d.key]) d.boss = true;
+      var isBoss5 = !!(d.boss), isElite5 = !!(d.elite);
       // 未知怪种（登记表没这 key / 图录没加载）不能就地抛异常 —— makeFoes 跑在 switchTo 里，
       // 一抛整个 rAF 循环当场死掉、画面卡住，而现象只是「切过去黑屏/不动」，极难定位。
       // 这里跳过该条目（该格没有怪），并留一条控制台线索。
@@ -5119,6 +5149,10 @@
         x: cell.x, y: cell.y, home: cell,
         hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, exp: d.exp, stones: d.stones,
         face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0,
+        // ★5 Boss/精英读条机制状态
+        isBoss: isBoss5, isElite: isElite5,
+        casting: false, castT: 0, castMax: 1, castKind: null,
+        castCd: 2.5 + Math.random() * 3,
         // —— 领地半径：超出就不再追、走回 home；登记表可写 leash 覆盖默认 aggro+FOE_LEASH_PAD ——
         leash: d.leash || (aggro + FOE_LEASH_PAD),
         // —— 动作状态机（侧视多动作素材用；老等距妖兽没有 anims，这些字段空转不影响）——
@@ -5243,7 +5277,7 @@
     bumpCombo(best);
     addFloater(best.x, best.y - 0.3, (hit.crit ? '暴击 -' : '-') + hit.dmg,
       hit.crit ? '#ffe66b' : '#ffd36b', { crit: hit.crit });
-    if (hit.crit) { player.critT = 0.45; addFloater(best.x, best.y - 1.1, '暴击！', '#ff9f43', { crit: true }); }
+    if (hit.crit) { player.critT = 0.45; screenShake = Math.max(screenShake, 0.22); addFloater(best.x, best.y - 1.1, '暴击！', '#ff9f43', { crit: true }); }
     if (best.hp <= 0) killFoe(best); else hurtFoe(best);
   }
   // 玩家主动出手（J/空格/点击妖兽）：锁定仇恨内最近的妖兽并打一下
@@ -5315,7 +5349,7 @@
       if (g.hp <= 0) killFoe(g); else hurtFoe(g);
     }
     bumpCombo(hit[0]);
-    if (crits > 0) player.critT = 0.45;
+    if (crits > 0) player.critT = 0.45; screenShake = Math.max(screenShake, 0.22);
     toast('重击命中 ' + hit.length + ' 只' + (crits ? '（' + crits + ' 记暴击）' : '') + '（冷却 ' + ATK_B_CD + ' 秒）');
     if (h0) h0.textContent = '重击命中 ' + hit.length + ' 只，' + ATK_B_CD + ' 秒后可再放';
   }
@@ -5430,7 +5464,7 @@
       } else if (player.invuln <= 0 && !player.dead &&
                  Math.hypot(player.mx - p.x, player.my - p.y) < 0.5) {
         player.hp -= p.dmg; player.flash = 0.25;
-        addFloater(player.mx, player.my - 0.35, '-' + p.dmg, '#ff6b6b');
+        addFloater(player.mx, player.my - 0.35, '-' + p.dmg, '#ff6b6b'); screenShake = Math.max(screenShake, 0.3);
         impactFx(p.x, p.y, 0.7);
         if (player.hp <= 0) playerDown(null);
         projectiles.splice(i, 1);
@@ -5446,7 +5480,7 @@
       r.crit ? '#ffe66b' : (s.color || '#ffd36b'), { crit: r.crit });
     if (f.hp <= 0) killFoe(f); else hurtFoe(f);
     bumpCombo(f);
-    if (r.crit) player.critT = 0.45;
+    if (r.crit) player.critT = 0.45; screenShake = Math.max(screenShake, 0.22);
     if (s.splash) {
       for (var j = 0; j < foes.length; j++) {
         var g = foes[j];
@@ -5537,7 +5571,7 @@
       if (g.hp <= 0) killFoe(g); else hurtFoe(g);
     }
     bumpCombo(hits[0]);
-    if (crits > 0) player.critT = 0.45;
+    if (crits > 0) player.critT = 0.45; screenShake = Math.max(screenShake, 0.22);
     toast(s.name + ' 命中 ' + hits.length + ' 只，合计 ' + sum + (crits ? '（' + crits + ' 记暴击）' : ''));
     if (h0) h0.textContent = s.name + ' 命中 ' + hits.length + ' 只，' + s.cd + ' 秒后可再放';
     return true;
@@ -5985,6 +6019,7 @@
       }
       toast('开启宝箱：' + cs + ' 银两 · 妖丹×' + cd + (gotGear ? ' · 得一件装备！' : ''));
     }
+    quest.gather++; checkQuest();   // ★4 任务：采集进度
   }
   function drawNodes() {
     for (var i = 0; i < nodes.length; i++) drawNode(nodes[i]);
@@ -7616,6 +7651,7 @@
     if (f.dying > 0) return;            // 已经在倒地过程中，别重复结算
     f.hp = 0;
     window.__kills = (window.__kills || 0) + 1;   // 击杀计数（状态行判据：杀0=没怪死过）
+    quest.kills++; checkQuest();   // ★4 任务：击杀进度
     /* v54：修为统一走 gainCult —— 杀怪涨的修为也要能触发突破。
      * 原来这里直写 player.exp += f.exp，如果炼化以外的入口不判突破，
      * 就会出现"修为早就过线了、却要点一下妖丹才突破"的荒谬感。 */
@@ -7628,6 +7664,7 @@
     // 等动画播完再掉会让玩家以为"没掉东西"而提前走开。
     spawnLoot(f, rollLoot(f));
     spawnParticles(f.x, f.y);
+    screenShake = Math.max(screenShake, 0.16);   // ★2 击杀轻微震屏
     /* v57：目标倒下 → 若身边还有一只在攻击距离内就自动接上（连打不断档），
      * 没有就清空停手。★ 只在"伸手就够得着"的范围内换目标：一旦允许自动挑更远的，
      * 就变成"点一下怪，角色自己把整张图刷完"，那不是自动攻击、是代打。 */
@@ -7693,6 +7730,11 @@
   }
   function hurtFoe(f) {
     if (f.dying > 0) return;
+    // ★5 打断：攻击正在读条的 Boss/精英即可打断它的大招（给玩家"趁读条时猛攻"的策略点）
+    if (f.casting) {
+      f.casting = false; f.castKind = null; f.castCd = 3 + Math.random() * 2;
+      addFloater(f.x, f.y - 0.6, '打断！', '#9be7ff');
+    }
     if (ATLAS.foes.anim && ATLAS.foes.anim[f.key]) setBeastAnim(f, 'hurt');
     /* 挨打短叫：只在上一句快说完时才覆盖 —— 连招时不会一直刷屏 */
     if (f.sayT === undefined || f.sayT < 0.6) {
@@ -7770,6 +7812,32 @@
             foeSay(f, foeSayIdleLine(f), 2.2 + Math.random() * 1.2);
           } else {
             f.sayCd = 4 + Math.random() * 5;   // 这轮没轮上，稍后再试
+          }
+        }
+      }
+      // ★5 读条技能状态机：Boss/精英起手读条；读条中持续走表（不依赖玩家是否在范围内，
+      // 玩家跑出范围也照常释放）；起手期间攻击它即可打断；读条完成若仍在施法半径内则吃大额伤害。
+      if (!f.casting) f.castCd -= dt;
+      if (f.isBoss || f.isElite) {
+        if (f.casting) {
+          f.castT -= dt;
+          if (f.castT <= 0) {
+            f.casting = false; f.castKind = null; f.castCd = 4 + Math.random() * 3;
+            var cr = f.isBoss ? 3.4 : 2.6;
+            var cd2 = Math.hypot(player.mx - f.x, player.my - f.y);
+            if (cd2 < cr && !player.dead && player.invuln <= 0) {
+              var big = Math.max(1, Math.round(f.atk * (f.isBoss ? 2.2 : 1.5) - player.def * 0.5));
+              player.hp -= big; player.flash = 0.3;
+              addFloater(player.mx, player.my - 0.4, '-' + big, '#ff3b3b', { crit: true });
+              screenShake = Math.max(screenShake, 0.4);
+              if (player.hp <= 0) playerDown(f);
+            }
+          }
+        } else if (f.castCd <= 0) {
+          var cd = Math.hypot(player.mx - f.x, player.my - f.y);
+          if (cd < (f.def_.aggro || AGGRO)) {
+            f.casting = true; f.castT = f.isBoss ? 2.4 : 1.8; f.castMax = f.castT; f.castKind = 'aoe';
+            addFloater(f.x, f.y - 0.6, f.isBoss ? '蓄力·天崩！' : '蓄力·重击！', '#ffae42');
           }
         }
       }
@@ -7852,7 +7920,7 @@
           setBeastAnim(f, (f.def_.elite && Math.random() < 0.35) ? 'atk2' : 'atk');
           var real = Math.max(1, Math.round(f.atk - player.def * 0.5));
           player.hp -= real; player.flash = 0.25;
-          addFloater(player.mx, player.my - 0.35, '-' + real, '#ff6b6b');
+          addFloater(player.mx, player.my - 0.35, '-' + real, '#ff6b6b'); screenShake = Math.max(screenShake, 0.3);
           if (player.hp <= 0) playerDown(f);
         }
       } else if (hd > 0.6) {
@@ -8035,6 +8103,24 @@
     }
     /* 头顶小字台词（v43）：淡入 0.22s / 结束前 0.35s 淡出；
      * 近处的怪有名字+血条，气泡自动抬高避让。 */
+    /* ★5 读条技能：地面预警圈（随进度收紧 + 变亮）+ 头顶进度条 */
+    if (f.casting) {
+      var prog = 1 - Math.max(0, f.castT) / Math.max(0.01, f.castMax);
+      var gr = (f.isBoss ? 3.4 : 2.6);
+      ctx.save();
+      ctx.globalAlpha = 0.18 + 0.32 * prog;
+      ctx.fillStyle = f.isBoss ? 'rgba(255,60,60,.55)' : 'rgba(255,170,60,.5)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, baseY - 2, gr * HW * Z, gr * HH * Z, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+      var cty = dy - 6 * Z, cbw = Math.max(46 * Z, ow * 0.8), cbh = 6 * Z;
+      var cbx = p.x - cbw / 2, cby = cty - 26 * Z;
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(cbx, cby, cbw, cbh);
+      ctx.fillStyle = f.isBoss ? '#ff4d4d' : '#ffb24d';
+      ctx.fillRect(cbx, cby, cbw * prog, cbh);
+      ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1 * Z; ctx.strokeRect(cbx, cby, cbw, cbh);
+    }
     if (f.sayT > 0 && f.say) {
       var nearF = (player.targetFoe === f || dist < 3.0);
       var sy2 = dy - (nearF ? 24 : 8) * Z;
@@ -8191,6 +8277,16 @@
         (nxr ? ' / ' + nxr.need : ' · 圆满');
     }
     var sv = document.getElementById('stonev'); if (sv) sv.textContent = player.stones;
+    // ★1 常驻属性条：攻/御/境界，折叠面板时也可见
+    var sak = document.getElementById('satk'); if (sak) sak.textContent = player.atk;
+    var sdf = document.getElementById('sdef'); if (sdf) sdf.textContent = player.def;
+    var srm = document.getElementById('srealm'); if (srm) srm.textContent = player.realmName;
+    // ★4 任务追踪行
+    var tr = document.getElementById('taskRow');
+    if (tr) {
+      if (quest.done) tr.textContent = '任务 · 全部达成 ✓';
+      else { var qt = QUESTS[quest.step]; tr.textContent = '任务 · ' + qt.text + ' ' + Math.min(quest[qt.key] || 0, qt.need) + '/' + qt.need; }
+    }
     var ft = document.getElementById('foetarget');
     if (ft) {
       if (player.targetFoe && player.targetFoe.alive) {
@@ -8719,6 +8815,15 @@
     var bs = document.querySelectorAll('#worldmap .node');
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].dataset.id === cur);
   }
+  function openPause() {
+    if (player.dead || worldOpen) return;   // 死了或开地图时不叠暂停
+    pauseOpen = true;
+    var pp = document.getElementById('pausePanel'); if (pp) pp.hidden = false;
+  }
+  function closePause() {
+    pauseOpen = false;
+    var pp = document.getElementById('pausePanel'); if (pp) pp.hidden = true;
+  }
   function openWorld() {
     var wm = document.getElementById('worldmap'); if (!wm) return;
     wm.classList.add('show'); worldOpen = true;
@@ -8763,6 +8868,18 @@
     if (sb) sb.addEventListener('input', function () { filterWorldNodes(sb.value); });
     var wm = document.getElementById('worldmap');
     if (wm) wm.addEventListener('click', function (e) { if (e.target === wm) closeWorld(); });
+    // ★3 暂停面板按钮
+    var pp = document.getElementById('pausePanel');
+    if (pp) pp.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var act = b.dataset.act;
+        if (act === 'resume') closePause();
+        else if (act === 'reload') location.reload();
+        else if (act === 'world') { closePause(); openWorld(); }
+      });
+    });
+    var pbtn = document.getElementById('pauseBtn');
+    if (pbtn) pbtn.addEventListener('click', openPause);
   })();
 
   function resize() {
@@ -8801,9 +8918,15 @@
     if (!last) last = ts;
     var dt = Math.min(0.05, (ts - last) / 1000);
     last = ts;
-    if (!held) update(dt);
+    if (!held && !pauseOpen) update(dt);
     if (ready) updateHUD();
     render();
+    // ★2 震屏：零侵入方案 —— 用 CSS transform 抖整个 canvas，不碰 render 内部的 ctx 配平
+    if (screenShake > 0) {
+      var s2 = screenShake * 9;
+      canvas.style.transform = 'translate(' + ((Math.random() * 2 - 1) * s2).toFixed(1) + 'px,' + ((Math.random() * 2 - 1) * s2).toFixed(1) + 'px)';
+      screenShake = Math.max(0, screenShake - dt * 1.6);
+    } else if (canvas.style.transform) { canvas.style.transform = ''; }
     /* ★ 背包兜底轮询（v42）：事件驱动的 dirty 链只要**任何一环**死过
      * （dirty 丢标 / bagBuilt 翻转 / 格子失联 / 赋值中断），格子就永远停在过去。
      * 这里每 0.5s 无条件把整条链拉回正确状态 —— 类似心跳包，不依赖任何事件。

@@ -43,6 +43,12 @@
   #topleft.open .tlmini .tg{transform:rotate(180deg)}
   #topleft .tlfold{display:none}
   #topleft.open .tlfold{display:block;margin-top:7px;padding-top:7px;border-top:1px solid rgba(214,178,96,.3)}
+  /* ★1 常驻角色属性条：必须放在 .tlfold 之外（panel 折叠时也得在），否则等于没做。
+     攻击/防御/境界平时看不到是 v53 之前最大体验缺口之一。 */
+  #topleft .statbar{display:flex;gap:12px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(214,178,96,.28);font-size:11.5px;color:#c9bda0;white-space:nowrap}
+  #topleft .statbar b{color:#8bf3ff;font-weight:600}
+  #topleft .statbar .atk{color:#ffb38a}
+  #topleft .taskbar{margin-top:6px;padding-top:6px;border-top:1px solid rgba(214,178,96,.28);font-size:11.5px;color:#ffd88a;white-space:nowrap}
   #topleft .row{font-size:11.5px;color:#c9bda0;margin-top:4px;line-height:1.55}
   #topleft .row b{color:#8bf3ff;font-weight:600}
   #topleft .row b.hpnum{color:#ff9a9a}
@@ -729,6 +735,27 @@
     border:1px solid rgba(214,178,96,.7);background:rgba(18,26,44,.92);color:#f0e3c2;
     box-shadow:0 4px 16px rgba(0,0,0,.4)}
   #viewfix.on{display:block}
+
+  /* ★3 独立暂停/设置面板：含继续/重新载入/返回地图 + 操作提示。
+     不带 .hud 类、显式 pointer-events:auto（否则会被 .hud{pointer-events:none} 继承掉，按钮点不到）。 */
+  #pausePanel{position:fixed;inset:0;z-index:160;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+  #pausePanel[hidden]{display:none}
+  #pausePanel .pmsk{position:absolute;inset:0;background:rgba(6,10,20,.78);backdrop-filter:blur(3px)}
+  #pausePanel .pdlg{position:relative;width:min(360px,92vw);padding:22px 20px;border-radius:14px;
+    background:linear-gradient(180deg,rgba(26,30,46,.99),rgba(11,15,26,.99));
+    border:1px solid rgba(214,178,96,.6);box-shadow:0 14px 46px rgba(0,0,0,.62);color:#f0e3c2;text-align:center}
+  #pausePanel .pt{font-size:20px;letter-spacing:6px;color:#ffd88a;margin-bottom:12px}
+  #pausePanel .pinfo{font-size:12px;line-height:1.9;color:#9fb3d0;margin-bottom:16px;font-family:ui-monospace,Consolas,monospace}
+  #pausePanel .pbtns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  #pausePanel button{font:inherit;font-size:13px;cursor:pointer;padding:10px 16px;border-radius:8px;
+    background:rgba(28,36,52,.92);color:#e6dcc0;border:1px solid rgba(214,178,96,.5)}
+  #pausePanel button:hover{background:#2b2438;border-color:rgba(255,214,130,.9)}
+  #pausePanel button:active{transform:translateY(1px)}
+  /* 手机没有 Esc 键，给一个常驻暂停钮（仿 bagBtn 位置） */
+  #pauseBtn{position:fixed;right:14px;bottom:74px;z-index:120;width:46px;height:46px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;
+    border:1px solid rgba(214,178,96,.7);background:rgba(18,26,44,.92);color:#f0e3c2;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  #pauseBtn:active{transform:translateY(1px)}
 </style>
 </head>
 <body>
@@ -741,6 +768,13 @@
     <span class="hpv" id="hpv">260/260</span>
     <span class="tg">▾</span>
   </div>
+  <!-- ★1 常驻属性条：攻/御/境界，折叠面板时也常驻可见。由 updateHUD 每帧刷新 -->
+  <div class="statbar" id="statbar">
+    <span class="atk">攻 <b id="satk">0</b></span>
+    <span>御 <b id="sdef">0</b></span>
+    <span>境界 <b id="srealm">炼气期</b></span>
+  </div>
+  <div class="taskbar" id="taskRow">任务 · 击杀妖兽 0/5</div>
   <div id="foetarget">
     <div class="ftname"></div>
     <div class="ftbar"><div class="ftfill"></div></div>
@@ -764,6 +798,21 @@
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.2 11.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
   <span class="dot" id="bagDot"></span>
 </button>
+
+<!-- ★3 暂停/设置：手机点此，桌面按 Esc。浮层不带 .hud 类（避免 pointer-events 继承）。 -->
+<button id="pauseBtn" title="暂停（Esc）" aria-label="暂停">⏸</button>
+<div id="pausePanel" class="hud" hidden>
+  <div class="pmsk"></div>
+  <div class="pdlg">
+    <div class="pt">已 暂 停</div>
+    <div class="pinfo">移动 WASD/方向键 · 攻击 J/空格 · 重击 K · 技能 123<br>走位锁定怪物自动出手 · 拾取 B 背包 · M 地图 · Esc 暂停/继续</div>
+    <div class="pbtns">
+      <button data-act="resume">继续</button>
+      <button data-act="reload">重新载入</button>
+      <button data-act="world">返回地图</button>
+    </div>
+  </div>
+</div>
 
 <!-- 背包面板：丹药格子由脚本按 ITEMS 生成；装备区（已装备 3 槽 + 行囊网格）同步在这块 -->
 <div id="bag" class="hud panel">
@@ -1052,6 +1101,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=62"></script>
+<script src="js/game.js?v=63"></script>
 </body>
 </html>
