@@ -458,9 +458,32 @@ results.push(run('成长 妖丹炼化与重铸', 'autotest=growth', ({ probe }) 
     && C.save.name === true && C.save.atk === true               // 读完境界自己算回来
     && C.rf.ok === true && C.rf.left === 1 && C.rf.id === true && C.rf.t === true
     && C.rf.baseKept === true && C.rf.hasAffix === true && C.rf.worn === true
-    && C.arm.off === true && C.arm.left === 0                    // 用光自动退出重铸模式
-    && C.ui.act === true && C.ui.armed === true && C.ui.cursor === 'pointer'
+    && C.arm.left === 0 && C.arm.wornStill === true              // 最后一枚令花光，装备没被弄丢
+    && C.ui.act === true && C.ui.actX === true && C.ui.cursor === 'pointer'
+    && C.hint.left === 3                                         // 玄铁令格点一下只提示，不改状态
     && C.pass === true;
+}, { budget: 20000 }));
+
+// 8.4b) 装备操作卡（v55）：点格子弹卡片替代长按熔炼。
+//       为什么必须单独立一条：这套交互"看起来对"和"真的对"差得远 ——
+//       卡片可能打开在错误的位置、按钮可能在但点了没反应、取消可能有副作用、
+//       已装备的格子也可能混进熔炼/丢弃（熔炼是不可逆销毁，按钮摆错位置就是数据损坏）。
+//       ⚠ 命中判据走 elementFromPoint（`el.click()` 不经过命中测试，pointer-events 类故障抓不到）。
+results.push(run('装备 操作卡与按钮', 'autotest=card', ({ probe }) => {
+  if (!probe) return false;
+  const K = probe;
+  return K.hit === 'ok'                        // 格子真的点得到（命中测试，不是 JS 派发）
+    && K.open === true                          // 卡片真的出现
+    && K.nameOk === true && K.statsOk === true   // 名字/属性来自真实数据
+    && K.bagOk === true                          // 行囊：装备 + 熔炼 + 丢弃 + 重铸 + 取消
+    && K.cancelClean === true                    // 取消零副作用
+    && K.dumpAsks === true && K.dumpCancel === true   // 丢弃过确认框，取消后东西还在
+    && K.meltGain === K.meltWant && K.meltGain > 0    // 熔炼真加钱（数额=展示的数额）
+    && K.meltGone === true                       // 且真的离开行囊
+    && K.noStoneOk === true                      // 没玄铁令就不摆「重铸」按钮
+    && K.wornOk === true                         // 已装备只给「卸下」
+    && K.unequipOk === true
+    && K.pass === true;
 }, { budget: 20000 }));
 
 // 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）

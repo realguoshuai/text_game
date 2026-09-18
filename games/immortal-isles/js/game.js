@@ -389,7 +389,7 @@
     xiaohuan:  { cn: '小还丹', kind: 'heal', icon: 'xiaohuan',  val: 0.55, desc: '回复 55% 气血' },
     dahuan:    { cn: '大还丹', kind: 'heal', icon: 'dahuan',    val: 1.00, desc: '回满气血' },
     xuantie:   { cn: '玄铁令', kind: 'rare', icon: 'xuantie',   val: 60,   act: 'reforge',
-                 desc: '江湖信物 · 点一下取出，再点任意装备重铸词缀' }
+                 desc: '江湖信物 · 在装备操作卡里点「重铸」消耗一枚洗词缀' }
   };
   /* 掉落表：<怪种> → [[物品键, 概率(0~1), 最少, 最多], ...]
    * 没登记的怪走 DEFAULT_LOOT。精英（def_.elite）额外掷一次 ELITE_LOOT。
@@ -466,9 +466,10 @@
   var gearInv = [];                  // 背包里的装备实例
   var equipped = { weapon: null, armor: null, trinket: null };
   var gearSeq = 1;                   // 实例编号（存档/对比都靠它认人）
-  /* 重铸模式（点一下玄铁令格进入）：此状态下点任意装备格 = 重铸，而不是穿上/卸下。
-   * 为什么用"模式"而不是给装备格再加一个长按：长按已经是熔炼了，再加手势没人记得住。 */
-  var reforgeArm = false;
+  /* v55 删除了「玄铁令取出 → 重铸模式」这套状态机（连同 `reforgeArm`）：
+   * 重铸现在是装备操作卡里的一个按钮，点哪件就洗哪件。
+   * 少一个隐式模式 = 少一类 bug（原来"长按熔炼"与"点击重铸"会互相误伤，
+   * 还得靠 `.armed` 脉冲去告诉玩家"你现在在重铸模式"，全靠猜）。 */
 
   function rndInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
   function pickW(w) {   // 按权重取下标
@@ -513,6 +514,11 @@
   function gearTier(g) { return TIERS[g.t] || TIERS[0]; }
   function gearBase(g) { return GEAR_BASES[g.key]; }
   function gearName(g) { return gearTier(g).cn + '·' + gearBase(g).cn; }
+  /** 槽位中文名（'weapon' → '兵器'） */
+  function gearSlotCn(key) {
+    for (var i = 0; i < GEAR_SLOTS.length; i++) if (GEAR_SLOTS[i].key === key) return GEAR_SLOTS[i].cn;
+    return '装备';
+  }
   /** 一行的属性描述（给 title 悬停 / 对比用）：「攻 +8  御 +2」 */
   function gearStatsLine(g, sep) {
     var out = [], i, s = g.st;
@@ -527,26 +533,32 @@
   function gearValue(g) {
     return Math.max(4, Math.round(gearScore(g.st) * (0.7 + 0.35 * g.t)) + gearTier(g).t * 8);
   }
-  /* ═════════ 重铸 · 玄铁令的出口（v54）════════
-   * 用户选了「装备重铸，洗词缀」。三条规则说明白，玩家才敢用：
+  /* ═════════ 重铸 · 玄铁令的出口（v54，v55 改成操作卡按钮）════════
+   * 三条规则说明白，玩家才敢用：
    *   ① **只重掷词缀，不动品质与器型基座** —— 仙品的底子不会因为手气差掉成凡品。
    *   ② 一次消耗**一枚玄铁令**；重掷 REFORGE_TRIES 次取评分最高的一次（有赌性但不太坑）。
    *   ③ 已装备的也能重铸：玩家想在身上那件上试，不该逼他先脱下来（多一步还可能爆行囊）。
    * 用同一把尺子（gearScore）与熔炼价，避免"UI 上说变强了、熔炼价反而更低"的口径矛盾。
    */
   var REFORGE_TRIES = 2;
+  /** 这件装备现在穿在身上吗？在的话返回槽位 key，否则 null。 */
+  function wornSlotOf(g) {
+    for (var i = 0; i < GEAR_SLOTS.length; i++) {
+      if (equipped[GEAR_SLOTS[i].key] === g) return GEAR_SLOTS[i].key;
+    }
+    return null;
+  }
   function reforgeGear(g) {
     var b = gearBase(g);
     if (!b) return false;
-    /* 守卫：正在重铸的这件可能已经被熔炼掉了（长按熔炼之后抬起手指还会补一个 click）。
-     * 没有这一句，玩家会"白烧一枚玄铁令，还看不见任何变化"。 */
-    if (gearInv.indexOf(g) < 0 && equipped[b.slot] !== g) {
-      reforgeArm = false; bagDirty = true;
+    /* 守卫：这件可能已经不在身上也不在行囊里了（卡片开着时被别处销毁）。
+     * 没有这一句，会"白烧一枚玄铁令、还看不见任何变化"。 */
+    if (gearInv.indexOf(g) < 0 && !wornSlotOf(g)) {
+      bagDirty = true;
       return false;
     }
     if (!(bag.xuantie | 0)) {
       toast('没有玄铁令 —— 精英妖兽身上才出');
-      reforgeArm = false;
       bagDirty = true;
       return false;
     }
@@ -562,10 +574,10 @@
     }
     var before = gearStatsLine(g);
     bag.xuantie = (bag.xuantie | 0) - 1;
-    if (bag.xuantie <= 0) { delete bag.xuantie; reforgeArm = false; }
+    if (bag.xuantie <= 0) delete bag.xuantie;
     g.st = best;
     recalcStats();
-    lastGearSig = '';          // 属性变了 → 强制重建装备区（tooltip 里那行数值要跟着更新）
+    lastGearSig = '';          // 属性变了 → 强制重建装备区（格子上的数值要跟着更新）
     bagDirty = true;
     var after = gearStatsLine(g);
     addFloater(player.mx, player.my - 0.5, '重铸 ' + gearName(g), tier.col);
@@ -2656,24 +2668,28 @@
           reforgeGear(rg);
           C.rf.worn = equipped.weapon === rg && player.atk === realmBase().atk + (rg.st.atk | 0);
           C.rf.wornChanged = !!equipped.weapon;
-          // ── ⑥ 玄铁令用光 → 自动退出重铸模式 ──
-          bag.xuantie = 1; reforgeArm = true;
+          // ── ⑥ 玄铁令用光：只剩 1 枚时重铸一次必须把它花光（v55 起没有"模式"要退出） ──
+          bag.xuantie = 1;
           reforgeGear(rg);
-          C.arm = { left: bag.xuantie | 0, off: reforgeArm === false, wornStill: equipped.weapon === rg };
-          // ── UI：材料格真的有手型，玄铁令格在重铸模式下真的高亮 ──
-          bag = {}; bag.yaodan = 2; bag.xuantie = 3; reforgeArm = true;
-          bagBuilt = false; buildBagUI();      // .act / .armed 由 renderBag 落类（重建后必须先 refresh）
+          C.arm = { left: bag.xuantie | 0, wornStill: equipped.weapon === rg };
+          // ── UI：材料格真的有手型（妖丹炼化 / 玄铁令提示用法都靠 .act） ──
+          bag = {}; bag.yaodan = 2; bag.xuantie = 3;
+          bagBuilt = false; buildBagUI();      // .act 由 renderBag 落类（重建后必须先 refresh）
           bagDirty = true; bagToggle(true); renderBag();
           var cellY = bagCells.yaodan, cellX = bagCells.xuantie;
           C.ui = {
             act: !!(cellY && cellY.classList.contains('act')),
-            armed: !!(cellX && cellX.classList.contains('armed')),
+            // 玄铁令格也必须是 .act（不然玩家不会想到去点它）
+            actX: !!(cellX && cellX.classList.contains('act')),
             // cursor 是**最终计算值**（非法值会被浏览器丢弃，所以读它有诊断意义）
             cursor: cellY ? getComputedStyle(cellY).cursor : 'no-cell',
             cnt: cellY ? (cellY.querySelector('.n') || {}).textContent : '?'
           };
+          // ── ⑦ 操作卡：玄铁令格点一下只提示用法，且**不该**改变任何状态 ──
+          hintReforge();
+          C.hint = { left: bag.xuantie | 0 };
           // 复位：别把测试状态留在玩家看得见的界面上（含"档位一被自测占用"）
-          reforgeArm = false; bag = {}; gearInv = [];
+          bag = {}; gearInv = [];
           equipped = { weapon: null, armor: null, trinket: null };
           setCurSlot(0);
           player.exp = 0; player.realmIdx = 0; player.realmName = REALMS[0].cn;
@@ -2687,9 +2703,107 @@
             C.save.exp && C.save.idx && C.save.name && C.save.atk && C.save.hpKept &&
             C.rf.ok && C.rf.left === 1 && C.rf.id && C.rf.key && C.rf.t && C.rf.baseKept &&
             C.rf.hasAffix && C.rf.worn && C.rf.wornChanged &&
-            C.arm.off && C.arm.left === 0 &&
-            C.ui.act && C.ui.armed && C.ui.cursor === 'pointer');
+            C.arm.left === 0 && C.arm.wornStill &&
+            C.ui.act && C.ui.actX && C.ui.cursor === 'pointer' && C.hint.left === 3);
           gp2.textContent = JSON.stringify(C);
+        }
+        if (at === 'card') {
+          /* ?map=<图>&autotest=card —— 装备操作卡（v55）
+           * 用户原话：「装备长按熔炼能不能改成点击，有装备/使用或熔炼或者丢弃什么的」。
+           * 判据只看**看得见的东西 + 真的发生的事**：
+           *   ① 点格子后卡片真的出现（不是"调用了 openGearCard"）
+           *   ② 卡片上的名字/属性来自真实数据（不是模板占位）
+           *   ③ 按钮集合随状态变：行囊 = 装备+熔炼+丢弃，已穿 = 只有卸下（**没有**熔炼/丢弃）
+           *   ④ 「取消」必须零副作用；「熔炼」必须真加钱、真离开行囊
+           *   ⑤ 没有玄铁令时不出现「重铸」按钮（摆一个点了只弹提示的按钮更像 bug）
+           *   ⑥ 「丢弃」必须过确认框，且取消后这件还在
+           * 反向对照：删掉 makeGearCell 里的 click 监听 → open:false、pass:false。
+           * ⚠ 命中判据用 elementFromPoint —— `el.click()` 不经过命中测试，
+           *   本项目历史上靠它把"pointer-events 继承导致点不到"整类故障放过去过（v50）。 */
+          var pc = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe';
+            d.style.display = 'none'; document.body.appendChild(d); return d;
+          })();
+          var K = { btns: [] };
+          var btnActs = function () {
+            var out = [], list = document.querySelectorAll('#gmBtns button');
+            for (var i = 0; i < list.length; i++) out.push(list[i].getAttribute('data-a'));
+            return out.join(',');
+          };
+          var clickCell = function (sel) {
+            var c = document.querySelector(sel);
+            if (!c) return 'no-cell';
+            var r = c.getBoundingClientRect();
+            var hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            var okHit = !!hit && (hit === c || c.contains(hit));
+            c.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            return okHit ? 'ok' : ('miss:' + (hit ? (hit.className || hit.tagName) : 'null'));
+          };
+          var clickCard = function (a) {
+            var b = document.querySelector('#gmBtns button[data-a="' + a + '"]');
+            if (!b) return false;
+            b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            return true;
+          };
+          // 造一件确定的行囊装备（不靠随机），让 title / 属性 / 熔炼价都可逐字比对
+          var g1 = { id: 92001, key: 'ge_jia', t: 2, st: { atk: 0, def: 0, maxhp: 0 } };
+          var bb1 = gearBaseSt(GEAR_BASES.ge_jia, gearTier(g1));
+          g1.st = { atk: bb1.atk, def: bb1.def, maxhp: bb1.maxhp };
+          gearInv = [g1]; equipped = { weapon: null, armor: null, trinket: null };
+          bag = {}; bag.xuantie = 1;                     // 有令 → 应该多出「重铸」
+          recalcStats(); bagBuilt = false; buildBagUI(); bagToggle(true); renderBag();
+          // ── ①②③ 行囊装备：卡片出现 + 内容真实 + 按钮集合 ──
+          K.hit = clickCell('#gearGrid .g');
+          K.open = cardOpen();
+          var elT = document.getElementById('gmTitle'), elS = document.getElementById('gmStats');
+          K.title = elT ? elT.textContent : '';
+          K.nameOk = K.title === gearName(g1);
+          K.statsOk = !!elS && elS.textContent.indexOf(gearStatsLine(g1, '\n')) === 0;
+          K.bagBtns = btnActs();
+          K.bagOk = K.bagBtns === 'equip,melt,dump,reforge,close';
+          // ── ④ 取消：必须零副作用 ──
+          var st0 = player.stones, n0 = gearInv.length;
+          clickCard('close');
+          K.cancelClean = !cardOpen() && player.stones === st0 && gearInv.length === n0;
+          // ── ⑥ 丢弃：必须弹确认框，取消后这件还在（纯亏的动作要过门槛） ──
+          clickCell('#gearGrid .g'); clickCard('dump');
+          K.dumpAsks = confirmOpen();
+          var cfNoEl = document.getElementById('cfNo');
+          if (cfNoEl) cfNoEl.click();
+          K.dumpCancel = !confirmOpen() && gearInv.length === 1;
+          // ── ④ 熔炼：真的加钱 + 真的离开行囊 ──
+          var want = gearValue(g1);
+          clickCell('#gearGrid .g'); clickCard('melt');
+          K.meltGain = player.stones - st0;
+          K.meltWant = want;
+          K.meltGone = gearInv.length === 0 && !cardOpen();
+          // ── ⑤ 没有玄铁令：不该出现「重铸」按钮 ──
+          var g2 = { id: 92002, key: 'ge_jian', t: 1, st: { atk: 6 } };
+          gearInv = [g2]; bag = {};
+          bagDirty = true; renderBag();
+          clickCell('#gearGrid .g');
+          K.noStoneBtns = btnActs();
+          K.noStoneOk = K.noStoneBtns === 'equip,melt,dump,close';
+          clickCard('close');
+          // ── ③ 穿上后再点：只该有「卸下」（已装备**不给**熔炼/丢弃） ──
+          equipGear(g2);
+          bagDirty = true; renderBag();
+          clickCell('#eqGrid .g');
+          K.wornBtns = btnActs();
+          K.wornOk = K.wornBtns === 'unequip,close';
+          K.wornTitle = (document.getElementById('gmTitle') || {}).textContent || '';
+          clickCard('unequip');
+          K.unequipOk = equipped.weapon === null && gearInv.length === 1 && !cardOpen();
+          // 复位：别把测试状态留在玩家看得见的界面上
+          bag = {}; gearInv = [];
+          equipped = { weapon: null, armor: null, trinket: null };
+          recalcStats(); player.hp = player.maxhp;
+          bagDirty = true; lastGearSig = ''; bagToggle(false);
+          K.pass = !!(K.hit === 'ok' && K.open && K.nameOk && K.statsOk && K.bagOk &&
+            K.cancelClean && K.dumpAsks && K.dumpCancel &&
+            K.meltGain === K.meltWant && K.meltGain > 0 && K.meltGone &&
+            K.noStoneOk && K.wornOk && K.unequipOk);
+          pc.textContent = JSON.stringify(K);
         }
         if (at === 'saveload') {
           /* ?map=<图>&autotest=saveload —— 「小数坐标存档」验收（2026-09-18 用户报
@@ -4077,6 +4191,13 @@
       else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
       return;
     }
+    /* 装备操作卡同理：开着时按键全归它（Esc / Enter = 关掉，别让角色在背后走位）。
+     * 漏了这层，玩家在卡片上按 Esc 会连带把世界地图也关了。 */
+    if (cardOpen()) {
+      if (k === 'Escape' || k === 'Enter') { e.preventDefault(); closeGearCard(); }
+      else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
+      return;
+    }
     // Tab 开/关世界地图（打开时背后游戏暂停移动）；Esc 仅关闭。都拦掉默认行为避免焦点乱跳。
     if (k === 'Tab' || (worldOpen && k === 'Escape')) { e.preventDefault(); toggleWorld(); return; }
     if (worldOpen) return;
@@ -5146,17 +5267,12 @@
     toast('炼化 ' + n + ' 枚妖丹 → 修为 +' + gain + tail);
     return true;
   }
-  /** 玄铁令：进入/退出重铸模式。真正的重铸发生在点装备格那一刻（见 reforgeGear）。 */
-  function toggleReforge() {
-    if (!(bag.xuantie | 0)) {
-      toast('没有玄铁令 —— 精英妖兽身上才出（练功场那只不算）');
-      return false;
-    }
-    reforgeArm = !reforgeArm;
-    bagDirty = true;
-    toast(reforgeArm
-      ? '已取出玄铁令（' + bag.xuantie + ' 枚）—— 点任意装备格重铸其词缀\n再点玄铁令可取消'
-      : '已收回玄铁令，重铸取消');
+  /** 玄铁令：v55 起不再有"取出/收起"的模式，点它只报一句"有多少、怎么用"。
+   *  少一个隐式状态，就少一类"点了没反应"的困惑。 */
+  function hintReforge() {
+    var n = bag.xuantie | 0;
+    if (!n) { toast('没有玄铁令 —— 精英妖兽身上才出（练功场那只不算）'); return false; }
+    toast('玄铁令 ' + n + ' 枚 —— 点任意装备格，在操作卡里选「重铸」');
     return true;
   }
   /** 服药时的地面涟漪（在主角脚下扩散一圈绿光） */
@@ -5286,7 +5402,7 @@
         lastFireT = nowT;
         if (it.kind === 'heal') { useHeal(key); return; }
         if (it.act === 'refine') { refineYaodan(); return; }
-        if (it.act === 'reforge') { toggleReforge(); return; }
+        if (it.act === 'reforge') { hintReforge(); return; }
         toast(it.cn + '：' + it.desc);
       };
       c.addEventListener('click', fire);
@@ -5317,8 +5433,10 @@
     for (i = 0; i < gearInv.length; i++) s += gearInv[i].id + ':' + gearInv[i].t + ',';
     return s;
   }
-  /** 造一枚装备格（行囊 / 已装备槽通用）：图标 + 品质边框 + 悬停详情。 */
-  function makeGearCell(g, size, slotName, longPressFn, clickFn) {
+  /** 造一枚装备格（行囊 / 已装备槽通用）：图标 + 品质边框 + 悬停详情。
+   *  v55：**点击 = 弹出操作卡**（原来点击是直接穿戴/卸下、长按才是熔炼）。
+   *  这里只负责"报出我是哪一个"，动作全部收在 openGearCard 里。 */
+  function makeGearCell(g, size, slotName) {
     var c = document.createElement('div');
     c.className = 'g' + (g ? ' t' + (g.t + 1) : ' empty');
     if (g) {
@@ -5333,35 +5451,17 @@
       }
       c.title = gearName(g) + '（' + gearTier(g).cn + '）\n' +
         gearStatsLine(g, '\n') + '\n' + gearBase(g).note +
-        '\n熔炼可得约 ' + gearValue(g) + ' 银两';
+        '\n点一下打开操作卡（装备 / 融炼 / 丢弃）';
+      c.addEventListener('click', function (ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        openGearCard(g);
+      });
     } else {
       var sp = document.createElement('span');
       sp.className = 'slot';
       sp.textContent = slotName;
       c.appendChild(sp);
       c.title = slotName + '位空缺 —— 行囊里有对应装备时点一下穿上';
-    }
-    if (g && clickFn) c.addEventListener('click', function (ev) {
-      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-      clickFn();
-    });
-    /* 长按熔炼：移动端唯一的"重操作"入口。0.7s 足够长，避免手滑把好东西烧了；
-     * 抬起/滑动都取消——滑动多半是想滚动面板，不是想分解装备。 */
-    if (g && longPressFn) {
-      var pt = null, moved = false;
-      var cancel = function () { if (pt) { clearTimeout(pt); pt = null; } c.classList.remove('press'); };
-      var begin = function () {
-        moved = false;
-        c.classList.add('press');
-        pt = setTimeout(function () { pt = null; c.classList.remove('press'); if (!moved) longPressFn(); }, 700);
-      };
-      c.addEventListener('touchstart', begin, { passive: true });
-      c.addEventListener('touchmove', function () { moved = true; cancel(); }, { passive: true });
-      c.addEventListener('touchend', cancel);
-      c.addEventListener('touchcancel', cancel);
-      c.addEventListener('mousedown', begin);
-      c.addEventListener('mouseup', cancel);
-      c.addEventListener('mouseleave', cancel);
     }
     return c;
   }
@@ -5370,39 +5470,145 @@
     if (eg) {
       eg.innerHTML = '';
       GEAR_SLOTS.forEach(function (sl) {
-        var g = equipped[sl.key];
-        eg.appendChild(makeGearCell(g, EQ_ICON, sl.cn, null, function () {
-          if (g && reforgeArm) { reforgeGear(g); return; }   // 重铸模式：身上这件也能洗
-          unequipGear(sl.key);
-        }));
+        eg.appendChild(makeGearCell(equipped[sl.key], EQ_ICON, sl.cn));
       });
     }
     var gg = document.getElementById('gearGrid');
     if (gg) {
       gg.innerHTML = '';
       gearInv.forEach(function (g) {
-        gg.appendChild(makeGearCell(g, GEAR_ICON, gearBase(g).cn, function () { meltGear(g); },
-          function () {
-            if (reforgeArm) { reforgeGear(g); return; }
-            equipGear(g);
-          }));
+        gg.appendChild(makeGearCell(g, GEAR_ICON, gearBase(g).cn));
       });
     }
     gearBuilt = true;
   }
-  /** 熔炼：换银两。写在面板上是"长按"，所以每次只要一行 toast 说清换了多少钱。 */
+
+  /* ═════════ 装备操作卡（v55）════════
+   * 用户原话：「装备长按熔炼能不能改成点击，有装备/使用或熔炼或者丢弃什么的」。
+   * 换掉长按的三个理由：
+   *   ① **不可发现**：没人会去长按一个格子"试试看"，熔炼这个功能等于藏起来了；
+   *   ② **看不到属性**：桌面靠 `title` tooltip 显示，而手机上 tooltip 根本不触发
+   *      —— 玩家穿着装备却不知道它给了什么，卡片顺手把属性摊在脸上；
+   *   ③ **手势互相误伤**：长按抬手浏览器还会补一个 click，长按语义与点击语义冲突时
+   *      必须到处加守卫（v54 就为此在 reforgeGear 里加过一道"这件还在不在"）。
+   *
+   * 做成**居中浮层**而不是贴着格子的气泡：面板本身是 fixed + 触屏下 transform 缩放的，
+   * 气泡的定位会在"缩放 / 面板高度变化 / 滚动"三件事上反复出问题（v53 刚修过一轮）。
+   * 浮层放 body 下、**不带 .hud 类** —— 带了会被 .hud{pointer-events:none} 继承，按钮点不到。 */
+  var cardGear = null;                      // 卡片当前对应的装备实例
+  function cardOpen() {
+    var box = document.getElementById('gearMenu');
+    return !!box && !box.hasAttribute('hidden');
+  }
+  function closeGearCard() {
+    var box = document.getElementById('gearMenu');
+    if (box) box.setAttribute('hidden', '');
+    cardGear = null;
+  }
+  /** 造一个卡片按钮。data-a 是动作名（自测靠它当靶子，比按文字找稳）。 */
+  function cardBtn(host, label, act, cls) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('data-a', act);
+    b.className = cls || '';
+    b.textContent = label;
+    host.appendChild(b);
+    return b;
+  }
+  function openGearCard(g) {
+    var box = document.getElementById('gearMenu');
+    if (!box) return false;
+    var b = gearBase(g);
+    if (!b) return false;
+    var tier = gearTier(g), worn = wornSlotOf(g);
+    var t = document.getElementById('gmTitle'), sub = document.getElementById('gmSub'),
+      st = document.getElementById('gmStats'), note = document.getElementById('gmNote'),
+      btns = document.getElementById('gmBtns');
+    if (t) t.textContent = gearName(g);
+    if (sub) sub.textContent = tier.cn + ' · ' + b.cn + ' · ' +
+      (worn ? '已装备（' + gearSlotCn(b.slot) + '位）' : '行囊中');
+    /* 属性摊在脸上 —— 手机上 title tooltip 根本不触发，这是玩家唯一能看到自己穿了什么的地方。 */
+    if (st) st.textContent = gearStatsLine(g, '\n') + '\n熔炼可得约 ' + gearValue(g) + ' 银两';
+    if (note) note.textContent = b.note +
+      (bag.xuantie | 0 ? '\n（可用玄铁令重铸词缀：只洗词缀，品质与基座不变）' : '');
+    if (btns) {
+      btns.innerHTML = '';
+      if (worn) {
+        cardBtn(btns, '卸下', 'unequip');
+      } else {
+        cardBtn(btns, '装备', 'equip');
+        cardBtn(btns, '熔炼 +' + gearValue(g), 'melt', 'warn');
+        cardBtn(btns, '丢弃', 'dump', 'bad');
+      }
+      /* 重铸：有玄铁令才出现（没有就不给这个按钮 —— 摆一个点了只弹提示的按钮更像 bug）。
+       * 已装备的也能洗，不必先卸下。 */
+      if (bag.xuantie | 0) cardBtn(btns, '重铸（耗 1 令）', 'reforge');
+      cardBtn(btns, '取消', 'close', 'ghost');
+    }
+    cardGear = g;
+    box.removeAttribute('hidden');
+    return true;
+  }
+  /** 卡片上的动作派发。每个动作先关卡片再执行 —— 执行会改数据、触发装备区重建，
+   *  卡片留着会指着一件已经不在的装备（v54 踩过同款：白烧一枚玄铁令还看不见变化）。 */
+  function cardAct(a) {
+    var g = cardGear;
+    if (a === 'close') { closeGearCard(); return; }
+    if (!g) { closeGearCard(); return; }
+    var slot = wornSlotOf(g);
+    closeGearCard();
+    if (a === 'equip') { if (!slot) equipGear(g); return; }
+    if (a === 'unequip') { if (slot) unequipGear(slot); return; }
+    if (a === 'reforge') { reforgeGear(g); return; }
+    if (a === 'melt') { if (!slot) meltGear(g); else toast('先卸下再熔炼'); return; }
+    if (a === 'dump') {
+      if (slot) { toast('已装备的不能丢弃，先卸下'); return; }
+      /* 丢弃是纯亏（熔炼至少给银两），所以这里再过一道通用确认框 */
+      confirmBox('丢弃 ' + gearName(g) + '？',
+        '这件装备会直接消失，**不会**得到任何银两。\n想换钱的话用「熔炼」。',
+        '丢弃', function (ok) { if (ok) dumpGear(g); });
+      return;
+    }
+  }
+  function wireGearCard() {
+    var box = document.getElementById('gearMenu');
+    if (!box) return;
+    box.addEventListener('click', function (ev) {
+      var b = ev.target && ev.target.closest ? ev.target.closest('button[data-a]') : null;
+      ev.stopPropagation();
+      if (!b) return;
+      ev.preventDefault();
+      cardAct(b.getAttribute('data-a'));
+    });
+    // 点遮罩 / 空白处 = 取消（遮罩也在 box 里，上面的分支会先接走按钮）
+    var msk = document.getElementById('gmMask');
+    if (msk) msk.addEventListener('click', function (ev) {
+      ev.stopPropagation(); closeGearCard();
+    });
+  }
+  /** 熔炼：换银两（装备操作卡里的按钮）。
+   *  **只接受行囊里的** —— 身上那件要先卸下：熔炼是不可逆销毁，把"已装备"也开放给它，
+   *  误触的代价是"攻/御突然掉一截"且卡片已经关了、玩家说不清刚才发生了什么。 */
   function meltGear(g) {
     var i = gearInv.indexOf(g);
-    if (i < 0) return;
-    /* 重铸模式里长按不熔炼：长按抬手后浏览器还会补一个 click（= 重铸），
-     * 如果这里先把它熔成银两，那一下重铸就烧在一块已经没了的装备上。 */
-    if (reforgeArm) { toast('重铸模式中 —— 点它即可重铸；再点玄铁令可取消'); return; }
+    if (i < 0) { toast('这件已不在行囊里'); return false; }
     var v = gearValue(g);
     gearInv.splice(i, 1);
     player.stones += v;
     addFloater(player.mx, player.my - 0.3, '+' + v + ' 银两', '#8bf3ff');
     toast('熔炼 ' + gearName(g) + ' → ' + v + ' 银两');
     bagDirty = true;
+    return true;
+  }
+  /** 丢弃：直接销毁、**不返还银两**。存在的唯一意义是"我就是不想留它"（熔炼总能拿到钱，
+   *  所以纯亏的事必须再过一道确认框 —— 一道没人会误触的门槛）。 */
+  function dumpGear(g) {
+    var i = gearInv.indexOf(g);
+    if (i < 0) return false;
+    gearInv.splice(i, 1);
+    lastGearSig = ''; bagDirty = true;
+    toast('已丢弃 ' + gearName(g));
+    return true;
   }
   /** 属性行 + 计数：装备系统的"收益显示屏"。
    *  括号里的增量刻意只算**装备贡献**（对比 realmBase() 而不是对比 0）——
@@ -5419,7 +5625,7 @@
     var gc = document.getElementById('gearCnt');
     if (gc) gc.textContent = gearInv.length + ' / ' + GEAR_CAP;
     var et = document.getElementById('eqTip');
-    if (et) et.textContent = reforgeArm ? '重铸模式：点装备格洗词缀' : '点格子卸下';
+    if (et) et.textContent = '点格子打开操作卡';
   }
 
   /* ═════════ 存档（2026-09-18）════════
@@ -5822,11 +6028,9 @@
       c.classList.toggle('empty', n <= 0);
       c.classList.toggle('has', n > 0);          // ★ 有货 → 提亮/描金边/角标显现
       c.classList.toggle('use', it.kind === 'heal');
-      /* v54：材料格也有"点下去会做事"的了（妖丹炼化 / 玄铁令取出重铸）。
-       * .act 给手型与配色，.armed 是玄铁令被取出时的脉冲高亮 —— 玩家必须能一眼看出
-       * "现在是重铸模式"，否则点装备时会以为"怎么点一下没穿上"。 */
+      /* v54：材料格也有"点下去会做事"的了（妖丹炼化 / 玄铁令提示用法）。
+       * .act 给手型与配色 —— 玩家得能一眼看出"这一格点下去有事发生"。 */
       c.classList.toggle('act', !!it.act);
-      c.classList.toggle('armed', key === 'xuantie' && reforgeArm);
       /* ★ .cool 只给**刚按下去的那一格**上（healUsed）。原来写的是无条件
        *   `toggle('cool', healCd>0)` —— 用一次药全场格子一起灰 0.6 秒，
        *   叠上 filter 的优先级问题，用户看到的就是"背包永远是灰的"。 */
@@ -7061,6 +7265,7 @@
     var bb = document.getElementById('bagBtn');
     if (bb) bb.onclick = function () { bagToggle(); };
     wireSaveUI();          // 存档按钮 + 离场落盘（挂在 IIFE 里：此时 DOM 必定已就绪）
+    wireGearCard();        // 装备操作卡的按钮派发（同一时刻 DOM 必定已就绪）
     syncLeftBtns();        // 左列圆钮先按当前面板高度排一次（药格是脚本后建的，心跳会再校正）
     var x = document.getElementById('worldClose');
     if (x) x.onclick = closeWorld;

@@ -335,21 +335,15 @@
   #bag .cell.use:hover{background:rgba(46,26,50,.9);border-color:#ff9ec4;
     box-shadow:0 0 12px rgba(255,140,190,.45)}
   #bag .cell.use:active{transform:translateY(1px)}
-  /* ★ 材料格也有"点下去会做事"的了（v54）：妖丹炼化 / 玄铁令取出重铸。
+  /* ★ 材料格也有"点下去会做事"的了（v54）：妖丹炼化 / 玄铁令提示用法。
      .act 与 .use 是同一套交互感（手型 + 悬停反馈），只是换成金色调，和丹药的粉色分开。
-     .armed = 玄铁令已被取出：脉冲发光，玩家必须一眼看出"现在是重铸模式" ——
-     否则点装备格时会以为"怎么点一下没穿上"。
-     ⚠ border-color 必须 !important：`.cell:not(.empty)` 的特异性(1,3,0) 高于 `.cell.armed`(1,2,0)，
+     ⚠ border-color 必须 !important：`.cell:not(.empty)` 的特异性(1,3,0) 高于 `.cell.act`(1,2,0)，
        不加就永远看不到金边（本项目的老坑：选择器写了、被后写的同特异性规则盖掉）。 */
   #bag .cell.act{cursor:pointer;border-color:rgba(255,206,120,.7) !important;
     box-shadow:inset 0 0 12px rgba(255,196,90,.18)}
   #bag .cell.act:hover{background:rgba(48,38,18,.9);border-color:#ffd977 !important;
     box-shadow:0 0 12px rgba(255,206,120,.42)}
   #bag .cell.act:active{transform:translateY(1px)}
-  #bag .cell.armed{border-color:#ffd977 !important;animation:cellarm 1.05s ease-in-out infinite}
-  @keyframes cellarm{
-    0%,100%{box-shadow:0 0 7px rgba(255,206,120,.40),inset 0 0 10px rgba(255,206,120,.25)}
-    50%{box-shadow:0 0 18px rgba(255,206,120,.95),inset 0 0 18px rgba(255,206,120,.55)}}
   /* ★ 数量角标：压在右下、大号黑底金字，保证"捡到了几个"一眼可读 */
   #bag .cell .n{position:absolute;right:-2px;bottom:-3px;z-index:3;
     min-width:17px;height:17px;line-height:17px;text-align:center;
@@ -405,7 +399,9 @@
   #bag .g.t2{border-color:rgba(127,224,138,.90);box-shadow:inset 0 0 9px rgba(127,224,138,.20)}
   #bag .g.t3{border-color:rgba(111,182,255,.95);box-shadow:inset 0 0 10px rgba(111,182,255,.24)}
   #bag .g.t4{border-color:rgba(199,139,255,.98);box-shadow:inset 0 0 12px rgba(199,139,255,.30),0 0 8px rgba(199,139,255,.35)}
-  #bag .g.press{transform:translateY(1px);outline:2px solid rgba(255,190,120,.9)}
+  /* v55：点击 = 弹出操作卡（长按熔炼已删除），所以给个按住反馈代替原来的 .press 长按态 */
+  #bag .g:not(.empty):hover{background:rgba(30,38,58,.92)}
+  #bag .g:not(.empty):active{transform:translateY(1px)}
   /* 存档区（v52：三个档位）
      为什么必须分档：只有一个存档时，"换个路线试试" 就等于 "先毁掉这一条命"，
      玩家不敢试；而这套游戏的核心乐趣恰恰是摸地图。分档之后删哪个都是单独一次确认。
@@ -455,6 +451,35 @@
   #confirm .danger{background:linear-gradient(180deg,rgba(150,40,34,.95),rgba(96,20,18,.96));
     color:#ffe4d6;border:1px solid rgba(255,150,120,.6)}
   #confirm .danger:hover{border-color:#ff9e8a}
+  /* ── 装备操作卡（v55）：点装备格弹出的动作列表 ──
+     为什么删掉长按熔炼：
+       ① 长按在触屏上**不可发现** —— 没人会去长按一个格子"试试看"；
+       ② 手机上 `title` tooltip 根本不显示 → 玩家连自己穿的什么属性都看不到；
+       ③ 长按与点击语义冲突会互相误伤（长按抬手浏览器还会补一个 click）。
+     改成"点一下 → 卡片列全动作"，顺带把属性/熔炼价摊在脸上。
+     与 #confirm 同款：**不带 .hud 类**（否则被 pointer-events:none 继承，按钮点不到）。 */
+  #gearMenu{position:fixed;inset:0;z-index:130;display:flex;align-items:center;justify-content:center;padding:20px}
+  #gearMenu[hidden]{display:none}
+  #gearMenu .msk{position:absolute;inset:0;background:rgba(6,10,20,.72);backdrop-filter:blur(3px)}
+  #gearMenu .dlg{position:relative;width:min(330px,90vw);padding:15px 15px 12px;border-radius:12px;
+    background:linear-gradient(180deg,rgba(22,30,50,.99),rgba(12,18,32,.99));
+    border:1px solid rgba(214,178,96,.6);box-shadow:0 10px 34px rgba(0,0,0,.55);
+    color:#f0e3c2;text-align:center}
+  #gearMenu .ct{font-size:15px;letter-spacing:1.5px;color:#ffd88a}
+  #gearMenu .csub{font-size:11px;color:#9fb3d0;margin-top:3px}
+  #gearMenu .cs{font-size:12.5px;line-height:1.8;color:#cfe6d2;margin-top:8px;
+    padding:6px 8px;border-radius:7px;background:rgba(0,0,0,.32);white-space:pre-line;
+    font-family:ui-monospace,Consolas,monospace}
+  #gearMenu .cm{font-size:11.5px;line-height:1.7;color:#8ea3bf;margin-top:7px;white-space:pre-line}
+  #gearMenu .cb{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:13px}
+  #gearMenu button{font:inherit;font-size:12.5px;cursor:pointer;padding:8px 14px;border-radius:8px;
+    background:rgba(28,36,52,.92);color:#e6dcc0;border:1px solid rgba(214,178,96,.5)}
+  #gearMenu button:hover{background:#2b2438;border-color:rgba(255,214,130,.9)}
+  #gearMenu button:active{transform:translateY(1px)}
+  #gearMenu button.warn{border-color:rgba(226,150,80,.6);color:#ffd9a8}
+  #gearMenu button.bad{border-color:rgba(226,90,80,.55);color:#ffb9ae}
+  #gearMenu button.ghost{background:transparent;border-color:rgba(160,180,210,.45);color:#cfcbe8}
+  body.touch #gearMenu button{padding:10px 16px;font-size:13px}
   /* 触屏：面板缩一点、挪到**屏幕中下方**。
      为什么不贴右边：右下是技能盘（right:14/bottom:14）、右上是一排面板，都占满了。
      为什么不贴左下：摇杆是"按哪出现在哪"的浮动盘，左下正是它最常出现的位置。 */
@@ -660,16 +685,15 @@
   <!-- ★ 属性行：穿戴结果的唯一反馈。玩家必须能一眼看出"换了这件甲之后御 +4"，
        否则装备系统等于没有 —— 数值全藏在 tooltip 里没人看。 -->
   <div class="attr" id="bagAttr">攻 — · 御 — · 气血 —</div>
-  <div class="subt">已装备<i id="eqTip">点格子卸下</i></div>
+  <div class="subt">已装备<i id="eqTip">点格子打开操作卡</i></div>
   <div class="eqgrid" id="eqGrid"></div>
   <div class="subt">丹药 · 材料</div>
   <div class="grid" id="bagGrid"></div>
   <div class="subt">行囊 · 装备<i id="gearCnt">0 / 24</i></div>
   <div class="gears" id="gearGrid"></div>
-  <div class="tip">点<b>装备格</b>穿戴，<b>长按 0.7 秒</b>熔炼成银两；
-    <b>已装备</b>的格子点一下卸下　·　按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药<br>
-    <b>妖丹</b>点一下全部炼化成修为（攒够自动突破境界）<br>
-    <b>玄铁令</b>点一下取出，再点任意装备格重铸其词缀</div>
+  <div class="tip">点<b>装备格</b>弹出操作卡：<b>装备 / 卸下 / 重铸 / 熔炼 / 丢弃</b><br>
+    按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药　·　<b>妖丹</b>点一下全部炼化成修为（攒够自动突破境界）<br>
+    <b>玄铁令</b>攒着，在装备的操作卡里点「重铸」洗词缀</div>
   <div class="tip" id="saveRow">
     <div class="svhint">存档 · <i id="saveInfo">尚未存档</i></div>
     <div id="slotList"></div>
@@ -727,9 +751,9 @@
   走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
   <span class="hl">Shift</span> 奔跑　·　<span class="hl">B</span> 背包　·　<span class="hl">1 / 2 / 3</span> 或直接点左上药格 服金创药 / 小还丹 / 大还丹　·　
   击杀妖兽会 <span class="hl">掉落物品与装备</span>，走近自动拾取　·　<span class="hl">B</span> 开行囊：
-  点装备格<b>穿戴</b>、长按<b>熔炼</b>成银两　·　点<b>妖丹</b>炼化成修为，
+  点装备格<span class="hl">弹出操作卡</span>（装备 / 卸下 / 重铸 / 熔炼 / 丢弃）　·　点<b>妖丹</b>炼化成修为，
   <span class="hl">修为攒满自动突破境界</span>（攻 / 御 / 气血上限一起抬）　·　
-  点<b>玄铁令</b>取出，再点任意装备格 <span class="hl">重铸词缀</span>（一次一枚）　·　
+  <b>玄铁令</b>在操作卡里点 <span class="hl">重铸词缀</span>（一次一枚）　·　
   进度 <span class="hl">每 15 秒自动存档</span>，
   行囊底部可切成 <span class="hl">三个存档档位</span>：逐档 <b>存 / 读 / 删</b>，
   <span class="hl">重开</span>只重来当前进度、不删档位　·　<span class="hl">Alt+1~6</span> 试动作
@@ -814,6 +838,19 @@
   </div>
 </div>
 
+<!-- 装备操作卡（v55）：点装备格弹出，把「装备 / 卸下 / 重铸 / 熔炼 / 丢弃」一次列全。
+     和 #confirm 一样**不带 .hud 类** —— 带了会被 .hud{pointer-events:none} 继承，按钮点不到。 -->
+<div id="gearMenu" hidden>
+  <div class="msk" id="gmMask"></div>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="gmTitle">
+    <div class="ct" id="gmTitle">装备</div>
+    <div class="csub" id="gmSub"></div>
+    <div class="cs" id="gmStats"></div>
+    <div class="cm" id="gmNote"></div>
+    <div class="cb" id="gmBtns"></div>
+  </div>
+</div>
+
 <script>
 /* ────────────────── 手机端「视口防线」 ──────────────────
    为什么必须有：`maximum-scale=1, user-scalable=no` 从 iOS 10 起被 Safari 忽略
@@ -895,6 +932,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=54"></script>
+<script src="js/game.js?v=55"></script>
 </body>
 </html>
