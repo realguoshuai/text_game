@@ -583,7 +583,24 @@
     updateZoomUI();
     // 左上面板折叠开关：默认收成迷你条，点一下展开详情
     var tl = document.getElementById('topleft');
-    if (tl) tl.onclick = function () { tl.classList.toggle('open'); };
+    if (tl) tl.onclick = function () { tl.classList.toggle('open'); syncLeftBtns(); };
+  }
+  /* 左列圆钮避让（v53）：把上面板的真实底边写进 CSS 变量 --tlb。
+   * 起因：用户截图里「世界地图」圆钮压住了第一个药格 —— 面板高度不是常数
+   *   （展开详情 / 出现目标血条 / 开背包时药格被隐藏 / 触屏药格更大），
+   *   写死 top 必然在某个组合下压上去。所以位置改成"算出来的"，不是"猜出来的"。
+   * 写在 <html> 的行内样式上：优先级最高，且不依赖任何选择器匹配（本项目吃过
+   *   "选择器写了却被覆盖"的亏）。
+   * ⚠ 读 offsetHeight 会强制重排，所以先用 lastTlb 挡一道，值没变就一个字节都不写。 */
+  var lastTlb = -1;
+  function syncLeftBtns() {
+    var tl = document.getElementById('topleft');
+    if (!tl) return;
+    if (document.body.classList.contains('touch')) return;   // 手机端两个钮在左下，不参与
+    var b = Math.round(tl.offsetTop + tl.offsetHeight + 10);
+    if (b === lastTlb) return;
+    lastTlb = b;
+    document.documentElement.style.setProperty('--tlb', b + 'px');
   }
   // 每帧平滑逼近目标缩放；按锚点做比例换算，使锚点下的画面不位移
   function stepZoom(dt) {
@@ -1254,6 +1271,7 @@
         ready = true;
         window.__ready = true;
         buildBagUI();          // 背包格子（依赖 items_atlas 已进 ATLAS，必须等 initAtlas 之后）
+        syncLeftBtns();        // 药格建完面板才定型 → 立刻把左列圆钮排到它下面（v53 防重叠）
         buildGearUI();         // 装备区（有存档时要在落地前把"穿了什么"画出来）
         renderGearInfo();
         updateSaveUI();        // 存档状态行：告诉玩家"你此刻有没有存档"
@@ -2486,6 +2504,51 @@
           S.pass = !!(S.wrote && S.distinct && S.loadPick && S.autosaveFollows &&
             S.delAsks && S.delCancel && S.delOk && S.clearAsks && S.clearCancel && S.ui);
           pbs.textContent = JSON.stringify(S);
+        }
+        if (at === 'layout') {
+          /* ?autotest=layout —— 左上角竖排元素不许重叠（2026-09-18 用户截图：
+           * 「世界地图」圆钮压住了第一个药格）。
+           * 为什么必须量化：根因是"上面板高度不是常数"（展开详情 / 目标血条 / 触屏药格更大 /
+           * 开背包时药格被隐藏），扫代码根本看不出来，只能把两个元素的矩形求交。
+           * ★ 折叠态与展开态**都要测**：只测一种必然漏掉另一种。
+           * ★ 再补一条 elementFromPoint 命中：矩形不重叠 ≠ 点得到（本项目被
+           *   pointer-events:none 继承坑过两次，命中测试是唯一诚实的问法）。 */
+          var pbl = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none';
+            document.body.appendChild(d); return d;
+          })();
+          var L = {};
+          var over = function (a, b) {
+            if (!a || !b) return -1;     // 元素缺失要报 -1：别让它悄悄等于 0（="不重叠"，假绿）
+            var A = a.getBoundingClientRect(), B = b.getBoundingClientRect();
+            var w = Math.min(A.right, B.right) - Math.max(A.left, B.left);
+            var h = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top);
+            return (w > 0 && h > 0) ? Math.round(w) + 'x' + Math.round(h) : 0;
+          };
+          var hitAt = function (el) {
+            if (!el) return 'no-el';
+            var r = el.getBoundingClientRect();
+            var e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            if (!e) return 'none';
+            return (e === el || (e.closest && e.closest('#' + el.id))) ? 'ok'
+              : 'blocked:' + (e.id || e.className || e.tagName);
+          };
+          var tlL = document.getElementById('topleft'), wbL = document.getElementById('worldBtn'),
+            bgL = document.getElementById('bagBtn');
+          var snapL = function () {
+            return { tlWorld: over(tlL, wbL), tlBag: over(tlL, bgL), wbBag: over(wbL, bgL) };
+          };
+          L.tlb = getComputedStyle(document.documentElement).getPropertyValue('--tlb').trim();
+          L.folded = snapL();
+          tlL.classList.add('open'); syncLeftBtns();
+          L.open = snapL();
+          tlL.classList.remove('open'); syncLeftBtns();
+          L.back = snapL();
+          L.hit = { world: hitAt(wbL), bag: hitAt(bgL) };
+          L.pass = L.folded.tlWorld === 0 && L.folded.tlBag === 0 && L.folded.wbBag === 0 &&
+            L.open.tlWorld === 0 && L.open.tlBag === 0 && L.open.wbBag === 0 &&
+            L.back.tlWorld === 0 && L.hit.world === 'ok' && L.hit.bag === 'ok';
+          pbl.textContent = JSON.stringify(L);
         }
         if (at === 'loot') {
           // 为什么值得单独立一条：这四件事各自都能"看起来对"，但接在一起才暴露真问题 ——
@@ -5437,6 +5500,7 @@
     if (b) b.classList.toggle('on', bagOpen);
     // 背包面板也在 left:14，展开时会压住左上这块（快捷药栏就在那里）→ 让药栏先收起来
     document.body.classList.toggle('bagopen', bagOpen);
+    syncLeftBtns();      // 药格被隐藏/恢复 → 左列圆钮跟着挪（面板矮了一截）
     bagDirty = true;
     if (bagOpen) renderBag();
     else renderQuick();  // 关背包时立刻把药栏画回来（它刚才是 display:none 的）
@@ -6613,6 +6677,7 @@
     var bb = document.getElementById('bagBtn');
     if (bb) bb.onclick = function () { bagToggle(); };
     wireSaveUI();          // 存档按钮 + 离场落盘（挂在 IIFE 里：此时 DOM 必定已就绪）
+    syncLeftBtns();        // 左列圆钮先按当前面板高度排一次（药格是脚本后建的，心跳会再校正）
     var x = document.getElementById('worldClose');
     if (x) x.onclick = closeWorld;
     var sb = document.getElementById('worldSearch');
@@ -6629,6 +6694,7 @@
     //   clientWidth/clientHeight 就是 CSS 盒本身，与 100% 恒等，一条都对不上。
     var w = canvas.clientWidth || window.innerWidth;
     var h = canvas.clientHeight || window.innerHeight;
+    syncLeftBtns();      // 窗口尺寸变 → 上面板的行可能重新换行 → 左列圆钮要重排（v53）
     // ★ 尺寸没变就**一个字都不做**：给 canvas.width 赋值会清空整块画布并重置 ctx 状态。
     //   手机上拖动时地址栏动画会连发 resize，每次清一屏 → 看到的就是"地图一块一块地漏出来"。
     //   原来没有这道早退，等于每帧把自己擦一遍。
@@ -6669,6 +6735,10 @@
       bagDirty = true;                                  // 强制走一次完整刷新
       renderBag();
       renderQuick();                                    // 心跳：不依赖任何事件也保证药栏是对的
+      /* 左列圆钮避让也挂在这条心跳上（v53）：面板高度会被各种事件改（目标血条出现、
+       * 提示文案换行、字体加载完导致行高变化…），逐个入口去补迟早漏一个。
+       * 值没变时 syncLeftBtns 直接 return，所以这只是每 0.5s 一次 offsetHeight。 */
+      syncLeftBtns();
     }
     if (window.__dbg && CUR) {
       window.__dbg.textContent = JSON.stringify({

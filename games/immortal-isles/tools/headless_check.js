@@ -429,6 +429,16 @@ results.push(run('存档 多档位与确认框', 'autotest=slots', ({ probe }) =
     && probe.pass === true;
 }, { budget: 20000 }));
 
+// 8.46) 左上角竖排不重叠（v53）。用户截图：面板展开后「世界地图」圆钮压在第一个药格上。
+//       三条覆盖三种状态：折叠 / 展开 / 复位，且必须同时满足"矩形不相交"和"点得到"。
+results.push(run('左上 圆钮不压药格', 'autotest=layout', ({ probe }) => {
+  if (!probe) return false;
+  const flat = (o) => o && o.tlWorld === 0 && o.tlBag === 0 && o.wbBag === 0;
+  return flat(probe.folded) && flat(probe.open) && flat(probe.back)
+    && probe.hit && probe.hit.world === 'ok' && probe.hit.bag === 'ok'
+    && probe.pass === true;
+}, { budget: 20000 }));
+
 // 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）
 //      ② 伤害不再恒定（有浮动/暴击/连击）③ 背对目标砍不中、挥空自动转身。
 //      50 刀逐帧推进，预算要给足。

@@ -566,7 +566,14 @@
   #worldmap .node .nm{font-size:13px;font-weight:600;line-height:1.35;color:#f0e3c2;display:block}
   #worldmap .node .dim{font-size:10px;color:#9fb0c8;margin-top:3px;display:block}
   /* 打开世界地图的入口：桌面用 Tab，这里给鼠标/手机一个图标入口 */
-  #worldBtn{position:fixed;left:14px;top:60px;z-index:12;width:44px;height:44px;border-radius:50%;
+  /* ★★ 左列两个圆钮的 top 必须**跟着上面板的真实底边走**（2026-09-18 用户截图报重叠：
+     地图圆钮压住了第一个药格）。
+     为什么不能写死：上面板 #topleft 的高度一直在变 —— 展开详情（.open 多出 4 行）、
+     锁定目标时多一条目标血条、开背包时药格被 display:none（body.bagopen）、
+     触屏药格还大一圈。任何一组状态组合都会让写死的 60/112 压到药格上。
+     方案：JS 把「面板底边 + 10px 间距」写进 --tlb，这里只负责叠上去。
+     ⚠ 手机端 top:auto 优先（排在 body.touch 里），不参与这套计算。 */
+  #worldBtn{position:fixed;left:14px;top:var(--tlb,110px);z-index:12;width:44px;height:44px;border-radius:50%;
     pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
     border:2px solid rgba(226,192,110,.75);box-shadow:0 3px 10px rgba(0,0,0,.45);
@@ -576,8 +583,8 @@
   #worldBtn svg{display:block}
   body.touch #worldBtn{top:auto;bottom:14px;left:14px}  /* 手机左下，避开右上面板 */
 
-  /* 背包入口按钮：与左上面的「世界地图」同款圆形，竖排在它下面；手机移到右下（摇杆在左下） */
-  #bagBtn{position:fixed;left:14px;top:112px;z-index:12;width:44px;height:44px;border-radius:50%;
+  /* 背包入口按钮：与左上面的「世界地图」同款圆形，竖排在它下面（同样跟着 --tlb 走）；手机移到右下（摇杆在左下） */
+  #bagBtn{position:fixed;left:14px;top:calc(var(--tlb,110px) + 52px);z-index:12;width:44px;height:44px;border-radius:50%;
     pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 35% 25%,#3c5a8e,#16243e 70%);
     border:2px solid rgba(226,192,110,.75);box-shadow:0 3px 10px rgba(0,0,0,.45);
@@ -865,6 +872,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=52"></script>
+<script src="js/game.js?v=53"></script>
 </body>
 </html>
