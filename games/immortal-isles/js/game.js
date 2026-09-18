@@ -2317,10 +2317,52 @@
             attr: (document.getElementById('bagAttr') || {}).textContent,
             saveInfo: (document.getElementById('saveInfo') || {}).textContent
           };
+          /* ⑧ 可点性（2026-09-18：用户报「点穿戴没反应 / 存档按钮没用」）
+           * 数据层与 addEventListener 都可能是好的，但只要祖先带 pointer-events:none，
+           * 整块面板在浏览器眼里是透明的 —— DOM 在、样式在、监听器也在，就是点不到。
+           * ★ 这种故障用 el.click() **永远测不出来**（JS 派发不经过命中测试），
+           * 唯一诚实的问法是 document.elementFromPoint：由浏览器按真实渲染算命中。
+           * 对照组的丹药格（历史上一直接得上）用来证明"这把尺子本身没坏"。 */
+          bagToggle(true);
+          function hitSelf(el) {
+            if (!el) return 'no-el';
+            try { el.scrollIntoView({ block: 'center' }); } catch (e) { }
+            var r = el.getBoundingClientRect();
+            if (r.width < 2 || r.height < 2) return 'no-box';
+            var t = document.elementFromPoint(Math.round(r.left + r.width / 2),
+              Math.round(r.top + r.height / 2));
+            if (!t) return 'no-target';
+            return (t === el || el.contains(t)) ? 'ok' : 'blocked:' + (t.id || t.className || t.tagName);
+          }
+          // 造一件待穿戴的剑，好在行囊里有个**非空**格子可点
+          var clickMe = { id: 98001, key: 'ge_jian', t: 2, st: { atk: 11, def: 3, maxhp: 40 } };
+          gearInv = [clickMe]; equipped = { weapon: null, armor: null, trinket: null };
+          recalcStats(); bagDirty = true; lastGearSig = ''; renderBag();
+          G.hit = {
+            healCell: hitSelf(document.querySelector('#bagGrid .cell')),   // 对照组
+            gearCell: hitSelf(document.querySelector('#gearGrid .g:not(.empty)')),
+            eqCell: hitSelf(document.querySelector('#eqGrid .g')),
+            svSave: hitSelf(document.getElementById('svSave')),
+            svLoad: hitSelf(document.getElementById('svLoad')),
+            svClear: hitSelf(document.getElementById('svClear'))
+          };
+          /* 命中 OK 之后再补一条**真点击**（合成 MouseEvent 走完整冒泡），
+           * 证明"点得到"且"监听器真的会做事"，而不是只有一条 CSS 摆在那儿。 */
+          var real = document.querySelector('#gearGrid .g:not(.empty)');
+          if (real && G.hit.gearCell === 'ok') {
+            real.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            G.realClickEquip = !!equipped.weapon && equipped.weapon.id === 98001;
+          } else G.realClickEquip = 'skip';
+          var svb = document.getElementById('svSave');
+          if (svb && G.hit.svSave === 'ok') {
+            try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+            svb.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            G.realClickSave = !!readSave();
+          } else G.realClickSave = 'skip';
+          bagToggle(false);
           gp.textContent = JSON.stringify(G);
         }
         if (at === 'loot') {
-          // ?map=<图>&autotest=loot —— 掉落 / 拾取 / 服药 / 背包 全链路验收（2026-09-17 加）。
           // 为什么值得单独立一条：这四件事各自都能"看起来对"，但接在一起才暴露真问题 ——
           //   ① 掉落掷骰的**实际**命中率 vs 配置概率（rollLoot 是独立掷骰，可能全不中）
           //   ② 掉落物是否真的被 repath 到可走格（溅到墙里的图标玩家永远捡不到）

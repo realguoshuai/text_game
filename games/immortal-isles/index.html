@@ -363,6 +363,14 @@
     display:flex;justify-content:space-between;align-items:center}
   #bag .subt i{font-style:normal;font-size:10.5px;color:#7f93ad}
   #bag .eqgrid{display:grid;grid-template-columns:repeat(3,52px);gap:8px}
+  /* ★★ pointer-events 必须逐个容器显式打开（2026-09-18）
+   * .hud 带着 pointer-events:none（怕面板挡住画布摇杆），子元素默认继承 none。
+   * 之前只有丹药格 .grid 补了 auto，新加的装备网格 / 装备槽 / 存档按钮全都忘了
+   * → 鼠标悬停没手型、点击压根不到 DOM：表现就是「点穿戴没反应」「存档按钮没用」。
+   * 只给这三处开、不给 #bag 整体开：面板空白处仍能点穿到画布。 */
+  #bag .gears{pointer-events:auto}
+  #bag .eqgrid{pointer-events:auto}
+  #saveRow .svbtns{pointer-events:auto}
   #bag .gears{display:grid;grid-template-columns:repeat(4,42px);gap:8px}
   #bag .gears .g,#bag .eqgrid .g{position:relative;width:100%;height:52px;height:var(--gh,42px);
     border-radius:8px;background:rgba(8,14,26,.72);border:1px solid rgba(150,170,200,.30);
@@ -802,6 +810,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=49"></script>
+<script src="js/game.js?v=50"></script>
 </body>
 </html>
