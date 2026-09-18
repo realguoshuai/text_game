@@ -439,6 +439,30 @@ results.push(run('左上 圆钮不压药格', 'autotest=layout', ({ probe }) => 
     && probe.pass === true;
 }, { budget: 20000 }));
 
+// 8.47) 妖丹的出口：境界 / 炼化 / 重铸（v54）。用户一句「妖丹没什么用啊」起的头 ——
+//       45% 掉落的东西捡起来后没有任何用途。这条用例盯三种"失败时看起来也正常"的坏法：
+//       ① 炼化涨了修为，但属性被顺手写死（绕过 recalcStats）——存读一次就翻倍
+//       ② 境界被存进存档（改门槛后老档境界错乱）—— 正解是只存 exp、读档用纯函数算回来
+//       ③ 重铸把品质/器型基座一起重掷（玩家花玄铁令把仙品洗成凡品，还没提示）
+//       ⚠ 断言写花括号体 + return（见 8.4 注释：箭头裸表达式会被 `, {budget}` 的逗号吃掉）
+results.push(run('成长 妖丹炼化与重铸', 'autotest=growth', ({ probe }) => {
+  if (!probe) return false;
+  const C = probe;
+  return C.refine.ok === true && C.refine.left === 0 && C.refine.gain === C.refine.want
+    && C.refine.noBrk === true && C.refine.statsIntact === true   // 炼化不碰属性
+    && C.brk.idx === 1 && C.brk.name === true
+    && C.brk.atk === true && C.brk.def === true && C.brk.maxhp === true
+    && C.brk.full === true && C.brk.grew === true                // 突破回满 + 确实变强
+    && C.multi.to === C.multi.top && C.multi.jumped === 3 && C.multi.atk === true
+    && C.save.exp === true && C.save.idx === true
+    && C.save.name === true && C.save.atk === true               // 读完境界自己算回来
+    && C.rf.ok === true && C.rf.left === 1 && C.rf.id === true && C.rf.t === true
+    && C.rf.baseKept === true && C.rf.hasAffix === true && C.rf.worn === true
+    && C.arm.off === true && C.arm.left === 0                    // 用光自动退出重铸模式
+    && C.ui.act === true && C.ui.armed === true && C.ui.cursor === 'pointer'
+    && C.pass === true;
+}, { budget: 20000 }));
+
 // 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）
 //      ② 伤害不再恒定（有浮动/暴击/连击）③ 背对目标砍不中、挥空自动转身。
 //      50 刀逐帧推进，预算要给足。

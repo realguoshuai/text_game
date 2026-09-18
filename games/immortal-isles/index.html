@@ -335,6 +335,21 @@
   #bag .cell.use:hover{background:rgba(46,26,50,.9);border-color:#ff9ec4;
     box-shadow:0 0 12px rgba(255,140,190,.45)}
   #bag .cell.use:active{transform:translateY(1px)}
+  /* ★ 材料格也有"点下去会做事"的了（v54）：妖丹炼化 / 玄铁令取出重铸。
+     .act 与 .use 是同一套交互感（手型 + 悬停反馈），只是换成金色调，和丹药的粉色分开。
+     .armed = 玄铁令已被取出：脉冲发光，玩家必须一眼看出"现在是重铸模式" ——
+     否则点装备格时会以为"怎么点一下没穿上"。
+     ⚠ border-color 必须 !important：`.cell:not(.empty)` 的特异性(1,3,0) 高于 `.cell.armed`(1,2,0)，
+       不加就永远看不到金边（本项目的老坑：选择器写了、被后写的同特异性规则盖掉）。 */
+  #bag .cell.act{cursor:pointer;border-color:rgba(255,206,120,.7) !important;
+    box-shadow:inset 0 0 12px rgba(255,196,90,.18)}
+  #bag .cell.act:hover{background:rgba(48,38,18,.9);border-color:#ffd977 !important;
+    box-shadow:0 0 12px rgba(255,206,120,.42)}
+  #bag .cell.act:active{transform:translateY(1px)}
+  #bag .cell.armed{border-color:#ffd977 !important;animation:cellarm 1.05s ease-in-out infinite}
+  @keyframes cellarm{
+    0%,100%{box-shadow:0 0 7px rgba(255,206,120,.40),inset 0 0 10px rgba(255,206,120,.25)}
+    50%{box-shadow:0 0 18px rgba(255,206,120,.95),inset 0 0 18px rgba(255,206,120,.55)}}
   /* ★ 数量角标：压在右下、大号黑底金字，保证"捡到了几个"一眼可读 */
   #bag .cell .n{position:absolute;right:-2px;bottom:-3px;z-index:3;
     min-width:17px;height:17px;line-height:17px;text-align:center;
@@ -451,8 +466,11 @@
   body.touch #bag .cell{width:46px;height:46px}
 
   /* 居中事件提示（被击退/折损银两等） */
+  /* white-space:pre-line（v54）：重铸的前后对比、突破的属性清单是**多行**提示，
+     默认 white-space 会把 \n 折叠成空格，两条信息糊成一行看不清。 */
   #toast{position:fixed;left:50%;top:22%;transform:translate(-50%,-6px);z-index:60;
     padding:10px 20px;border-radius:10px;pointer-events:none;max-width:82vw;text-align:center;
+    white-space:pre-line;line-height:1.7;
     background:linear-gradient(180deg,rgba(120,26,26,.94),rgba(70,14,14,.96));
     border:1px solid rgba(255,150,120,.55);color:#ffe4d6;font-size:14px;letter-spacing:1px;
     box-shadow:0 8px 26px rgba(0,0,0,.45);opacity:0;transition:opacity .2s,transform .2s}
@@ -649,7 +667,9 @@
   <div class="subt">行囊 · 装备<i id="gearCnt">0 / 24</i></div>
   <div class="gears" id="gearGrid"></div>
   <div class="tip">点<b>装备格</b>穿戴，<b>长按 0.7 秒</b>熔炼成银两；
-    <b>已装备</b>的格子点一下卸下　·　按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药</div>
+    <b>已装备</b>的格子点一下卸下　·　按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药<br>
+    <b>妖丹</b>点一下全部炼化成修为（攒够自动突破境界）
+    <b>玄铁令</b>点一下取出，再点任意装备格重铸其词缀</div>
   <div class="tip" id="saveRow">
     <div class="svhint">存档 · <i id="saveInfo">尚未存档</i></div>
     <div id="slotList"></div>
@@ -707,7 +727,10 @@
   走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
   <span class="hl">Shift</span> 奔跑　·　<span class="hl">B</span> 背包　·　<span class="hl">1 / 2 / 3</span> 或直接点左上药格 服金创药 / 小还丹 / 大还丹　·　
   击杀妖兽会 <span class="hl">掉落物品与装备</span>，走近自动拾取　·　<span class="hl">B</span> 开行囊：
-  点装备格<b>穿戴</b>、长按<b>熔炼</b>成银两　·　进度 <span class="hl">每 15 秒自动存档</span>，
+  点装备格<b>穿戴</b>、长按<b>熔炼</b>成银两　·　点<b>妖丹</b>炼化成修为，
+  <span class="hl">修为攒满自动突破境界</span>（攻 / 御 / 气血上限一起抬）　·　
+  点<b>玄铁令</b>取出，再点任意装备格 <span class="hl">重铸词缀</span>（一次一枚）　·　
+  进度 <span class="hl">每 15 秒自动存档</span>，
   行囊底部可切成 <span class="hl">三个存档档位</span>：逐档 <b>存 / 读 / 删</b>，
   <span class="hl">重开</span>只重来当前进度、不删档位　·　<span class="hl">Alt+1~6</span> 试动作
   </div>
@@ -872,6 +895,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=53"></script>
+<script src="js/game.js?v=54"></script>
 </body>
 </html>

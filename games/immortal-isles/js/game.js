@@ -158,12 +158,110 @@
   var IMG = {};              // file -> Image（只留给非图集的小图，例如云）
   var MAPS = [], IDX = {}, CUR = null;
   var PAL = {}, WALK = '', WATER = '';
-  /* ★ 角色裸装底子：atk/def/maxhp 的**唯一真源**。以后做境界突破只改这一处，
-   * 装备带来的加成必定由 recalcStats() 在这份底子上叠加（详见下面的装备系统注释）。 */
+  /* ★ 角色裸装底子：atk/def/maxhp 的**唯一真源**（炼气期的底子）。
+   * 装备带来的加成必定由 recalcStats() 在这份底子上叠加（详见下面的装备系统注释）；
+   * 境界带来的加成加在 realmBase() 上（见下），同样是"唯一出口"的一部分。 */
   var BASE_STATS = { atk: 20, def: 8, maxhp: 260 };
+
+  /* ═════════ 境界体系（2026-09-18）════════
+   * 起因：用户一句「妖丹没什么用啊」—— 妖丹 45% 掉落，捡起来进背包第 4 格，然后**没有任何出口**，
+   * 连 HUD 上那行「修为」也只是一个累加数字。掉落的一半成了纯计数，白做。
+   *
+   * 现在它是一条真正的成长线：**妖丹 → 炼化 → 修为 → 突破境界 → 直接抬底子**。
+   *
+   * 四条纪律（改以前先读）：
+   *   ① 境界是**纯函数**：realmIdx 由「累计修为」算出来（realmForExp），**不进存档**。
+   *      存档里只有 exp 一个数，读档后 syncRealm() 重算 —— 天生幂等，不可能出现
+   *      "修为一万还停在炼气期"这种要靠修档才能救的状态。
+   *   ② 修为是**累计值，不是消耗品**。突破不扣修为，所以没有任何"剩余/已花"需要存，
+   *      也就没有多出来的坏档入口。
+   *   ③ 属性仍然只有一个出口：境界只提供**底子**（realmBase()），再交给 recalcStats()
+   *      叠装备。任何地方都不许直接写 player.atk/def/maxhp。
+   *   ④ need 的门槛按"打怪的累计节奏"标定：一只普通怪 12~32 修为 + 45% 掉一枚妖丹，
+   *      筑基约等于清两轮场，化神是长线目标（不是几天能摸完的）。
+   */
+  var REALMS = [
+    { cn: '炼气期', need: 0,    st: { atk: 0,  def: 0,  maxhp: 0 } },
+    { cn: '筑基期', need: 150,  st: { atk: 4,  def: 2,  maxhp: 50 } },
+    { cn: '金丹期', need: 500,  st: { atk: 9,  def: 5,  maxhp: 118 } },
+    { cn: '元婴期', need: 1400, st: { atk: 16, def: 9,  maxhp: 210 } },
+    { cn: '化神期', need: 3200, st: { atk: 24, def: 14, maxhp: 330 } }
+  ];
+  var YAODAN_CULT = 12;              // 一枚妖丹能炼出的修为（ITEMS.yaodan.cult 与此保持一致）
+  /** 由累计修为反查境界下标（只认最大的、need 已满足的那一档）。 */
+  function realmForExp(exp) {
+    var i = 0;
+    for (i = REALMS.length - 1; i > 0; i--) if ((exp || 0) >= REALMS[i].need) return i;
+    return 0;
+  }
+  function realmNow() { return REALMS[player.realmIdx] || REALMS[0]; }
+  function realmNext() { return REALMS[player.realmIdx + 1] || null; }
+  /** 当前境界的**底子**（不含装备）。recalcStats() 唯一该读这里，别再直接用 BASE_STATS。 */
+  function realmBase() {
+    var b = realmNow().st;
+    return { atk: BASE_STATS.atk + (b.atk | 0), def: BASE_STATS.def + (b.def | 0),
+             maxhp: BASE_STATS.maxhp + (b.maxhp | 0) };
+  }
+  var realmFx = 0;                   // 突破的金环特效计时（绘制见 drawRealmFx）
+  /** 加修为。★ 突破判定只在这里 —— 修为只有这一个入口，不可能有第二条触发路径。 */
+  function gainCult(amount) {
+    amount = Math.max(0, Math.round(amount || 0));
+    if (!amount) return 0;
+    var was = player.realmIdx;
+    player.exp = (player.exp || 0) + amount;
+    syncRealm();
+    return player.realmIdx - was;     // 突破了几重（炼化一大把可能连跳）
+  }
+  /** 把 realmIdx 与 exp 对齐。**读档后必调**（存档里只有 exp，境界是算出来的）。
+   *  突破的副作用（回满气血 / 特效 / 提示）统一挂在这里，保证"手动炼化"和"读档恢复"
+   *  两条路径表现一致 —— 否则会出现"读档那次突破没有特效"的廉价感。 */
+  function syncRealm() {
+    var idx = realmForExp(player.exp), up = idx - player.realmIdx;
+    if (!up) { player.realmName = realmNow().cn; return 0; }
+    player.realmIdx = idx;
+    player.realmName = REALMS[idx].cn;
+    recalcStats();
+    if (up > 0) {
+      player.hp = player.maxhp;       // 突破回满：让"变强"在血条上也看得见
+      realmFx = 1.2;
+      /* 刻意**不用** player.flash —— 那套闪白在本游戏里是"挨打"的语义
+       * （见受伤分支 player.flash = 0.25），突破时闪一下会被读成被偷袭。金环够表达。 */
+      toast('境界突破 · ' + player.realmName + '\n攻 ' + player.atk + ' · 御 ' + player.def +
+        ' · 气血 ' + player.maxhp);
+    }
+    bagDirty = true;
+    return up;
+  }
+  /** 突破时的地面金环（比服药涟漪大一号，且往上冒一圈光柱） */
+  function drawRealmFx() {
+    if (realmFx <= 0) return;
+    var p = isoToScreen(player.mx, player.my);
+    var q = realmFx / 1.2;                 // 1 → 0
+    var rr = (1 - q) * 120 * Z + 18 * Z;
+    ctx.save();
+    ctx.globalAlpha = q * 0.85;
+    ctx.strokeStyle = '#ffd977'; ctx.lineWidth = 3 * Z;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + HH * Z, rr, rr * 0.5, 0, 0, 6.2832); ctx.stroke();
+    ctx.globalAlpha = q * 0.45;
+    ctx.lineWidth = 1.8 * Z;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + HH * Z, rr * 0.62, rr * 0.31, 0, 0, 6.2832); ctx.stroke();
+    // 光柱：从脚底往上收，像"气机拔高"
+    ctx.globalAlpha = q * 0.30;
+    var gr = ctx.createLinearGradient(0, p.y - 150 * Z, 0, p.y + HH * Z);
+    gr.addColorStop(0, 'rgba(255,217,119,0)');
+    gr.addColorStop(1, 'rgba(255,217,119,.9)');
+    ctx.fillStyle = gr;
+    var bw = (0.45 + q * 0.25) * 26 * Z;
+    ctx.beginPath();
+    ctx.moveTo(p.x - bw, p.y + HH * Z); ctx.lineTo(p.x + bw, p.y + HH * Z);
+    ctx.lineTo(p.x + bw * 0.45, p.y - 150 * Z); ctx.lineTo(p.x - bw * 0.45, p.y - 150 * Z);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
     hp: BASE_STATS.maxhp, maxhp: BASE_STATS.maxhp,
     atk: BASE_STATS.atk, def: BASE_STATS.def, exp: 0, stones: 0, realmName: '炼气期',
+    realmIdx: 0,      // 由 exp 推导（realmForExp），不进存档；realmName 只是它的显示缓存
     attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0,
     // —— 侧视素材专用方向（2026-09-17）——
     // 侧视素材（CraftPix 那几套）**只有朝右一版**，左向靠水平翻转，根本没有「正面/背面」。
@@ -283,11 +381,15 @@
    */
   var ITEMS = {
     lingshi:   { cn: '银两',   kind: 'mat',  icon: 'lingshi',   val: 0,    desc: '通用货币，拾取即入账' },
-    yaodan:    { cn: '妖丹',   kind: 'mat',  icon: 'yaodan',    val: 12,   desc: '妖兽内丹，可折算银两' },
+    /* act = 这一格**点下去有额外动作**（不是只弹一句描述）。renderBag 会给它挂 .act 手型。
+     * 妖丹 / 玄铁令是 v54 补上的出口 —— 在这之前它们捡起来就只是计数。 */
+    yaodan:    { cn: '妖丹',   kind: 'mat',  icon: 'yaodan',    val: 12,   act: 'refine',
+                 desc: '妖兽内丹 · 点一下全部炼化成修为（'+ YAODAN_CULT + ' 修为 / 枚）' },
     jinchuang: { cn: '金创药', kind: 'heal', icon: 'jinchuang', val: 0.35, desc: '回复 35% 气血' },
     xiaohuan:  { cn: '小还丹', kind: 'heal', icon: 'xiaohuan',  val: 0.55, desc: '回复 55% 气血' },
     dahuan:    { cn: '大还丹', kind: 'heal', icon: 'dahuan',    val: 1.00, desc: '回满气血' },
-    xuantie:   { cn: '玄铁令', kind: 'rare', icon: 'xuantie',   val: 60,   desc: '江湖信物，可折算大笔银两' }
+    xuantie:   { cn: '玄铁令', kind: 'rare', icon: 'xuantie',   val: 60,   act: 'reforge',
+                 desc: '江湖信物 · 点一下取出，再点任意装备重铸词缀' }
   };
   /* 掉落表：<怪种> → [[物品键, 概率(0~1), 最少, 最多], ...]
    * 没登记的怪走 DEFAULT_LOOT。精英（def_.elite）额外掷一次 ELITE_LOOT。
@@ -364,6 +466,9 @@
   var gearInv = [];                  // 背包里的装备实例
   var equipped = { weapon: null, armor: null, trinket: null };
   var gearSeq = 1;                   // 实例编号（存档/对比都靠它认人）
+  /* 重铸模式（点一下玄铁令格进入）：此状态下点任意装备格 = 重铸，而不是穿上/卸下。
+   * 为什么用"模式"而不是给装备格再加一个长按：长按已经是熔炼了，再加手势没人记得住。 */
+  var reforgeArm = false;
 
   function rndInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
   function pickW(w) {   // 按权重取下标
@@ -372,21 +477,35 @@
     for (i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; }
     return w.length - 1;
   }
+  /** 器型在某个品质下的**裸值**（不含词缀）。重铸时这一半要原样保留。 */
+  function gearBaseSt(b, tier) {
+    var st = { atk: 0, def: 0, maxhp: 0 }, k;
+    for (k in b.st) if (b.st.hasOwnProperty(k)) st[k] = Math.round(b.st[k] * tier.mul);
+    return st;
+  }
+  /** 掷一次词缀（条数按品质区间，属性从池里抽，可重复叠同一属性）。 */
+  function rollAffix(tier) {
+    var st = { atk: 0, def: 0, maxhp: 0 };
+    var na = rndInt(tier.affix[0], tier.affix[1]);
+    for (var i = 0; i < na; i++) {
+      var af = AFFIX_POOL[rndInt(0, AFFIX_POOL.length - 1)];
+      st[af.k] = (st[af.k] || 0) + rndInt(af.min, af.max);
+    }
+    return st;
+  }
+  /** 属性评分（熔炼价与重铸取优共用同一把尺子，免得两处口径不一致）。 */
+  function gearScore(st) {
+    return (st.atk | 0) * 6 + (st.def | 0) * 7 + (st.maxhp | 0) * 0.8;
+  }
   /** 掷一件装备。tier 不传就按权重摇（精英传 true 走精英权重）。 */
   function rollGear(elite) {
     var bk = GEAR_BASE_KEYS[rndInt(0, GEAR_BASE_KEYS.length - 1)];
     var b = GEAR_BASES[bk];
     var ti = elite ? pickW(TIER_W_ELITE) : pickW(TIER_W);
     var tier = TIERS[ti];
-    var st = { atk: 0, def: 0, maxhp: 0 }, k;
-    for (k in b.st) if (b.st.hasOwnProperty(k)) {
-      st[k] = Math.round(b.st[k] * tier.mul);
-    }
-    var na = rndInt(tier.affix[0], tier.affix[1]);
-    for (var i = 0; i < na; i++) {
-      var af = AFFIX_POOL[rndInt(0, AFFIX_POOL.length - 1)];
-      st[af.k] = (st[af.k] || 0) + rndInt(af.min, af.max);
-    }
+    var st = gearBaseSt(b, tier);
+    var af = rollAffix(tier), k;
+    for (k in af) if (af.hasOwnProperty(k)) st[k] = (st[k] || 0) + af[k];
     // 负值得留着（重刃 -1 防是它的代价），但别把属性跌成负数让玩家困惑
     if (st.def < 0 && tier.t <= 1) st.def = 0;
     return { id: gearSeq++, key: bk, t: ti, st: st };
@@ -406,9 +525,53 @@
   }
   /** 装备折算银两（熔炼用）：品质越高越值钱，再加点属性 amounts。 */
   function gearValue(g) {
-    var v = 0, s = g.st;
-    v += (s.atk | 0) * 6 + (s.def | 0) * 7 + (s.maxhp | 0) * 0.8;
-    return Math.max(4, Math.round(v * (0.7 + 0.35 * g.t)) + gearTier(g).t * 8);
+    return Math.max(4, Math.round(gearScore(g.st) * (0.7 + 0.35 * g.t)) + gearTier(g).t * 8);
+  }
+  /* ═════════ 重铸 · 玄铁令的出口（v54）════════
+   * 用户选了「装备重铸，洗词缀」。三条规则说明白，玩家才敢用：
+   *   ① **只重掷词缀，不动品质与器型基座** —— 仙品的底子不会因为手气差掉成凡品。
+   *   ② 一次消耗**一枚玄铁令**；重掷 REFORGE_TRIES 次取评分最高的一次（有赌性但不太坑）。
+   *   ③ 已装备的也能重铸：玩家想在身上那件上试，不该逼他先脱下来（多一步还可能爆行囊）。
+   * 用同一把尺子（gearScore）与熔炼价，避免"UI 上说变强了、熔炼价反而更低"的口径矛盾。
+   */
+  var REFORGE_TRIES = 2;
+  function reforgeGear(g) {
+    var b = gearBase(g);
+    if (!b) return false;
+    /* 守卫：正在重铸的这件可能已经被熔炼掉了（长按熔炼之后抬起手指还会补一个 click）。
+     * 没有这一句，玩家会"白烧一枚玄铁令，还看不见任何变化"。 */
+    if (gearInv.indexOf(g) < 0 && equipped[b.slot] !== g) {
+      reforgeArm = false; bagDirty = true;
+      return false;
+    }
+    if (!(bag.xuantie | 0)) {
+      toast('没有玄铁令 —— 精英妖兽身上才出');
+      reforgeArm = false;
+      bagDirty = true;
+      return false;
+    }
+    var tier = gearTier(g);
+    var base = gearBaseSt(b, tier);
+    var best = null, bestSc = -1;
+    for (var i = 0; i < REFORGE_TRIES; i++) {
+      var af = rollAffix(tier), st = { atk: base.atk, def: base.def, maxhp: base.maxhp }, k;
+      for (k in af) if (af.hasOwnProperty(k)) st[k] = (st[k] || 0) + af[k];
+      if (st.def < 0 && tier.t <= 1) st.def = 0;
+      var sc = gearScore(st);
+      if (sc > bestSc) { bestSc = sc; best = st; }
+    }
+    var before = gearStatsLine(g);
+    bag.xuantie = (bag.xuantie | 0) - 1;
+    if (bag.xuantie <= 0) { delete bag.xuantie; reforgeArm = false; }
+    g.st = best;
+    recalcStats();
+    lastGearSig = '';          // 属性变了 → 强制重建装备区（tooltip 里那行数值要跟着更新）
+    bagDirty = true;
+    var after = gearStatsLine(g);
+    addFloater(player.mx, player.my - 0.5, '重铸 ' + gearName(g), tier.col);
+    toast('重铸 ' + gearName(g) + '（剩玄铁令 ' + (bag.xuantie | 0) + ' 枚）\n' +
+      before + '  →  ' + after);
+    return true;
   }
   /** 穿上：同槽位自动换下（旧装备回行囊，不会凭空消失）。 */
   function equipGear(g) {
@@ -435,7 +598,7 @@
     toast('已卸下 ' + gearName(g));
     return true;
   }
-  /** ★ 属性的唯一出口：裸底子 + 三件已穿装备。任何地方都别直接改 player.atk/def/maxhp。 */
+  /** ★ 属性的唯一出口：**境界底子** + 三件已穿装备。任何地方都别直接改 player.atk/def/maxhp。 */
   function recalcStats() {
     var s = { atk: 0, def: 0, maxhp: 0 }, i, sl, g, k;
     for (i = 0; i < GEAR_SLOTS.length; i++) {
@@ -443,10 +606,11 @@
       if (!g) continue;
       for (k in g.st) if (g.st.hasOwnProperty(k)) s[k] = (s[k] || 0) + (g.st[k] | 0);
     }
+    var base = realmBase();                // v54：底子随境界抬升（原来直接用 BASE_STATS）
     var oldMax = player.maxhp;
-    player.atk = BASE_STATS.atk + s.atk;
-    player.def = Math.max(0, BASE_STATS.def + s.def);
-    player.maxhp = BASE_STATS.maxhp + s.maxhp;
+    player.atk = base.atk + s.atk;
+    player.def = Math.max(0, base.def + s.def);
+    player.maxhp = base.maxhp + s.maxhp;
     // 换件护甲不至于把人"换死"：上限抬高时按比例补、压缩时钳住，且永远留 1 点血
     if (player.maxhp !== oldMax) {
       var ratio = oldMax > 0 ? player.hp / oldMax : 1;
@@ -2276,7 +2440,8 @@
           sweep(300, false, G.tier);
           sweep(300, true, G.eliteTier);
           /* ③ 穿戴链路：造一件确定的装备（不靠随机），验证属性确实来自 recalcStats。
-           * 用 toFixed(0) 比对而不是 === 裸减：万一以后加了境界加成，这里要能察觉。
+           * 增量一律对比 **realmBase()**（境界底子）而不是 BASE_STATS —— v54 起底子会随境界变，
+           * 拿裸常量当基准，一旦境界不是炼气期（例如将来有人把用例排在 growth 后面）就会假失败。
            * ★ 断言必须写成花括号体 + return —— 项目历史上用 `=> a && b, {budget}`
            * 写过逗号运算符，结果断言恒真，测试自己失效了三天没人发现。 */
           gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
@@ -2287,7 +2452,7 @@
           var okEquip = equipGear(mk);
           G.equip = !!okEquip && equipped.weapon === mk;
           G.atk = player.atk - atk0;                       // 期望 +11
-          G.def = player.def - (BASE_STATS.def);
+          G.def = player.def - (realmBase().def);
           G.maxhp = player.maxhp - maxhp0;                 // 期望 +40
           unequipGear('weapon');
           G.unequip = equipped.weapon === null && gearInv.indexOf(mk) >= 0 &&
@@ -2395,6 +2560,136 @@
           } else G.realClickSave = 'skip';
           bagToggle(false);
           gp.textContent = JSON.stringify(G);
+        }
+        if (at === 'growth') {
+          /* ?map=<图>&autotest=growth —— 境界 / 炼化 / 重铸 验收（v54）。
+           * 起因：用户一句「妖丹没什么用啊」—— 45% 掉落的东西捡起来后**没有任何出口**。
+           *
+           * 判据全部是「看得见的最终值」，并且**硬编码期望**，不拿被测函数自己算的结果当标准：
+           *   ① 炼化：妖丹清零 / 修为按枚数入账 / 属性不该被炼化动到
+           *   ② 突破：跨门槛后 realmIdx 升，且 player.atk = BASE_STATS + REALMS[n].st
+           *      （★ 防的是"有人绕过 recalcStats 直接写 player.maxhp"——本项目头号翻车点）
+           *   ③ 连跳：一次炼一大把要能跨多级，不是只升一级
+           *   ④ 存档：境界**不进存档**，读回来必须由 exp 自己算回去（纯函数的好处要能验）
+           *   ⑤ 重铸：玄铁令 -1；实例 id / 器型 / 品质不变；**基座数值一分不动**，只有词缀变
+           *   ⑥ 玄铁令用光后重铸模式必须自动解除（否则点装备格会静默变成重铸，玩家以为没穿上）
+           */
+          var gp2 = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none';
+            document.body.appendChild(d); return d;
+          })();
+          var C = { refine: {}, brk: {}, multi: {}, save: {}, rf: {}, arm: {}, ui: {} };
+          // ── ① 炼化 ──
+          player.exp = 0; player.realmIdx = 0; player.realmName = REALMS[0].cn;
+          gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
+          recalcStats();
+          bag = {}; bag.yaodan = 5;
+          var atkB = player.atk, maxB = player.maxhp;
+          var okRef = refineYaodan();
+          C.refine = {
+            ok: !!okRef, left: bag.yaodan | 0, gain: player.exp, want: 5 * YAODAN_CULT,
+            // 5 枚 = 60 修为 < 150，还不该突破
+            noBrk: player.realmIdx === 0,
+            // 炼化只加修为，不该顺手改属性（属性唯一出口的守卫）
+            statsIntact: player.atk === atkB && player.maxhp === maxB
+          };
+          // ── ② 突破（再 10 枚 → 累计 180 ≥ 筑基门槛 150）──
+          bag.yaodan = 10;
+          refineYaodan();
+          C.brk = {
+            idx: player.realmIdx, name: player.realmName === REALMS[1].cn,
+            atk: player.atk === (BASE_STATS.atk + REALMS[1].st.atk),
+            def: player.def === (BASE_STATS.def + REALMS[1].st.def),
+            maxhp: player.maxhp === (BASE_STATS.maxhp + REALMS[1].st.maxhp),
+            full: player.hp === player.maxhp,          // 突破回满气血
+            grew: player.atk > atkB && player.maxhp > maxB
+          };
+          // ── ③ 连跳 ──
+          var wasIdx = player.realmIdx;
+          gainCult(3200);
+          C.multi = {
+            to: player.realmIdx, jumped: player.realmIdx - wasIdx,
+            top: REALMS.length - 1,
+            atk: player.atk === (BASE_STATS.atk + REALMS[REALMS.length - 1].st.atk)
+          };
+          // ── ④ 存档：境界不进档，读回要自己算出来 ──
+          bag = {}; bag.jinchuang = 2;
+          saveGame(true, 1);
+          var wantExp = player.exp, wantIdx = player.realmIdx;
+          player.exp = 0; player.realmIdx = 0; player.realmName = REALMS[0].cn; recalcStats();
+          loadGame(true, 1);
+          C.save = {
+            exp: player.exp === wantExp, idx: player.realmIdx === wantIdx,
+            name: player.realmName === REALMS[wantIdx].cn,
+            atk: player.atk === (BASE_STATS.atk + REALMS[wantIdx].st.atk),
+            // 读档不该"假突破"回满血（syncRealm 的重副作用要绕开）
+            hpKept: player.hp <= player.maxhp && player.hp >= 1
+          };
+          clearSlot(1);        // 别把测试数据留给玩家的档位一
+          // ── ⑤ 重铸 ──
+          /* 造一件**正好等于基座**的仙品重刃（g.t 是 TIERS 的**下标**，3 = 仙品）。
+           * 仙品词缀区间 [2,3]，重铸后必然多出词缀 → "重铸确实改了东西"是可判定的，
+           * 不像"新旧随机对比"那样可能掷回原点、把断言变成掷硬币。 */
+          var rg = { id: 99001, key: 'ge_ji', t: 3, st: { atk: 0, def: 0, maxhp: 0 } };
+          var rgBase = gearBaseSt(GEAR_BASES.ge_ji, gearTier(rg));
+          rg.st = { atk: rgBase.atk, def: rgBase.def, maxhp: rgBase.maxhp };
+          gearInv = [rg]; equipped = { weapon: null, armor: null, trinket: null };
+          recalcStats();
+          bag = {}; bag.xuantie = 2;
+          var rfBefore = gearStatsLine(rg);
+          var okRf = reforgeGear(rg);
+          C.rf = {
+            ok: !!okRf, left: bag.xuantie | 0, id: rg.id === 99001, key: rg.key === 'ge_ji',
+            t: rg.t === 3,
+            // ★ 基座必须一分不动（只允许词缀在其上叠加）
+            baseKept: rg.st.atk >= rgBase.atk && rg.st.def >= rgBase.def &&
+              rg.st.maxhp >= rgBase.maxhp,
+            // 词缀部分确实有正增量（宝品至少一条）
+            hasAffix: (rg.st.atk - rgBase.atk) + (rg.st.def - rgBase.def) +
+              (rg.st.maxhp - rgBase.maxhp) > 0,
+            label: rfBefore + ' → ' + gearStatsLine(rg),
+            // 已装备的也能重铸（这里没穿，顺带验证 recalcStats 没被无脑触发成错误值）
+            atkOk: player.atk === realmBase().atk
+          };
+          equipGear(rg);                       // 穿上再重铸一次：验证"身上那件也能洗"
+          var eqAtk = player.atk;
+          reforgeGear(rg);
+          C.rf.worn = equipped.weapon === rg && player.atk === realmBase().atk + (rg.st.atk | 0);
+          C.rf.wornChanged = !!equipped.weapon;
+          // ── ⑥ 玄铁令用光 → 自动退出重铸模式 ──
+          bag.xuantie = 1; reforgeArm = true;
+          reforgeGear(rg);
+          C.arm = { left: bag.xuantie | 0, off: reforgeArm === false, wornStill: equipped.weapon === rg };
+          // ── UI：材料格真的有手型，玄铁令格在重铸模式下真的高亮 ──
+          bag = {}; bag.yaodan = 2; bag.xuantie = 3; reforgeArm = true;
+          bagBuilt = false; buildBagUI();      // .act / .armed 由 renderBag 落类（重建后必须先 refresh）
+          bagDirty = true; bagToggle(true); renderBag();
+          var cellY = bagCells.yaodan, cellX = bagCells.xuantie;
+          C.ui = {
+            act: !!(cellY && cellY.classList.contains('act')),
+            armed: !!(cellX && cellX.classList.contains('armed')),
+            // cursor 是**最终计算值**（非法值会被浏览器丢弃，所以读它有诊断意义）
+            cursor: cellY ? getComputedStyle(cellY).cursor : 'no-cell',
+            cnt: cellY ? (cellY.querySelector('.n') || {}).textContent : '?'
+          };
+          // 复位：别把测试状态留在玩家看得见的界面上（含"档位一被自测占用"）
+          reforgeArm = false; bag = {}; gearInv = [];
+          equipped = { weapon: null, armor: null, trinket: null };
+          setCurSlot(0);
+          player.exp = 0; player.realmIdx = 0; player.realmName = REALMS[0].cn;
+          recalcStats(); player.hp = player.maxhp;
+          bagDirty = true; lastGearSig = ''; bagToggle(false);
+          C.pass = !!(C.refine.ok && C.refine.left === 0 && C.refine.gain === C.refine.want &&
+            C.refine.noBrk && C.refine.statsIntact &&
+            C.brk.idx === 1 && C.brk.name && C.brk.atk && C.brk.def && C.brk.maxhp &&
+            C.brk.full && C.brk.grew &&
+            C.multi.to === C.multi.top && C.multi.jumped === 3 && C.multi.atk &&
+            C.save.exp && C.save.idx && C.save.name && C.save.atk && C.save.hpKept &&
+            C.rf.ok && C.rf.left === 1 && C.rf.id && C.rf.key && C.rf.t && C.rf.baseKept &&
+            C.rf.hasAffix && C.rf.worn && C.rf.wornChanged &&
+            C.arm.off && C.arm.left === 0 &&
+            C.ui.act && C.ui.armed && C.ui.cursor === 'pointer');
+          gp2.textContent = JSON.stringify(C);
         }
         if (at === 'saveload') {
           /* ?map=<图>&autotest=saveload —— 「小数坐标存档」验收（2026-09-18 用户报
@@ -3583,6 +3878,7 @@
       ctx.fillRect(0, 0, W, H);
     }
     drawHealFx();      // 服药的脚下涟漪（没在服药时零开销）
+    drawRealmFx();     // 突破的金环 + 光柱（同上，realmFx=0 时立刻 return）
     updateHUD();
     updateSkillUI();   // 技能冷却遮罩与倒计时
     updateMinimap();   // 右上角缩略图（内部有脏检查，不是每帧都重画）
@@ -3886,6 +4182,7 @@
     if (player.atkBCd > 0) player.atkBCd = Math.max(0, player.atkBCd - dt);
     if (healCd > 0) { healCd = Math.max(0, healCd - dt); bagDirty = true; }   // 冷却结束要立刻解除格子的灰化
     if (healFx > 0) healFx = Math.max(0, healFx - dt);
+    if (realmFx > 0) realmFx = Math.max(0, realmFx - dt);
     updateLoot(dt);            // 掉落物：老化 + 拾取判定
     for (var sk = 0; sk < player.skillCd.length; sk++) {
       if (player.skillCd[sk] > 0) player.skillCd[sk] = Math.max(0, player.skillCd[sk] - dt);
@@ -4759,6 +5056,17 @@
       healHinted = true;
       toast('拾得 ' + it.cn + ' —— 按 1 / 2 / 3 或点背包格子即可服用');
     }
+    /* v54：妖丹 / 玄铁令第一次到手各提示一句。
+     * 它们现在是"点一下就有用"的格子，但**没人会自己发现**——用户的原话就是「妖丹没什么用啊」，
+     * 说明摆在那里却不说的东西等于不存在。只提示一次，之后靠格子的手型与金边自解释。 */
+    if (key === 'yaodan' && !yaodanHinted) {
+      yaodanHinted = true;
+      toast('拾得妖丹 —— 按 B 开行囊，点妖丹格即可炼化成修为');
+    }
+    if (key === 'xuantie' && !xuantieHinted) {
+      xuantieHinted = true;
+      toast('拾得玄铁令 —— 点它取出，再点装备格即可重铸词缀');
+    }
   }
   var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；银两不入包）
   var bagDirty = true;       // HUD 脏标记（数量变了才碰 DOM）
@@ -4784,6 +5092,8 @@
            (window.__lastErr ? ' | 错:' + window.__lastErr : '');
   }
   var healHinted = false;    // 药品用法是否已提示过
+  var yaodanHinted = false;  // 妖丹（炼化）提示过没有
+  var xuantieHinted = false; // 玄铁令（重铸）提示过没有
   var healCd = 0;            // 服药公共冷却（防止一口气连嗑）
   var HEAL_CD = 0.6;
   var healUsed = '';         // 刚服下的那一格（只有它该显示冷却灰，不是全场一起灰）
@@ -4815,6 +5125,38 @@
     addFloater(player.mx, player.my - 0.5, '+' + got, '#7dff9b');
     healFx = 0.55;
     toast('服下' + it.cn + '，气血 +' + got);
+    return true;
+  }
+  /* ---------------- 妖丹炼化（v54：妖丹的出口） ----------------
+   * 为什么是"点一下炼化**全部**"而不是一枚一枚点：
+   *   妖丹是攒着来的（普通怪 45%、精英一次 1~3 枚），一枚一枚点等于让玩家做几十次无效点击。
+   *   一次炼光的代价只有"没法留几枚看着玩"，换来的是一直不断的打怪节奏。
+   */
+  function refineYaodan() {
+    var n = bag.yaodan | 0;
+    if (!n) { toast('没有妖丹可炼 —— 打妖兽会掉'); return false; }
+    delete bag.yaodan;
+    bagDirty = true;
+    var gain = n * YAODAN_CULT;
+    addFloater(player.mx, player.my - 0.5, '修为 +' + gain, '#c78bff');
+    var up = gainCult(gain);
+    var nx = realmNext();
+    var tail = up ? '' : (nx ? '　·　距' + nx.cn + '还需 ' + Math.max(0, nx.need - player.exp)
+      : '　·　已至化神圆满');
+    toast('炼化 ' + n + ' 枚妖丹 → 修为 +' + gain + tail);
+    return true;
+  }
+  /** 玄铁令：进入/退出重铸模式。真正的重铸发生在点装备格那一刻（见 reforgeGear）。 */
+  function toggleReforge() {
+    if (!(bag.xuantie | 0)) {
+      toast('没有玄铁令 —— 精英妖兽身上才出（练功场那只不算）');
+      return false;
+    }
+    reforgeArm = !reforgeArm;
+    bagDirty = true;
+    toast(reforgeArm
+      ? '已取出玄铁令（' + bag.xuantie + ' 枚）—— 点任意装备格重铸其词缀\n再点玄铁令可取消'
+      : '已收回玄铁令，重铸取消');
     return true;
   }
   /** 服药时的地面涟漪（在主角脚下扩散一圈绿光） */
@@ -4933,10 +5275,19 @@
         var kb = document.createElement('span'); kb.className = 'kb';
         kb.textContent = BAG_KEYS[key]; c.appendChild(kb);
       }
+      /* ★ 触摸屏上 touchstart 与 click 会**连着触发两次**（同一根手指）。
+       *   丹药过去靠 0.6s 公共冷却兜住了第二次；炼化/重铸没有冷却 —— 第二次进来妖丹已经空了，
+       *   会弹一句"没有妖丹可炼"，看着就像 bug。所以在这里用时间戳去重：一次手势只算一次。 */
+      var lastFireT = 0;
       var fire = function (ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-        if (it.kind === 'heal') useHeal(key);
-        else toast(it.cn + '：' + it.desc);
+        var nowT = Date.now();
+        if (nowT - lastFireT < 350) return;
+        lastFireT = nowT;
+        if (it.kind === 'heal') { useHeal(key); return; }
+        if (it.act === 'refine') { refineYaodan(); return; }
+        if (it.act === 'reforge') { toggleReforge(); return; }
+        toast(it.cn + '：' + it.desc);
       };
       c.addEventListener('click', fire);
       c.addEventListener('touchstart', fire, { passive: false });
@@ -5020,7 +5371,10 @@
       eg.innerHTML = '';
       GEAR_SLOTS.forEach(function (sl) {
         var g = equipped[sl.key];
-        eg.appendChild(makeGearCell(g, EQ_ICON, sl.cn, null, function () { unequipGear(sl.key); }));
+        eg.appendChild(makeGearCell(g, EQ_ICON, sl.cn, null, function () {
+          if (g && reforgeArm) { reforgeGear(g); return; }   // 重铸模式：身上这件也能洗
+          unequipGear(sl.key);
+        }));
       });
     }
     var gg = document.getElementById('gearGrid');
@@ -5028,7 +5382,10 @@
       gg.innerHTML = '';
       gearInv.forEach(function (g) {
         gg.appendChild(makeGearCell(g, GEAR_ICON, gearBase(g).cn, function () { meltGear(g); },
-          function () { equipGear(g); }));
+          function () {
+            if (reforgeArm) { reforgeGear(g); return; }
+            equipGear(g);
+          }));
       });
     }
     gearBuilt = true;
@@ -5037,6 +5394,9 @@
   function meltGear(g) {
     var i = gearInv.indexOf(g);
     if (i < 0) return;
+    /* 重铸模式里长按不熔炼：长按抬手后浏览器还会补一个 click（= 重铸），
+     * 如果这里先把它熔成银两，那一下重铸就烧在一块已经没了的装备上。 */
+    if (reforgeArm) { toast('重铸模式中 —— 点它即可重铸；再点玄铁令可取消'); return; }
     var v = gearValue(g);
     gearInv.splice(i, 1);
     player.stones += v;
@@ -5044,18 +5404,22 @@
     toast('熔炼 ' + gearName(g) + ' → ' + v + ' 银两');
     bagDirty = true;
   }
-  /** 属性行 + 计数：装备系统的"收益显示屏"。 */
+  /** 属性行 + 计数：装备系统的"收益显示屏"。
+   *  括号里的增量刻意只算**装备贡献**（对比 realmBase() 而不是对比 0）——
+   *  否则每次境界突破，那串 "+xx" 会一起变大，玩家就分不清"这件装备到底给了我多少"。 */
   function renderGearInfo() {
     var el = document.getElementById('bagAttr');
     if (el) {
-      var pa = (player.atk - BASE_STATS.atk), pd = (player.def - BASE_STATS.def),
-        ph = (player.maxhp - BASE_STATS.maxhp);
+      var rb = realmBase();
+      var pa = player.atk - rb.atk, pd = player.def - rb.def, ph = player.maxhp - rb.maxhp;
       function pm(v) { return v > 0 ? '+' + v : (v < 0 ? String(v) : ''); }
-      el.textContent = '攻 ' + player.atk + pm(pa) + ' · 御 ' + player.def + pm(pd) +
-        ' · 气血 ' + player.maxhp + pm(ph);
+      el.textContent = player.realmName + '　攻 ' + player.atk + pm(pa) + ' · 御 ' + player.def +
+        pm(pd) + ' · 气血 ' + player.maxhp + pm(ph);
     }
     var gc = document.getElementById('gearCnt');
     if (gc) gc.textContent = gearInv.length + ' / ' + GEAR_CAP;
+    var et = document.getElementById('eqTip');
+    if (et) et.textContent = reforgeArm ? '重铸模式：点装备格洗词缀' : '点格子卸下';
   }
 
   /* ═════════ 存档（2026-09-18）════════
@@ -5228,6 +5592,11 @@
     player.exp = o.exp || 0;
     player.stones = o.stones || 0;
     window.__kills = o.kills || 0;
+    /* ★ 境界是 exp 的纯函数，读档只对齐、不"突破"：这里刻意不调 syncRealm() ——
+     * 那个函数带着回满血 + 金环特效 + 弹提示的副作用，读档时触发会覆盖存档里的气血，
+     * 还会在刚进游戏时莫名弹一句"境界突破"。 */
+    player.realmIdx = realmForExp(player.exp);
+    player.realmName = realmNow().cn;
     recalcStats();
     player.hp = Math.max(1, Math.min(player.maxhp, o.hp || player.maxhp));
     lastSaveMs = o.t || 0;
@@ -5453,6 +5822,11 @@
       c.classList.toggle('empty', n <= 0);
       c.classList.toggle('has', n > 0);          // ★ 有货 → 提亮/描金边/角标显现
       c.classList.toggle('use', it.kind === 'heal');
+      /* v54：材料格也有"点下去会做事"的了（妖丹炼化 / 玄铁令取出重铸）。
+       * .act 给手型与配色，.armed 是玄铁令被取出时的脉冲高亮 —— 玩家必须能一眼看出
+       * "现在是重铸模式"，否则点装备时会以为"怎么点一下没穿上"。 */
+      c.classList.toggle('act', !!it.act);
+      c.classList.toggle('armed', key === 'xuantie' && reforgeArm);
       /* ★ .cool 只给**刚按下去的那一格**上（healUsed）。原来写的是无条件
        *   `toggle('cool', healCd>0)` —— 用一次药全场格子一起灰 0.6 秒，
        *   叠上 filter 的优先级问题，用户看到的就是"背包永远是灰的"。 */
@@ -5590,7 +5964,10 @@
     if (f.dying > 0) return;            // 已经在倒地过程中，别重复结算
     f.hp = 0;
     window.__kills = (window.__kills || 0) + 1;   // 击杀计数（状态行判据：杀0=没怪死过）
-    player.exp += f.exp;
+    /* v54：修为统一走 gainCult —— 杀怪涨的修为也要能触发突破。
+     * 原来这里直写 player.exp += f.exp，如果炼化以外的入口不判突破，
+     * 就会出现"修为早就过线了、却要点一下妖丹才突破"的荒谬感。 */
+    gainCult(f.exp);
     var st = f.stones[0] + Math.floor(Math.random() * (f.stones[1] - f.stones[0] + 1));
     player.stones += st;
     addFloater(f.x, f.y - 0.4, '+' + st + ' 银两', '#8bf3ff');
@@ -6139,7 +6516,14 @@
   function updateHUD() {
     var hpv = document.getElementById('hpv'); if (hpv) hpv.textContent = Math.max(0, Math.round(player.hp)) + '/' + player.maxhp;
     var fill = document.getElementById('hpfill'); if (fill) fill.style.width = Math.max(0, player.hp / player.maxhp * 100) + '%';
-    var expv = document.getElementById('expv'); if (expv) expv.textContent = player.realmName + ' · 修为 ' + Math.round(player.exp);
+    /* v54：修为不只是个数字了 —— 显示成「当前累计 / 下一境界门槛」，玩家才知道还差多少。
+     * 用的是**累计值**（突破不扣修为），所以分子只会涨，不会因为突破了就归零。 */
+    var expv = document.getElementById('expv');
+    if (expv) {
+      var nxr = realmNext();
+      expv.textContent = player.realmName + ' · 修为 ' + Math.round(player.exp) +
+        (nxr ? ' / ' + nxr.need : ' · 圆满');
+    }
     var sv = document.getElementById('stonev'); if (sv) sv.textContent = player.stones;
     var ft = document.getElementById('foetarget');
     if (ft) {
