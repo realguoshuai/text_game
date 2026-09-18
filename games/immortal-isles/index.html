@@ -51,6 +51,17 @@
   #topleft #foetarget .ftbar{height:7px;border-radius:4px;background:rgba(0,0,0,.4);overflow:hidden;
     border:1px solid rgba(255,120,120,.4)}
   #topleft #foetarget .ftfill{height:100%;width:100%;background:linear-gradient(90deg,#ff3b3b,#ff7a4a)}
+  /* ---------- 符箓计时条（v58）----------
+   * 限时增益必须**看得见剩多久**：看不见剩余时间，玩家就不知道"现在该不该再嗑一张"，
+   * 符箓会退化成"想起来才点一下"的摆设。
+   * ⚠ 无符箓时整块 hidden（不是 opacity:0）—— 面板要真的矮一截，
+   *   --tlb 才会把左列三个圆钮往上收；否则会永久占着一条空白带。
+   * ⚠ 放面板**内部**：让"面板变高 → 圆钮自动让位"这条既有链路自己生效。 */
+  #topleft #buffRow{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  #topleft #buffRow[hidden]{display:none}
+  #topleft #buffRow .bf{font-size:11px;line-height:1;padding:4px 7px;border-radius:999px;
+    color:#ffe6a6;background:rgba(58,44,22,.85);border:1px solid rgba(226,192,110,.6);
+    font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
   /* ---------- 快捷药栏（常驻：不开背包，点一下直接服药）----------
    * 药品是唯一「挨打时要立刻吃到」的东西：开背包 = 一次点击 + 一次瞄准，血条见底时
    * 这两下往往就是死亡本身。所以三种丹药另开一条常驻横条，挂在**血条正下方** ——
@@ -306,8 +317,13 @@
   #bag .t .stones{color:#8bf3ff;font-family:ui-monospace,Consolas,monospace;font-weight:600}
   /* gap 给到 10：数量角标是**溢出到格子右下角外面**的（right:-2/bottom:-3），
      原来的 7px 会让它压到隔壁格子上，看着像"数字跑别人家去了"。 */
-  #bag .grid{display:grid;grid-template-columns:repeat(3,52px);gap:9px 10px;pointer-events:auto}
-  #bag .cell{position:relative;width:52px;height:52px;border-radius:9px;
+  /* ★ 常备格 5 列 × 2 行（v58）：物品从 5 种加到 10 种（符箓/秘宝都进常备栏），
+     若继续用 3 列就是 4 行 —— 面板被撑高 120px，100vh-190px 的 max-height 撑不住，
+     **行囊（装备）网格会被挤到折叠线以下**：点不到、看不到，等于把装备区藏了。
+     改 5 列后仍是 2 行，高度比原来还矮 8px，代价只是面板宽了约 90px（桌面完全放得下）。
+     这比"给面板加滚动条"好：滚动条只是让人多一步，而这里能直接不滚。 */
+  #bag .grid{display:grid;grid-template-columns:repeat(5,48px);gap:9px 10px;pointer-events:auto}
+  #bag .cell{position:relative;width:48px;height:48px;border-radius:9px;
     background:rgba(8,14,26,.72);border:1px solid rgba(214,178,96,.38);
     display:flex;align-items:center;justify-content:center;transition:.12s}
   #bag .cell > canvas.ico{display:block;transition:filter .15s,opacity .15s}
@@ -536,7 +552,7 @@
     transform-origin:center bottom}
   /* ★ 存档那行不能连着 .tip 一起隐藏 —— 手机玩家更需要一个"我现在存档了吗"的确认 */
   body.touch #bag .tip:not(#saveRow){display:none}
-  body.touch #bag .grid{grid-template-columns:repeat(3,46px)}
+  body.touch #bag .grid{grid-template-columns:repeat(5,46px)}
   body.touch #bag .cell{width:46px;height:46px}
 
   /* 居中事件提示（被击退/折损银两等） */
@@ -699,6 +715,11 @@
     transition:border-color .15s,box-shadow .15s;font-family:inherit}
   #shopBtn:hover{border-color:#ffd24a;box-shadow:0 0 12px rgba(255,210,74,.55)}
   #shopBtn.on{border-color:#ffd24a;box-shadow:0 0 14px rgba(255,210,74,.65)}
+  /* 此地无坊市（v58）：只有城镇才能交易。用 .off 变暗而不是 disabled ——
+     万一地图判断出问题，按钮也不会永久点不动（点一下会给一句"此地无坊市"的说明，
+     比一个完全不响应、也说不清为什么的按钮好）。 */
+  #shopBtn.off{filter:grayscale(.85) brightness(.62);border-color:rgba(160,170,190,.45)}
+  #shopBtn.off:hover{border-color:rgba(160,170,190,.6);box-shadow:none}
   #shopBtn svg{display:block}
   body.touch #shopBtn{top:auto;bottom:122px;left:14px}
 
@@ -724,6 +745,10 @@
     <div class="ftname"></div>
     <div class="ftbar"><div class="ftfill"></div></div>
   </div>
+  <!-- 符箓计时条（v58）：只在有符箓生效时显示。
+       放在面板**内部**而不是另起一个 fixed 浮层：面板高度变化会通过 --tlb 自动把
+       左列三个圆钮往下推（v53 那套机制），不需要再写一处定位、也不会跟它们打架。 -->
+  <div id="buffRow" hidden></div>
   <div class="tlfold">
     <div class="row">坐标 <b id="pos">—</b></div>
     <div class="row" id="hint">踩上青色光门即可切换地图</div>
@@ -748,14 +773,13 @@
   <div class="attr" id="bagAttr">攻 — · 御 — · 气血 —</div>
   <div class="subt">已装备<i id="eqTip">点格子打开操作卡</i></div>
   <div class="eqgrid" id="eqGrid"></div>
-  <div class="subt">丹药 · 材料</div>
+  <div class="subt">丹药 · 符箓 · 材料</div>
   <div class="grid" id="bagGrid"></div>
   <div class="subt">行囊 · 装备<i id="gearCnt">0 / 24</i></div>
   <div class="gears" id="gearGrid"></div>
-  <div class="tip">点<b>装备格</b>弹出操作卡：<b>装备 / 卸下 / 重铸 / 熔炼 / 丢弃</b><br>
-    按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药　·　<b>妖丹</b>点一下全部炼化成修为（攒够自动突破境界）<br>
-    <b>玄铁令</b>攒着，在装备的操作卡里点「重铸」洗词缀<br>
-    银两攒着没处花？左下角<b>坊市</b>买丹药与装备</div>
+  <div class="tip">点<b>装备格</b>弹操作卡：<b>装备 / 卸下 / 重铸 / 熔炼 / 丢弃</b>　·　按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药<br>
+    <b>妖丹</b>点一下炼化成修为　·　<b>符箓</b>点一下即生效（限时增益，倒地会散）<br>
+    <b>玄铁令</b>在装备卡里点「重铸」洗词缀　·　<b>银两</b>去<b>城镇</b>坊市花　·　<b>Esc</b> 关最上层面板</div>
   <div class="tip" id="saveRow">
     <div class="svhint">存档 · <i id="saveInfo">尚未存档</i></div>
     <div id="slotList"></div>
@@ -771,7 +795,7 @@
 </button>
 
 <!-- 坊市入口（v56）：银两的出口。铜钱图标，位置跟着上面板底边（--tlb）走 -->
-<button id="shopBtn" title="坊市（用银两买丹药与装备）" aria-label="坊市">
+<button id="shopBtn" title="坊市（仅城镇：青玄山门 / 黑橡城 / 洛赫港）" aria-label="坊市">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><rect x="9.1" y="9.1" width="5.8" height="5.8" rx="1.1"/></svg>
 </button>
 
@@ -930,10 +954,18 @@
       <span class="purse">银两 <b id="shPurse">0</b></span>
     </div>
     <div class="sc">
-      <div class="grp">丹药 · 常备</div>
+      <div class="grp">丹药 · 常备（即时补给）</div>
       <div id="shPotion"></div>
-      <div class="grp">现货 · 装备（买走即无，换地图补货）</div>
+      <div class="grp">符箓 · 限时增益（同款只刷新时长）</div>
+      <div id="shBuff"></div>
+      <div class="grp">秘宝 · 长期（限量，永久生效）</div>
+      <div id="shRare"></div>
+      <div class="grp">耗材 · 玄铁令</div>
+      <div id="shStuff"></div>
+      <div class="grp">现货 · 装备（买走即无，换城镇补货）</div>
       <div id="shGear"></div>
+      <div class="grp">寄售 · 回收</div>
+      <div id="shRecycle"></div>
     </div>
     <div class="sf"><button id="shClose" type="button">关闭</button></div>
   </div>
@@ -1020,6 +1052,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=57"></script>
+<script src="js/game.js?v=58"></script>
 </body>
 </html>

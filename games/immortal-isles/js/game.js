@@ -188,6 +188,27 @@
     { cn: '化神期', need: 3200, st: { atk: 24, def: 14, maxhp: 330 } }
   ];
   var YAODAN_CULT = 12;              // 一枚妖丹能炼出的修为（ITEMS.yaodan.cult 与此保持一致）
+  /* 秘宝的两个数值锚（v58）：同理，ITEMS 的 desc 与坊市定价都要读这里，别各写一份。
+   *  · 凝元丹直接给修为 ⇒ **必须限量**（SHOP_CULT_MAX / 重境界），否则"银两→修为"盖过主线。
+   *  · 储物玉匣抬行囊上限 ⇒ 必须硬封顶（VAULT_MAX 次），否则 GEAR_CAP 这道取舍门槛失效。 */
+  var NINGYUAN_CULT = 150;           // 一枚凝元丹给的修为（= 筑基门槛，早期买不起、晚期当补票）
+  var VAULT_STEP = 4;                // 一次储物玉匣给的行囊格
+  var VAULT_MAX = 2;                 // 最多买几次
+  var SHOP_CULT_MAX = 2;             // 每重境界最多买几枚凝元丹
+  /* 符箓（v58）：同款只刷新时长、不叠倍率；倒地清除；**不进存档**（瞬时有状态，存了反而
+   * 会出现"下线两天回来符还亮着"，而且读档要处理"过期没"这类边界）。 */
+  var BUFFS = {
+    ruijin:   { cn: '锐金符', stat: 'atk', mul: 1.25 },
+    panshi:   { cn: '磐石符', stat: 'def', mul: 1.45 },
+    shenxing: { cn: '神行符', stat: 'mv',  mul: 1.25 }
+  };
+  var buffT = { ruijin: 0, panshi: 0, shenxing: 0 };   // 剩余秒数
+  /* 秘宝带来的两个**永久**增量，必须进存档（否则重开一局就能再买一次，限量形同虚设）：
+   *  · vaultLv  已买的储物玉匣次数 → 行囊上限 = GEAR_CAP + VAULT_STEP*vaultLv
+   *  · cultBuyRealm/cultBuyN 记录"在哪一重境界买了几枚凝元丹"——
+   *    存 realmIdx 而不是"买过几枚"：换境界自动重置（realmIdx 变了就等于没买过），
+   *    不用额外写"突破时清零"的分支，也就不会漏。 */
+  var vaultLv = 0, cultBuyRealm = 0, cultBuyN = 0;
   /** 由累计修为反查境界下标（只认最大的、need 已满足的那一档）。 */
   function realmForExp(exp) {
     var i = 0;
@@ -391,6 +412,22 @@
     jinchuang: { cn: '金创药', kind: 'heal', icon: 'jinchuang', val: 0.35, desc: '回复 35% 气血' },
     xiaohuan:  { cn: '小还丹', kind: 'heal', icon: 'xiaohuan',  val: 0.55, desc: '回复 55% 气血' },
     dahuan:    { cn: '大还丹', kind: 'heal', icon: 'dahuan',    val: 1.00, desc: '回满气血' },
+    /* —— 符箓（v58）：**钱换一段时间的强度** —— 与丹药的区别是"延时生效"而不是"即时救命"。
+     * kind='buff' 的物品不占公共服药冷却（符箓不是战斗急救），但同款只**刷新时长**不叠倍率，
+     * 且**倒地一律清除**（见 clearBuffs）—— 否则它就从"消耗品"退化成"一次性买断的常驻属性"。 */
+    ruijin:    { cn: '锐金符', kind: 'buff', icon: 'ruijin',   val: 1.25, dur: 90,
+                 desc: '攻 +25% · 持续 90 秒' },
+    panshi:    { cn: '磐石符', kind: 'buff', icon: 'panshi',   val: 1.45, dur: 90,
+                 desc: '御 +45% · 持续 90 秒' },
+    shenxing:  { cn: '神行符', kind: 'buff', icon: 'shenxing', val: 1.25, dur: 120,
+                 desc: '移速 +25% · 持续 120 秒' },
+    /* —— 秘宝（v58）：**钱换进度 / 钱换容量** —— 一次性，但影响是永久的（或限量的）。
+     * 凝元丹直接给修为，所以必须限量（每境界 SHOP_CULT_MAX 枚），否则"银两→修为"
+     * 会盖过"打怪攒修为"这条主线；储物玉匣抬高行囊上限，同样要硬封顶（见 VAULT_MAX）。 */
+    ningyuan:  { cn: '凝元丹', kind: 'rare', icon: 'ningyuan', val: NINGYUAN_CULT, act: 'cult',
+                 desc: '修为 +' + NINGYUAN_CULT + ' · 每重境界限购 ' + SHOP_CULT_MAX + ' 枚' },
+    yuxia:     { cn: '储物玉匣', kind: 'rare', icon: 'yuxia',   val: VAULT_STEP, act: 'vault',
+                 desc: '行囊上限 +' + VAULT_STEP + ' 格 · 可叠加 ' + VAULT_MAX + ' 次' },
     xuantie:   { cn: '玄铁令', kind: 'rare', icon: 'xuantie',   val: 60,   act: 'reforge',
                  desc: '江湖信物 · 在装备操作卡里点「重铸」消耗一枚洗词缀' }
   };
@@ -466,6 +503,10 @@
   var TIER_W = [58, 30, 10, 2];      // 普通怪品质权重
   var TIER_W_ELITE = [16, 34, 36, 14];
   var GEAR_CAP = 24;                 // 行囊格子数（满了就捡不起来，逼着玩家做取舍）
+  /* v58：行囊上限变成**可成长项**（坊市卖「储物玉匣」，最多 VAULT_MAX 次）。
+   * ★ 所以别再用 GEAR_CAP 直接比较 —— 一律走 gearCap()，否则买过玉匣的玩家
+   *   在"捡东西/卸装备/买装备"三条路径上会拿到三个不同的上限。 */
+  function gearCap() { return GEAR_CAP + VAULT_STEP * (vaultLv | 0); }
   var gearInv = [];                  // 背包里的装备实例
   var equipped = { weapon: null, armor: null, trinket: null };
   var gearSeq = 1;                   // 实例编号（存档/对比都靠它认人）
@@ -606,7 +647,7 @@
   function unequipGear(slot) {
     var g = equipped[slot];
     if (!g) return false;
-    if (gearInv.length >= GEAR_CAP) { toast('行囊已满，先熔炼几件再卸下'); return false; }
+    if (gearInv.length >= gearCap()) { toast('行囊已满，先熔炼几件再卸下'); return false; }
     equipped[slot] = null;
     gearInv.unshift(g);
     recalcStats(); bagDirty = true;
@@ -626,6 +667,10 @@
     player.atk = base.atk + s.atk;
     player.def = Math.max(0, base.def + s.def);
     player.maxhp = base.maxhp + s.maxhp;
+    /* v58 符箓：**乘数挂在唯一出口里**，别在伤害公式里另加一处 ——
+     * 那样"面板攻"和"实际伤害"会分叉（玩家看到攻 25 却打出攻 20 的数）。 */
+    if (buffT.ruijin > 0) player.atk = Math.round(player.atk * BUFFS.ruijin.mul);
+    if (buffT.panshi > 0) player.def = Math.round(player.def * BUFFS.panshi.mul);
     // 换件护甲不至于把人"换死"：上限抬高时按比例补、压缩时钳住，且永远留 1 点血
     if (player.maxhp !== oldMax) {
       var ratio = oldMax > 0 ? player.hp / oldMax : 1;
@@ -849,10 +894,13 @@
       //   → fxFrame 'noRect' 全灭 → 火球/爆炸/落雷全部静默不画（炎爆术没特效的真根因）。
       { url: 'assets/fx_atlas.json?v=2', json: true, atlas: 'fx', weight: 1, label: '读取特效索引' },
       { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' },
-      { url: 'assets/items_atlas.png?v=3', atlas: 'items', weight: 23, label: '载入物品图标' },
+      /* v58：图集从 12 帧长到 17 帧（符箓 ×3 + 秘宝 ×2），96KB → 125KB。
+       * 改图集必须同时做两件事：① `?v=` 递增（按 URL 缓存，不升会接着用旧图）
+       * ② weight 改成**新的真实传输 KB**（进度条按权重加权，写小了表现为"卡在这一步"）。 */
+      { url: 'assets/items_atlas.png?v=4', atlas: 'items', weight: 125, label: '载入物品图标' },
       // ⚠ atlas 字段两张都要写：boot 里是按 `p.atlas === 'items'` 把值填进 ATLAS.items 的。
       //   首版漏了 json 这张，导致 json 下载了却没人接（ATLAS.items.rect 恒 null）。
-      { url: 'assets/items_atlas.json?v=3', atlas: 'items', json: true, weight: 1, label: '读取物品图录' }
+      { url: 'assets/items_atlas.json?v=4', atlas: 'items', json: true, weight: 2, label: '读取物品图录' }
     ];
 
   /* ── 按需图集（懒加载）────────────────────────────────────────────────
@@ -2479,13 +2527,13 @@
           /* ⑤ 上限：塞满行囊后在脚下撒一件地上的装备，玩家踩上去**不该**捡起来
            * （旧实现会把它捡起来再丢掉 —— 那样玩家的装备会凭空消失）。 */
           gearInv = [];
-          for (i = 0; i < GEAR_CAP; i++) gearInv.push({ id: 91000 + i, key: 'ge_pei', t: 0, st: { maxhp: 5 } });
+          for (i = 0; i < gearCap(); i++) gearInv.push({ id: 91000 + i, key: 'ge_pei', t: 0, st: { maxhp: 5 } });
           var fake = { id: 95555, key: 'ge_jian', t: 1, st: { atk: 3 } };
           lootDrops = [{ mx: player.mx, my: player.my, key: null, gear: fake, n: 1,
             life: 30, phase: 0, pop: 1, tossT: 0 }];
           player.dead = false;
           updateLoot(1 / 30);
-          G.cap = lootDrops.length === 1 && gearInv.length === GEAR_CAP;
+          G.cap = lootDrops.length === 1 && gearInv.length === gearCap();
           /* ⑥ 存档读写：手动构造一份已知状态 → 存 → 把内存全搞乱 → 读 → 逐项比对 */
           gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
           recalcStats();
@@ -2823,7 +2871,18 @@
            *   ⑦ 点得到：elementFromPoint 在圆钮中心要命中它自己（v50 那类 pointer-events 故障）
            *   ⑧ 补货**按位补**：挖掉位 0 → 补回来的仍是位 0，且位数不重复
            *   ⑨ 开关商店零副作用；存档能带住现货（买走的不会因为"存→读"又回到货架）
-           * 反向对照：把 buyStock 的"行囊满"守卫挪到扣钱之后 → ⑤ 必须变红。
+           * v58 追加（⑩~⑮）：
+           *   ⑩ **符箓真的改到属性**：判据量 player.atk（不是 buffT>0）——后者的病是
+           *      "标了记却没接进 recalcStats"，面板纹丝不动而用例照样绿。
+           *      同时守两条规矩：同款**不叠倍率**、倒地**必须清**。
+           *   ⑪ 限量品先判上限再扣钱；额度要真挡得住（人为把额度用满再试，
+           *      而不是"吃两枚跨过门槛"——那会顺带突破、额度被自动重置，用例永远绿）。
+           *   ⑫ 一键回收只吃凡品，灵品必须留下，到账 = 逐件熔炼价之和。
+           *   ⑬ 城镇门控：临时把当前图移出 TOWN_MAPS，shopToggle(true) 必须失败。
+           *   ⑭ 三组商品 + 回收行真的渲染出来了（没摆出来的商品 = 白做）；买不起报"还差 N"。
+           *   ⑮ Esc 分层关闭：关背包、**一次只关一层**，且 ⛔ **缩略图不归 Esc 管**。
+           * 反向对照：把 buyStock 的"行囊满"守卫挪到扣钱之后 → ⑤ 必须变红；
+           *           把 recalcStats 里符箓那两行删掉 → ⑩ 必须变红（buffT 照样有值）。
            * ⚠ 命中判据一律 elementFromPoint —— el.click() 不经过命中测试（本项目老坑）。
            * ⚠ 用例会写档位一，最后连 raw 一起还原，别吃掉玩家的档。 */
           var ps = document.getElementById('probe') || (function () {
@@ -2894,7 +2953,10 @@
           player.stones = 0; renderShop();
           var bEls = document.querySelectorAll('#shop button.buy'), bAll = bEls.length > 0, bq;
           for (bq = 0; bq < bEls.length; bq++) if (!bEls[bq].disabled) bAll = false;
-          S2.poorDisabled = bAll && bEls.length === SHOP_POTIONS.length + shopStock.length;
+          /* v58：架上多了符箓/秘宝/耗材三组与「回收」一行，所以按钮总数 =
+           * 丹药 + 新三组 + 回收行(1) + 现货装备。少算哪一项都会被这条断言抓出来。 */
+          S2.poorDisabled = bAll && bEls.length ===
+            SHOP_POTIONS.length + SHOP_GOODS.length + 1 + shopStock.length;
           player.stones = 99999; renderShop();
           // ── ④ 买装备：钱减得正好、货架少一件、到手的就是那件 ──
           var tgt = shopStock[0], inv0 = gearInv.length, gm0 = player.stones,
@@ -2906,7 +2968,7 @@
           S2.stockDown = shopStock.length === sl0 - 1;
           // ── ⑤ 行囊满：拒绝 + 钱一分不动 + 货还在架上 ──
           var keepInv = gearInv.slice(), full = [], fi;
-          for (fi = 0; fi < GEAR_CAP; fi++) {
+          for (fi = 0; fi < gearCap(); fi++) {
             full.push({ id: 95000 + fi, key: 'ge_jian', t: 0, st: { atk: 5 } });
           }
           gearInv = full;
@@ -2934,7 +2996,102 @@
           applySave(readSlot(1));
           S2.saveKeeps = shopStock.map(function (s) { return s.g.id; }).join(',') === ids0 &&
             shopStock.length === tst;
-          // 复位：档位一原样还回去，别吃掉玩家的档
+          /* ── ⑩ v58 符箓：买了 → 用了 → **属性真的变了** ──
+           * 判据刻意不取 buffT>0（那只能证明"标了记"，证明不了"生效了"），
+           * 而是直接量 player.atk —— 因为符箓的唯一落点是 recalcStats()，
+           * 只要那里没接上，buffT 照样有值、面板却纹丝不动。 */
+          bag = {}; gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
+          vaultLv = 0; cultBuyRealm = 0; cultBuyN = 0;
+          clearBuffs(); recalcStats();
+          player.stones = 99999;
+          var atk0 = player.atk, wantAtk = Math.round(atk0 * BUFFS.ruijin.mul);
+          S2.buyBuff = buyGoods('ruijin') === true;
+          S2.buffPaid = 99999 - player.stones;
+          S2.buffCount = bag.ruijin | 0;
+          S2.useBuff = useBuff('ruijin') === true;
+          S2.buffOn = buffT.ruijin > 0 && (bag.ruijin | 0) === 0;
+          S2.buffAtk = player.atk;
+          S2.buffAtkWant = wantAtk;
+          S2.buffCalc = player.atk === wantAtk && player.atk > atk0;
+          /* ★ 规矩①：同款再嗑 = 只刷新时长，**倍率绝不叠**（否则嗑五张就是 +125%） */
+          buyGoods('ruijin'); useBuff('ruijin');
+          S2.buffNoStack = player.atk === wantAtk;
+          /* 计时到期：推到只剩 0.01 秒，走一步 tick，属性必须回落 */
+          buffT.ruijin = 0.01; tickBuffs(0.5);
+          S2.buffExpire = buffT.ruijin === 0 && player.atk === atk0;
+          /* 规矩②：倒地清除 */
+          buyGoods('ruijin'); useBuff('ruijin');
+          S2.buffCleared = clearBuffs() === true && buffT.ruijin === 0 && player.atk === atk0;
+          /* ── ⑪ v58 秘宝：限量品**先判上限、再扣钱**（钱必须一分不动）── */
+          player.stones = 99999;
+          var vCap0 = gearCap();
+          buyGoods('yuxia'); useVault();
+          buyGoods('yuxia'); useVault();
+          S2.vaultCap = (vaultLv | 0) === VAULT_MAX && gearCap() === vCap0 + VAULT_STEP * VAULT_MAX;
+          var vm0 = player.stones, vb0 = bag.yuxia | 0;
+          S2.vaultReject = buyGoods('yuxia') === false && player.stones === vm0 && (bag.yuxia | 0) === vb0;
+          /* 凝元丹：每重境界只让服 SHOP_CULT_MAX 枚。**刻意人为把额度用满**再试，
+           * 而不是靠"吃两枚跨过门槛"—— 那会顺带触发突破、把额度自动重置，
+           * 于是用例永远绿而额度从来没被验过。
+           * ⚠ cultBuyRealm 必须**在调用前**对齐到当前 realmIdx：上一句服用已经
+           *   把修为推过 150（筑基门槛），境界变了、额度合法清零 —— 不对齐就会
+           *   误判成"守卫生效"失败（第一版就是这么红的）。 */
+          var e0 = player.exp;
+          cultBuyRealm = player.realmIdx; cultBuyN = 0; bag.ningyuan = 1;
+          S2.cultGain = useNingyuan() === true && (player.exp - e0) === NINGYUAN_CULT && cultBuyN === 1;
+          cultBuyRealm = player.realmIdx; cultBuyN = SHOP_CULT_MAX; bag.ningyuan = 1;
+          var e1 = player.exp;
+          S2.cultReject = useNingyuan() === false && player.exp === e1 && (bag.ningyuan | 0) === 1;
+          /* 反向：**突破后额度自动重置**（存的是"在哪一重境界服的"，不是累计枚数）——
+           * 这条性质值得锁住，否则有人改成累计计数，额度就会永久锁死。 */
+          cultBuyRealm = player.realmIdx - 1; cultBuyN = SHOP_CULT_MAX; bag.ningyuan = 1;
+          S2.cultReset = useNingyuan() === true && cultBuyN === 1;
+          /* ── ⑫ v58 一键回收：只吃凡品，灵品必须留下，钱 = 件件熔炼价之和 ── */
+          gearInv = [
+            { id: 96001, key: 'ge_jian', t: 0, st: { atk: 5 } },
+            { id: 96002, key: 'ge_pei', t: 0, st: { maxhp: 30 } },
+            { id: 96003, key: 'ge_jia', t: 1, st: { def: 6 } }
+          ];
+          var rv0 = player.stones, rWant = gearValue(gearInv[0]) + gearValue(gearInv[1]);
+          S2.recycle = recycleTrash() === true && gearInv.length === 1 && (gearInv[0].t | 0) === 1 &&
+            (player.stones - rv0) === rWant;
+          /* ── ⑬ v58 城镇门控：非城镇图必须**开不了**（这是"补货能刷"的根治手段）── */
+          closeShop();
+          S2.townHere = shopHere() === true;          // 用例跑在 ?map=qingxuan（城镇）
+          var bakTown = TOWN_MAPS.qingxuan;
+          delete TOWN_MAPS.qingxuan;                  // 临时把当前图变成"野外"
+          S2.townGate = shopToggle(true) === false && shopOpen() === false;
+          TOWN_MAPS.qingxuan = bakTown;               // 立刻还原，别污染后面的断言
+          S2.townBack = shopToggle(true) === true && shopOpen() === true;
+          /* ── ⑭ v58 分组与"还差多少"：商品没摆出来 = 白做 ── */
+          player.stones = 99999; renderShop();
+          S2.grpBuff = document.querySelectorAll('#shBuff .it').length;
+          S2.grpRare = document.querySelectorAll('#shRare .it').length;
+          S2.grpStuff = document.querySelectorAll('#shStuff .it').length;
+          S2.grpRecycle = document.querySelectorAll('#shRecycle .it').length;
+          S2.grpOk = S2.grpBuff === 3 && S2.grpRare === 2 && S2.grpStuff === 1 && S2.grpRecycle === 1;
+          player.stones = 0; renderShop();
+          var b0 = document.querySelector('#shGear button.buy');
+          S2.diffText = !!(b0 && b0.disabled && /^还差 /.test(b0.textContent));
+          /* ── ⑮ v58 Esc 分层关闭 + **缩略图不关** ──
+           * 这条必须看 elementFromPoint 之外的东西：判的是"谁被关了、谁还在"。
+           * ⛔ 缩略图（#minimap）不在 Esc 的管辖范围 —— 顺手把它收掉就是 bug。 */
+          closeShop(); bagToggle(false); if (worldOpen) closeWorld();
+          bagToggle(true);
+          if (typeof mmFold === 'function') mmFold(false);
+          var escLayer1 = escLayer();
+          S2.escBag = escLayer1 === 'bag' && !bagOpen;
+          toggleWorld();
+          bagToggle(true);
+          var escLayer2 = escLayer();
+          S2.escOrder = escLayer2 === 'world' && !worldOpen && bagOpen;   // 一次只关一层，先关地图
+          escLayer();
+          if (typeof mmFold === 'function') mmFold(false);
+          var escLayer3 = escLayer();
+          S2.escMini = escLayer3 === '' && MM.folded === false;          // 缩略图必须毫发无损
+          if (typeof mmFold === 'function') mmFold(document.body.classList.contains('touch'));
+          bagToggle(false);
+          /* 复位：档位一原样还回去，别吃掉玩家的档 */
           try {
             if (bakSlot1 === null) localStorage.removeItem(slotKey(1));
             else localStorage.setItem(slotKey(1), bakSlot1);
@@ -2943,6 +3100,7 @@
           bag = {}; gearInv = [];
           equipped = { weapon: null, armor: null, trinket: null };
           player.stones = 0;
+          vaultLv = 0; cultBuyRealm = 0; cultBuyN = 0; clearBuffs();
           recalcStats(); player.hp = player.maxhp;
           bagDirty = true; lastGearSig = ''; bagToggle(false);
           shopStock = []; restockShop();
@@ -2952,7 +3110,14 @@
             S2.poorReject && S2.poorNoGift && S2.poorDisabled &&
             S2.buyGear && S2.gearPaid === S2.gearWant && S2.gearGot && S2.stockDown &&
             S2.fullReject && S2.fullNoPay && S2.fullNoTake &&
-            S2.refill && S2.toggleClean && S2.saveKeeps);
+            S2.refill && S2.toggleClean && S2.saveKeeps &&
+            /* v58 */
+            S2.buyBuff && S2.buffPaid === 45 && S2.buffCount === 1 && S2.useBuff &&
+            S2.buffOn && S2.buffCalc && S2.buffNoStack && S2.buffExpire && S2.buffCleared &&
+            S2.vaultCap && S2.vaultReject && S2.cultGain && S2.cultReject && S2.cultReset &&
+            S2.recycle && S2.townHere && S2.townGate && S2.townBack &&
+            S2.grpOk && S2.diffText &&
+            S2.escBag && S2.escOrder && S2.escMini);
           ps.textContent = JSON.stringify(S2);
         }
         if (at === 'saveload') {
@@ -3119,6 +3284,18 @@
           var R = { defs: 0, healDefs: 0, iconOk: 0, iconMiss: [], rolls: 0, dropped: 0, byKey: {},
                     landed: 0, onWall: 0, picked: 0, bagAfter: {}, healOk: false, healFull: false,
                     healCdBlock: false, crafted: {} };
+          // ★ 期望值一律由**数据表自己算出来**（v58）：原来 headless 里写死"背包 5 格 /
+          //   6 种物品"，每加一件物品都要手改测试 —— 忘了改就会出现"测试红了，
+          //   但游戏其实是对的"，然后有人顺手把断言改成新数字，等于测试没测任何东西。
+          //   改成"页面上报期望值、测试拿去比"，加物品就只剩改数据表这一处。
+          R.want = {
+            defs: Object.keys(ITEMS).length,
+            cells: BAG_ORDER.length,
+            frames: Object.keys(ITEMS).length + Object.keys(GEAR_BASES).length,
+            heal: BAG_ORDER.filter(function (k) {
+              return ITEMS[k] && ITEMS[k].kind === 'heal';
+            }).length
+          };
           // 图集自检：三张表都要到位（任一缺失都会让图标静默变成空白格，不报错）
           R.atlas = {
             img: !!(ATLAS.items && ATLAS.items.img),
@@ -3242,6 +3419,27 @@
           R.bagStates = bagStates;
           // 图集本身解码是否正常（对比参考，不参与判据）
           R.atlasNatural = ATLAS.items.img ? (ATLAS.items.img.naturalWidth + 'x' + ATLAS.items.img.naturalHeight) : '-';
+          /* ★ 图集**交叉判据**（v58）：图里每一个矩形都必须落在解码出来的图片内。
+           * 写死尺寸（原来是 '782x198'）会随帧数变化立刻失效，而"红灯的理由"和
+           * "图标真的坏了"长得一模一样 —— 很容易被顺手改成新数字糊过去，测试从此白设。
+           * 越界才是真故障（越界 = 裁到隔壁帧或空白，且**全程不报错**），
+           * 所以判据改成"所有帧都装得下"：OK 时返回真实尺寸，越界时返回 'overflow …'。 */
+          R.atlasFit = (function () {
+            var img = ATLAS.items && ATLAS.items.img;
+            if (!img || !img.naturalWidth) return 'no-img';
+            var mx = -1, my = -1;
+            var scan = function (tbl) {
+              Object.keys(tbl || {}).forEach(function (k) {
+                var r = tbl[k];
+                if (!r) return;
+                mx = Math.max(mx, (r[0] | 0) + (r[2] | 0));
+                my = Math.max(my, (r[1] | 0) + (r[3] | 0));
+              });
+            };
+            scan(ATLAS.items.rect); scan(ATLAS.items.big);
+            if (mx > img.naturalWidth || my > img.naturalHeight) return 'overflow ' + mx + 'x' + my;
+            return img.naturalWidth + 'x' + img.naturalHeight;
+          })();
           pbold.textContent = JSON.stringify(R);
         }
         if (at === 'ranged') {
@@ -4568,31 +4766,52 @@
   }
 
   var keys = {};
+  /* ── Esc 的统一语义（v58）：**从最里面那一层往外关，一次只关一层**。
+   * 优先级 = 视觉层级：确认框 > 装备操作卡 > 坊市 > 世界地图 > 背包。
+   * 三条纪律，改以前先读：
+   *   ① **一次只关一层**。原来"关世界地图"那条写在最后，于是操作卡开着时按 Esc
+   *      会把背后的地图一起关掉 —— 玩家按一下，关掉的是他根本没看见的那层。
+   *   ② **背包不吞按键**：背包是常驻侧栏（可以边打边开），不是模态浮层。
+   *      给它加按键拦截会顺手废掉"开着背包继续打"这个正常玩法；
+   *      另外四层都是模态，才需要把背后的走位/出手全部吞掉。
+   *   ③ ⛔ **场景缩略图（#minimap）不归 Esc 管**。它是常驻 HUD，折叠由右上角 ▾ 负责。
+   *      Esc 顺手把它收掉 = 玩家"想关地图，结果把小地图也弄没了"，还得自己找回来。
+   */
+  function escLayer() {
+    if (confirmOpen()) { closeConfirm(false); return 'confirm'; }
+    if (cardOpen()) { closeGearCard(); return 'card'; }
+    if (shopOpen()) { closeShop(); return 'shop'; }
+    if (worldOpen) { closeWorld(); return 'world'; }
+    if (bagOpen) { bagToggle(false); return 'bag'; }
+    return '';
+  }
   window.addEventListener('keydown', function (e) {
     var k = e.key;
-    /* 确认框开着时所有按键归它：Esc = 取消、Enter = 确定，其余一律吞掉。
+    /* Esc 统一入口：必须在下面几个"模态吞按键"分支**之前**，否则会先被它们吞掉。
+     * 另外这里必须 return —— 原来 Esc 会一路掉进 keys['escape']=1，
+     * 表现就是"浮层开着、角色还在背后正常走位"。 */
+    if (k === 'Escape') { e.preventDefault(); escLayer(); return; }
+    /* 确认框开着时所有按键归它：Enter = 确定，其余一律吞掉。
      * 不做这层拦截的话，弹窗浮在上面、人在背后还在走位出手 —— 点个确认回来已经死了。 */
     if (confirmOpen()) {
-      if (k === 'Escape') { e.preventDefault(); closeConfirm(false); }
-      else if (k === 'Enter') { e.preventDefault(); closeConfirm(true); }
+      if (k === 'Enter') { e.preventDefault(); closeConfirm(true); }
       else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
       return;
     }
-    /* 装备操作卡同理：开着时按键全归它（Esc / Enter = 关掉，别让角色在背后走位）。
-     * 漏了这层，玩家在卡片上按 Esc 会连带把世界地图也关了。 */
+    /* 装备操作卡同理：开着时按键全归它（Enter = 关掉，别让角色在背后走位）。 */
     if (cardOpen()) {
-      if (k === 'Escape' || k === 'Enter') { e.preventDefault(); closeGearCard(); }
+      if (k === 'Enter') { e.preventDefault(); closeGearCard(); }
       else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
       return;
     }
     /* 坊市（z-index 135，比操作卡还高）：开着时按键全归它，同样别让角色在背后走位。 */
     if (shopOpen()) {
-      if (k === 'Escape' || k === 'Enter') { e.preventDefault(); closeShop(); }
+      if (k === 'Enter') { e.preventDefault(); closeShop(); }
       else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
       return;
     }
-    // Tab 开/关世界地图（打开时背后游戏暂停移动）；Esc 仅关闭。都拦掉默认行为避免焦点乱跳。
-    if (k === 'Tab' || (worldOpen && k === 'Escape')) { e.preventDefault(); toggleWorld(); return; }
+    // Tab 开/关世界地图（打开时背后游戏暂停移动）。都拦掉默认行为避免焦点乱跳。
+    if (k === 'Tab') { e.preventDefault(); toggleWorld(); return; }
     if (worldOpen) return;
     keys[k.toLowerCase()] = 1;
     if (k.indexOf('Arrow') === 0) e.preventDefault();
@@ -4736,7 +4955,8 @@
     var d = inputDir();
     if (player.dead) d = { dx: 0, dy: 0 };              // 倒地期间不接受移动输入
     var running = !!((keys['shift'] || joyVec.run) && (d.dx || d.dy));  // 按住 Shift / 摇杆推满 = 奔跑
-    var speed = 3.8 * (running ? RUN_MUL : 1);   // 5.2 太飘，降到 3.8 格/秒
+    var speed = 3.8 * (running ? RUN_MUL : 1)
+      * (buffT.shenxing > 0 ? BUFFS.shenxing.mul : 1);   // v58 神行符：只影响走路，不影响攻速/出手
     var px0 = player.mx, py0 = player.my;
 
     if (d.dx || d.dy) {
@@ -4837,6 +5057,7 @@
       }
     }
     if (player.attackCd > 0) player.attackCd = Math.max(0, player.attackCd - dt);
+    tickBuffs(dt);                       // v58 符箓计时（到期才 recalc，见 tickBuffs 注释）
     if (player.flash > 0) player.flash = Math.max(0, player.flash - dt);
     if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt);
@@ -5594,10 +5815,10 @@
       if (Math.hypot(player.mx - L.mx, player.my - L.my) > PICK_R) continue;
       /* 行囊满了就**留在地上**（不是捡起来丢掉 —— 那才是真的作恶），
        * 每 4 秒提醒一次，不然每帧 toast 会把屏幕刷成提示墙。 */
-      if (L.gear && gearInv.length >= GEAR_CAP) {
+      if (L.gear && gearInv.length >= gearCap()) {
         if (time - (L.lastWarn || -99) > 4) {
           L.lastWarn = time;
-          toast('行囊已满（' + GEAR_CAP + ' 件）—— 熔炼几件或先穿走一件');
+          toast('行囊已满（' + gearCap() + ' 件）—— 熔炼几件或先穿走一件');
         }
         continue;
       }
@@ -5615,7 +5836,7 @@
   /** 装备入包（一股 ╳ 一件，不存在堆叠）。 */
   function collectGear(g, mx, my) {
     if (!g || !GEAR_BASES[g.key]) return;
-    if (gearInv.length >= GEAR_CAP) return;
+    if (gearInv.length >= gearCap()) return;
     if (gearInv.indexOf(g) >= 0) return;      // 同一实例别被重复塞进来
     gearInv.push(g);
     var tier = gearTier(g);
@@ -5754,6 +5975,107 @@
     toast('玄铁令 ' + n + ' 枚 —— 点任意装备格，在操作卡里选「重铸」');
     return true;
   }
+  /* ═════════ 符箓 · 限时增益（v58）════════
+   * 与丹药的分工：**丹药 = 即时救命（钱换命），符箓 = 一段时间的强度（钱换窗口）**。
+   * 三条规矩，改以前先读：
+   *   ① **同款只刷新时长，不叠倍率**。允许叠加的话，"开战前嗑五张锐金符"就是 +125% 攻，
+   *      符箓会从消耗品退化成必刷仪式 —— 而且越攒越强，怪的设计强度全部失效。
+   *   ② **倒地一律清除**。倒地是这个游戏唯一的真实惩罚（折损银两），符箓跟着散掉，
+   *      "这波亏了"才有痛感；不清就变成倒地也白赚一段时长。
+   *   ③ **不进存档**。它是"此刻在生效"的瞬时状态，存进去就得处理"下线两天回来还亮着吗"。
+   * 生效点只有两处，都在既有出口上：recalcStats()（攻/御）与移动速度那一行（移速）。
+   */
+  function useBuff(key) {
+    var it = ITEMS[key], b = BUFFS[key];
+    if (!it || !b) return false;
+    if (player.dead) { toast('已经倒下了，先等起身'); return false; }
+    if (!bag[key]) { toast('没有' + it.cn + ' —— 坊市有卖'); return false; }
+    bag[key]--;
+    if (bag[key] <= 0) delete bag[key];
+    /* 直接赋值 = 刷新时长（不是 += ，那就是叠加了，见规矩①） */
+    buffT[key] = it.dur;
+    recalcStats();
+    bagDirty = true;
+    addFloater(player.mx, player.my - 0.5, it.cn, '#ffd24a');
+    toast(it.cn + ' 生效 · ' + it.desc);
+    renderBuffs();
+    return true;
+  }
+  /** 倒地/换局时清掉全部符箓。返回是否真的清掉了东西（给 toast 用）。 */
+  function clearBuffs() {
+    var k, had = false;
+    for (k in buffT) if (buffT.hasOwnProperty(k)) { if (buffT[k] > 0) had = true; buffT[k] = 0; }
+    if (had) { recalcStats(); renderBuffs(); }
+    return had;
+  }
+  /** 每帧推进符箓计时。**只有真的到期才 recalcStats** ——
+   *  乘数是常数，没必要每帧重算一遍属性（那是白跑）。 */
+  function tickBuffs(dt) {
+    var k, gone = false;
+    for (k in buffT) {
+      if (!buffT.hasOwnProperty(k) || buffT[k] <= 0) continue;
+      buffT[k] -= dt;
+      if (buffT[k] <= 0) { buffT[k] = 0; gone = true; toast(BUFFS[k].cn + ' 失效'); }
+    }
+    if (gone) { recalcStats(); renderBuffs(); }
+  }
+  /** 上面板里的符箓计时条。★ 无符箓时整条 hidden —— 面板矮一截，左列圆钮靠
+   *  --tlb 自动跟着上移（v53 那套机制），不用另写一处定位。 */
+  var buffRowShown = false;
+  function renderBuffs() {
+    var el = document.getElementById('buffRow');
+    if (!el) return;
+    var out = '', k, on = 0;
+    for (k in buffT) {
+      if (!buffT.hasOwnProperty(k) || buffT[k] <= 0) continue;
+      on++;
+      out += '<span class="bf">' + BUFFS[k].cn + ' ' + Math.ceil(buffT[k]) + 's</span>';
+    }
+    if (on) el.innerHTML = out; else el.innerHTML = '';
+    if (!!on !== buffRowShown) {
+      buffRowShown = !!on;
+      if (on) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+      syncLeftBtns();      // 面板高度变了 → 左列圆钮要重排（别等 0.5s 心跳）
+    }
+  }
+  /* ═════════ 秘宝：凝元丹 / 储物玉匣（v58）════════
+   * 两者都是"钱换进度"，所以都必须有硬上限 —— 不然游戏的成长主线（打怪攒修为 / 行囊取舍）
+   * 会被银两直接买断。上限的**计数都进存档**，否则"用完刷新页面"就能无限吃。 */
+  function useNingyuan() {
+    if (!bag.ningyuan) { toast('没有凝元丹 —— 坊市有卖'); return false; }
+    /* 换境界自动重置额度：存的是"在哪一重买的"，所以不用写"突破时清零"这种会漏的分支。 */
+    if (cultBuyRealm !== player.realmIdx) { cultBuyRealm = player.realmIdx; cultBuyN = 0; }
+    if (cultBuyN >= SHOP_CULT_MAX) {
+      toast('这一重境界的凝元丹已服满（' + SHOP_CULT_MAX + ' 枚）\n突破之后才能再服');
+      return false;
+    }
+    bag.ningyuan--;
+    if (bag.ningyuan <= 0) delete bag.ningyuan;
+    cultBuyN++;
+    bagDirty = true;
+    addFloater(player.mx, player.my - 0.5, '修为 +' + NINGYUAN_CULT, '#c78bff');
+    var up = gainCult(NINGYUAN_CULT);
+    var nx = realmNext();
+    var tail = up ? '　·　突破至 ' + player.realmName
+      : (nx ? '　·　距' + nx.cn + '还需 ' + Math.max(0, nx.need - player.exp) : '　·　已至化神圆满');
+    toast('服下凝元丹 → 修为 +' + NINGYUAN_CULT + tail +
+      '\n本境界已服 ' + cultBuyN + '/' + SHOP_CULT_MAX);
+    saveGame(true);      // 限量计数立刻落盘（"吃完就刷新"这条漏洞必须当场堵住）
+    return true;
+  }
+  function useVault() {
+    if (!bag.yuxia) { toast('没有储物玉匣 —— 坊市有卖'); return false; }
+    if ((vaultLv | 0) >= VAULT_MAX) {
+      toast('储物玉匣已经用满（+' + (VAULT_STEP * VAULT_MAX) + ' 格）'); return false;
+    }
+    bag.yuxia--;
+    if (bag.yuxia <= 0) delete bag.yuxia;
+    vaultLv = (vaultLv | 0) + 1;
+    bagDirty = true; lastGearSig = '';    // 行囊区要重画（格数与计数都变了）
+    toast('行囊扩容 · 上限 ' + gearCap() + ' 格（' + vaultLv + '/' + VAULT_MAX + '）');
+    saveGame(true);
+    return true;
+  }
   /** 服药时的地面涟漪（在主角脚下扩散一圈绿光） */
   var healFx = 0;
   function drawHealFx() {
@@ -5779,11 +6101,15 @@
    * 位置稳定才能让「1/2/3 对应哪瓶药」变成肌肉记忆，图标乱跑反而难用。
    * 三种药固定占前三格（金创药 / 小还丹 / 大还丹），材料类排后面只展示。
    */
-  var BAG_ORDER = ['jinchuang', 'xiaohuan', 'dahuan', 'yaodan', 'xuantie'];
+  var BAG_ORDER = ['jinchuang', 'xiaohuan', 'dahuan', 'ruijin', 'panshi', 'shenxing',
+    'ningyuan', 'yuxia', 'yaodan', 'xuantie'];
   var BAG_KEYS = { jinchuang: '1', xiaohuan: '2', dahuan: '3' };
   var bagCells = {};         // key → cell 元素（增量更新计数，不重建 DOM）
   var bagBuilt = false;
-  var BAG_ICON = 46;         // 图标在格子里的显示边长（px）
+  /* 图标在格子里的显示边长（px）。v58：格子从 52 收到 48（常备栏改 5 列 2 行，
+   * 见 index.html 里 #bag .grid 的注释），图标跟着从 46 收到 40 —— 留出 4px 内边距，
+   * 否则图标会贴到格线，看起来像"没对齐"。 */
+  var BAG_ICON = 40;
 
   /* ★★ 从图集里"取一帧"的**唯一**正确写法
    *
@@ -5814,7 +6140,7 @@
    *   ② 图还没解码完（naturalWidth=0）时先不画，等 load 后重建；否则缩放系数是 Infinity。
    */
   function bagIconEl(pz, cn, size) {
-    var S = size || BAG_ICON;                    // 背包格子 46px、左上角快捷药格 40px，同一份画法
+    var S = size || BAG_ICON;   // 背包格 / 左上角快捷药格共用同一份画法，只是目标边长不同
     var nw = pz.img.naturalWidth || pz.img.width || 0;
     var nh = pz.img.naturalHeight || pz.img.height || 0;
     if (!pz.w || !nw || !nh) {                   // 图未解码完 → 挂 load 后重建
@@ -5880,6 +6206,9 @@
         if (nowT - lastFireT < 350) return;
         lastFireT = nowT;
         if (it.kind === 'heal') { useHeal(key); return; }
+        if (it.kind === 'buff') { useBuff(key); return; }
+        if (it.act === 'cult') { useNingyuan(); return; }
+        if (it.act === 'vault') { useVault(); return; }
         if (it.act === 'refine') { refineYaodan(); return; }
         if (it.act === 'reforge') { hintReforge(); return; }
         toast(it.cn + '：' + it.desc);
@@ -6076,7 +6405,16 @@
    *   ② **现货装备**（有限、买走即无）：银两的大目标 —— "钱换实力"，
    *      顺手补上「脸黑一直掉不到装备」这条路：**掉落给运气，商店给积累**。
    *
-   * 四条规矩，改以前先读：
+   * v58 扩成五类，**每类对应一个不同的"钱能买到什么"**（这是不重复铺货的关键）：
+   *   ① 丹药  = 钱换命（即时）
+   *   ② 符箓  = 钱换一段时间的强度（限时）
+   *   ③ 秘宝  = 钱换进度 / 容量（永久，但限量）
+   *   ④ 现货装备 = 钱换实力（明码标价、买走即无）
+   *   ⑤ 耗材  = 钱换"运气"（玄铁令：把脸黑变成可积累）
+   * 加任何新品前先问一句：**它属于哪一类？** 若是"第六类"，先想清楚它替换掉了谁 ——
+   * 重复用途的商品只会让货架变长，让玩家多滚两屏。
+   *
+   * 五条规矩，改以前先读：
    *   ★ ① **买入价必须永远高于熔炼价**。熔炼一件装备值 25~272 银两（看品质与词缀），
    *        所以最低一档也定在 90 —— 否则会出现"买来立刻熔炼"的稳定套利，经济当场崩。
    *        `?autotest=shop` 里有一条断言专门守它（三档品质各验一次）。
@@ -6086,9 +6424,36 @@
    *   ★ ③ **价格只由品质决定，不随属性浮动**。同上：价格浮动会让"淘货"退化成"按价格排序"。
    *   ★ ④ **补货只发生在换地图时，不在每次打开商店时**。否则"开→关→开"就能无限刷货，
    *        现货的稀缺性（以及"换张图看看货"的动力）就没了。
+   *   ★ ⑤ **v58 补**：限量类商品（凝元丹 / 储物玉匣）**先在买入侧判上限、再判钱** ——
+   *        先扣钱后拒绝是最坏的一类 bug（损失无声无息）。同"行囊满"的纪律。
    */
   var SHOP_POTIONS = ['jinchuang', 'xiaohuan', 'dahuan'];
   var SHOP_POTION_PRICE = { jinchuang: 15, xiaohuan: 35, dahuan: 85 };
+  /* —— 符箓 / 秘宝 / 耗材（v58）——
+   * 定价口径，逐一交代（都不是拍脑袋）：
+   *   · 锐金符 45：攻 +25% 顶 90 秒。一件凡品剑（90 银两）给 +5 攻且**永久**；
+   *     炼气期底子 20 攻，+25% 也才 +5 —— 所以它必须比装备便宜（60 秒 vs 永久）。
+   *     但它**随境界放大**（化神期攻 40+ 时 +25% 值 +10 以上），所以又不能太便宜，
+   *     取 45 ≈ 半件凡品：短期爆发，长期不划算，这才是消耗品该有的性价比。
+   *   · 磐石符 55：御 +45% 是三条里数值最大的一条（御在减伤公式里是直接减，收益更高）。
+   *   · 神行符 40：只影响赶路，不影响战斗数值 —— 定最低价，让"跑图"这件事便宜。
+   *   · 凝元丹 400：直接给 150 修为。**用服用上限（每重境界 2 枚）限流，而不是靠价格** ——
+   *     光靠高价挡不住"后期银两过剩"。定价 400 的依据：一只普通怪约 8 银两，
+   *     400 ≈ 50 只怪；而 50 只怪本身能打出一千多修为。所以它是"补票"不是"捷径"。
+   *   · 储物玉匣 900：永久 +4 行囊格。行囊格直接影响"能带几趟装备回来"，
+   *     是整个循环的产能。定得上限（2 次）+ 高价，两者缺一不可。
+   *   · 玄铁令 220：本来只从精英掉（30%）。上架是给"脸黑但攒了钱"的人一条路 ——
+   *     定价必须**高于一次精英清场的期望收益**（一趟清场约 60~120 银两，但还得赌 30%），
+   *     220 才能保住"刷精英"的理由。
+   */
+  var SHOP_GOODS = [
+    { key: 'ruijin',   group: 'buff',  price: 45 },
+    { key: 'panshi',   group: 'buff',  price: 55 },
+    { key: 'shenxing', group: 'buff',  price: 40 },
+    { key: 'ningyuan', group: 'rare',  price: 400 },
+    { key: 'yuxia',    group: 'rare',  price: 900 },
+    { key: 'xuantie',  group: 'stuff', price: 220 }
+  ];
   /* 现货定价（下标 = 品质下标：凡/灵/宝/仙）。
    * 必须守住"买 > 卖"：熔炼价 凡 25~50 / 灵 60~130 / 宝 110~230 / 仙 200~272。 */
   var SHOP_TIER_PRICE = [90, 260, 750, 1800];
@@ -6102,8 +6467,25 @@
     [50, 50, 0, 0],      /* 位 2：凡 / 灵 */
     [100, 0, 0, 0]       /* 位 3：凡品垫底 */
   ];
+  /* 有坊市的地图（v58）：**只在这三张图能买东西**。
+   * 为什么必须收紧：补货只发生在"换地图"时，而世界地图可以随便传送 ——
+   * 16 张图来回横跳几十秒就能把货架刷成任意想要的，现货的稀缺性等于零。
+   * 副作用是好事：城镇 = 补给点，野外 = 猎场，地图之间终于有了功能差异。 */
+  var TOWN_MAPS = {
+    qingxuan: 1,
+    flare_grass_empyrean_campaign_black_oak_city: 1,
+    flare_grass_empyrean_campaign_lochport: 1
+  };
   var shopStock = [];        // [{ slot, g: 装备实例, price }]
   var shopSeq = 90000;       // 现货实例号（与掉落的 gearSeq 分开编号，避免存档里认错人）
+
+  /** 当前站在有坊市的地图上吗？（三张城镇图，见 TOWN_MAPS） */
+  function shopHere() { return !!(CUR && TOWN_MAPS[CUR.id]); }
+  /** 当前境界**买得到**的最高品质下标（v58）。
+   *  炼气期只到灵品、筑基期到宝品、金丹期起才见仙品。
+   *  为什么要有这道闸：16 张图 5 个境界，而货架从第一秒就把 1800 的仙品摆在那里 ——
+   *  进店永远是同一屏，没有任何"新东西"。加了闸，"能买得起什么"本身就成了进度的一部分。 */
+  function shopMaxTier() { return Math.max(1, Math.min(TIERS.length - 1, 1 + (player.realmIdx | 0))); }
 
   /** 指定品质搓一件装备（与 rollGear 同口径：器型裸值 × 品质 + 词缀）。
    *  不能直接调 rollGear —— 那里面品质是随机摇的，而货架的品质由位次决定。 */
@@ -6125,7 +6507,10 @@
     for (i = 0; i < shopStock.length; i++) have[shopStock[i].slot] = 1;
     for (i = 0; i < SHOP_STOCK_MAX; i++) {
       if (have[i]) continue;
-      var ti = pickW(SHOP_STOCK_TIER[i]);
+      /* v58：货架品质再被境界**向下夹**一道（shopMaxTier）——
+       * 位 0 本来会摇出仙品，炼气期的玩家看着 1800 的仙品只能干瞪眼，
+       * 那不是"目标"，是"挫败"。夹一刀之后，同一个位在高境界自然解锁。 */
+      var ti = Math.min(shopMaxTier(), pickW(SHOP_STOCK_TIER[i]));
       shopStock.push({ slot: i, g: makeShopGear(ti), price: SHOP_TIER_PRICE[ti] });
     }
     shopStock.sort(function (a, b) { return a.slot - b.slot; });
@@ -6148,8 +6533,8 @@
     if (!it) return false;
     /* 行囊满必须先判，再扣钱 —— 反过来会做出"钱扣了、装备没进包"，
      * 那是最坏的一类 bug：损失无声无息，玩家只会觉得"钱少了"。 */
-    if (gearInv.length >= GEAR_CAP) {
-      toast('行囊已满（' + GEAR_CAP + ' 件）—— 先熔炼几件再来');
+    if (gearInv.length >= gearCap()) {
+      toast('行囊已满（' + gearCap() + ' 件）—— 先熔炼几件再来');
       return false;
     }
     if (player.stones < it.price) {
@@ -6162,6 +6547,77 @@
     bagDirty = true; lastGearSig = '';   // 强制重建装备区，否则新买的这件不显示
     toast('买到 ' + gearName(it.g) + '（' + it.price + ' 银两）\n' + gearStatsLine(it.g, '　'));
     return true;
+  }
+  /** 符箓 / 秘宝 / 耗材的购买（v58）。与买装备同一条纪律：
+   *  **先判"能不能收"，再扣钱** —— 先扣钱后拒绝会造成无声损失。 */
+  function buyGoods(key) {
+    var g = null, i, it = ITEMS[key];
+    for (i = 0; i < SHOP_GOODS.length; i++) if (SHOP_GOODS[i].key === key) g = SHOP_GOODS[i];
+    if (!g || !it) return false;
+    /* 储物玉匣：行囊上限已经到顶 / 手上还有没用的，都别再卖给他（买了就是废纸）。 */
+    if (key === 'yuxia' && ((vaultLv | 0) + (bag.yuxia | 0)) >= VAULT_MAX) {
+      toast('储物玉匣已到上限（+' + (VAULT_STEP * VAULT_MAX) + ' 格）');
+      return false;
+    }
+    /* 凝元丹：手上超过"一重境界的额度"就没必要再买 —— 免得玩家把钱换成用不掉的存货。 */
+    if (key === 'ningyuan' && (bag.ningyuan | 0) >= SHOP_CULT_MAX) {
+      toast('手上已有 ' + SHOP_CULT_MAX + ' 枚凝元丹 —— 先服用再来买');
+      return false;
+    }
+    if (player.stones < g.price) {
+      toast('银两不足 —— ' + it.cn + ' 要 ' + g.price + '，现有 ' + player.stones);
+      return false;
+    }
+    player.stones -= g.price;
+    bag[key] = (bag[key] | 0) + 1;
+    bagDirty = true;
+    toast('买到 ' + it.cn + ' ×1（余 ' + player.stones + ' 银两）\n' + it.desc);
+    return true;
+  }
+  /* ── 一键回收（v58）──
+   * 只在"纯垃圾"上开一键：凡品熔炼价 25~50，逐件长按熔炼要几十次点击，
+   * 那是纯操作税。灵品以上不碰 —— 它可能比身上那件还好，"一键"卖掉好东西是不可挽回的伤害。
+   * ★ 回收价**严格等于熔炼价**（一分不加）：只要有一点溢价，"买来立刻回收"就成立，
+   *   经济会当场破（与现货定价规矩①同源）。 */
+  function trashStat() {
+    var n = 0, v = 0, i;
+    for (i = 0; i < gearInv.length; i++) {
+      if ((gearInv[i].t | 0) === 0) { n++; v += gearValue(gearInv[i]); }
+    }
+    return { n: n, v: v };
+  }
+  function recycleTrash() {
+    var st = trashStat(), i;
+    if (!st.n) { toast('没有可回收的凡品'); return false; }
+    for (i = gearInv.length - 1; i >= 0; i--) if ((gearInv[i].t | 0) === 0) gearInv.splice(i, 1);
+    player.stones += st.v;
+    bagDirty = true; lastGearSig = '';
+    addFloater(player.mx, player.my - 0.3, '+' + st.v + ' 银两', '#8bf3ff');
+    toast('回收凡品 ' + st.n + ' 件 → ' + st.v + ' 银两（共 ' + player.stones + '）');
+    return true;
+  }
+  /** 回收要先过确认框：一次性丢掉十几件是**不可逆**的，必须有一道门。 */
+  function askRecycle() {
+    var st = trashStat();
+    if (!st.n) { toast('没有可回收的凡品 —— 回收只收未装备的凡品'); return false; }
+    confirmBox('回收 ' + st.n + ' 件凡品？',
+      '未装备的**凡品**共 ' + st.n + ' 件，回收可得 ' + st.v + ' 银两。\n' +
+      '灵品以上不在回收范围（可能比身上那件还好）。',
+      '回收', function (ok) { if (ok) { recycleTrash(); renderShop(); } });
+    return true;
+  }
+  /** 坊市入口按钮的可用态（v58：只有城镇才有坊市）。
+   *  用 class 而不是 disabled —— 万一同城判断出问题，按钮也不会永远点不动（可自愈）。 */
+  var shopBtnTown = null;
+  function syncShopBtn() {
+    var b = document.getElementById('shopBtn');
+    if (!b) return;
+    var ok = shopHere();
+    if (shopBtnTown === ok) return;
+    shopBtnTown = ok;
+    b.classList.toggle('off', !ok);
+    b.title = ok ? '坊市（用银两买丹药、符箓、秘宝与装备）'
+      : '此地无坊市 —— 青玄山门 / 黑橡城 / 洛赫港才有';
   }
   function shopOpen() {
     var el = document.getElementById('shop');
@@ -6203,12 +6659,34 @@
     row.appendChild(tx);
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'buy';
-    b.textContent = o.price + ' 银两';
-    /* 买不起 = 灰掉且不可点（而不是点了才弹"银两不足"）——
-     * 灰按钮本身就是"还差多少钱"的提示，少一次无用点击。 */
+    /* 按钮文案三态（v58 加了"还差多少"）：
+     *   ① 自定义（回收这类没有价格的行动）
+     *   ② 买得起 → 直接报价格
+     *   ③ 买不起 → **报差价**。原来只写价格 + 灰掉，玩家得自己拿钱包里的数去减 ——
+     *      把这道减法替他做了，灰按钮就从"不能点"变成"还差多少"的提示。 */
+    var ptxt;
+    if (o.btn) ptxt = o.btn;
+    else if (o.afford) ptxt = o.price + ' 银两';
+    else ptxt = '还差 ' + Math.max(0, (o.price | 0) - (player.stones | 0));
+    b.textContent = ptxt;
+    /* 买不起 = 灰掉且不可点（而不是点了才弹"银两不足"）—— 少一次无用点击。 */
     if (!o.afford) b.disabled = true;
     row.appendChild(b);
     host.appendChild(row);
+  }
+  /** 「这件比身上那件强多少」—— 现货最有价值的一行字。
+   *  玩家本来要在两个面板之间来回记数字，现在直接给结论。
+   *  ★ 只算**装备贡献**（两边都含境界底子，相减自然抵消），所以不会因为突破而失真。 */
+  function gearDeltaLine(g) {
+    var sl = gearBase(g).slot, cur = equipped[sl];
+    if (!cur) return '（' + gearSlotCn(sl) + '位空着 · 买了直接变强）';
+    var keys = ['atk', 'def', 'maxhp'], cn = { atk: '攻', def: '御', maxhp: '气血' };
+    var out = [], i;
+    for (i = 0; i < keys.length; i++) {
+      var d = (g.st[keys[i]] | 0) - (cur.st[keys[i]] | 0);
+      if (d) out.push(cn[keys[i]] + (d > 0 ? '+' : '') + d);
+    }
+    return out.length ? '对比现穿：' + out.join('  ') : '对比现穿：完全一样';
   }
   function renderShop() {
     var p = document.getElementById('shPurse');
@@ -6228,20 +6706,60 @@
         });
       });
     }
+    /* 符箓 / 秘宝 / 耗材（v58）：同一套 shopRow，只按 group 分派到不同容器。
+     * 加新品只改 SHOP_GOODS 一行 —— 这是"可扩展"落在代码上的样子。 */
+    ['buff', 'rare', 'stuff'].forEach(function (grp) {
+      var host = document.getElementById('sh' + grp.charAt(0).toUpperCase() + grp.slice(1));
+      if (!host) return;
+      host.innerHTML = '';
+      SHOP_GOODS.forEach(function (gd) {
+        if (gd.group !== grp) return;
+        var it = ITEMS[gd.key];
+        if (!it) return;
+        var extra = '';
+        if (gd.key === 'yuxia') {
+          extra = '\n已用 ' + (vaultLv | 0) + '/' + VAULT_MAX + '　行囊 ' +
+            gearInv.length + '/' + gearCap();
+        } else if (gd.key === 'ningyuan') {
+          var used = (cultBuyRealm === player.realmIdx) ? (cultBuyN | 0) : 0;
+          extra = '\n本境界已服 ' + used + '/' + SHOP_CULT_MAX + '　现有 ' + (bag[gd.key] | 0) + ' 枚';
+        } else {
+          extra = '\n现有 ' + (bag[gd.key] | 0) + ' 个';
+        }
+        shopRow(host, {
+          act: 'goods', key: gd.key, name: it.cn, price: gd.price,
+          desc: it.desc + extra,
+          pz: piece(it.icon + '_big') || piece(it.icon),
+          afford: player.stones >= gd.price
+        });
+      });
+    });
+    var rc = document.getElementById('shRecycle');
+    if (rc) {
+      rc.innerHTML = '';
+      var ts = trashStat();
+      shopRow(rc, {
+        act: 'recycle', key: 0, name: '一键回收凡品', btn: ts.n ? '回收' : '无货',
+        price: 0, afford: ts.n > 0,
+        desc: ts.n ? '未装备的凡品 ' + ts.n + ' 件 · 可得 ' + ts.v + ' 银两\n' +
+          '灵品以上不回收（可能比身上那件好）' : '行囊里没有未装备的凡品\n（灵品以上请用装备卡逐个熔炼）'
+      });
+    }
     var ge = document.getElementById('shGear');
     if (ge) {
       ge.innerHTML = '';
       if (!shopStock.length) {
         var e = document.createElement('div');
         e.className = 'empty';
-        e.textContent = '货已售罄 —— 换一张地图再来看';
+        e.textContent = '货已售罄 —— 换一张有坊市的城镇图再来看';
         ge.appendChild(e);
       } else {
         shopStock.forEach(function (st, i) {
           var g = st.g;
           shopRow(ge, {
             act: 'gear', key: i, name: gearName(g), price: st.price, col: gearTier(g).col,
-            desc: gearBase(g).cn + ' · ' + gearTier(g).cn + '\n' + gearStatsLine(g, '　'),
+            desc: gearBase(g).cn + ' · ' + gearTier(g).cn + '\n' + gearStatsLine(g, '　') +
+              '\n' + gearDeltaLine(g),
             pz: piece(g.key + '_big') || piece(g.key),
             afford: player.stones >= st.price
           });
@@ -6253,6 +6771,12 @@
     var el = document.getElementById('shop');
     if (!el) return false;
     var want = (open === undefined) ? !shopOpen() : !!open;
+    /* v58：只有城镇才有坊市。这里也判一道（不只靠按钮灰掉）——
+     * 按钮态是"提示"，真正的闸门必须在数据入口上，否则改天有人从别处调 shopToggle(true) 就破了。 */
+    if (want && !shopHere()) {
+      toast('此地无坊市 —— 青玄山门 / 黑橡城 / 洛赫港才有');
+      return false;
+    }
     if (want) renderShop();
     if (want) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
     var b = document.getElementById('shopBtn');
@@ -6271,7 +6795,9 @@
       ev.preventDefault();
       var a = row.getAttribute('data-a');
       if (a === 'potion') buyPotion(row.getAttribute('data-k'));
+      else if (a === 'goods') buyGoods(row.getAttribute('data-k'));
       else if (a === 'gear') buyStock(+row.getAttribute('data-k'));
+      else if (a === 'recycle') { askRecycle(); return; }   // 回收自己会重绘（要过确认框）
       renderShop();     // 买完立刻重绘：钱变了、按钮该变灰、装备该从架上消失
     });
     var b = document.getElementById('shopBtn');
@@ -6318,7 +6844,7 @@
         pm(pd) + ' · 气血 ' + player.maxhp + pm(ph);
     }
     var gc = document.getElementById('gearCnt');
-    if (gc) gc.textContent = gearInv.length + ' / ' + GEAR_CAP;
+    if (gc) gc.textContent = gearInv.length + ' / ' + gearCap();
     var et = document.getElementById('eqTip');
     if (et) et.textContent = '点格子打开操作卡';
   }
@@ -6510,6 +7036,12 @@
     player.exp = o.exp || 0;
     player.stones = o.stones || 0;
     window.__kills = o.kills || 0;
+    /* v58 秘宝的永久增量：老档没有这两项 → 按"没买过"处理（0），不需要迁移。
+     * ⚠ vaultLv 必须在任何 getGearCap 之前就位 —— 读档后马上会有人拿它算行囊上限。 */
+    vaultLv = Math.max(0, Math.min(VAULT_MAX, o.vault | 0));
+    cultBuyRealm = (o.cult && (o.cult[0] | 0)) || 0;
+    cultBuyN = Math.max(0, (o.cult && (o.cult[1] | 0)) || 0);
+    clearBuffs();     // 符箓不进存档：读档 = 从现在开始，别把上一局残留的时长带进来
     /* ★ 境界是 exp 的纯函数，读档只对齐、不"突破"：这里刻意不调 syncRealm() ——
      * 那个函数带着回满血 + 金环特效 + 弹提示的副作用，读档时触发会覆盖存档里的气血，
      * 还会在刚进游戏时莫名弹一句"境界突破"。 */
@@ -6536,7 +7068,11 @@
       var o = { v: SAVE_VER, t: Date.now(), map: CUR.id,
         x: +player.mx.toFixed(2), y: +player.my.toFixed(2),
         hp: player.hp, exp: player.exp, stones: player.stones,
-        kills: window.__kills || 0, bag: {}, gear: gearInv, eq: {}, shop: [] };
+        kills: window.__kills || 0, bag: {}, gear: gearInv, eq: {}, shop: [],
+        /* v58：秘宝的两个**永久增量**。刻意不升 SAVE_VER ——
+         * 老档没有这两个字段，读档时按 0/未买过处理即可，没有任何需要迁移的状态。
+         * （升版本号会让所有老档作废，代价远大于收益。） */
+        vault: vaultLv | 0, cult: [cultBuyRealm | 0, cultBuyN | 0] };
       for (var k in bag) if (bag.hasOwnProperty(k)) o.bag[k] = bag[k] | 0;
       GEAR_SLOTS.forEach(function (sl) { o.eq[sl.key] = equipped[sl.key] || null; });
       /* 坊市现货也进档：否则"买走 → 存 → 读"会把买走的那件还回货架，
@@ -6746,8 +7282,9 @@
       c.classList.toggle('has', n > 0);          // ★ 有货 → 提亮/描金边/角标显现
       c.classList.toggle('use', it.kind === 'heal');
       /* v54：材料格也有"点下去会做事"的了（妖丹炼化 / 玄铁令提示用法）。
+       * v58：符箓同样是"点一下就用"，一并给 .act（手型 + 金边）。
        * .act 给手型与配色 —— 玩家得能一眼看出"这一格点下去有事发生"。 */
-      c.classList.toggle('act', !!it.act);
+      c.classList.toggle('act', !!it.act || it.kind === 'buff');
       /* ★ .cool 只给**刚按下去的那一格**上（healUsed）。原来写的是无条件
        *   `toggle('cool', healCd>0)` —— 用一次药全场格子一起灰 0.6 秒，
        *   叠上 filter 的优先级问题，用户看到的就是"背包永远是灰的"。 */
@@ -6994,6 +7531,7 @@
     var pushed = foe ? knockBackPlayer(foe.x, foe.y, 0.6) : 0;   // 只轻推半步，不再大幅位移
     player.path = null; player.targetFoe = null;
     breakCombo();                                                 // 倒地断连
+    clearBuffs();                                                 // v58：符箓跟着散（理由见 BUFFS 注释②）
     player.dead = true;
     player.act = 'dead'; player.actT = 0; player.actHold = ACT_DUR.dead;   // 播倒地动作
     player.flash = 0.5;
@@ -8071,6 +8609,8 @@
       bagDirty = true;                                  // 强制走一次完整刷新
       renderBag();
       renderQuick();                                    // 心跳：不依赖任何事件也保证药栏是对的
+      renderBuffs();                                    // v58：符箓倒计时（有就显示、没有就收起来）
+      syncShopBtn();                                    // v58：换图后坊市入口的可用态（城镇才有）
       /* 左列圆钮避让也挂在这条心跳上（v53）：面板高度会被各种事件改（目标血条出现、
        * 提示文案换行、字体加载完导致行高变化…），逐个入口去补迟早漏一个。
        * 值没变时 syncLeftBtns 直接 return，所以这只是每 0.5s 一次 offsetHeight。 */

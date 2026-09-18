@@ -363,7 +363,11 @@ results.push(run('战斗 击杀掉落', 'map=beilin&autotest=fight', ({ probe })
 //   整条断言变成恒真的 `{budget:X}`，跑批就永远 PASS —— 一个测试自己的静默失效。
 results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ probe }) => {
   if (!probe) return false;
-  return probe.defs === 6 && probe.healDefs === 3      // 6 种物品、3 种药
+  // ★ v58：格数 / 物品数不再写死，改比"页面上报的期望值"（由 ITEMS 与 BAG_ORDER 现算）。
+  //   写死的老写法每加一件物品都得手改测试，忘了就红 —— 而红灯的理由跟"游戏坏了"一模一样，
+  //   很容易被"顺手改成新数字"糊过去，测试从此形同虚设。
+  return probe.defs === probe.want.defs                 // 物品数 = ITEMS 条目数
+    && probe.healDefs === 3                            // 3 种药（数字键 1/2/3，这个语义要固定）
     && probe.iconMiss.length === 0                     // 图标全部能解析
     && probe.rolls > 0 && probe.dropped > 0            // 400 次掷骰、真的掉出过东西
     && probe.landed > 0 && probe.onWall === 0          // 撒下的每一件都在可走格
@@ -371,10 +375,10 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
     && probe.healOk === true                           // 服药回血且数量 -1
     && probe.healFull === true                         // 满血不消耗
     && probe.healCdBlock === true                      // 冷却期间不生效
-    && probe.crafted.cells === 5                       // 背包 5 格
-    && probe.crafted.healUseCells === 3                // 其中 3 格可点服用
+    && probe.crafted.cells === probe.want.cells         // 背包格数 = BAG_ORDER 长度
+    && probe.crafted.healUseCells === probe.want.heal   // 其中 heal 格可点服用
     && probe.crafted.ghostImgs === 0                   // 不再用 <img> 塞图标
-    && probe.geo && probe.geo.n === 5                  // ★ 5 格图标都画出来了
+    && probe.geo && probe.geo.n === probe.want.cells    // ★ 每格图标都画出来了
     // ★★★ 唯一真判据（2026-09-17 两轮教训）：canvas 里必须真的有不透明像素。
     //   ① 只断言"帧解析到/计数对" → 图标全空白也过（第 1 轮）；
     //   ② 改断言"可见区间 = [0,46]²" → 全绿但用户仍看不到（CSS background 引用了
@@ -391,7 +395,7 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
     //     · 有货但**正在冷却**（只有刚服下那一格）→ 允许轻微变暗，但**绝不能是 grayscale**
     //       （grayscale 是"空格"的语义，有货变灰正是用户抱怨的那个观感）
     //     · 空格 → 必须 grayscale
-    && probe.bagStates && probe.bagStates.length === 5
+    && probe.bagStates && probe.bagStates.length === probe.want.cells
     && probe.bagStates.every(function (s) {
          // ★ 行内兜底必须写上（第四次修复）：某些环境下那份 CSS 没能作用到 canvas，
          //   行内样式优先级最高，从结构上不可能被覆盖/匹配不到。
@@ -403,9 +407,15 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
          }
          return s.has === false && s.filter.indexOf('grayscale') >= 0;
        })
-    && probe.atlasNatural === '782x198'                // 图集本身解码正常（对比参考）
-    && probe.atlas && probe.atlas.img && probe.atlas.rectKeys === 6
-    && probe.atlas.bigKeys === 6;                      // 图集三张表都到位
+    // 图集"解码正常"的**交叉判据**：图里每一个矩形都必须落在解码出来的图片内。
+    //   ⛔ 原来写死 `atlasNatural === '782x198'` —— 帧数一变这行就红，
+    //      而"红灯的理由"跟"图标真的坏了"长得一模一样，很容易被顺手改成新数字糊过去。
+    //      越界才是真正要防的故障（越界 = 裁到隔壁帧或空白，且**全程不报错**），
+    //      所以判据改成"所有帧都装得下"，它天然不需要维护。
+    && probe.atlasFit === probe.atlasNatural && /^\d+x\d+$/.test(probe.atlasFit || '')
+    && probe.atlas && probe.atlas.img
+    && probe.atlas.rectKeys === probe.want.frames      // 1× 帧数 = 物品 + 器型
+    && probe.atlas.bigKeys === probe.want.frames;      // 2× 帧数必须一一对应
 }, { budget: 20000 }));
 
 // 8.45) 多档位存档（v52）：三档互不串味、自动存档跟当前档走、删档与重开必须弹确认框。
@@ -486,14 +496,20 @@ results.push(run('装备 操作卡与按钮', 'autotest=card', ({ probe }) => {
     && K.pass === true;
 }, { budget: 20000 }));
 
-// 8.4c) 坊市（v56）：银两的出口 —— 丹药（常备）+ 现货装备（买走即无）。
+// 8.4c) 坊市（v56 起，v58 扩容）：银两的出口 —— 丹药 / 符箓 / 秘宝 / 耗材 / 现货装备 / 回收。
 //       为什么必须单独立一条：商店是**唯一能从系统里凭空拿走钱、也能凭空印出钱**的地方 ——
 //       ① 买入价若低于熔炼价，就是一条稳定的"买→熔"套利流水线（经济当场崩）；
 //          而且必须比**上界**（六种器型 × 满词缀逐属性堆满）才守得住，比平均货等于没守。
 //       ② "行囊满"若判在扣钱之后，就是无声吞钱 —— 玩家只会觉得"钱少了"，说不清为什么。
 //       这两条都不是"看一眼就能确认"的事，只能靠跑。
+//       v58 追加盯的是"扩容最容易做坏的三件事"：
+//       ③ **符箓必须真的改到属性**（判据取 player.atk，不取 buffT>0 —— 后者只能证明标了记）；
+//          同款不许叠倍率；倒地必须清。
+//       ④ **限量品（凝元丹/玉匣）必须先判上限再扣钱**，且上限要真的挡住。
+//       ⑤ **城镇门控**：非城镇图 shopToggle(true) 必须失败（这是"走传送门刷货"的根治手段）。
 //       ⚠ 命中判据走 elementFromPoint（`el.click()` 不经过命中测试，pointer-events 类故障抓不到）。
-results.push(run('坊市 买卖与防套利', 'autotest=shop', ({ probe }) => {
+//       ⚠ 必须写死 map=qingxuan：v58 起坊市只在城镇图开，用例得站在能交易的地图上跑。
+results.push(run('坊市 买卖与防套利', 'map=qingxuan&autotest=shop', ({ probe }) => {
   if (!probe) return false;
   const S = probe;
   return S.stock === 4 && S.stockLegal === true && S.stockSlots === '0,1,2,3'  // 货架有序有质
@@ -507,6 +523,20 @@ results.push(run('坊市 买卖与防套利', 'autotest=shop', ({ probe }) => {
     && S.fullReject === true && S.fullNoPay === true && S.fullNoTake === true  // 行囊满：不吞钱
     && S.refill === true                          // 补货按位补（位 0 补回来还是位 0）
     && S.toggleClean === true && S.saveKeeps === true    // 开关无副作用、存档带得住现货
+    // ── v58 ──
+    && S.buyBuff === true && S.buffPaid === 45 && S.buffCount === 1
+    && S.useBuff === true && S.buffOn === true
+    && S.buffCalc === true                        // ★ 攻真的 = round(底子 × 1.25)
+    && S.buffNoStack === true                     // ★ 同款只刷新时长，绝不叠倍率
+    && S.buffExpire === true && S.buffCleared === true
+    && S.vaultCap === true && S.vaultReject === true      // 玉匣到顶后不吞钱
+    && S.cultGain === true && S.cultReject === true && S.cultReset === true       // 凝元丹额度真的挡得住
+    && S.recycle === true                         // 一键回收只吃凡品
+    && S.townHere === true && S.townGate === true && S.townBack === true
+    && S.grpOk === true                           // 三组商品 + 回收行真的渲染出来了
+    && S.diffText === true                        // 买不起 → 按钮报差价而不是干灰着
+    && S.escBag === true && S.escOrder === true   // Esc 关背包 / 一次只关一层
+    && S.escMini === true                         // ★ 缩略图不归 Esc 管
     && S.pass === true;
 }, { budget: 20000 }));
 
