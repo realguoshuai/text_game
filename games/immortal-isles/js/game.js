@@ -6002,17 +6002,43 @@
         ctx.closePath(); ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 0.6 * Z; ctx.stroke();
       }
-    } else {   // chest
-      var w = 22 * Z, h = 16 * Z;
+    } else {   // chest：经典圆顶木宝箱（拱顶 + 金属横箍 + 大锁 + 包角）
+      var w = 24 * Z, hb = 13 * Z, hg = 10 * Z;
+      var bx = p.x - w / 2, by = baseY - hb;          // 箱体左上角
+      // 落地阴影
       ctx.globalAlpha = 0.3; ctx.fillStyle = '#000';
-      ctx.beginPath(); ctx.ellipse(p.x, baseY + 2 * Z, w * 0.6, h * 0.3, 0, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(p.x, baseY + 2 * Z, w * 0.62, hb * 0.32, 0, 0, 6.2832); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.fillStyle = '#8a5a2b'; ctx.fillRect(p.x - w / 2, baseY - h, w, h);
-      ctx.fillStyle = '#6e4420'; ctx.fillRect(p.x - w / 2, baseY - h, w, h * 0.4);
-      ctx.strokeStyle = '#3e2613'; ctx.lineWidth = 1.4 * Z; ctx.strokeRect(p.x - w / 2, baseY - h, w, h);
-      ctx.fillStyle = '#ffd86b'; ctx.fillRect(p.x - 2 * Z, baseY - h * 0.62, 4 * Z, 5 * Z);
+      // 箱体（木色 + 正面竖纹）
+      ctx.fillStyle = '#7a4a22'; ctx.fillRect(bx, by, w, hb);
+      ctx.strokeStyle = 'rgba(60,36,18,.55)'; ctx.lineWidth = 1 * Z;
+      for (var s = 1; s <= 2; s++) {
+        var lx = bx + w * s / 3;
+        ctx.beginPath(); ctx.moveTo(lx, by + 1.5 * Z); ctx.lineTo(lx, baseY - 1.5 * Z); ctx.stroke();
+      }
+      // 圆顶盖（拱形）
+      ctx.fillStyle = '#5e3618';
+      ctx.beginPath(); ctx.moveTo(bx, by);
+      ctx.quadraticCurveTo(p.x, by - hg * 1.7, bx + w, by); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,220,160,.35)'; ctx.lineWidth = 1 * Z;
+      ctx.beginPath(); ctx.moveTo(bx + 3 * Z, by - hg * 0.7);
+      ctx.quadraticCurveTo(p.x, by - hg * 1.5, bx + w - 3 * Z, by - hg * 0.7); ctx.stroke();
+      // 金属横箍（箱盖与箱体交界）
+      ctx.fillStyle = '#d9a441'; ctx.fillRect(bx - 1 * Z, by - 2 * Z, w + 2 * Z, 3.2 * Z);
+      ctx.strokeStyle = '#8a6418'; ctx.lineWidth = 0.8 * Z; ctx.strokeRect(bx - 1 * Z, by - 2 * Z, w + 2 * Z, 3.2 * Z);
+      // 左右包角
+      ctx.fillStyle = '#caa03a';
+      ctx.fillRect(bx - 1 * Z, baseY - 3 * Z, 2.4 * Z, 3 * Z);
+      ctx.fillRect(bx + w - 1.4 * Z, baseY - 3 * Z, 2.4 * Z, 3 * Z);
+      // 中央大锁
+      ctx.fillStyle = '#e8c25a';
+      ctx.beginPath(); ctx.arc(p.x, by, 3.6 * Z, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = '#7a5a1e'; ctx.lineWidth = 1 * Z; ctx.stroke();
+      ctx.fillStyle = '#4a3210';
+      ctx.beginPath(); ctx.arc(p.x, by + 0.6 * Z, 1 * Z, 0, 6.2832); ctx.fill();
+      // 顶部呼吸微光
       ctx.globalAlpha = 0.55 * br; ctx.fillStyle = '#ffe9a8';
-      ctx.beginPath(); ctx.arc(p.x, baseY - h - 4 * Z, 2 * Z, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, by - hg, 2 * Z, 0, 6.2832); ctx.fill();
     }
     ctx.restore();
   }
