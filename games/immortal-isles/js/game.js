@@ -5920,12 +5920,34 @@
     occ[Math.round(player.mx) + ',' + Math.round(player.my)] = 1;
     var total = Math.max(3, Math.floor(cells.length * 0.012));
     var placed = 0;
+    // 宝箱保底：每图至少 1 个，让"逛图找宝箱"体验成立（旧 8.3% 概率使多数图 0 宝箱）。
+    // 大图（total>=8）额外 50% 概率再放 1 个。
+    if (cells.length) {
+      for (var ci = 0; ci < cells.length && placed < total; ci++) {
+        var cp = cells[ci].split(','), cgx = +cp[0], cgy = +cp[1];
+        if (occ[cgx + ',' + cgy]) continue;
+        occ[cgx + ',' + cgy] = 1;
+        nodes.push({ x: cgx, y: cgy, type: 'chest', pulse: Math.random() * 6.2832 });
+        placed++;
+        break;
+      }
+      if (total >= 8 && Math.random() < 0.5) {
+        for (var cj = 0; cj < cells.length && placed < total; cj++) {
+          var dp = cells[cj].split(','), dgx = +dp[0], dgy = +dp[1];
+          if (occ[dgx + ',' + dgy]) continue;
+          occ[dgx + ',' + dgy] = 1;
+          nodes.push({ x: dgx, y: dgy, type: 'chest', pulse: Math.random() * 6.2832 });
+          placed++;
+          break;
+        }
+      }
+    }
     for (var c = 0; c < cells.length && placed < total; c++) {
       var pa = cells[c].split(','), gx = +pa[0], gy = +pa[1];
       if (occ[gx + ',' + gy]) continue;
       occ[gx + ',' + gy] = 1;
       var r = Math.random();
-      var type = r < 0.083 ? 'chest' : (r < 0.5 ? 'ore' : 'herb');  // 宝箱 8.3% / 矿石~42% / 灵草~50%
+      var type = r < 0.42 ? 'ore' : 'herb';  // 矿石~42% / 灵草~58%（宝箱已保底放置）
       nodes.push({ x: gx, y: gy, type: type, pulse: Math.random() * 6.2832 });
       placed++;
     }
