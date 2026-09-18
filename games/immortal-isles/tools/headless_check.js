@@ -408,6 +408,27 @@ results.push(run('掉落 拾取 服药 背包', 'map=beilin&autotest=loot', ({ p
     && probe.atlas.bigKeys === 6;                      // 图集三张表都到位
 }, { budget: 20000 }));
 
+// 8.45) 多档位存档（v52）：三档互不串味、自动存档跟当前档走、删档与重开必须弹确认框。
+//      为什么值得单立一条：这三条全是**只有改成多槽之后才可能存在**的故障，
+//      而且每条失败时都"看起来正常"（三个键写成一个键 → 照样能存能读，只是另一个档没了；
+//      确认框没弹 → 点了立刻生效，表现就是"我还想回来结果没了"）。
+//      ⚠ 断言写花括号体 + return（见本文件上方 8.4 的注释：箭头函数裸表达式会被
+//         `, { budget }` 的逗号吃掉，整条变恒真）。
+results.push(run('存档 多档位与确认框', 'autotest=slots', ({ probe }) => {
+  if (!probe) return false;
+  return probe.wrote === true
+    && probe.distinct === true        // 三个槽三份数据，互不串味
+    && probe.loadPick === true        // 读档能挑，且读完认领该槽
+    && probe.autosaveFollows === true // 自动存档写的是当前槽，不是写死的槽一
+    && probe.delAsks === true         // 删档先弹框
+    && probe.delCancel === true       // 取消 = 什么都不做
+    && probe.delOk === true           // 确定 = 只删这一个
+    && probe.clearAsks === true       // 重开也要弹框
+    && probe.clearCancel === true
+    && probe.ui === true              // 三行都在 / 当前槽有标记 / 空档的读删是禁用
+    && probe.pass === true;
+}, { budget: 20000 }));
+
 // 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）
 //      ② 伤害不再恒定（有浮动/暴击/连击）③ 背对目标砍不中、挥空自动转身。
 //      50 刀逐帧推进，预算要给足。

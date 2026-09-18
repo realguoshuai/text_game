@@ -1232,6 +1232,13 @@
          *   · ?map=xxx = 明确要去某张图（调试用途，优先级高于存档位置，但装备/银两照常读回）
          *   其余情况：有存档就落回存档所在的图与坐标 —— 这才是"存档"两个字该有的样子。 */
         var svNew = (q.get('new') === '1');
+        migrateLegacySave();     // v51 及以前的 isles.save → 档位一（一次性）
+        /* 认领槽位：
+         *   · 新开局（?new=1）挑**第一个空槽** —— 不能让它顺手把旧档冲掉，那正是分档的全部意义；
+         *     三个槽都满了就认领 0（自动存档暂停），先让玩家自己决定覆盖谁。
+         *   · 正常进来挑「最近存过的那个」；一个都没有才落到档位一，
+         *     这样从头到尾没点过「存」的人，15 秒后也不会白打。 */
+        setCurSlot(svNew ? firstEmptySlot() : (newestSlot() || 1));
         var sv = svNew ? null : readSave();
         var svMapId = sv ? sv.map : null;
         var start = IDX[q.get('map')] ? q.get('map') : (svMapId || data.start.map);
@@ -2348,9 +2355,11 @@
             healCell: hitSelf(document.querySelector('#bagGrid .cell')),   // 对照组
             gearCell: hitSelf(document.querySelector('#gearGrid .g:not(.empty)')),
             eqCell: hitSelf(document.querySelector('#eqGrid .g')),
-            svSave: hitSelf(document.getElementById('svSave')),
-            svLoad: hitSelf(document.getElementById('svLoad')),
-            svClear: hitSelf(document.getElementById('svClear'))
+            svClear: hitSelf(document.getElementById('svClear')),
+            /* 存档按钮从"全局三颗"改成了"每槽三颗"（v52）——  probes 的命中对象得跟着换，
+             * 否则 headless 里 hit(id) 拿到 null，这条"按钮点得到"的防线就悄悄失效了。 */
+            svSlotSave: hitSelf(document.querySelector('#slotList .svrow[data-slot="1"] [data-a="save"]')),
+            svSlotDel: hitSelf(document.querySelector('#slotList .svrow[data-slot="1"] [data-a="del"]'))
           };
           /* 命中 OK 之后再补一条**真点击**（合成 MouseEvent 走完整冒泡），
            * 证明"点得到"且"监听器真的会做事"，而不是只有一条 CSS 摆在那儿。 */
@@ -2359,11 +2368,12 @@
             real.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
             G.realClickEquip = !!equipped.weapon && equipped.weapon.id === 98001;
           } else G.realClickEquip = 'skip';
-          var svb = document.getElementById('svSave');
-          if (svb && G.hit.svSave === 'ok') {
-            try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+          var svRow = document.querySelector('#slotList .svrow[data-slot="1"]');
+          var svb = svRow && svRow.querySelector('[data-a="save"]');
+          if (svb && G.hit.svSlotSave === 'ok') {
+            for (var si = 1; si <= SLOT_N; si++) clearSlot(si);
             svb.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-            G.realClickSave = !!readSave();
+            G.realClickSave = !!readSlot(1) && curSlot === 1;
           } else G.realClickSave = 'skip';
           bagToggle(false);
           gp.textContent = JSON.stringify(G);
@@ -2417,7 +2427,7 @@
           // ④ 坏坐标不能把 boot 打死：坐标置 NaN 再读一次
           try {
             var bad = JSON.parse(JSON.stringify(raw)); bad.x = 'oops'; bad.y = null;
-            localStorage.setItem(SAVE_KEY, JSON.stringify(bad));
+            localStorage.setItem(slotKey(curSlot), JSON.stringify(bad));
             var o2 = readSave();
             R.badCoord = { x: o2 && o2.x, y: o2 && o2.y, sanitized: !!o2 && o2.x === null && o2.y === null };
             var sp2 = snapWalkable(CUR, o2.x, o2.y);
@@ -2426,6 +2436,56 @@
           R.pass = R.cellChar.ok && R.snap.ok && R.snap.integral && R.snap.walkable && R.written.ok &&
             R.load.ok && R.load.integral && R.load.stands && !R.loadErr && R.badCoord.sanitized;
           P.textContent = JSON.stringify(R);
+        }
+        if (at === 'slots') {
+          /* ?autotest=slots —— 多档位存档（v52）验收。
+           * 三条**只有多槽后才可能存在**的故障，看代码看不出来，必须跑：
+           *   ① 三个槽互相串味（写 A 结果把 B 也改了 —— 典型是写死成一个键）
+           *   ② 自动存档不跟当前槽走（先手动存槽二，15 秒后自动存却写回槽一）
+           *   ③ 删档/重开不弹确认框（点了立刻生效 = 之前单一存档时代的行为残留）
+           * 另加一条：确认框点**取消**必须真的什么都不做。 */
+          var pbs = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none';
+            document.body.appendChild(d); return d;
+          })();
+          var S = {};
+          for (var qi = 1; qi <= SLOT_N; qi++) clearSlot(qi);
+          lsDel(CUR_SLOT_KEY);
+          // ① 三个槽各存一份不同的进度，互不干扰
+          setCurSlot(1); player.stones = 111; var w1 = saveGame(true, 1);
+          player.stones = 222; var w2 = saveGame(true, 2);
+          player.stones = 333; var w3 = saveGame(true, 3);
+          S.distinct = !!readSlot(1) && !!readSlot(2) && !!readSlot(3) &&
+            readSlot(1).stones === 111 && readSlot(2).stones === 222 && readSlot(3).stones === 333;
+          S.wrote = !!(w1 && w2 && w3);
+          // ② 读档要能挑：读槽二后银两=222，且当前槽被认领成 2
+          S.loadPick = (loadGame(true, 2) === true) && player.stones === 222 && curSlot === 2;
+          // ③ 自动存档跟当前槽走（不传 slot 的那一路）
+          player.stones = 999; saveGame(true);
+          S.autosaveFollows = readSlot(2).stones === 999 && readSlot(1).stones === 111 && readSlot(3).stones === 333;
+          // ④ 删档必须先弹确认框，且**取消 = 什么都不做**
+          doSlotDel(1);
+          S.delAsks = confirmOpen();
+          document.getElementById('cfNo').click();
+          S.delCancel = !confirmOpen() && !!readSlot(1) && readSlot(1).stones === 111;
+          // ⑤ 确定 = 真删，且只删这一个
+          doSlotDel(1);
+          document.getElementById('cfYes').click();
+          S.delOk = !readSlot(1) && !!readSlot(2) && !!readSlot(3);
+          // ⑥ 重开也必须弹框；取消不得真的跳走（跳转用 setTimeout，这里只验"框弹了 + 取消后框关了"）
+          document.getElementById('svClear').click();
+          S.clearAsks = confirmOpen();
+          document.getElementById('cfNo').click();
+          S.clearCancel = !confirmOpen();
+          // ⑦ UI：三行都在，当前槽有标记，空档的「读」「删」是禁用的
+          updateSaveUI();
+          S.ui = document.querySelectorAll('#slotList .svrow').length === 3 &&
+            !!document.querySelector('#slotList .svrow.cur') &&
+            document.querySelector('#slotList .svrow[data-slot="2"]').classList.contains('cur') &&
+            document.querySelector('#slotList .svrow[data-slot="1"] [data-a="load"]').disabled === true;
+          S.pass = !!(S.wrote && S.distinct && S.loadPick && S.autosaveFollows &&
+            S.delAsks && S.delCancel && S.delOk && S.clearAsks && S.clearCancel && S.ui);
+          pbs.textContent = JSON.stringify(S);
         }
         if (at === 'loot') {
           // 为什么值得单独立一条：这四件事各自都能"看起来对"，但接在一起才暴露真问题 ——
@@ -3650,6 +3710,14 @@
   var keys = {};
   window.addEventListener('keydown', function (e) {
     var k = e.key;
+    /* 确认框开着时所有按键归它：Esc = 取消、Enter = 确定，其余一律吞掉。
+     * 不做这层拦截的话，弹窗浮在上面、人在背后还在走位出手 —— 点个确认回来已经死了。 */
+    if (confirmOpen()) {
+      if (k === 'Escape') { e.preventDefault(); closeConfirm(false); }
+      else if (k === 'Enter') { e.preventDefault(); closeConfirm(true); }
+      else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
+      return;
+    }
     // Tab 开/关世界地图（打开时背后游戏暂停移动）；Esc 仅关闭。都拦掉默认行为避免焦点乱跳。
     if (k === 'Tab' || (worldOpen && k === 'Escape')) { e.preventDefault(); toggleWorld(); return; }
     if (worldOpen) return;
@@ -4936,37 +5004,142 @@
    *      存进去只会读出「新 World + 旧角色」的缝合状态，反而更难排查。
    *   ③ **坏档必须能自愈**：版本不对 / 地图 id 已不存在 / JSON 坏了 → 一律静默跳过新开一局，
    *      而不是卡在白屏。改写存档格式时必须升 SAVE_VER（旧档自动作废）。
+   *
+   * ④ **v52 起改成三个槽位**。单一存档的代价是"换个路线试试"必须先毁掉这一条命，
+   *   而摸地图恰恰是这游戏的核心乐趣。现在删哪个档都是单独一次确认，互不牵连。
+   *   三个槽的核心是一条纪律：
+   *     · `curSlot` = 当前认领的槽。**自动存档只写这一个**（写多个 = 三个数据打架）。
+   *       认领规则：手动点某槽的「存」或「读」= 认领它；boot 时自动认领「最近存过的那个」。
+   *     · `curSlot === 0` = 没认领 → 自动存档暂停（玩家刚把档全删了，别自作主张重建）。
+   *     · 键：`isles.slot.N`（N=1..3）+ `isles.curslot`（记住上次认领哪个）。
+   *       v51 及以前的 `isles.save` 会在 boot 时迁移到档位一，老玩家的进度不丢。
    */
-  var SAVE_KEY = 'isles.save';
+  var SLOT_N = 3;
+  var SLOT_CN = ['一', '二', '三'];
+  var SAVE_PREFIX = 'isles.slot.';
+  var SAVE_LEGACY = 'isles.save';      // v51 及以前的单一存档键（迁移后就删掉）
+  var CUR_SLOT_KEY = 'isles.curslot';
   var SAVE_VER = 1;
-  var AUTOSAVE_EVERY = 15;      // 秒
+  var AUTOSAVE_EVERY = 15;             // 秒
   var autosaveT = 0;
   var lastSaveMs = 0;
+  var curSlot = 0;                     // 0 = 未认领
 
+  function slotKey(i) { return SAVE_PREFIX + i; }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } }
+  /** 一次迁移：把 v51 的单档搬到档位一。失败不影响任何东西 —— 最坏情况就是少个旧档。 */
+  function migrateLegacySave() {
+    var raw = lsGet(SAVE_LEGACY);
+    if (!raw) return 0;
+    if (!lsGet(slotKey(1))) { try { localStorage.setItem(slotKey(1), raw); } catch (e) { } }
+    lsDel(SAVE_LEGACY);
+    return 1;
+  }
+  function parseSlot(raw) {
+    if (!raw) return null;
+    var o = null;
+    try { o = JSON.parse(raw); } catch (e) { return null; }
+    if (!o || o.v !== SAVE_VER || !o.map) return null;
+    if (!IDX[o.map]) return null;             // 这张图已经删了/改名了 —— 旧档作废
+    /* 坐标必须是**真数字**且有限（2026-09-18）：NaN/null/字符串混进来后，
+     * 一路走到 ground[NaN] 那种下标，异常点离根因十万八千里。
+     * ⚠ 别用裸 isFinite：`isFinite(null) === true`（Number(null)===0），
+     *   坏坐标会被悄悄洗成 0 —— 玩家瞬间被扔到地图角落。必须先判类型。
+     * 坏坐标不该整档作废（装备/银两还是好的）→ 退成 null，让调用方落回出生点。 */
+    o.x = (typeof o.x === 'number' && isFinite(o.x)) ? o.x : null;
+    o.y = (typeof o.y === 'number' && isFinite(o.y)) ? o.y : null;
+    return o;
+  }
+  function readSlot(i) { return parseSlot(lsGet(slotKey(i))); }
+  /** 第一个空槽；全满返回 0（新开局挑 cx时用它避免覆盖旧档） */
+  function firstEmptySlot() {
+    for (var i = 1; i <= SLOT_N; i++) if (!readSlot(i)) return i;
+    return 0;
+  }
+  /** boot 认领：上次用的那个 > 最近存过的那个 > 没有 */
+  function newestSlot() {
+    var last = +lsGet(CUR_SLOT_KEY);
+    if (last >= 1 && last <= SLOT_N && readSlot(last)) return last;
+    var best = 0, bt = 0;
+    for (var i = 1; i <= SLOT_N; i++) { var o = readSlot(i); if (o && (o.t || 0) >= bt) { bt = o.t || 0; best = i; } }
+    return best;
+  }
+  function setCurSlot(i) {
+    curSlot = (i >= 1 && i <= SLOT_N) ? i : 0;
+    try {
+      if (curSlot) localStorage.setItem(CUR_SLOT_KEY, String(curSlot));
+      else localStorage.removeItem(CUR_SLOT_KEY);
+    } catch (e) { }
+    var o = curSlot ? readSlot(curSlot) : null;
+    lastSaveMs = o ? (o.t || 0) : 0;
+  }
+  function clearSlot(i) { lsDel(slotKey(i)); }
+  /** 旧接口保留：返回**当前认领槽**的内容（boot 与自测用例还指着这个名字）。 */
+  function readSave() { return curSlot ? readSlot(curSlot) : null; }
+
+  function fmtSaveTime(t) {
+    var d = new Date(t);
+    var p2 = function (n) { return ('0' + n).slice(-2); };
+    return p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+  function slotDesc(o) {
+    if (!o) return '（空）';
+    var m = IDX[o.map];
+    return (m ? m.name : String(o.map)) + ' · ' + (o.t ? fmtSaveTime(o.t) : '时间未知') +
+      ' · 银 ' + (o.stones || 0);
+  }
   function updateSaveUI() {
     var el = document.getElementById('saveInfo');
-    if (!el) return;
-    if (!lastSaveMs) { el.textContent = '尚未存档'; return; }
-    var d = new Date(lastSaveMs);
-    var hh = ('0' + d.getHours()).slice(-2), mm = ('0' + d.getMinutes()).slice(-2);
-    el.textContent = '已存档 · ' + (CUR ? CUR.name : '') + ' · ' + hh + ':' + mm;
+    if (el) {
+      if (!curSlot) el.textContent = '未认领档位（自动存档暂停）';
+      else el.textContent = '档位' + SLOT_CN[curSlot - 1] +
+        (lastSaveMs ? ' · ' + fmtSaveTime(lastSaveMs) : ' · 本次尚未落盘');
+    }
+    renderSlots();
   }
-  function readSave() {
-    try {
-      var s = localStorage.getItem(SAVE_KEY);
-      if (!s) return null;
-      var o = JSON.parse(s);
-      if (!o || o.v !== SAVE_VER || !o.map) return null;
-      if (!IDX[o.map]) return null;             // 这张图已经删了/改名了 —— 旧档作废
-      /* 坐标必须是**真数字**且有限（2026-09-18）：NaN/null/字符串混进来后，
-       * 一路走到 ground[NaN] 那种下标，异常点离根因十万八千里。
-       * ⚠ 别用裸 isFinite：`isFinite(null) === true`（Number(null)===0），
-       *   坏坐标会被悄悄洗成 0 —— 玩家瞬间被扔到地图角落。必须先判类型。
-       * 坏坐标不该整档作废（装备/银两还是好的）→ 退成 null，让调用方落回出生点。 */
-      o.x = (typeof o.x === 'number' && isFinite(o.x)) ? o.x : null;
-      o.y = (typeof o.y === 'number' && isFinite(o.y)) ? o.y : null;
-      return o;
-    } catch (e) { return null; }
+  var slotBuilt = 0;
+  function buildSlots() {
+    var box = document.getElementById('slotList');
+    if (!box) return 0;
+    box.innerHTML = '';
+    for (var i = 1; i <= SLOT_N; i++) {
+      var row = document.createElement('div');
+      row.className = 'svrow';
+      row.setAttribute('data-slot', String(i));
+      row.innerHTML =
+        '<div class="r1"><span class="nm"><b>' + SLOT_CN[i - 1] + '</b>档位' + SLOT_CN[i - 1] + '</span>' +
+        '<span class="ops">' +
+        '<button type="button" data-a="save" title="把当前进度存到这里">存</button>' +
+        '<button type="button" data-a="load" title="读回这个档位">读</button>' +
+        '<button type="button" data-a="del" class="del" title="删除这个档位">删</button>' +
+        '</span></div><div class="ds"></div>';
+      box.appendChild(row);
+    }
+    slotBuilt++;
+    return 1;
+  }
+  function renderSlots() {
+    var box = document.getElementById('slotList');
+    if (!box) return;
+    /* 失联自愈（与背包同款）：#slotList 被别处重建过就会只剩游离引用。
+     * 重建次数设上限，防止"容器本身没了"时每帧重搭。 */
+    if (slotBuilt && !document.body.contains(box)) {
+      if (slotBuilt < 4) { buildSlots(); box = document.getElementById('slotList'); }
+      else return;
+    }
+    if (!slotBuilt && !buildSlots()) return;
+    for (var i = 1; i <= SLOT_N; i++) {
+      var row = box.querySelector('.svrow[data-slot="' + i + '"]');
+      if (!row) continue;
+      var o = null;
+      try { o = readSlot(i); } catch (e) { o = null; }
+      row.classList.toggle('cur', curSlot === i);
+      var ds = row.querySelector('.ds');
+      if (ds) ds.textContent = slotDesc(o) + (curSlot === i ? ' · 当前' : '');
+      var bl = row.querySelector('[data-a="load"]'); if (bl) bl.disabled = !o;
+      var bd = row.querySelector('[data-a="del"]'); if (bd) bd.disabled = !o;
+    }
   }
   /** 把存档里的角色状态塞回内存。**不负责切图**（切图由调用方决定时机）。 */
   function applySave(o) {
@@ -4998,8 +5171,17 @@
     bagDirty = true;
     return true;
   }
-  function saveGame(silent) {
+  /** 落盘。不传 slot = 写「当前认领的槽」；传了就写指定槽（手动点「存」时用）。
+   *  ★ curSlot === 0（没认领）时**什么都不写**：玩家刚把档全删了，
+   *    这时候自作主张重建一个档，等于把他刚才的删除操作吃掉一半。 */
+  function saveGame(silent, slot) {
     if (!ready) return false;      // boot 还没走完：此时落盘会把"半成品"状态写成正式档
+    slot = slot || curSlot;
+    if (!(slot >= 1 && slot <= SLOT_N)) {
+      if (!silent) toast('请先点某个档位的「存」');
+      window.__saveErr = 'no-slot';
+      return false;
+    }
     try {
       var o = { v: SAVE_VER, t: Date.now(), map: CUR.id,
         x: +player.mx.toFixed(2), y: +player.my.toFixed(2),
@@ -5007,10 +5189,10 @@
         kills: window.__kills || 0, bag: {}, gear: gearInv, eq: {} };
       for (var k in bag) if (bag.hasOwnProperty(k)) o.bag[k] = bag[k] | 0;
       GEAR_SLOTS.forEach(function (sl) { o.eq[sl.key] = equipped[sl.key] || null; });
-      localStorage.setItem(SAVE_KEY, JSON.stringify(o));
+      localStorage.setItem(slotKey(slot), JSON.stringify(o));
       lastSaveMs = o.t;
       updateSaveUI();
-      if (!silent) toast('已存档 · 下次进来回到「' + CUR.name + '」');
+      if (!silent) toast('已存入档位' + SLOT_CN[slot - 1] + ' · ' + CUR.name);
       return true;
     } catch (e) {
       // localStorage 写不进（隐私模式 / 配额满）要明说，不能假装存上了
@@ -5019,21 +5201,56 @@
       return false;
     }
   }
-  function loadGame(silent) {
-    var o = readSave();
-    if (!o) { if (!silent) toast('没有找到可读的存档'); return false; }
+  function loadGame(silent, slot) {
+    slot = slot || curSlot;
+    var o = slot ? readSlot(slot) : null;
+    if (!o) { if (!silent) toast(curSlot ? '这个档位是空的' : '还没有可用的存档'); return false; }
     applySave(o);
+    setCurSlot(slot);                        // 认领它：此后自动存档接着往这儿写
     switchTo(o.map, o.x, o.y, true);
-    lastGearSig = '';                       // 强制重建装备区（不然还画着上一局的格子）
+    lastGearSig = '';                        // 强制重建装备区（不然还画着上一局的格子）
     if (bagBuilt) buildBagUI();
     updateSaveUI();
-    if (!silent) toast('读档完成 · ' + CUR.name + ' · 银两 ' + o.stones);
+    if (!silent) toast('已读档位' + SLOT_CN[slot - 1] + ' · ' + CUR.name + ' · 银两 ' + o.stones);
     return true;
   }
-  function clearSave() {
-    try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+  function clearAllSaves() {
+    for (var i = 1; i <= SLOT_N; i++) clearSlot(i);
+    setCurSlot(0);
     lastSaveMs = 0;
     updateSaveUI();
+  }
+
+  /* ---------------- 通用确认框（v52）----------------
+   * 为什么不用 window.confirm：
+   *   ① 部分内嵌 WebView（微信 / QQ 内置浏览器）会直接吞掉 confirm 并返回 false，
+   *      玩家点了"确定"却毫无反应、且控制台干净 —— 比不弹窗更难排查；
+   *   ② 它是浏览器原生皮，跟这游戏的调子不是一个世界；
+   *   ③ 自测需要一个能 querySelector 到、能 dispatch click 的靶子。
+   * 于是做成 DOM 浮层，回调式。注意它**不带 .hud 类** —— 带了会被
+   * .hud{pointer-events:none} 继承，按钮点不到（本项目踩过两次）。 */
+  var cfCb = null;
+  function confirmOpen() {
+    var box = document.getElementById('confirm');
+    return !!box && !box.hasAttribute('hidden');
+  }
+  function confirmBox(title, msg, okText, cb) {
+    var box = document.getElementById('confirm');
+    if (!box) { if (cb) cb(true); return false; }   // 兜底：没有浮层也别把动作卡死
+    var t = document.getElementById('cfTitle'), m = document.getElementById('cfMsg'),
+      y = document.getElementById('cfYes');
+    if (t) t.textContent = title;
+    if (m) m.textContent = msg;
+    if (y) y.textContent = okText || '确定';
+    cfCb = cb || null;
+    box.removeAttribute('hidden');
+    return true;
+  }
+  function closeConfirm(ok) {
+    var box = document.getElementById('confirm');
+    if (box) box.setAttribute('hidden', '');
+    var cb = cfCb; cfCb = null;
+    if (cb) { try { cb(!!ok); } catch (e) { toast('操作失败：' + (e && e.message || e)); } }
   }
 
   /* ---------------- 快捷药栏（v47）----------------
@@ -5225,26 +5442,71 @@
     else renderQuick();  // 关背包时立刻把药栏画回来（它刚才是 display:none 的）
   }
 
-  /* ---------------- 存档按钮 + 离场落盘 ----------------
-   * 手动存档存在的意义不是"补 functionality"，是**给玩家确定感** ——
+  /* ---------------- 存档区（三档位）+ 离场落盘（v52）----------------
+   * 手动存档存在的意义不是"补一个功能"，是**给玩家确定感** ——
    * 自动档看不见摸不着，点一下屏幕上会写出时间和地图名，人才肯放心去打 boss。
-   * 「重开」会真清档：确认方式是点了之后立刻新开一局（且旧档已删），
-   * 不弹 confirm —— 弹窗在手机端经常被判为非用户手势而被拦，反而更不可靠。 */
+   *
+   * ★ 「重开」和「删档」是两种完全不同的意图，以前挤在一个按钮里（点了必清档）：
+   *     · 重开 = 放弃当前进度从头来过，**档位里的存档一律保留**（想回来点「读」即可）；
+   *     · 删某个档 = 只毁那一条。两者都必须先弹确认框 —— 都是点了回不来的事。 */
+  function doSlotSave(i) {
+    if (saveGame(false, i)) setCurSlot(i);   // 认领：此后自动存档跟着这个档走
+    autosaveT = 0;                            // 刚按过就不要 15 秒后再重复一次
+    updateSaveUI();
+  }
+  function doSlotDel(i) {
+    var o = readSlot(i);
+    if (!o) return;
+    confirmBox('删除档位' + SLOT_CN[i - 1] + '？',
+      slotDesc(o) + '\n删除后无法恢复。',
+      '删除',
+      function (ok) {
+        if (!ok) return;
+        clearSlot(i);
+        if (curSlot === i) setCurSlot(newestSlot());   // 删的正是当前档 → 认领最近的那个（没有就停自动存档）
+        toast('档位' + SLOT_CN[i - 1] + '已删除');
+        updateSaveUI();
+      });
+  }
   function wireSaveUI() {
-    var a = document.getElementById('svSave'), b = document.getElementById('svLoad'),
-      c = document.getElementById('svClear');
-    if (a) a.addEventListener('click', function (ev) {
-      ev.preventDefault(); ev.stopPropagation(); saveGame(false); autosaveT = 0;
+    buildSlots();
+    updateSaveUI();
+    /* 事件委托挂在容器上：三个槽 × 三个按钮 = 9 个监听器写一遍就够，
+     * 而且 renderSlots 只是改文字/类名、不重建 DOM，不存在"监听器跟着节点一起没了"。 */
+    var box = document.getElementById('slotList');
+    if (box) box.addEventListener('click', function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var b = t.closest('button[data-a]');
+      var row = b && b.closest ? b.closest('.svrow') : null;
+      if (!b || !row || b.disabled) return;
+      ev.preventDefault(); ev.stopPropagation();
+      var i = +row.getAttribute('data-slot');
+      var a = b.getAttribute('data-a');
+      if (a === 'save') doSlotSave(i);
+      else if (a === 'load') loadGame(false, i);
+      else if (a === 'del') doSlotDel(i);
     });
-    if (b) b.addEventListener('click', function (ev) {
-      ev.preventDefault(); ev.stopPropagation(); loadGame(false);
-    });
+    // 确认框上的两个按钮：确定了才调回调，取消一律不做事
+    var cy = document.getElementById('cfYes'), cn = document.getElementById('cfNo'),
+      cm = document.getElementById('cfMask');
+    if (cy) cy.addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); closeConfirm(true); });
+    if (cn) cn.addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); closeConfirm(false); });
+    if (cm) cm.addEventListener('click', function (ev) { ev.stopPropagation(); closeConfirm(false); });
+    var c = document.getElementById('svClear');
     if (c) c.addEventListener('click', function (ev) {
       ev.preventDefault(); ev.stopPropagation();
-      clearSave();
-      toast('存档已清空，正在开始新的一局…');
-      // 重开后浏览器地址里的 ?map= 会把人又送回去，所以显式带上 ?new=1 重载
-      setTimeout(function () { location.href = 'index.html?new=1'; }, 260);
+      confirmBox('重开这一局？',
+        '当前进度会丢失，从出生点重新开始。\n' +
+        (curSlot ? '档位' + SLOT_CN[curSlot - 1] + '里的存档会保留，点它的「读」随时回来。'
+          : '（当前没有认领档位，自动存档处于暂停状态）'),
+        '重开',
+        function (ok) {
+          if (!ok) return;
+          toast('正在开始新的一局…');
+          // 重开后浏览器地址里的 ?map= 会把人又送回去，所以显式带上 ?new=1 重载
+          setTimeout(function () { location.href = 'index.html?new=1'; }, 220);
+        });
     });
     /* 关标签页 / 退后台：visibilitychange 是手机上唯一可靠的时机（pagehide 在 iOS Safari
      * 上不一定触发）。两边都挂、都只写一次即可（写两份内容一样，成本可接受）。 */

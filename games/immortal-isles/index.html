@@ -391,14 +391,55 @@
   #bag .g.t3{border-color:rgba(111,182,255,.95);box-shadow:inset 0 0 10px rgba(111,182,255,.24)}
   #bag .g.t4{border-color:rgba(199,139,255,.98);box-shadow:inset 0 0 12px rgba(199,139,255,.30),0 0 8px rgba(199,139,255,.35)}
   #bag .g.press{transform:translateY(1px);outline:2px solid rgba(255,190,120,.9)}
-  /* 存档行：状态文字 + 三个小按钮排一行，不占额外版面 */
-  #saveRow{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
-  #saveRow .svinfo{font-size:10.5px;color:#8ea3bf;font-family:ui-monospace,Consolas,monospace}
+  /* 存档区（v52：三个档位）
+     为什么必须分档：只有一个存档时，"换个路线试试" 就等于 "先毁掉这一条命"，
+     玩家不敢试；而这套游戏的核心乐趣恰恰是摸地图。分档之后删哪个都是单独一次确认。
+     每行 = 一个槽：标题行（编号 + 存/读/删），下面一行是该档的时间与地图名。 */
+  #saveRow{display:flex;flex-direction:column;gap:6px;align-items:stretch;width:100%}
+  #saveRow .svhint{font-size:10.5px;color:#8ea3bf;line-height:1.5}
+  #saveRow .svhint i{font-style:normal;color:#ffd88a;font-family:ui-monospace,Consolas,monospace}
   #saveRow .svbtns{display:flex;gap:6px}
-  #saveRow button{font:inherit;font-size:11px;color:#e6dcc0;cursor:pointer;padding:3px 8px;
-    border-radius:6px;background:rgba(28,36,52,.92);border:1px solid rgba(214,178,96,.45)}
+  #slotList{display:flex;flex-direction:column;gap:5px;width:100%;pointer-events:auto}
+  #saveRow .svrow{border:1px solid rgba(150,170,200,.24);border-radius:7px;padding:5px 6px;
+    background:rgba(8,14,26,.55);display:flex;flex-direction:column;gap:4px;min-width:0}
+  #saveRow .svrow.cur{border-color:rgba(255,206,120,.75);background:rgba(46,36,16,.5)}
+  #saveRow .svrow .r1{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  #saveRow .svrow .nm{font-size:11px;color:#e6dcc0;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
+  #saveRow .svrow .nm b{font-size:9px;font-weight:700;color:#1d1608;border-radius:3px;padding:0 3px;
+    background:linear-gradient(180deg,#ffd977,#f5b13c)}
+  #saveRow .svrow .ops{display:flex;gap:4px}
+  #saveRow .svrow .ds{font-size:10px;color:#8ea3bf;font-family:ui-monospace,Consolas,monospace;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #saveRow .svrow.cur .ds{color:#cfd8e6}
+  #saveRow button{font:inherit;font-size:11px;color:#e6dcc0;cursor:pointer;padding:2px 7px;
+    border-radius:5px;background:rgba(28,36,52,.92);border:1px solid rgba(214,178,96,.45)}
   #saveRow button:hover{background:#2b2438;border-color:rgba(255,214,130,.85)}
   #saveRow button:active{transform:translateY(1px)}
+  #saveRow button.del{border-color:rgba(226,90,80,.5)}
+  #saveRow button:disabled{opacity:.32;cursor:default}
+  #saveRow button:disabled:hover{background:rgba(28,36,52,.92);border-color:rgba(214,178,96,.45)}
+  #saveRow .svbtns #svClear{width:100%;padding:4px 8px}
+  /* 手指比鼠标粗：三个小按钮在触屏上要吃得住点击 */
+  body.touch #saveRow button{padding:5px 11px;font-size:12px}
+  /* ── 通用确认框（v52）：重开 / 删档这类"点了回不来"的动作必须拦一道 ──
+     ⚠ 刻意不用 window.confirm：部分内嵌 WebView（微信/QQ 内置浏览器）会直接吞掉
+       confirm 并返回 false，玩家点了"确定"却毫无反应 —— 比没弹窗更难排查。 */
+  #confirm{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:24px}
+  #confirm[hidden]{display:none}
+  #confirm .msk{position:absolute;inset:0;background:rgba(6,10,20,.72);backdrop-filter:blur(3px)}
+  #confirm .dlg{position:relative;width:min(320px,86vw);padding:16px 16px 13px;border-radius:12px;
+    background:linear-gradient(180deg,rgba(22,30,50,.98),rgba(12,18,32,.99));
+    border:1px solid rgba(214,178,96,.6);box-shadow:0 10px 34px rgba(0,0,0,.55);
+    color:#f0e3c2;text-align:center}
+  #confirm .ct{font-size:15px;letter-spacing:2px;color:#ffd88a;margin-bottom:9px}
+  #confirm .cm{font-size:12.5px;line-height:1.85;color:#cfcbe8;margin-bottom:15px;white-space:pre-line}
+  #confirm .cb{display:flex;gap:10px;justify-content:center}
+  #confirm button{font:inherit;font-size:13px;cursor:pointer;padding:7px 20px;border-radius:8px}
+  #confirm .ghost{background:transparent;color:#cfcbe8;border:1px solid rgba(160,180,210,.45)}
+  #confirm .ghost:hover{border-color:#cfcbe8}
+  #confirm .danger{background:linear-gradient(180deg,rgba(150,40,34,.95),rgba(96,20,18,.96));
+    color:#ffe4d6;border:1px solid rgba(255,150,120,.6)}
+  #confirm .danger:hover{border-color:#ff9e8a}
   /* 触屏：面板缩一点、挪到**屏幕中下方**。
      为什么不贴右边：右下是技能盘（right:14/bottom:14）、右上是一排面板，都占满了。
      为什么不贴左下：摇杆是"按哪出现在哪"的浮动盘，左下正是它最常出现的位置。 */
@@ -603,12 +644,11 @@
   <div class="tip">点<b>装备格</b>穿戴，<b>长按 0.7 秒</b>熔炼成银两；
     <b>已装备</b>的格子点一下卸下　·　按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药</div>
   <div class="tip" id="saveRow">
-    <span class="svinfo" id="saveInfo">尚未存档</span>
-    <span class="svbtns">
-      <button id="svSave" title="把当前进度写入本地">存档</button>
-      <button id="svLoad" title="读回最近一次存档">读档</button>
-      <button id="svClear" title="清空存档并重开新局">重开</button>
-    </span>
+    <div class="svhint">存档 · <i id="saveInfo">尚未存档</i></div>
+    <div id="slotList"></div>
+    <div class="svbtns">
+      <button id="svClear" title="放弃当前进度、从头开始（存档档位保留）">重开</button>
+    </div>
   </div>
 </div>
 
@@ -661,7 +701,8 @@
   <span class="hl">Shift</span> 奔跑　·　<span class="hl">B</span> 背包　·　<span class="hl">1 / 2 / 3</span> 或直接点左上药格 服金创药 / 小还丹 / 大还丹　·　
   击杀妖兽会 <span class="hl">掉落物品与装备</span>，走近自动拾取　·　<span class="hl">B</span> 开行囊：
   点装备格<b>穿戴</b>、长按<b>熔炼</b>成银两　·　进度 <span class="hl">每 15 秒自动存档</span>，
-  也可在行囊底部手动存档 / 读档 / 重开　·　<span class="hl">Alt+1~6</span> 试动作
+  行囊底部可切成 <span class="hl">三个存档档位</span>：逐档 <b>存 / 读 / 删</b>，
+  <span class="hl">重开</span>只重来当前进度、不删档位　·　<span class="hl">Alt+1~6</span> 试动作
   </div>
 </div>
 
@@ -728,6 +769,20 @@
 </div>
 
 <button id="viewfix" type="button">已自动校正视图 · 点此彻底复位</button>
+
+<!-- 通用确认框：重开 / 删档前拦一道。刻意不放 body 里的 .hud 结构上（不带 hud 类），
+     否则会被 .hud{pointer-events:none} 继承掉，按钮点不到 —— 这是本项目踩过两次的坑。 -->
+<div id="confirm" hidden>
+  <div class="msk" id="cfMask"></div>
+  <div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="cfTitle">
+    <div class="ct" id="cfTitle">确认</div>
+    <div class="cm" id="cfMsg"></div>
+    <div class="cb">
+      <button id="cfNo" class="ghost" type="button">取消</button>
+      <button id="cfYes" class="danger" type="button">确定</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ────────────────── 手机端「视口防线」 ──────────────────
@@ -810,6 +865,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=51"></script>
+<script src="js/game.js?v=52"></script>
 </body>
 </html>
