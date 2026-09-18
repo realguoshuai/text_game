@@ -510,6 +510,36 @@ results.push(run('坊市 买卖与防套利', 'autotest=shop', ({ probe }) => {
     && S.pass === true;
 }, { budget: 20000 }));
 
+// 8.4d) 点怪 = 自动平A + 始终面向目标（v57）。
+//       盯的是一个**看起来完全合理**的坏法：sideFace 记的是"最近一次水平移动方向"，
+//       于是从右边跑去打脚下的怪时，攻击动作朝右挥、而怪在屏幕左下 ——
+//       就是玩家说的「背对怪物攻击」。判据用「目标在屏幕哪一侧」= sign(dx-dy)
+//       （等距投影：map +x 画到屏幕右下、map +y 画到屏幕左下），而且**刻意先把朝向
+//       设成反的**，点下去必须被掰正。另外自动攻击必须能被键盘/浮层/距离正确打断。
+//       ★ probe 里的 oldCatch 是给用例自己上的防假绿锁：旧算法至少要有一条样例答错 ——
+//         否则这组样例根本抓不住那个 bug，跑绿了也说明不了什么。
+//       ⚠ 同样必须写死 map=qingxuan（出生点四周是开阔空地）：用例要在玩家周边
+//         ±4 格内找"屏幕偏左"和"屏幕偏右"两侧的候选格，别的图不一定凑得齐。
+results.push(run('战斗 点怪自动攻击与面向', 'map=qingxuan&autotest=autoatk', ({ probe }) => {
+  if (!probe) return false;
+  const A = probe;
+  return Array.isArray(A.cases) && A.cases.length >= 1
+    && A.oldCatch >= 1                                  // ★ 用例自身抓得住旧逻辑
+    && A.cases.every((r) => {
+      return r.hit === true && r.locked === true        // 点中即锁定
+        && r.side0ok === true && r.inArc === true       // ★ 锁定那一刻朝向就已正确
+        && r.closed === true && r.hurt === true         // 零输入自己靠近、自己出手
+        && r.sideAtHitOk === true;                      // ★ 出手那一刻仍朝着它
+    })
+    && A.keyTake && A.keyTake.moved === true && A.keyTake.along === true && A.keyTake.across === true
+    && A.farClear && A.farClear.cleared === true        // 跑出仇恨半径 → 停手清锁定
+    && A.modal && A.modal.opened === true && A.modal.hitBefore === true && A.modal.hpSame === true
+    && A.chain && A.chain.picked === true && A.chain.firstGone === true && A.chain.farInRange === true
+    && A.chainFar && A.chainFar.firstGone === true && A.chainFar.cleared === true
+    && A.clearClick && A.clearClick.lockedBefore === true && A.clearClick.cleared === true
+    && A.pass === true;
+}, { budget: 25000 }));
+
 // 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）
 //      ② 伤害不再恒定（有浮动/暴击/连击）③ 背对目标砍不中、挥空自动转身。
 //      50 刀逐帧推进，预算要给足。

@@ -263,6 +263,9 @@
     atk: BASE_STATS.atk, def: BASE_STATS.def, exp: 0, stones: 0, realmName: '炼气期',
     realmIdx: 0,      // 由 exp 推导（realmForExp），不进存档；realmName 只是它的显示缓存
     attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0,
+    // —— 自动追击的两个计时器（v57，只在锁定妖兽时用）——
+    foeStuck: 0,      // 「想走却没挪动」持续了多久（被水/墙隔开时会一直涨）
+    foeChased: false, // 这一轮追击已经尝试过绕路，不重复跑 BFS
     // —— 侧视素材专用方向（2026-09-17）——
     // 侧视素材（CraftPix 那几套）**只有朝右一版**，左向靠水平翻转，根本没有「正面/背面」。
     // 所以 face 是 up/down 时直接画右向图 —— 看起来就是「朝镜头挥砍」，很怪。
@@ -3349,6 +3352,239 @@
             backDmg: backDmg, faceAfterBack: faceBack
           });
         }
+        if (at === 'autoatk') {
+          /* ?map=<有怪图>&autotest=autoatk —— 「点怪 = 自动平A + 始终面向目标」（v57）。
+           * 判据全是几何与最终状态，不数"调了哪个函数"：
+           *   ① 点中的那一帧就锁定 + 转身（face 与 sideFace 同时到位，不能等下一帧）
+           *   ② ★ 朝向：目标在屏幕左/右哪一侧由 sign(dx-dy) 决定（等距投影），
+           *      而不是 sign(dx)。**故意先把 sideFace 设成反的**（模拟"刚从右边跑来"），
+           *      点下去必须被掰正 —— 旧版就是保持这个值，画出来即「背对怪物攻击」。
+           *   ③ 零输入下自己走过去（距离真的缩小）并自己出手（怪真的掉血）
+           *   ④ 出手那一刻 sideFace 仍是朝它的（动作播放中不许被翻转）
+           *   ⑤ 按方向键立刻接管：往 map +x 走就只动 x，不会被自动攻击拽向 +y 的怪
+           *   ⑥ 怪跑出仇恨半径 → 停手清锁定（旧版会被拽着追出半张地图）
+           *   ⑦ 模态浮层（确认框）开着 → 不出手
+           *   ⑧ 目标倒下 → 自动接上够得着的下一只；够不着则清空
+           *   ⑨ 点空地 → 清锁定
+           * ★ 还自查一件事：这组样例能不能真的抓住旧逻辑（oldPick）——
+           *   如果新旧算法在样例上给出完全一样的答案，说明用例是**假绿**，得报出来。
+           */
+          var pba = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          var A = { cases: [], oldCatch: 0, keyTake: null,
+                    farClear: null, modal: null, chain: null, clearClick: null };
+          var savedFoes = foes;
+          /* 造"自测妖兽"的 def_ 必须**无副作用**：qingxuan 出生点第一只可能是训练靶
+           * （`def_.dummy`），直接继承它 → killFoe 首行就把 hp 重置回满 → 永远打不死，
+           * 「目标倒下→自动接下一只」当场失效，而现象看起来像"自动攻击没生效"。
+           * ⚠ def_ 是**共享对象**，绝不能就地改：浅拷一份并显式去掉 dummy。 */
+          var baseDef = (savedFoes[0] && savedFoes[0].def_) || FOE_DEFS[Object.keys(FOE_DEFS)[0]];
+          var testDef = {};
+          for (var dk in baseDef) if (baseDef.hasOwnProperty(dk)) testDef[dk] = baseDef[dk];
+          testDef.dummy = false;
+          var mkA = function (x, y, hp) {
+            return { def_: testDef, key: testDef.key, name: '自测妖兽',
+              x: x, y: y, home: { x: x, y: y },
+              hp: hp, maxhp: hp, atk: 0, def: 0, exp: 0, stones: [0, 0],
+              face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 999, alive: true, respawn: 0,
+              leash: 0.01, ret: 0, bpath: null, repath: 0,
+              anim: 'idle', animT: 0, animHold: 0, dying: 0, sayT: 0 };
+          };
+          /* 旧算法（v56 及以前）：sideFace 只跟**移动/朝向的 dx 符号**，dx=0 就保持原值。
+           * 用它当对照组，验证新判据不是"怎么写都过"。 */
+          var oldPick = function (dx, cur) { return dx ? (dx > 0 ? 'right' : 'left') : cur; };
+
+          var pxA = Math.round(player.mx), pyA = Math.round(player.my);
+          player.dead = false; player.invuln = 999; player.path = null;
+          player.targetFoe = null; player.actHold = 0; player.attackCd = 0;
+          // 候选格：离玩家 1.6~3.4 格（仇恨半径内、又在攻击距离外，正好走一段）
+          var candA = [];
+          for (var axA = -4; axA <= 4; axA++) for (var ayA = -4; ayA <= 4; ayA++) {
+            if (!axA && !ayA) continue;
+            var cxA = pxA + axA, cyA = pyA + ayA;
+            if (!walkable(cxA, cyA) || isSolid(cxA, cyA)) continue;
+            var ddA = Math.hypot(axA, ayA);
+            if (ddA < 1.6 || ddA > 3.4) continue;
+            candA.push({ dx: axA, dy: ayA, x: cxA, y: cyA });
+          }
+          /* 取一格来当样例。**两级优先，第一级是关键**：
+           *   ① dx 与 s=dx−dy **反号**的格（例如 dx>0 但 dy 更大 ⇒ s<0）——
+           *      这种位置老算法会答 right、新算法答 left，是唯一能区分新旧算法、
+           *      也唯一对应"从屏幕右侧跑来打屏幕左下的怪"那类真实情形的样例；
+           *   ② dx=0 的格（老算法"保持原值"，只要原值不是期望值就同样能区分）；
+           *   ③ 兜底：符号对就行（此时 oldCatch 可能为 0，用例会自己报出来）。 */
+          var pickA = function (sign) {
+            var b1 = null, b2 = null, b3 = null;
+            for (var i = 0; i < candA.length; i++) {
+              var c = candA[i], s = c.dx - c.dy;
+              if (sign > 0 ? s <= 0 : s >= 0) continue;
+              if (c.dx * s < 0) {
+                if (!b1 || Math.abs(s) > Math.abs(b1.dx - b1.dy)) b1 = c;
+              } else if (c.dx === 0) { if (!b2) b2 = c; }
+              if (!b3) b3 = c;
+            }
+            return b1 || b2 || b3;
+          };
+          var resetA = function () {
+            player.mx = pxA; player.my = pyA; player.tx = pxA; player.ty = pyA;
+            player.path = null; player.targetFoe = null;
+            player.actHold = 0; player.attackCd = 0; player.walk = 0;
+          };
+
+          [1, -1].forEach(function (sign) {
+            var c = pickA(sign);
+            if (!c) { A.cases.push({ sign: sign, skip: 'no-cell' }); return; }
+            var want = sign > 0 ? 'right' : 'left';
+            resetA();
+            foes = [mkA(c.x, c.y, 99999)];
+            // ★ 故意埋下"错误的历史朝向"：旧版会一路保持它
+            player.face = 'right'; player.sideFace = 'right';
+            var hit = window.ISLES.tapAt(c.x, c.y);
+            var st0 = window.ISLES.stance();
+            // 锁定那一刻就必须已经落在命中扇形内 —— 转身"当场生效"的硬证据
+            // （不是等主循环下一帧才转；晚了那一帧，画面上角色还朝着别处）
+            var arc0 = inFacingArc(foes[0].x, foes[0].y);
+            var d0 = Math.hypot(foes[0].x - player.mx, foes[0].y - player.my);
+            var hp0 = foes[0].hp, nTk = 0, sideHit = null;
+            while (nTk < 300 && foes[0].hp >= hp0) {
+              window.ISLES.tick(1 / 60); nTk++;
+              if (foes[0].hp < hp0) sideHit = window.ISLES.stance().sideFace;
+            }
+            var d1 = Math.hypot(foes[0].x - player.mx, foes[0].y - player.my);
+            var row = { sign: sign, cell: c.x + ',' + c.y, dx: c.dx, dy: c.dy,
+              hit: hit, locked: !!st0.target, face0: st0.face, side0: st0.sideFace, wantSide: want,
+              side0ok: st0.sideFace === want,
+              inArc: arc0,
+              d0: +d0.toFixed(2), d1: +d1.toFixed(2), closed: d1 < d0 - 0.2,
+              hurt: foes[0].hp < hp0, tick: nTk, sideAtHit: sideHit, sideAtHitOk: sideHit === want };
+            // 旧逻辑在这组样例上会不会给出一样的答案？一样 = 抓不住，用例是假绿
+            row.oldWrong = oldPick(c.dx, 'right') !== want;
+            if (row.oldWrong) A.oldCatch++;
+            A.cases.push(row);
+          });
+
+          /* ⑤ 键盘接管：先找一个**相邻可走方向**当基准（按下去必定走得动 —— 否则
+           * "没位移"分不清是被墙挡住还是被自动攻击拽住了）。然后把怪放在**不在按键
+           * 那一侧**的候选格上，按该方向键：位移必须与按键同向，且正交方向零位移。
+           * 被自动攻击拐走时，"同向"或"零正交位移"必有一条不成立。 */
+          var DIR4 = [[1, 0, 'd'], [-1, 0, 'a'], [0, 1, 's'], [0, -1, 'w']], od = null;
+          for (var qi = 0; qi < DIR4.length && !od; qi++) {
+            var qx = pxA + DIR4[qi][0], qy = pyA + DIR4[qi][1];
+            if (walkable(qx, qy) && !isSolid(qx, qy)) od = DIR4[qi];
+          }
+          if (od) {
+            var ck = null;
+            for (var ci = 0; ci < candA.length; ci++) {
+              var cc = candA[ci];
+              if (cc.dx * od[0] + cc.dy * od[1] > 0) continue;
+              if (!ck || Math.abs(cc.dx - cc.dy) > Math.abs(ck.dx - ck.dy)) ck = cc;
+            }
+            if (ck) {
+              resetA();
+              foes = [mkA(ck.x, ck.y, 99999)];
+              window.ISLES.tapAt(ck.x, ck.y);
+              var mx0 = player.mx, my0 = player.my;
+              keys[od[2]] = 1;
+              for (var kA = 0; kA < 10; kA++) window.ISLES.tick(1 / 60);
+              keys[od[2]] = 0;
+              var kdx = player.mx - mx0, kdy = player.my - my0;
+              A.keyTake = { k: od[2], ddx: +kdx.toFixed(3), ddy: +kdy.toFixed(3),
+                moved: Math.hypot(kdx, kdy) > 0.05,
+                along: (kdx * od[0] + kdy * od[1]) > 0,
+                across: Math.abs(kdx * od[1] - kdy * od[0]) < 1e-6,
+                foeStillLocked: !!player.targetFoe };
+              resetA();
+            }
+          }
+
+          // ⑥ 跑出仇恨半径：1 帧内就该解除锁定
+          resetA();
+          foes = [mkA(pxA + 8, pyA, 99999)];
+          player.targetFoe = foes[0];
+          window.ISLES.tick(1 / 60);
+          A.farClear = { dist: +(Math.hypot(foes[0].x - player.mx, foes[0].y - player.my)).toFixed(2),
+            cleared: player.targetFoe === null };
+
+          /* ⑦ 模态浮层（确认框）开着：贴着怪也不许出手。
+           * 先 tick 到真的打出第一刀再开浮层 —— 否则"没掉血"可能是由别的原因造成的，
+           * 什么都证明不了（先把"能打"证出来，再证"浮层拦住了"）。 */
+          resetA();
+          var cModal = snapWalkable(CUR, pxA + 1, pyA);
+          foes = [mkA(cModal.x, cModal.y, 99999)];
+          window.ISLES.tapAt(cModal.x, cModal.y);
+          var hpM0 = foes[0].hp;
+          for (var mPre = 0; mPre < 300 && foes[0].hp >= hpM0; mPre++) window.ISLES.tick(1 / 60);
+          var hitBefore = foes[0].hp < hpM0, hpM1 = foes[0].hp;
+          confirmBox('自测', '浮层开着时不该出手', '确定', function () { });
+          for (var mA = 0; mA < 90; mA++) window.ISLES.tick(1 / 60);   // 1.5 秒 = 至少 2 刀的时间
+          A.modal = { opened: confirmOpen(), hitBefore: hitBefore, hpSame: foes[0].hp === hpM1 };
+          closeConfirm(false);
+          resetA();
+
+          /* ⑧ 目标倒下 → 自动接上"够得着"的下一只（伸手可及才接，见 killFoe 的注释）。
+           * 同时验反面：够不着（远在仇恨半径之外）就必须清空，不能自动挑更远的接着打 ——
+           * 否则点一下怪，角色会自己把整张图刷完。 */
+          resetA();
+          var candSorted = candA.slice().sort(function (a, b) {
+            return Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy);
+          });
+          if (candSorted.length) {
+            var cw = snapWalkable(CUR, pxA + 1, pyA);
+            var fwA = mkA(cw.x, cw.y, 1), fnA = mkA(candSorted[0].x, candSorted[0].y, 99999);
+            foes = [fwA, fnA];
+            var hitC = window.ISLES.tapAt(fwA.x, fwA.y);
+            var lockC = player.targetFoe === fwA;
+            var distC = Math.hypot(fwA.x - player.mx, fwA.y - player.my);
+            var nC = 0;
+            while (nC < 240 && fwA.hp > 0) { window.ISLES.tick(1 / 60); nC++; }
+            var nD = 0;
+            while (nD < 120 && player.targetFoe !== fnA) { window.ISLES.tick(1 / 60); nD++; }
+            A.chain = { hit: hitC, lock: lockC, dist: +distC.toFixed(2),
+              hpEnd: fwA.hp, killedAt: nC, tookAt: nD,
+              picked: player.targetFoe === fnA, firstGone: fwA.hp <= 0,
+              dead: player.dead, pHp: Math.round(player.hp), act: player.act,
+              actHold: +player.actHold.toFixed(2), cd: +player.attackCd.toFixed(2),
+              foeAlive: fwA.alive, foeDying: +fwA.dying.toFixed(2),
+              farInRange: Math.hypot(fnA.x - player.mx, fnA.y - player.my) <= MELEE + 0.9 };
+            // 反面：另一只在 20 格之外（远超任何仇恨半径），打死了也不该接
+            foes = [mkA(cw.x, cw.y, 1), mkA(player.mx + 20, player.my, 99999)];
+            window.ISLES.tapAt(cw.x, cw.y);
+            for (var cB = 0; cB < 240 && foes[0].hp > 0; cB++) window.ISLES.tick(1 / 60);
+            A.chainFar = { firstGone: foes[0].hp <= 0, cleared: player.targetFoe === null,
+              hpEnd: foes[0].hp };
+            resetA();
+          }
+
+          // ⑨ 点空地清锁定
+          resetA();
+          var cClr = snapWalkable(CUR, pxA + 1, pyA);
+          foes = [mkA(cClr.x, cClr.y, 99999)];
+          window.ISLES.tapAt(cClr.x, cClr.y);
+          var lockedB = !!player.targetFoe;
+          window.ISLES.tapAt(pxA, pyA);          // 点自己脚下（怪在 1 格外，不会误判成命中）
+          A.clearClick = { lockedBefore: lockedB, cleared: player.targetFoe === null };
+
+          // —— 复位：别把自测状态留玩家界面上 ——
+          foes = savedFoes;
+          player.targetFoe = null; player.path = null;
+          player.mx = pxA; player.my = pyA; player.tx = pxA; player.ty = pyA;
+          player.actHold = 0; player.attackCd = 0; player.sideFace = 'right'; player.face = 'down';
+
+          /* 汇总。★ oldCatch ≥ 1 是**给用例自己上的防假绿锁**：旧算法（sideFace 只跟
+           * 水平移动方向）至少在一条样例上会给出与新算法不同的答案 —— 否则这些样例
+           * 根本抓不住「背对怪物攻击」，跑绿了也说明不了什么。 */
+          A.pass = A.cases.length >= 1 && A.oldCatch >= 1 &&
+            A.cases.every(function (r) {
+              return r.hit === true && r.locked === true && r.side0ok === true && r.inArc === true &&
+                r.closed === true && r.hurt === true && r.sideAtHitOk === true;
+            }) &&
+            !!A.keyTake && A.keyTake.moved === true && A.keyTake.along === true && A.keyTake.across === true &&
+            !!A.farClear && A.farClear.cleared === true &&
+            !!A.modal && A.modal.opened === true && A.modal.hitBefore === true && A.modal.hpSame === true &&
+            !!A.chain && A.chain.picked === true && A.chain.firstGone === true && A.chain.farInRange === true &&
+            !!A.chainFar && A.chainFar.firstGone === true && A.chainFar.cleared === true &&
+            !!A.clearClick && A.clearClick.lockedBefore === true && A.clearClick.cleared === true;
+          pba.textContent = JSON.stringify(A);
+        }
         if (at === 'skill') {
           // ?map=qingxuan&autotest=skill —— 三个技能各自验收：命中掉血、冷却拦截、冷却清零后可再放
           var pbs = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
@@ -4415,9 +4651,39 @@
     if (!dx && !dy) return;
     if (Math.abs(dx) > Math.abs(dy)) player.face = dx > 0 ? 'right' : 'left';
     else player.face = dy > 0 ? 'down' : 'up';
-    // 侧视素材只有左右两版：顺手记下最近的水平朝向（纯上下移动时保留上次的值），
-    // 攻击/倒地这类一次性动作靠它取图，避免画出"朝镜头挥砍"。
-    if (dx) player.sideFace = dx > 0 ? 'right' : 'left';
+    /* 侧视素材只有左右两版：顺手记下最近的水平朝向（纯上下移动时保留上次的值），
+     * 攻击/倒地这类一次性动作靠它取图，避免画出"朝镜头挥砍"。
+     * ★ 但一次性动作播放期间（actHold>0）**不许再改** —— 见 faceToward 的说明：
+     *   攻击那一瞬间朝向已经定死了，动作播到一半被方向键翻转，画面上就成了
+     *   "同一刀越挥越歪"，比不转身更奇怪。 */
+    if (dx && player.actHold <= 0) player.sideFace = dx > 0 ? 'right' : 'left';
+  }
+  /* ★ 朝某个点转身 —— 「面向目标」的唯一入口（v57）。
+   * 它一次定**两个**朝向，别只定一个：
+   *   player.face     = map 轴四向（扇形判定 inFacingArc 用这个）
+   *   player.sideFace = 屏幕上的左/右（侧视素材只有左右两版，画攻击动作用这个）
+   * ★ 关键：**屏幕左右 ≠ map 的 x 正负**。等距投影下 map +x 画到屏幕右下、map +y 画到
+   *   屏幕左下，所以"目标在屏幕的哪一边"= sign(dx - dy)，不是 sign(dx)。
+   *   这是「背对怪物攻击」的根因：旧版 sideFace 只记"最近一次水平**移动**方向"，
+   *   于是从右边跑来打脚下的怪（map +y）时 sideFace 还是 right → 画出朝右挥砍，
+   *   而怪在屏幕左下 —— 玩家看到的就是背对着怪砍。
+   *   （先 setFaceFromDelta 再算 sideFace：前者在 |dx|>|dy| 时也会写 sideFace，
+   *     顺序反了会被它用 map 轴的 x 符号盖掉。） */
+  function faceToward(mx, my) {
+    var dx = mx - player.mx, dy = my - player.my;
+    if (!dx && !dy) return;
+    setFaceFromDelta(dx, dy);
+    // 动作播放中朝向已锁定（同上）；这样一次攻击动作永远是同一个方向
+    if (player.actHold > 0) return;
+    var s = dx - dy;
+    if (s > 1e-6) player.sideFace = 'right';
+    else if (s < -1e-6) player.sideFace = 'left';
+    // s≈0 = 目标在屏幕正上/正下方，左右都是侧身 —— 保持上一次的值，免得来回抖
+  }
+  /* 模态浮层开着时不接管移动/出手。少了这道闸，开着世界地图或确认框站在怪旁边，
+   * 角色会在浮层背后继续自动追打、还把玩家带离原位（输入被浮层吃掉了，人却还在动）。 */
+  function canAutoFight() {
+    return !player.dead && !worldOpen && !cardOpen() && !confirmOpen() && !shopOpen();
   }
 
   function update(dt) {
@@ -4503,18 +4769,46 @@
       }
       // ★ 这里原来什么都没有 —— 点击移动全程不更新朝向，所以角色永远正对镜头
       setFaceFromDelta(dx, dy);
-    } else if (player.targetFoe && player.targetFoe.alive && !player.dead) {
-      // 锁定妖兽后自动追上去，贴脸自动出手（攻击受冷却约束）
+    } else if (canAutoFight() && player.targetFoe && player.targetFoe.alive) {
+      /* 锁定妖兽后：自己走过去 → 贴脸自动出手（出手仍受冷却约束）。这一段是
+       * 「点击怪物 = 自动平A」的全部实现，玩家不需要再按任何键。
+       *
+       * v57 三处修正（都是上一条更早版本的漏）：
+       *   ① 转身提到分支最外层 —— 旧版只在"还够远、正在走"那一条里转身，
+       *      站到攻击距离等冷却的那 0.65 秒里**不转身**，怪一绕背就成了"背对着怪等CD"。
+       *   ② 加了 AGGRO 上限 —— 旧版没有距离上限，点一下就被拽着追出半张地图。
+       *   ③ 被水/断崖隔开时会原地抖 —— 卡住 0.5 秒就绕一次路（复用点击寻路），
+       *      绕不通就放弃并明说，而不是让玩家看着角色贴着岸边抽搐。 */
       var tf = player.targetFoe;
       var tdx = tf.x - player.mx, tdy = tf.y - player.my, tdist = Math.hypot(tdx, tdy);
-      if (tdist > MELEE - 0.1) {
-        var tux = tdx / (tdist || 1), tuy = tdy / (tdist || 1), tsp = speed * dt;
-        if (couldStand(player.mx + tux * tsp, player.my)) player.mx += tux * tsp;
-        if (couldStand(player.mx, player.my + tuy * tsp)) player.my += tuy * tsp;
-        setFaceFromDelta(tdx, tdy);
-        player.walk = player.walk + dt;
+      if (tdist > AGGRO) {
+        player.targetFoe = null;                  // 跟丢了：停手，别一路追过去
       } else {
-        tryAttack();
+        faceToward(tf.x, tf.y);                   // 无论要走还是要打，先朝它
+        if (tdist > MELEE - 0.1) {
+          var tux = tdx / (tdist || 1), tuy = tdy / (tdist || 1), tsp = speed * dt;
+          var px1 = player.mx, py1 = player.my;
+          if (couldStand(player.mx + tux * tsp, player.my)) player.mx += tux * tsp;
+          if (couldStand(player.mx, player.my + tuy * tsp)) player.my += tuy * tsp;
+          player.walk = player.walk + dt;
+          var stick = (Math.abs(player.mx - px1) < 1e-6 && Math.abs(player.my - py1) < 1e-6);
+          player.foeStuck = stick ? player.foeStuck + dt : 0;
+          if (player.foeStuck > 0.5 && !player.foeChased) {
+            player.foeChased = true;              // 只试一次，别每 0.5 秒跑一遍 BFS
+            var rt = findPath(Math.round(player.mx), Math.round(player.my),
+              Math.round(tf.x), Math.round(tf.y));
+            if (rt && rt.length) {
+              player.path = rt;                   // 交给点击寻路分支绕过去（它会接管移动）
+              player.tx = Math.round(tf.x); player.ty = Math.round(tf.y);
+              player.foeStuck = 0;
+            } else {
+              player.targetFoe = null;
+              toast('那只妖兽过不去 —— 隔着水面或断崖');
+            }
+          }
+        } else {
+          tryAttack();
+        }
       }
     }
 
@@ -4682,20 +4976,40 @@
     //   下一刀才真打中。手感上的表现就是"打空率高、不跟手"。现在改成：
     //   ① 范围内最近的怪 → ② 立刻转向它 → ③ 用**转向后**的朝向来判定扇形。
     //   代价是偶尔会"自动转向"到最近的怪，但这正是动作游戏该有的吸附手感。
+    /* v57：**锁定目标优先**。玩家点了某只怪，这一刀就该落在它身上 ——
+     * 不能被旁边一只更近的抢走（"我点了 A、它却在打 B"是最难解释的一种手感 bug）。
+     * 没有锁定（或锁定的那只跑出攻击距离了）才退回"打最近的一只"。 */
+    var tfoe = (player.targetFoe && player.targetFoe.alive) ? player.targetFoe : null;
     var near = null, nd = AGGRO;
-    for (var i = 0; i < foes.length; i++) {
-      var f = foes[i]; if (!f.alive) continue;
-      var d = Math.hypot(f.x - player.mx, f.y - player.my);
-      if (d < nd) { nd = d; near = f; }
+    if (tfoe) {
+      var d0 = Math.hypot(tfoe.x - player.mx, tfoe.y - player.my);
+      if (d0 <= MELEE + 0.9) { near = tfoe; nd = d0; }
     }
-    if (near && nd <= MELEE + 0.9) setFaceFromDelta(near.x - player.mx, near.y - player.my);
+    if (!near) {
+      for (var i = 0; i < foes.length; i++) {
+        var f = foes[i]; if (!f.alive) continue;
+        var d = Math.hypot(f.x - player.mx, f.y - player.my);
+        if (d < nd) { nd = d; near = f; }
+      }
+    }
+    // faceToward 而不是 setFaceFromDelta：它顺手把 sideFace 也定成"目标在屏幕的哪一侧"，
+    // 否则侧视素材会按上次的移动方向挥砍 —— 就是「背对怪物攻击」。
+    if (near && nd <= MELEE + 0.9) faceToward(near.x, near.y);
     player.act = 'atkA'; player.actT = 0; player.actHold = ACT_DUR.atkA;   // 挥空也播，打不到也有反馈
-    // 只认「够近 且 在面朝扇形内」的目标 —— 背对着怪不再能砍中
+    // 只认「够近 且 在面朝扇形内」的目标 —— 背对着怪不再能砍中。
+    // 转身是四向的、扇形是 ±60°，而最近的目标转完身必然落在扇形内（最坏 |dx|=|dy| 时
+    // 点积 0.707 > FACE_ARC 0.5），所以这一条只会淘汰"根本没转过去的"情况。
     var best = null, bd = MELEE;
-    for (var j = 0; j < foes.length; j++) {
-      var g = foes[j]; if (!g.alive) continue;
-      var gd = Math.hypot(g.x - player.mx, g.y - player.my);
-      if (gd < bd && inFacingArc(g.x, g.y)) { bd = gd; best = g; }
+    if (tfoe && tfoe === near) {
+      var d1 = Math.hypot(tfoe.x - player.mx, tfoe.y - player.my);
+      if (d1 < MELEE && inFacingArc(tfoe.x, tfoe.y)) { best = tfoe; bd = d1; }
+    }
+    if (!best) {
+      for (var j = 0; j < foes.length; j++) {
+        var g = foes[j]; if (!g.alive) continue;
+        var gd = Math.hypot(g.x - player.mx, g.y - player.my);
+        if (gd < bd && inFacingArc(g.x, g.y)) { bd = gd; best = g; }
+      }
     }
     if (!best) return;
     var hit = rollDamage(player.atk, best.def);
@@ -4732,14 +5046,22 @@
       return;
     }
     player.atkBCd = ATK_B_CD;
-    // 与普攻同理：先朝最近的怪转身，再判定横扫范围（旧版判定用旧朝向，导致"贴着怪横扫却落空"）。
+    // 与普攻同理：先朝目标转身，再判定横扫范围（旧版判定用旧朝向，导致"贴着怪横扫却落空"）。
+    // 同样**锁定目标优先**（v57）—— 重击是横扫，但仍以玩家点的那只为转身基准。
+    var tfoeB = (player.targetFoe && player.targetFoe.alive) ? player.targetFoe : null;
     var near = null, nd = AGGRO;
-    for (var k = 0; k < foes.length; k++) {
-      var nf = foes[k]; if (!nf.alive) continue;
-      var ndd = Math.hypot(nf.x - player.mx, nf.y - player.my);
-      if (ndd < nd) { nd = ndd; near = nf; }
+    if (tfoeB) {
+      var d0b = Math.hypot(tfoeB.x - player.mx, tfoeB.y - player.my);
+      if (d0b <= MELEE + 1.4) { near = tfoeB; nd = d0b; }
     }
-    if (near && nd <= MELEE + 1.4) setFaceFromDelta(near.x - player.mx, near.y - player.my);
+    if (!near) {
+      for (var k = 0; k < foes.length; k++) {
+        var nf = foes[k]; if (!nf.alive) continue;
+        var ndd = Math.hypot(nf.x - player.mx, nf.y - player.my);
+        if (ndd < nd) { nd = ndd; near = nf; }
+      }
+    }
+    if (near && nd <= MELEE + 1.4) faceToward(near.x, near.y);
     player.act = 'atkB'; player.actT = 0; player.actHold = ACT_DUR.atkB;
     // 重击是横扫，扇形比普攻宽（±90°），但依然要求大致朝着目标
     var reach = MELEE + 0.55, hit = [];
@@ -6575,7 +6897,20 @@
     // 等动画播完再掉会让玩家以为"没掉东西"而提前走开。
     spawnLoot(f, rollLoot(f));
     spawnParticles(f.x, f.y);
-    if (player.targetFoe === f) player.targetFoe = null;
+    /* v57：目标倒下 → 若身边还有一只在攻击距离内就自动接上（连打不断档），
+     * 没有就清空停手。★ 只在"伸手就够得着"的范围内换目标：一旦允许自动挑更远的，
+     * 就变成"点一下怪，角色自己把整张图刷完"，那不是自动攻击、是代打。 */
+    if (player.targetFoe === f) {
+      var nxt = null, nb = MELEE + 0.9;
+      for (var ii = 0; ii < foes.length; ii++) {
+        var f2 = foes[ii];
+        if (f2 === f || !f2.alive || f2.dying > 0) continue;
+        var dd2 = Math.hypot(f2.x - player.mx, f2.y - player.my);
+        if (dd2 < nb) { nb = dd2; nxt = f2; }
+      }
+      player.targetFoe = nxt;
+      if (nxt) { player.foeStuck = 0; player.foeChased = false; }
+    }
     // 有倒地素材就播倒地（新怪物包取自 Dead.png，老妖兽用图集里的 _death_N 帧），
     // 播完由 updateFoes 收尾（置 alive=false 并排队复活）。没有素材才直接消失。
     var hasDeadAnim = (ATLAS.foes.anim && ATLAS.foes.anim[f.key] && ATLAS.foes.anim[f.key].acts.dead);
@@ -7372,19 +7707,35 @@
     return true;
   }
 
-  // 点击移动
-  function onClick(e) {
-    var r = canvas.getBoundingClientRect();
-    var iso = screenToIso(localX(e.clientX, r), localY(e.clientY, r));
-    var cx = iso.mx, cy = iso.my;
-    // 点到妖兽：锁定追击（清空普通寻路目标）；点空地：取消锁定
+  /* 点击/触摸地图上的某一点 —— 鼠标点击、触屏点按、自测钩子共用这**一处**，
+   * 保证自测跑的是玩家真走的那条路，而不是另写一份平行逻辑（本项目的老纪律）。
+   *   点到活着的妖兽 → 锁定它（之后自动追击 + 自动平A），并**当场转身**
+   *   点空地         → 取消锁定，交给点击寻路
+   * 返回 true 表示这一下点的是妖兽。
+   * ⚠ 倒地中的怪（dying>0，alive 还是 true）点不动 —— 它已经死了，锁上去只会站着干等。 */
+  function tapMap(cx, cy) {
     for (var i = 0; i < foes.length; i++) {
-      var f = foes[i]; if (!f.alive) continue;
-      if (Math.hypot(f.x - cx, f.y - cy) < 0.8) { player.targetFoe = f; player.path = null; return; }
+      var f = foes[i]; if (!f.alive || f.dying > 0) continue;
+      if (Math.hypot(f.x - cx, f.y - cy) < 0.8) {
+        player.targetFoe = f; player.path = null;
+        player.tx = player.mx; player.ty = player.my;   // 清掉上一段走位目标
+        player.foeStuck = 0; player.foeChased = false;  // 重新计"卡住"
+        // ★ 锁定的一瞬间就转身，而不是等主循环的下一帧 —— 否则点下去的第一帧
+        //   仍是旧朝向（"点了怪却还朝反方向"的那一瞬，肉眼能看见）。
+        faceToward(f.x, f.y);
+        return true;
+      }
     }
     player.targetFoe = null;
     var tx = Math.round(cx), ty = Math.round(cy);
     if (setTargetCell(tx, ty)) clickMark = { mx: tx, my: ty, life: 2.4, max: 2.4 };
+    return false;
+  }
+  // 点击移动
+  function onClick(e) {
+    var r = canvas.getBoundingClientRect();
+    var iso = screenToIso(localX(e.clientX, r), localY(e.clientY, r));
+    tapMap(iso.mx, iso.my);
   }
   canvas.addEventListener('mousedown', function (e) { if (e.button === 0) onClick(e); });
 
@@ -7760,6 +8111,18 @@
     mmFold: function (f) { mmFold(f); return MM.folded; },
     /** 等价于鼠标点击第 (x,y) 格：走的是 onClick 同一条设置目标格的路径 */
     clickCell: function (x, y) { return setTargetCell(x, y); },
+    /** 等价于「鼠标点了地图上的 (x,y)」（map 坐标，不是屏幕坐标）：与 onClick 共用 tapMap，
+     *  所以「点到妖兽 → 锁定 + 当场转身 → 自动追击平A」这条真实路径能被自测完整跑到。
+     *  返回 true = 点中的是妖兽。 */
+    tapAt: function (x, y) { return tapMap(x, y); },
+    /** 朝向与锁定的只读快照（自测用）：
+     *  face = map 轴四向（命中扇形用它）／sideFace = 屏幕左·右（画攻击动作用它） */
+    stance: function () {
+      var tf = player.targetFoe;
+      return { face: player.face, sideFace: player.sideFace,
+        act: player.act, actHold: +player.actHold.toFixed(2),
+        target: (tf && tf.alive) ? { x: +tf.x.toFixed(2), y: +tf.y.toFixed(2), hp: tf.hp } : null };
+    },
     // 调试接口也算"人主动调"（自测里它就是模拟用户拉滑块）
     setZoom: function (z) { setZoom(z, W / 2, H / 2, true); return Zt; },
     heroes: function () { return HERO_OPTIONS.map(function (h) { return { n: h.n, src: h.file }; }); },
