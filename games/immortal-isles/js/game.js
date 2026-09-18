@@ -525,6 +525,12 @@
     // 一帧画空，好过一个死掉的 rAF 循环（画面还在、点什么都没反应，最难查）。
     if (!CUR || !CUR.ground) return ' ';
     if (!(x >= 0 && y >= 0 && x < CUR.w && y < CUR.h)) return ' ';
+    /* ★★ 非整数守卫（2026-09-18）：`ground[20.32]` 取到 undefined，再 `[12.32]`
+     * 直接抛 —— 一句 `Cannot read properties of undefined (reading '12.32')`
+     * 让整个 boot 挂掉，而错误信息里连函数名都没有，极难定位（我们绕了很久）。
+     * 上面那行范围检查挡不住它：小数是**通过**范围检查的。
+     * 格表只接受整数格，这一个 return 就把「小数坐标当格下标」整类问题关死。 */
+    if (x !== (x | 0) || y !== (y | 0)) return ' ';
     return CUR.ground[y][x];
   }
   function isSolid(x, y) { return !!CUR && CUR.solid['' + x + ',' + y]; }
@@ -2362,6 +2368,65 @@
           bagToggle(false);
           gp.textContent = JSON.stringify(G);
         }
+        if (at === 'saveload') {
+          /* ?map=<图>&autotest=saveload —— 「小数坐标存档」验收（2026-09-18 用户报
+           * 「加载失败 · Cannot read properties of undefined (reading '12.32')」）。
+           * 根因：saveGame 写的是 +player.mx.toFixed(2)（小数），读档时 switchTo →
+           * snapWalkable → walkable → cellChar → CUR.ground[20.32] → undefined[12.32] 抛异常，
+           * 整个 boot 链断掉 = 有存档就永远进不去。
+           * ★ 这条用例的存在意义：**旧档必崩**这件事只有"用小数坐标读一次档"才看得见，
+           *   headless 里玩家永远站在整数格上（?x=&y= 也是整数），所以历史用例全绿也漏了它。 */
+          var P = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none';
+            document.body.appendChild(d); return d;
+          })();
+          var R = { ver: SAVE_VER };
+          // ① 格表守卫：小数下标不再抛（旧代码在这里抛 "reading '12.32'"）
+          R.cellChar = { frac: 'no-throw', nan: 'no-throw', int: 'no-throw' };
+          try { R.cellChar.frac = String(cellChar(12.32, 20.32)); } catch (e) { R.cellChar.frac = 'THREW:' + e.message; }
+          try { R.cellChar.nan = String(cellChar(NaN, NaN)); } catch (e) { R.cellChar.nan = 'THREW:' + e.message; }
+          try { R.cellChar.int = String(cellChar(1, 1)); } catch (e) { R.cellChar.int = 'THREW:' + e.message; }
+          R.cellChar.ok = R.cellChar.frac === ' ' && R.cellChar.nan === ' ' && R.cellChar.int !== 'THREW';
+          // ② 吸附：小数落点必须变成**整数格**，且那格真的能站
+          //   ★ 这里必须自己 try/catch：旧代码在这一步就抛异常，若让它冒出去，
+          //     整条用例连 #probe 都不写 —— 现象只是「没有 probe」，和「用例没跑」
+          //     长得一模一样（项目里为这个坑贴过好几次注释了）。包起来才能看见真因。
+          try {
+            var sp = snapWalkable(CUR, 12.32, 20.32);
+            R.snap = { ok: true, x: sp.x, y: sp.y, integral: sp.x === (sp.x | 0) && sp.y === (sp.y | 0),
+                       walkable: walkable(sp.x, sp.y) };
+          } catch (e) { R.snap = { ok: false, err: e.message }; }
+          // ③ 真·存档往返：写一份**小数坐标**档 → 清内存 → 读回（走 loadGame 全链路）
+          var wantMap = CUR.id;
+          player.mx = player.tx = 12.32; player.my = player.ty = 20.32;
+          player.stones = 777;
+          var saveOk = saveGame(true);
+          var raw = readSave();
+          R.written = { ok: !!saveOk, x: raw && raw.x, y: raw && raw.y };
+          player.mx = player.tx = 0; player.my = player.ty = 0; player.stones = 0;
+          var loaded;
+          try { loaded = loadGame(true); R.loadErr = null; }
+          catch (e) { loaded = false; R.loadErr = e.message; }
+          R.load = {
+            ok: !!loaded, map: CUR.id === wantMap, stones: player.stones === 777,
+            x: player.mx, y: player.my,
+            integral: player.mx === (player.mx | 0) && player.my === (player.my | 0),
+            // 落点必须站得住（吸附成功），否则玩家会卡在水里/墙里
+            stands: walkable(player.mx, player.my)
+          };
+          // ④ 坏坐标不能把 boot 打死：坐标置 NaN 再读一次
+          try {
+            var bad = JSON.parse(JSON.stringify(raw)); bad.x = 'oops'; bad.y = null;
+            localStorage.setItem(SAVE_KEY, JSON.stringify(bad));
+            var o2 = readSave();
+            R.badCoord = { x: o2 && o2.x, y: o2 && o2.y, sanitized: !!o2 && o2.x === null && o2.y === null };
+            var sp2 = snapWalkable(CUR, o2.x, o2.y);
+            R.badCoord.snapped = [sp2.x, sp2.y];
+          } catch (e) { R.badCoord = { threw: e.message }; }
+          R.pass = R.cellChar.ok && R.snap.ok && R.snap.integral && R.snap.walkable && R.written.ok &&
+            R.load.ok && R.load.integral && R.load.stands && !R.loadErr && R.badCoord.sanitized;
+          P.textContent = JSON.stringify(R);
+        }
         if (at === 'loot') {
           // 为什么值得单独立一条：这四件事各自都能"看起来对"，但接在一起才暴露真问题 ——
           //   ① 掉落掷骰的**实际**命中率 vs 配置概率（rollLoot 是独立掷骰，可能全不中）
@@ -3553,6 +3618,17 @@
   }
   /** 把一个可能落在实体/虚空上的坐标吸附到最近的合法可走格（BFS 同心圈） */
   function snapWalkable(mp, x, y) {
+    /* ★★ 只允许**整数格**进查表（2026-09-18 用户报「加载失败 · reading '12.32'」的根因）：
+     * 读档传进来的是存档里的小数坐标（saveGame 写的是 `+player.mx.toFixed(2)`），
+     * 原先直接喂给 walkable → cellChar → `CUR.ground[20.32]` —— 行下标是小数，
+     * 该行取到 undefined，再取 `[12.32]` 当场抛异常。异常发生在 boot 链的 switchTo 里，
+     * 表现就是「加载失败 + 进度 100%」，整局进不去（存档在，但一读就崩）。
+     * ⚠ 小数坐标不是边角情况：自动存档 = 每 15 秒 + 换图 + 关页面，
+     *   **多半都在走路的半途触发**，所以存量档里小数才是常态。
+     * 落点必须吸附到格子上，那就老老实实先取整再探。
+     * 坐标彻底坏掉（null / NaN，见 readSave）时别落回 (0,0) 那种角落 —— 用出生点。 */
+    if (!isFinite(x) || !isFinite(y)) return { x: mp.home.x, y: mp.home.y };
+    x = Math.round(x); y = Math.round(y);
     if (walkable(x, y)) return { x: x, y: y };
     for (var r = 1; r <= 12; r++) {
       var best = null, bd = 1e9;
@@ -4882,6 +4958,13 @@
       var o = JSON.parse(s);
       if (!o || o.v !== SAVE_VER || !o.map) return null;
       if (!IDX[o.map]) return null;             // 这张图已经删了/改名了 —— 旧档作废
+      /* 坐标必须是**真数字**且有限（2026-09-18）：NaN/null/字符串混进来后，
+       * 一路走到 ground[NaN] 那种下标，异常点离根因十万八千里。
+       * ⚠ 别用裸 isFinite：`isFinite(null) === true`（Number(null)===0），
+       *   坏坐标会被悄悄洗成 0 —— 玩家瞬间被扔到地图角落。必须先判类型。
+       * 坏坐标不该整档作废（装备/银两还是好的）→ 退成 null，让调用方落回出生点。 */
+      o.x = (typeof o.x === 'number' && isFinite(o.x)) ? o.x : null;
+      o.y = (typeof o.y === 'number' && isFinite(o.y)) ? o.y : null;
       return o;
     } catch (e) { return null; }
   }
