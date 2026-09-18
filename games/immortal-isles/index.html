@@ -348,14 +348,56 @@
   #bag .cell.empty .n{display:none}
   #bag .cell .kb{position:absolute;left:3px;top:2px;z-index:2;font-size:9.5px;color:#cfe0f4;
     background:rgba(0,0,0,.55);border-radius:4px;padding:0 3px;line-height:1.35}
-  #bag .tip{font-size:11px;color:#9fb3d0;margin-top:8px;line-height:1.6;max-width:162px}
+  #bag .tip{font-size:11px;color:#9fb3d0;margin-top:8px;line-height:1.6;max-width:200px}
   #bag .tip b{color:#ff9ec4;font-weight:600}
+  /* ── 装备区（2026-09-18）──────────────────────────────────────────────
+    ① 属性行放在最顶上：换装的收益必须秒读，不能在格子深处。
+    ② 已装备 3 槽 + 行囊网格共用同一套格子尺寸（46px），保证拖拽观感一致。
+    ③ 品质只用**边框色 + 底光**表达（图标本身不重绘），每个品质在本文件 bottom
+       只有一处配色定义，改色不必翻 JS。 */
+  #bag{max-height:calc(100vh - 190px);overflow-y:auto;overflow-x:hidden}
+  #bag .attr{font-size:11.5px;color:#ffe6a6;font-family:ui-monospace,Consolas,monospace;
+    margin:-2px 0 8px;padding:4px 6px;border-radius:6px;
+    background:rgba(255,206,120,.10);border:1px solid rgba(255,206,120,.22)}
+  #bag .subt{font-size:11px;color:#8ea3bf;letter-spacing:.5px;margin:9px 0 6px;
+    display:flex;justify-content:space-between;align-items:center}
+  #bag .subt i{font-style:normal;font-size:10.5px;color:#7f93ad}
+  #bag .eqgrid{display:grid;grid-template-columns:repeat(3,52px);gap:8px}
+  #bag .gears{display:grid;grid-template-columns:repeat(4,42px);gap:8px}
+  #bag .gears .g,#bag .eqgrid .g{position:relative;width:100%;height:52px;height:var(--gh,42px);
+    border-radius:8px;background:rgba(8,14,26,.72);border:1px solid rgba(150,170,200,.30);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s;
+    overflow:visible}
+  #bag .gears .g{width:42px;height:42px}
+  #bag .eqgrid .g{width:52px;height:52px}
+  #bag .g > canvas.ico{display:block;pointer-events:none}
+  #bag .g .slot{position:absolute;left:2px;top:1px;z-index:2;font-size:9px;color:#9fb3d0;
+    background:rgba(0,0,0,.5);border-radius:3px;padding:0 2px;line-height:1.3}
+  #bag .g.hit{border-color:rgba(255,222,150,.95);box-shadow:0 0 10px rgba(255,206,120,.35);
+    background:linear-gradient(180deg,rgba(44,34,16,.92),rgba(14,18,30,.92))}
+  #bag .g.empty{border-style:dashed;opacity:.55;cursor:default}
+  #bag .g.empty .slot{color:#6a7d94}
+  /* 品质四色：凡 / 灵 / 宝 / 仙 */
+  #bag .g.t1{border-color:rgba(201,210,220,.75);box-shadow:inset 0 0 8px rgba(201,210,220,.14)}
+  #bag .g.t2{border-color:rgba(127,224,138,.90);box-shadow:inset 0 0 9px rgba(127,224,138,.20)}
+  #bag .g.t3{border-color:rgba(111,182,255,.95);box-shadow:inset 0 0 10px rgba(111,182,255,.24)}
+  #bag .g.t4{border-color:rgba(199,139,255,.98);box-shadow:inset 0 0 12px rgba(199,139,255,.30),0 0 8px rgba(199,139,255,.35)}
+  #bag .g.press{transform:translateY(1px);outline:2px solid rgba(255,190,120,.9)}
+  /* 存档行：状态文字 + 三个小按钮排一行，不占额外版面 */
+  #saveRow{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  #saveRow .svinfo{font-size:10.5px;color:#8ea3bf;font-family:ui-monospace,Consolas,monospace}
+  #saveRow .svbtns{display:flex;gap:6px}
+  #saveRow button{font:inherit;font-size:11px;color:#e6dcc0;cursor:pointer;padding:3px 8px;
+    border-radius:6px;background:rgba(28,36,52,.92);border:1px solid rgba(214,178,96,.45)}
+  #saveRow button:hover{background:#2b2438;border-color:rgba(255,214,130,.85)}
+  #saveRow button:active{transform:translateY(1px)}
   /* 触屏：面板缩一点、挪到**屏幕中下方**。
      为什么不贴右边：右下是技能盘（right:14/bottom:14）、右上是一排面板，都占满了。
      为什么不贴左下：摇杆是"按哪出现在哪"的浮动盘，左下正是它最常出现的位置。 */
-  body.touch #bag{left:50%;top:auto;bottom:12px;transform:translateX(-50%) scale(.86);
+  body.touch #bag{left:50%;top:auto;bottom:12px;max-height:64vh;transform:translateX(-50%) scale(.86);
     transform-origin:center bottom}
-  body.touch #bag .tip{display:none}
+  /* ★ 存档那行不能连着 .tip 一起隐藏 —— 手机玩家更需要一个"我现在存档了吗"的确认 */
+  body.touch #bag .tip:not(#saveRow){display:none}
   body.touch #bag .grid{grid-template-columns:repeat(3,46px)}
   body.touch #bag .cell{width:46px;height:46px}
 
@@ -538,11 +580,28 @@
   <span class="dot" id="bagDot"></span>
 </button>
 
-<!-- 背包面板：格子由脚本按 ITEMS 表动态生成（图标取自 items_atlas 的 2× 高清版） -->
+<!-- 背包面板：丹药格子由脚本按 ITEMS 生成；装备区（已装备 3 槽 + 行囊网格）同步在这块 -->
 <div id="bag" class="hud panel">
   <div class="t"><span>背包</span><span class="stones" id="bagStones">银两 0</span></div>
+  <!-- ★ 属性行：穿戴结果的唯一反馈。玩家必须能一眼看出"换了这件甲之后御 +4"，
+       否则装备系统等于没有 —— 数值全藏在 tooltip 里没人看。 -->
+  <div class="attr" id="bagAttr">攻 — · 御 — · 气血 —</div>
+  <div class="subt">已装备<i id="eqTip">点格子卸下</i></div>
+  <div class="eqgrid" id="eqGrid"></div>
+  <div class="subt">丹药 · 材料</div>
   <div class="grid" id="bagGrid"></div>
-  <div class="tip">点<b>粉色边框</b>的格子服药（或按 <b>1</b>/<b>2</b>/<b>3</b>）</div>
+  <div class="subt">行囊 · 装备<i id="gearCnt">0 / 24</i></div>
+  <div class="gears" id="gearGrid"></div>
+  <div class="tip">点<b>装备格</b>穿戴，<b>长按 0.7 秒</b>熔炼成银两；
+    <b>已装备</b>的格子点一下卸下　·　按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药</div>
+  <div class="tip" id="saveRow">
+    <span class="svinfo" id="saveInfo">尚未存档</span>
+    <span class="svbtns">
+      <button id="svSave" title="把当前进度写入本地">存档</button>
+      <button id="svLoad" title="读回最近一次存档">读档</button>
+      <button id="svClear" title="清空存档并重开新局">重开</button>
+    </span>
+  </div>
 </div>
 
 <!-- 世界地图入口：桌面 Tab 开关，手机点此图标；点开是诸天万界总览，点节点即传送 -->
@@ -592,7 +651,9 @@
   走到 <span class="hl">青色光门</span> 自动切换地图（淡入淡出过渡）　·　
   走近路人 NPC 会 <span class="hl">对话</span>　·　<span class="hl">J / F / 空格</span> 攻击A　·　<span class="hl">K</span> 重击B　·　
   <span class="hl">Shift</span> 奔跑　·　<span class="hl">B</span> 背包　·　<span class="hl">1 / 2 / 3</span> 或直接点左上药格 服金创药 / 小还丹 / 大还丹　·　
-  击杀妖兽会 <span class="hl">掉落物品</span>，走近自动拾取　·　<span class="hl">Alt+1~6</span> 试动作
+  击杀妖兽会 <span class="hl">掉落物品与装备</span>，走近自动拾取　·　<span class="hl">B</span> 开行囊：
+  点装备格<b>穿戴</b>、长按<b>熔炼</b>成银两　·　进度 <span class="hl">每 15 秒自动存档</span>，
+  也可在行囊底部手动存档 / 读档 / 重开　·　<span class="hl">Alt+1~6</span> 试动作
   </div>
 </div>
 
@@ -741,6 +802,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=48"></script>
+<script src="js/game.js?v=49"></script>
 </body>
 </html>

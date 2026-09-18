@@ -158,8 +158,12 @@
   var IMG = {};              // file -> Image（只留给非图集的小图，例如云）
   var MAPS = [], IDX = {}, CUR = null;
   var PAL = {}, WALK = '', WATER = '';
+  /* ★ 角色裸装底子：atk/def/maxhp 的**唯一真源**。以后做境界突破只改这一处，
+   * 装备带来的加成必定由 recalcStats() 在这份底子上叠加（详见下面的装备系统注释）。 */
+  var BASE_STATS = { atk: 20, def: 8, maxhp: 260 };
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
-    hp: 260, maxhp: 260, atk: 20, def: 8, exp: 0, stones: 0, realmName: '炼气期',
+    hp: BASE_STATS.maxhp, maxhp: BASE_STATS.maxhp,
+    atk: BASE_STATS.atk, def: BASE_STATS.def, exp: 0, stones: 0, realmName: '炼气期',
     attackCd: 0, targetFoe: null, dead: false, flash: 0, invuln: 0,
     // —— 侧视素材专用方向（2026-09-17）——
     // 侧视素材（CraftPix 那几套）**只有朝右一版**，左向靠水平翻转，根本没有「正面/背面」。
@@ -309,7 +313,148 @@
     gorgon_b:   [['yaodan', 0.50, 1, 2], ['jinchuang', 0.20, 1, 1]],
     knight_a:   [['yaodan', 0.50, 1, 2], ['xiaohuan', 0.20, 1, 1]]
   };
-  var lootDrops = [];        // 地上的掉落物 { mx,my,key,n,life,tossT,vy,vx,pop }
+  /* ═════════ 装备系统（2026-09-18）════════
+   * 掉落系统上加一层「能穿在身上的东西」，让刷怪从「攒银两」变成「攒装备」。
+   * 四条设计取舍写在前面，改以前先读：
+   *   ① **装备是实例，不是数量**。药品是「几瓶」，装备是「这一把」—— 每件带自己的品质
+   *      与词缀，所以独立成 gearInv 数组而不是塞进 bag 的计数表，否则同名字必叠一格。
+   *   ② **属性只有一个出口**：player.atk / def / maxhp 一律由 `recalcStats()` 从
+   *      BASE_STATS + 已穿装备重算。任何地方都不许直接写这三个值 —— 一旦有人在别处叠加，
+   *      存档读回时就会再算一遍，属性凭空翻倍。
+   *   ③ **品质只影响数值与 UI 边框色**，不改图标 —— 同一个器型做四份配色，
+   *      图集帧数与维护成本翻倍，换来的只是"看起来更花哨"。
+   *   ④ **行囊有上限（GEAR_CAP）**：装备是无限产出的，没上限等于鼓励挂机堆垃圾，
+   *      也顺手给「熔炼换银两」一个存在理由。
+   */
+  var GEAR_SLOTS = [
+    { key: 'weapon',  cn: '兵器', iconHint: '攻' },
+    { key: 'armor',   cn: '护甲', iconHint: '防' },
+    { key: 'trinket', cn: '灵饰', iconHint: '血' }
+  ];
+  /* 基础器型：st 是**品质 1.0 倍下的裸值**，实际数值 = round(st * 品质倍率) + 词缀之和。 */
+  var GEAR_BASES = {
+    ge_jian: { cn: '青锋剑',   slot: 'weapon',  st: { atk: 5 },              note: '轻利顺势，最易上手的兵刃' },
+    ge_ji:   { cn: '重刃',     slot: 'weapon',  st: { atk: 7, def: -1 },     note: '势大力沉，攻高一分护甲薄一分' },
+    ge_jia:  { cn: '玄铁甲',   slot: 'armor',   st: { def: 4 },              note: '厚重装甲，站得住才有输出' },
+    ge_pao:  { cn: '云纹道袍', slot: 'armor',   st: { def: 2, maxhp: 22 },   note: '轻便道袍，兼顾护体与气血' },
+    ge_pei:  { cn: '灵犀玉佩', slot: 'trinket', st: { maxhp: 30 },           note: '养气延寿，纯堆气血' },
+    ge_zhu:  { cn: '聚灵珠',   slot: 'trinket', st: { atk: 2, maxhp: 18 },   note: '灵气内蕴，攻血双沾' }
+  };
+  var GEAR_BASE_KEYS = Object.keys(GEAR_BASES);
+  /* 品质：mul 乘「器型裸值」，affix 是额外词缀条数区间（凡品可能一条都没有）。 */
+  var TIERS = [
+    { t: 1, cn: '凡品', col: '#c9d2dc', mul: 1.00, affix: [0, 1] },
+    { t: 2, cn: '灵品', col: '#7fe08a', mul: 1.45, affix: [1, 1] },
+    { t: 3, cn: '宝品', col: '#6fb6ff', mul: 2.05, affix: [1, 2] },
+    { t: 4, cn: '仙品', col: '#c78bff', mul: 2.85, affix: [2, 3] }
+  ];
+  /* 词缀池：一条词缀给一个属性的小增量（可重复抽到同一属性，叠起来也是合理的成长）。 */
+  var AFFIX_POOL = [
+    { k: 'atk',   cn: '攻',   min: 1, max: 3 },
+    { k: 'def',   cn: '御',   min: 1, max: 2 },
+    { k: 'maxhp', cn: '气血', min: 6,  max: 16 }
+  ];
+  /* 掉落概率：普通怪偏低（不刷屏），精英怪给足理由去蹲。
+   * 品质权重 [凡,灵,宝,仙]，普通怪基本出凡灵，精英才轮得到宝仙。 */
+  var GEAR_CHANCE = 0.07;            // 普通怪掉装备概率
+  var GEAR_CHANCE_ELITE = 0.42;      // 精英怪
+  var TIER_W = [58, 30, 10, 2];      // 普通怪品质权重
+  var TIER_W_ELITE = [16, 34, 36, 14];
+  var GEAR_CAP = 24;                 // 行囊格子数（满了就捡不起来，逼着玩家做取舍）
+  var gearInv = [];                  // 背包里的装备实例
+  var equipped = { weapon: null, armor: null, trinket: null };
+  var gearSeq = 1;                   // 实例编号（存档/对比都靠它认人）
+
+  function rndInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function pickW(w) {   // 按权重取下标
+    var s = 0, i; for (i = 0; i < w.length; i++) s += w[i];
+    var r = Math.random() * s;
+    for (i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; }
+    return w.length - 1;
+  }
+  /** 掷一件装备。tier 不传就按权重摇（精英传 true 走精英权重）。 */
+  function rollGear(elite) {
+    var bk = GEAR_BASE_KEYS[rndInt(0, GEAR_BASE_KEYS.length - 1)];
+    var b = GEAR_BASES[bk];
+    var ti = elite ? pickW(TIER_W_ELITE) : pickW(TIER_W);
+    var tier = TIERS[ti];
+    var st = { atk: 0, def: 0, maxhp: 0 }, k;
+    for (k in b.st) if (b.st.hasOwnProperty(k)) {
+      st[k] = Math.round(b.st[k] * tier.mul);
+    }
+    var na = rndInt(tier.affix[0], tier.affix[1]);
+    for (var i = 0; i < na; i++) {
+      var af = AFFIX_POOL[rndInt(0, AFFIX_POOL.length - 1)];
+      st[af.k] = (st[af.k] || 0) + rndInt(af.min, af.max);
+    }
+    // 负值得留着（重刃 -1 防是它的代价），但别把属性跌成负数让玩家困惑
+    if (st.def < 0 && tier.t <= 1) st.def = 0;
+    return { id: gearSeq++, key: bk, t: ti, st: st };
+  }
+  function gearTier(g) { return TIERS[g.t] || TIERS[0]; }
+  function gearBase(g) { return GEAR_BASES[g.key]; }
+  function gearName(g) { return gearTier(g).cn + '·' + gearBase(g).cn; }
+  /** 一行的属性描述（给 title 悬停 / 对比用）：「攻 +8  御 +2」 */
+  function gearStatsLine(g, sep) {
+    var out = [], i, s = g.st;
+    var order = ['atk', 'def', 'maxhp'], cn = { atk: '攻', def: '御', maxhp: '气血' };
+    for (i = 0; i < order.length; i++) {
+      var v = s[order[i]] | 0;
+      if (v) out.push(cn[order[i]] + ' ' + (v > 0 ? '+' : '') + v);
+    }
+    return out.length ? out.join(sep || '  ') : '无附加属性';
+  }
+  /** 装备折算银两（熔炼用）：品质越高越值钱，再加点属性 amounts。 */
+  function gearValue(g) {
+    var v = 0, s = g.st;
+    v += (s.atk | 0) * 6 + (s.def | 0) * 7 + (s.maxhp | 0) * 0.8;
+    return Math.max(4, Math.round(v * (0.7 + 0.35 * g.t)) + gearTier(g).t * 8);
+  }
+  /** 穿上：同槽位自动换下（旧装备回行囊，不会凭空消失）。 */
+  function equipGear(g) {
+    var b = gearBase(g); if (!b) return false;
+    var slot = b.slot;
+    var idx = gearInv.indexOf(g);
+    if (idx < 0) return false;
+    gearInv.splice(idx, 1);
+    var old = equipped[slot];
+    equipped[slot] = g;
+    if (old) gearInv.unshift(old);
+    recalcStats(); bagDirty = true;
+    var delta = (old ? '（换下 ' + gearName(old) + '）' : '');
+    toast('已装备 ' + gearName(g) + ' · ' + gearStatsLine(g) + delta);
+    return true;
+  }
+  function unequipGear(slot) {
+    var g = equipped[slot];
+    if (!g) return false;
+    if (gearInv.length >= GEAR_CAP) { toast('行囊已满，先熔炼几件再卸下'); return false; }
+    equipped[slot] = null;
+    gearInv.unshift(g);
+    recalcStats(); bagDirty = true;
+    toast('已卸下 ' + gearName(g));
+    return true;
+  }
+  /** ★ 属性的唯一出口：裸底子 + 三件已穿装备。任何地方都别直接改 player.atk/def/maxhp。 */
+  function recalcStats() {
+    var s = { atk: 0, def: 0, maxhp: 0 }, i, sl, g, k;
+    for (i = 0; i < GEAR_SLOTS.length; i++) {
+      sl = GEAR_SLOTS[i].key; g = equipped[sl];
+      if (!g) continue;
+      for (k in g.st) if (g.st.hasOwnProperty(k)) s[k] = (s[k] || 0) + (g.st[k] | 0);
+    }
+    var oldMax = player.maxhp;
+    player.atk = BASE_STATS.atk + s.atk;
+    player.def = Math.max(0, BASE_STATS.def + s.def);
+    player.maxhp = BASE_STATS.maxhp + s.maxhp;
+    // 换件护甲不至于把人"换死"：上限抬高时按比例补、压缩时钳住，且永远留 1 点血
+    if (player.maxhp !== oldMax) {
+      var ratio = oldMax > 0 ? player.hp / oldMax : 1;
+      player.hp = Math.max(1, Math.min(player.maxhp, Math.round(player.maxhp * ratio)));
+    }
+    if (player.hp > player.maxhp) player.hp = player.maxhp;
+  }
+  var lootDrops = [];        // 地上的掉落物 { mx,my,key,n,life,tossT,vy,vx,pop } 或 { gear:实例 }
   var LOOT_LIFE = 42;        // 掉落物停留秒数（够你打完这波再回头捡）
   /* 拾取半径（格）。原来是 0.72 —— 比一格还小，用户反馈「拾取不方便」：
    * 斜向走过去、或贴边绕过那格，距离就永远差一点点，东西明明在脚边却捡不起来。
@@ -502,10 +647,10 @@
       //   → fxFrame 'noRect' 全灭 → 火球/爆炸/落雷全部静默不画（炎爆术没特效的真根因）。
       { url: 'assets/fx_atlas.json?v=2', json: true, atlas: 'fx', weight: 1, label: '读取特效索引' },
       { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' },
-      { url: 'assets/items_atlas.png?v=2', atlas: 'items', weight: 23, label: '载入物品图标' },
+      { url: 'assets/items_atlas.png?v=3', atlas: 'items', weight: 23, label: '载入物品图标' },
       // ⚠ atlas 字段两张都要写：boot 里是按 `p.atlas === 'items'` 把值填进 ATLAS.items 的。
       //   首版漏了 json 这张，导致 json 下载了却没人接（ATLAS.items.rect 恒 null）。
-      { url: 'assets/items_atlas.json?v=2', atlas: 'items', json: true, weight: 1, label: '读取物品图录' }
+      { url: 'assets/items_atlas.json?v=3', atlas: 'items', json: true, weight: 1, label: '读取物品图录' }
     ];
 
   /* ── 按需图集（懒加载）────────────────────────────────────────────────
@@ -1076,18 +1221,30 @@
         zAnchor = true; zAx = W / 2; zAy = H / 2;
         updateZoomUI();
         zLock = true;      // ★ 默认值定完就上锁：此后只有「人主动拉」的入口能改 Z
-        var start = IDX[q.get('map')] ? q.get('map') : data.start.map;
+        /* ★ 读档（在 switchTo 之前把角色数据塞回来）：
+         *   · ?new=1 = 明确要重开（只读到此处的忽略判断）
+         *   · ?map=xxx = 明确要去某张图（调试用途，优先级高于存档位置，但装备/银两照常读回）
+         *   其余情况：有存档就落回存档所在的图与坐标 —— 这才是"存档"两个字该有的样子。 */
+        var svNew = (q.get('new') === '1');
+        var sv = svNew ? null : readSave();
+        var svMapId = sv ? sv.map : null;
+        var start = IDX[q.get('map')] ? q.get('map') : (svMapId || data.start.map);
         var m = IDX[start] || MAPS[0];
         // 没显式给坐标时：起点图用 maps.json 里写好的 start（山门广场），
         // 其它图落到离地图中心最近的可走格 —— 旧的写法把 start 里的坐标当摆设，一直没用上。
         var useCfg = (start === data.start.map);
-        var sx = q.get('x') !== null ? +q.get('x') : (useCfg ? data.start.x : m.home.x);
-        var sy = q.get('y') !== null ? +q.get('y') : (useCfg ? data.start.y : m.home.y);
+        var sx = q.get('x') !== null ? +q.get('x') : (svMapId && start === svMapId ? sv.x : (useCfg ? data.start.x : m.home.x));
+        var sy = q.get('y') !== null ? +q.get('y') : (svMapId && start === svMapId ? sv.y : (useCfg ? data.start.y : m.home.y));
+        if (sv) applySave(sv);        // 装备/背包/银两先回位，再落点
         switchTo(m.id, sx, sy, true);
         document.getElementById('loader').style.display = 'none';
         ready = true;
         window.__ready = true;
         buildBagUI();          // 背包格子（依赖 items_atlas 已进 ATLAS，必须等 initAtlas 之后）
+        buildGearUI();         // 装备区（有存档时要在落地前把"穿了什么"画出来）
+        renderGearInfo();
+        updateSaveUI();        // 存档状态行：告诉玩家"你此刻有没有存档"
+        if (sv) toast('已读取存档 · ' + m.name + ' · 银两 ' + sv.stones);
         // 首屏只载了「这一张图要用的」；其余按需图集趁空闲在后台补上，
         // 用户点地图按钮时通常已经就绪（见 preloadExtras 注释）。
         // ?preload=0 关掉按需图集的后台预取（省流量/弱网，也让 lazygoto 自测能测到真·按需）
@@ -2055,6 +2212,113 @@
           var pb = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
           pb.textContent = JSON.stringify({ alive: alive, total: foes.length, exp: player.exp, stones: player.stones, hp: Math.round(player.hp) });
         }
+        if (at === 'gear') {
+          /* ?map=<图>&autotest=gear —— 装备系统 + 存档 全链路验收（2026-09-18 加）。
+           * 判据全部是「看得见的最终值」，不是"调用了哪个函数"：
+           *   ① 图标：6 件套的 1× / 2× 帧都要能解析到（缺帧 = 格子空白，不报错）
+           *   ② 掷骰：实际品质分布（配置只是期望）+ 数值不能出现 NaN / undefined
+           *   ③ 穿戴：player.atk 必须由 recalcStats 得出 —— 旧 bug 是有人直接写 player.atk
+           *   ④ 上限：行囊满了掉在地上的装备**留在地上**，不能被吞
+           *   ⑤ 存/读：改坏状态再读回，逐项比对（直接拷-all 备份做对比，不靠"看起来对"）
+           */
+          var gp = document.getElementById('probe') || (function () { var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none'; document.body.appendChild(d); return d; })();
+          var G = { icon: { ok: 0, miss: [] }, tier: {}, eliteTier: {}, slot: {}, bad: [],
+                    equip: false, atk: 0, unequip: false, melt: 0, cap: false,
+                    saveOk: false, restore: {}, keepMap: null };
+          var i, k2;
+          // ① 图标帧
+          for (k2 in GEAR_BASES) if (GEAR_BASES.hasOwnProperty(k2)) {
+            if (piece(k2) && piece(k2 + '_big')) G.icon.ok++; else G.icon.miss.push(k2);
+          }
+          // ② 掷骰 300 普通 + 300 精英
+          function sweep(n, elite, sink) {
+            for (var s = 0; s < n; s++) {
+              var g = rollGear(elite);
+              if (!GEAR_BASES[g.key] || !TIERS[g.t] || g.st === undefined) { G.bad.push('shape'); continue; }
+              var v = (g.st.atk | 0) + (g.st.def | 0) + (g.st.maxhp | 0);
+              if (isNaN(v)) G.bad.push('nan');
+              if (!gearName(g) || gearValue(g) <= 0) G.bad.push('meta');
+              sink[TIERS[g.t].cn] = (sink[TIERS[g.t].cn] || 0) + 1;
+              G.slot[GEAR_BASES[g.key].slot] = (G.slot[GEAR_BASES[g.key].slot] || 0) + 1;
+            }
+          }
+          sweep(300, false, G.tier);
+          sweep(300, true, G.eliteTier);
+          /* ③ 穿戴链路：造一件确定的装备（不靠随机），验证属性确实来自 recalcStats。
+           * 用 toFixed(0) 比对而不是 === 裸减：万一以后加了境界加成，这里要能察觉。
+           * ★ 断言必须写成花括号体 + return —— 项目历史上用 `=> a && b, {budget}`
+           * 写过逗号运算符，结果断言恒真，测试自己失效了三天没人发现。 */
+          gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
+          recalcStats();
+          var atk0 = player.atk, maxhp0 = player.maxhp;
+          var mk = { id: 90001, key: 'ge_jian', t: 2, st: { atk: 11, def: 3, maxhp: 40 } };
+          gearInv.push(mk);
+          var okEquip = equipGear(mk);
+          G.equip = !!okEquip && equipped.weapon === mk;
+          G.atk = player.atk - atk0;                       // 期望 +11
+          G.def = player.def - (BASE_STATS.def);
+          G.maxhp = player.maxhp - maxhp0;                 // 期望 +40
+          unequipGear('weapon');
+          G.unequip = equipped.weapon === null && gearInv.indexOf(mk) >= 0 &&
+            player.atk === atk0 && player.maxhp === maxhp0;
+          // ④ 熔炼：应入账银两且离开行囊
+          var st0 = player.stones;
+          meltGear(mk);
+          G.melt = player.stones - st0;
+          /* ⑤ 上限：塞满行囊后在脚下撒一件地上的装备，玩家踩上去**不该**捡起来
+           * （旧实现会把它捡起来再丢掉 —— 那样玩家的装备会凭空消失）。 */
+          gearInv = [];
+          for (i = 0; i < GEAR_CAP; i++) gearInv.push({ id: 91000 + i, key: 'ge_pei', t: 0, st: { maxhp: 5 } });
+          var fake = { id: 95555, key: 'ge_jian', t: 1, st: { atk: 3 } };
+          lootDrops = [{ mx: player.mx, my: player.my, key: null, gear: fake, n: 1,
+            life: 30, phase: 0, pop: 1, tossT: 0 }];
+          player.dead = false;
+          updateLoot(1 / 30);
+          G.cap = lootDrops.length === 1 && gearInv.length === GEAR_CAP;
+          /* ⑥ 存档读写：手动构造一份已知状态 → 存 → 把内存全搞乱 → 读 → 逐项比对 */
+          gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
+          recalcStats();
+          bag = {}; bag.jinchuang = 7; bag.yaodan = 3;
+          player.stones = 4321; player.exp = 88; player.hp = 111;
+          window.__kills = 12;
+          gearInv.push({ id: 97001, key: 'ge_jia', t: 3, st: { def: 9 } });
+          var wpn = { id: 97002, key: 'ge_ji', t: 1, st: { atk: 6 } };
+          gearInv.push(wpn); equipGear(wpn);
+          var wantMap = CUR.id, wantAtk = player.atk, wantMax = player.maxhp;
+          G.saveOk = saveGame(true);
+          // —— 把内存搞乱（模拟"刷新页面"）——
+          bag = {}; gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
+          player.stones = 0; player.exp = 0; player.hp = 1; window.__kills = 0;
+          recalcStats();
+          var loaded = loadGame(true);
+          G.loadOk = !!loaded;
+          G.restore = {
+            map: CUR.id === wantMap, bag: bag.jinchuang === 7 && bag.yaodan === 3,
+            stones: player.stones === 4321, exp: player.exp === 88, kills: (window.__kills || 0) === 12,
+            gear: gearInv.length === 1 && gearInv[0].id === 97001,
+            eq: !!equipped.weapon && equipped.weapon.id === 97002,
+            // ★ 最关键的一条：读档后属性必须重新由装备算出（不是读成裸值）
+            atk: player.atk === wantAtk, maxhp: player.maxhp === wantMax
+          };
+          bagDirty = true; renderBag();
+          /* ⑦ UI：装备区到底建没建出来。
+           * 数据全对但屏幕空白是本项目反复出现的静默故障（历史五轮），所以这里也
+           * **数真格子**：3 个装备槽必须都在，行囊格数 = gearInv 长度，且每个有货的
+           * 格子必须真的挂着 <canvas class="ico">（bagIconEl 画不出 tile 时返回 null）。 */
+          var eqNodes = document.querySelectorAll('#eqGrid .g');
+          var ggNodes = document.querySelectorAll('#gearGrid .g');
+          G.ui = {
+            equipSlots: eqNodes.length,
+            gearCells: ggNodes.length,
+            gearExpected: gearInv.length,
+            icons: document.querySelectorAll('#eqGrid canvas.ico, #gearGrid canvas.ico').length,
+            tierClasses: Array.prototype.map.call(document.querySelectorAll('#gearGrid .g'),
+              function (n) { return n.className; }),
+            attr: (document.getElementById('bagAttr') || {}).textContent,
+            saveInfo: (document.getElementById('saveInfo') || {}).textContent
+          };
+          gp.textContent = JSON.stringify(G);
+        }
         if (at === 'loot') {
           // ?map=<图>&autotest=loot —— 掉落 / 拾取 / 服药 / 背包 全链路验收（2026-09-17 加）。
           // 为什么值得单独立一条：这四件事各自都能"看起来对"，但接在一起才暴露真问题 ——
@@ -2087,7 +2351,12 @@
               var got = rollLoot(f1);
               R.rolls++;
               if (got.length) R.dropped++;
-              got.forEach(function (g) { R.byKey[g.key] = (R.byKey[g.key] || 0) + g.n; });
+              got.forEach(function (g) {
+                // 装备条目是 {gear:实例}，没有 key/n —— 不分支的话这里会算出 NaN
+                // （g.key === undefined 落到 byKey['undefined']，显示成 null 误导人）
+                if (g.gear) { R.byGear = (R.byGear || 0) + 1; return; }
+                R.byKey[g.key] = (R.byKey[g.key] || 0) + g.n;
+              });
             }
             // ③ 落点：强制撒 200 次，检查每一件都落在可走格上（不该有图标嵌在墙/水里）
             lootDrops = [];
@@ -2665,8 +2934,15 @@
    *   ② 上下浮动 + 刚落地时的弹跳（tossT）—— 静止的图标会被当成地图装饰；
    *   ③ 图标底下的一圈柔光 —— 战场本身很花，光晕把道具从背景里抠出来。
    * 数值都乘 Z，缩放时比例不跑偏。缓存的 lootImg 见下面 lootSprite()。 */
+  /** '#7fe08a' → '127,224,138'（canvas 里画 rgba(r,g,b,a) 要的是三个分量，不是 hex）。 */
+  function hexToRgbStr(hex) {
+    var h = String(hex || '#ffffff').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var v = parseInt(h, 16) || 0;
+    return ((v >> 16) & 255) + ',' + ((v >> 8) & 255) + ',' + (v & 255);
+  }
   function drawLoot(L) {
-    var pz = lootSprite(L.key);
+    var pz = lootSprite(L.gear ? L.gear.key : L.key);
     if (!pz) return;
     var p = isoToScreen(L.mx, L.my);
     var baseY = p.y + HH * Z;
@@ -2678,9 +2954,10 @@
     // 图标比原来大一圈（30→36）：用户反馈「物品很小、不好捡」，先让人看得见。
     var size = 36 * Z * (1 - pop * 0.25);
 
-    // 按物品类别配色：药=粉、材料=青、稀有=金。整段绘制都复用这一组色。
-    var it = ITEMS[L.key];
-    var gc = it && it.kind === 'heal' ? '255,150,190'
+    // 按物品类别配色：药=粉、材料=青、稀有=金；装备用**品质色**（远处就能看出值不值得走过去）
+    var it = L.gear ? null : ITEMS[L.key];
+    var gc = L.gear ? hexToRgbStr(gearTier(L.gear).col)
+           : it && it.kind === 'heal' ? '255,150,190'
            : it && it.kind === 'rare' ? '255,214,130' : '150,235,205';
 
     // ① 地面投影（跟着浮动缩放：离地越高影子越小越淡）
@@ -2763,7 +3040,7 @@
      * 挂到浮动图标边上会跟着上下晃、认起来累。
      * 两级描边（粗黑描边 + 细描边）保证在草地/石板/水面任何底色上都读得清 ——
      * 只靠 fillText 在浅色地面上会糊掉。文字做对比增强不做纯白，避免刺眼。 */
-    var nm = (it && it.cn) ? it.cn : L.key;
+    var nm = L.gear ? gearName(L.gear) : ((it && it.cn) ? it.cn : L.key);
     var fs = Math.round(11 * Z);
     ctx.save();
     ctx.font = 'bold ' + fs + 'px "PingFang SC","Microsoft YaHei",ui-monospace,sans-serif';
@@ -3123,6 +3400,10 @@
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
     player.dead = false;
+    /* 换图必存：地图入口/密度各不相同，读档落回最近一张图比落回入口图体感好得多。
+     * silent=true（不弹提示），否则每次过传送门都被提示刷屏。 */
+    saveGame(true);
+    autosaveT = 0;
     breakCombo();                     // 换图也断连，别把上一张图的连击带过来
   }
 
@@ -3319,6 +3600,10 @@
   function update(dt) {
     time += dt;
     stepZoom(dt);
+    /* 自动存档：把"要记得存档"这件事从玩家身上拿走。
+     * 15 秒一次、且只在 ready 之后（saveGame 内部有这道闸），成本是一次 JSON.stringify。 */
+    autosaveT += dt;
+    if (autosaveT >= AUTOSAVE_EVERY) { autosaveT = 0; saveGame(true); }
     if (portalLock > 0) portalLock -= dt;
 
     // —— 过渡状态机 ——
@@ -4126,6 +4411,10 @@
     }
     roll2(tbl);
     if (f.def_ && f.def_.elite) roll2(ELITE_LOOT);
+    /* 装备：跟消耗品同一批落地、独立掷骰（可能"又掉药又掉装备"）。
+     * 精英用独立的高概率/高品质权重，蹲精英才有意义。 */
+    var chi = (f.def_ && f.def_.elite) ? GEAR_CHANCE_ELITE : GEAR_CHANCE;
+    if (Math.random() < chi) got.push({ gear: rollGear(!!(f.def_ && f.def_.elite)) });
     return got;
   }
   /** 把掉落物撒在怪倒地处周围（偏移一圈，叠在一起看不出是几件）。 */
@@ -4138,7 +4427,9 @@
       // 落到不可走处就退回怪脚下（不然图标会飘在墙里）
       if (!couldStand(mx, my)) { mx = f.x; my = f.y; }
       lootDrops.push({
-        mx: mx, my: my, key: list[i].key, n: list[i].n,
+        // 装备实例不能合并进 count（`key/n` 那套是给可堆叠物品的），单独挂 gear 字段
+        mx: mx, my: my, key: list[i].key || null, gear: list[i].gear || null,
+        n: list[i].n || 1,
         life: LOOT_LIFE, phase: (lootSeq++) * 1.37, pop: 0, tossT: 0.28
       });
     }
@@ -4155,16 +4446,43 @@
       if (L.life <= 0) { lootDrops.splice(i, 1); continue; }
       if (player.dead) continue;
       if (Math.hypot(player.mx - L.mx, player.my - L.my) > PICK_R) continue;
+      /* 行囊满了就**留在地上**（不是捡起来丢掉 —— 那才是真的作恶），
+       * 每 4 秒提醒一次，不然每帧 toast 会把屏幕刷成提示墙。 */
+      if (L.gear && gearInv.length >= GEAR_CAP) {
+        if (time - (L.lastWarn || -99) > 4) {
+          L.lastWarn = time;
+          toast('行囊已满（' + GEAR_CAP + ' 件）—— 熔炼几件或先穿走一件');
+        }
+        continue;
+      }
       pickUp(L);
       lootDrops.splice(i, 1);
     }
   }
-  /** 真正入账。银两是货币（走 player.stones），其余进背包。 */
+  /** 真正入账。银两是货币（走 player.stones），其馀进背包；装备实例进 gearInv。 */
   function pickUp(L) {
+    if (L.gear) { collectGear(L.gear, L.mx, L.my); return; }
     var it = ITEMS[L.key];
     if (!it) return;
     collectItem(L.key, L.n, L.mx, L.my);
   }
+  /** 装备入包（一股 ╳ 一件，不存在堆叠）。 */
+  function collectGear(g, mx, my) {
+    if (!g || !GEAR_BASES[g.key]) return;
+    if (gearInv.length >= GEAR_CAP) return;
+    if (gearInv.indexOf(g) >= 0) return;      // 同一实例别被重复塞进来
+    gearInv.push(g);
+    var tier = gearTier(g);
+    addFloater(mx, my - 0.3, gearName(g), tier.col);
+    addFloater(mx, my - 0.75, gearStatsLine(g), '#ffd98a');
+    bagDirty = true;
+    __lastPickup = gearName(g) + ' ' + new Date().toTimeString().slice(0, 8);
+    if (!gearHinted) {
+      gearHinted = true;
+      toast('拾得装备 ' + gearName(g) + ' —— 按 B 开行囊，点一下即可穿戴');
+    }
+  }
+  var gearHinted = false;
   /** 统一的「获得物品」入口（掉落、调试、以后的任务奖励都走这里）。 */
   function collectItem(key, n, mx, my) {
     var it = ITEMS[key];
@@ -4382,6 +4700,217 @@
     renderBag();      // 立刻刷一遍：否则要等下一帧循环才上 .use / 计数，中间有一帧是"半成品"
   }
 
+  /* ═════════ 装备区 UI（已装备 3 槽 + 行囊网格）═════════
+   * 挂进现有背包体系：**同一个 bagDirty 脏标记、同一份数据源**（gearInv / equipped）。
+   * 重建策略用「签名比対」—— signature 变了才动 DOM，否则 0.5s 一次强刷会把面板整棵重建，
+   * 既伤手机性能，也会把正在长按的元素从手指底下抽走。
+   */
+  var GEAR_ICON = 38;            // 行囊格 42px 里的图标边长（留一圈边距给边框）
+  var EQ_ICON = 46;              // 已装备槽 52px
+  var gearBuilt = false, lastGearSig = '';
+  function gearSig() {
+    var s = '', i;
+    for (i = 0; i < GEAR_SLOTS.length; i++) {
+      var g = equipped[GEAR_SLOTS[i].key];
+      s += (g ? (GEAR_SLOTS[i].key + ':' + g.id + ':' + g.t) : GEAR_SLOTS[i].key + ':-') + '|';
+    }
+    for (i = 0; i < gearInv.length; i++) s += gearInv[i].id + ':' + gearInv[i].t + ',';
+    return s;
+  }
+  /** 造一枚装备格（行囊 / 已装备槽通用）：图标 + 品质边框 + 悬停详情。 */
+  function makeGearCell(g, size, slotName, longPressFn, clickFn) {
+    var c = document.createElement('div');
+    c.className = 'g' + (g ? ' t' + (g.t + 1) : ' empty');
+    if (g) {
+      var pz = piece(g.key + '_big') || piece(g.key);
+      var ico = pz ? bagIconEl(pz, gearName(g), size) : null;
+      if (ico) c.appendChild(ico);
+      else {
+        var s0 = document.createElement('span');
+        s0.style.cssText = 'font-size:15px;color:#ffe6a6';
+        s0.textContent = gearBase(g).cn.charAt(0);
+        c.appendChild(s0);
+      }
+      c.title = gearName(g) + '（' + gearTier(g).cn + '）\n' +
+        gearStatsLine(g, '\n') + '\n' + gearBase(g).note +
+        '\n熔炼可得约 ' + gearValue(g) + ' 银两';
+    } else {
+      var sp = document.createElement('span');
+      sp.className = 'slot';
+      sp.textContent = slotName;
+      c.appendChild(sp);
+      c.title = slotName + '位空缺 —— 行囊里有对应装备时点一下穿上';
+    }
+    if (g && clickFn) c.addEventListener('click', function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      clickFn();
+    });
+    /* 长按熔炼：移动端唯一的"重操作"入口。0.7s 足够长，避免手滑把好东西烧了；
+     * 抬起/滑动都取消——滑动多半是想滚动面板，不是想分解装备。 */
+    if (g && longPressFn) {
+      var pt = null, moved = false;
+      var cancel = function () { if (pt) { clearTimeout(pt); pt = null; } c.classList.remove('press'); };
+      var begin = function () {
+        moved = false;
+        c.classList.add('press');
+        pt = setTimeout(function () { pt = null; c.classList.remove('press'); if (!moved) longPressFn(); }, 700);
+      };
+      c.addEventListener('touchstart', begin, { passive: true });
+      c.addEventListener('touchmove', function () { moved = true; cancel(); }, { passive: true });
+      c.addEventListener('touchend', cancel);
+      c.addEventListener('touchcancel', cancel);
+      c.addEventListener('mousedown', begin);
+      c.addEventListener('mouseup', cancel);
+      c.addEventListener('mouseleave', cancel);
+    }
+    return c;
+  }
+  function buildGearUI() {
+    var eg = document.getElementById('eqGrid');
+    if (eg) {
+      eg.innerHTML = '';
+      GEAR_SLOTS.forEach(function (sl) {
+        var g = equipped[sl.key];
+        eg.appendChild(makeGearCell(g, EQ_ICON, sl.cn, null, function () { unequipGear(sl.key); }));
+      });
+    }
+    var gg = document.getElementById('gearGrid');
+    if (gg) {
+      gg.innerHTML = '';
+      gearInv.forEach(function (g) {
+        gg.appendChild(makeGearCell(g, GEAR_ICON, gearBase(g).cn, function () { meltGear(g); },
+          function () { equipGear(g); }));
+      });
+    }
+    gearBuilt = true;
+  }
+  /** 熔炼：换银两。写在面板上是"长按"，所以每次只要一行 toast 说清换了多少钱。 */
+  function meltGear(g) {
+    var i = gearInv.indexOf(g);
+    if (i < 0) return;
+    var v = gearValue(g);
+    gearInv.splice(i, 1);
+    player.stones += v;
+    addFloater(player.mx, player.my - 0.3, '+' + v + ' 银两', '#8bf3ff');
+    toast('熔炼 ' + gearName(g) + ' → ' + v + ' 银两');
+    bagDirty = true;
+  }
+  /** 属性行 + 计数：装备系统的"收益显示屏"。 */
+  function renderGearInfo() {
+    var el = document.getElementById('bagAttr');
+    if (el) {
+      var pa = (player.atk - BASE_STATS.atk), pd = (player.def - BASE_STATS.def),
+        ph = (player.maxhp - BASE_STATS.maxhp);
+      function pm(v) { return v > 0 ? '+' + v : (v < 0 ? String(v) : ''); }
+      el.textContent = '攻 ' + player.atk + pm(pa) + ' · 御 ' + player.def + pm(pd) +
+        ' · 气血 ' + player.maxhp + pm(ph);
+    }
+    var gc = document.getElementById('gearCnt');
+    if (gc) gc.textContent = gearInv.length + ' / ' + GEAR_CAP;
+  }
+
+  /* ═════════ 存档（2026-09-18）════════
+   * 三条设计取舍：
+   *   ① **自动存档优先**。刷了半小时怪忘点保存然后刷新页面 = 白干，这种挫败感不该交给玩家规避。
+   *      所以主线是「每 15 秒 + 换图 + 关页面/退后台」三次无条件落盘，手动按钮只是给确定感。
+   *   ② **哪些进存档有明确边界**：角色状态（位置/气血/银两/背包/装备/穿了什么）进；
+   *      世界状态（怪物刷新、地上掉落）**不进** —— 换图本来就会重置这两样，
+   *      存进去只会读出「新 World + 旧角色」的缝合状态，反而更难排查。
+   *   ③ **坏档必须能自愈**：版本不对 / 地图 id 已不存在 / JSON 坏了 → 一律静默跳过新开一局，
+   *      而不是卡在白屏。改写存档格式时必须升 SAVE_VER（旧档自动作废）。
+   */
+  var SAVE_KEY = 'isles.save';
+  var SAVE_VER = 1;
+  var AUTOSAVE_EVERY = 15;      // 秒
+  var autosaveT = 0;
+  var lastSaveMs = 0;
+
+  function updateSaveUI() {
+    var el = document.getElementById('saveInfo');
+    if (!el) return;
+    if (!lastSaveMs) { el.textContent = '尚未存档'; return; }
+    var d = new Date(lastSaveMs);
+    var hh = ('0' + d.getHours()).slice(-2), mm = ('0' + d.getMinutes()).slice(-2);
+    el.textContent = '已存档 · ' + (CUR ? CUR.name : '') + ' · ' + hh + ':' + mm;
+  }
+  function readSave() {
+    try {
+      var s = localStorage.getItem(SAVE_KEY);
+      if (!s) return null;
+      var o = JSON.parse(s);
+      if (!o || o.v !== SAVE_VER || !o.map) return null;
+      if (!IDX[o.map]) return null;             // 这张图已经删了/改名了 —— 旧档作废
+      return o;
+    } catch (e) { return null; }
+  }
+  /** 把存档里的角色状态塞回内存。**不负责切图**（切图由调用方决定时机）。 */
+  function applySave(o) {
+    if (!o) return false;
+    var k;
+    for (k in bag) if (bag.hasOwnProperty(k)) delete bag[k];
+    var sb = o.bag || {};
+    for (k in sb) if (sb.hasOwnProperty(k)) bag[k] = sb[k] | 0;
+    var gi = [];
+    (o.gear || []).forEach(function (g) {
+      if (g && GEAR_BASES[g.key] && TIERS[g.t]) gi.push(g);
+    });
+    gearInv = gi;
+    equipped = { weapon: null, armor: null, trinket: null };
+    GEAR_SLOTS.forEach(function (sl) {
+      var g = o.eq && o.eq[sl.key];
+      if (g && GEAR_BASES[g.key] && TIERS[g.t]) equipped[sl.key] = g;
+    });
+    // ★ 实例编号必须跨过旧档里的最大值，否则新掉的装备会跟包袱里的撞 id（签名算错 → UI 不刷新）
+    var mx = gearSeq;
+    gi.forEach(function (g) { if (g.id >= mx) mx = g.id + 1; });
+    gearSeq = mx;
+    player.exp = o.exp || 0;
+    player.stones = o.stones || 0;
+    window.__kills = o.kills || 0;
+    recalcStats();
+    player.hp = Math.max(1, Math.min(player.maxhp, o.hp || player.maxhp));
+    lastSaveMs = o.t || 0;
+    bagDirty = true;
+    return true;
+  }
+  function saveGame(silent) {
+    if (!ready) return false;      // boot 还没走完：此时落盘会把"半成品"状态写成正式档
+    try {
+      var o = { v: SAVE_VER, t: Date.now(), map: CUR.id,
+        x: +player.mx.toFixed(2), y: +player.my.toFixed(2),
+        hp: player.hp, exp: player.exp, stones: player.stones,
+        kills: window.__kills || 0, bag: {}, gear: gearInv, eq: {} };
+      for (var k in bag) if (bag.hasOwnProperty(k)) o.bag[k] = bag[k] | 0;
+      GEAR_SLOTS.forEach(function (sl) { o.eq[sl.key] = equipped[sl.key] || null; });
+      localStorage.setItem(SAVE_KEY, JSON.stringify(o));
+      lastSaveMs = o.t;
+      updateSaveUI();
+      if (!silent) toast('已存档 · 下次进来回到「' + CUR.name + '」');
+      return true;
+    } catch (e) {
+      // localStorage 写不进（隐私模式 / 配额满）要明说，不能假装存上了
+      if (!silent) toast('存档失败：本页无法写入本地存储（隐私模式？）');
+      window.__saveErr = String(e && e.message || e);
+      return false;
+    }
+  }
+  function loadGame(silent) {
+    var o = readSave();
+    if (!o) { if (!silent) toast('没有找到可读的存档'); return false; }
+    applySave(o);
+    switchTo(o.map, o.x, o.y, true);
+    lastGearSig = '';                       // 强制重建装备区（不然还画着上一局的格子）
+    if (bagBuilt) buildBagUI();
+    updateSaveUI();
+    if (!silent) toast('读档完成 · ' + CUR.name + ' · 银两 ' + o.stones);
+    return true;
+  }
+  function clearSave() {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+    lastSaveMs = 0;
+    updateSaveUI();
+  }
+
   /* ---------------- 快捷药栏（v47）----------------
    * 药品是**唯一得在挨打时立刻吃到**的东西：开一次背包 = 一次点击 + 一次瞄准，
    * 血条见底时这两下往往就是死亡本身。所以三种丹药另开一条常驻横条，
@@ -4505,6 +5034,12 @@
     } else {
       bagRebuildTries = 0;                 // 恢复正常后重置，留出下次自愈余量
     }
+    /* ── 装备区同步 ──
+     * 签名（谁在第几格 + 品质）变了才重建 DOM：renderBag 被 0.5s 轮询强刷，
+     * 无条件 rebuild 会把手指底下正在长按的格子换掉（长按判定直接失效）。 */
+    var sg = gearSig();
+    if (!gearBuilt || sg !== lastGearSig) { lastGearSig = sg; buildGearUI(); }
+    renderGearInfo();
     var total = 0, hasHeal = 0;
     BAG_ORDER.forEach(function (key) {
       var c = bagCells[key]; if (!c) return;
@@ -4563,6 +5098,36 @@
     bagDirty = true;
     if (bagOpen) renderBag();
     else renderQuick();  // 关背包时立刻把药栏画回来（它刚才是 display:none 的）
+  }
+
+  /* ---------------- 存档按钮 + 离场落盘 ----------------
+   * 手动存档存在的意义不是"补 functionality"，是**给玩家确定感** ——
+   * 自动档看不见摸不着，点一下屏幕上会写出时间和地图名，人才肯放心去打 boss。
+   * 「重开」会真清档：确认方式是点了之后立刻新开一局（且旧档已删），
+   * 不弹 confirm —— 弹窗在手机端经常被判为非用户手势而被拦，反而更不可靠。 */
+  function wireSaveUI() {
+    var a = document.getElementById('svSave'), b = document.getElementById('svLoad'),
+      c = document.getElementById('svClear');
+    if (a) a.addEventListener('click', function (ev) {
+      ev.preventDefault(); ev.stopPropagation(); saveGame(false); autosaveT = 0;
+    });
+    if (b) b.addEventListener('click', function (ev) {
+      ev.preventDefault(); ev.stopPropagation(); loadGame(false);
+    });
+    if (c) c.addEventListener('click', function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      clearSave();
+      toast('存档已清空，正在开始新的一局…');
+      // 重开后浏览器地址里的 ?map= 会把人又送回去，所以显式带上 ?new=1 重载
+      setTimeout(function () { location.href = 'index.html?new=1'; }, 260);
+    });
+    /* 关标签页 / 退后台：visibilitychange 是手机上唯一可靠的时机（pagehide 在 iOS Safari
+     * 上不一定触发）。两边都挂、都只写一次即可（写两份内容一样，成本可接受）。 */
+    var flush = function () { saveGame(true); };
+    window.addEventListener('pagehide', flush);
+    if (document.addEventListener) document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flush();
+    });
   }
 
   function killFoe(f) {
@@ -5660,6 +6225,7 @@
     if (btn) btn.onclick = toggleWorld;
     var bb = document.getElementById('bagBtn');
     if (bb) bb.onclick = function () { bagToggle(); };
+    wireSaveUI();          // 存档按钮 + 离场落盘（挂在 IIFE 里：此时 DOM 必定已就绪）
     var x = document.getElementById('worldClose');
     if (x) x.onclick = closeWorld;
     var sb = document.getElementById('worldSearch');
