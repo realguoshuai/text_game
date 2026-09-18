@@ -309,6 +309,7 @@
   // ---------------- 战斗数据（碑林石阵 = 妖兽猎场） ----------------
   // 严格模式下这些必须先用 var 声明，否则 switchTo 里 `foes=…` 会抛 ReferenceError 直接卡死启动。
   var foes = [], floaters = [], particles = [], clickMark = null;
+  var nodes = [];   // 地图采集点 / 宝箱（v47：探索与随机）：{x,y,type:'herb'|'ore'|'chest',pulse}
   var MELEE = 1.45, AGGRO = 6.5;   // 近身出手半径 / 妖兽仇恨半径（格）
   var FOE_DEFS = {
     // fh = 目标绘制身高（屏幕像素，Z=1 时）；主角为 128，妖兽略矮，精英石魔接近主角
@@ -4417,6 +4418,7 @@
     drawSky();
     if (!CUR) return;
     drawGround();
+    drawNodes();              // v47：地面层之上的采集点 / 宝箱（不参与深度排序，画在物件之下）
     drawClickMark();
 
     // 传送门画在地面上、物件下
@@ -4618,6 +4620,7 @@
     // 地上的掉落物是「这张图的」，换图一律清掉 —— 不然坐标会飘到新图的地上。
     // 背包（bag）与银两是**角色**的，跨图保留。
     lootDrops = [];
+    makeNodes();   // v47：按地图随机刷采集点 / 宝箱（与 foes 同生命周期：换图重随，不存盘）
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
     player.dead = false;
@@ -4947,6 +4950,7 @@
     if (healFx > 0) healFx = Math.max(0, healFx - dt);
     if (realmFx > 0) realmFx = Math.max(0, realmFx - dt);
     updateLoot(dt);            // 掉落物：老化 + 拾取判定
+    updateGather(dt);          // v47：走到采集点/宝箱跟前自动采集/开启
     for (var sk = 0; sk < player.skillCd.length; sk++) {
       if (player.skillCd[sk] > 0) player.skillCd[sk] = Math.max(0, player.skillCd[sk] - dt);
     }
@@ -5888,6 +5892,129 @@
       xuantieHinted = true;
       toast('拾得玄铁令 —— 点它取出，再点装备格即可重铸词缀');
     }
+  }
+  /* ═════════ 探索与随机（v47）：地图采集点 / 宝箱 ═════════
+   * 设计取舍：
+   *   ① 采集点按地图随机刷（换图重随，与 foes 同生命周期，不存盘）；坐标全部取整
+   *      —— 避免浮点格 → CUR.ground[20.32] 抛错的老坑。
+   *   ② 三类：herb 灵草 / ore 矿石（直接化银两）、chest 宝箱（银两+妖丹+低概率装备）。
+   *      奖励的消耗方都已在游戏内存在（银两消费 / 妖丹炼修为 / 装备穿·熔），不构成无底洞。
+   *   ③ 交互走与「点怪」「点空地」同一入口 tapMap：点中节点 → 走过去 → updateGather 到达自动采。
+   *   ④ 渲染画在地面层之上、物件之下（不参与深度排序，小地面物可接受被树/墙遮）。
+   *   ⚠ 防刷待办：本版不做"已采存档"，重进图会重随——收益温和（银两少、宝箱≤1/图、装备 25%），
+   *      且重进图要花时间走图，成本在；后续若要根治再加"已采记录进存档"。 */
+  function makeNodes() {
+    nodes = [];
+    if (!CUR || !CUR.ground) return;
+    var cells = [];
+    for (var y = 0; y < CUR.h; y++)
+      for (var x = 0; x < CUR.w; x++)
+        if (walkable(x, y)) cells.push(x + ',' + y);
+    if (!cells.length) return;
+    for (var i = cells.length - 1; i > 0; i--) {            // Fisher–Yates 打乱
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = cells[i]; cells[i] = cells[j]; cells[j] = t;
+    }
+    var occ = {};                                            // 排除 foe / 出生点所在格
+    for (var fi = 0; fi < foes.length; fi++) occ[foes[fi].x + ',' + foes[fi].y] = 1;
+    occ[Math.round(player.mx) + ',' + Math.round(player.my)] = 1;
+    var total = Math.max(3, Math.floor(cells.length * 0.012));
+    var placed = 0;
+    for (var c = 0; c < cells.length && placed < total; c++) {
+      var pa = cells[c].split(','), gx = +pa[0], gy = +pa[1];
+      if (occ[gx + ',' + gy]) continue;
+      occ[gx + ',' + gy] = 1;
+      var r = Math.random();
+      var type = r < 0.083 ? 'chest' : (r < 0.5 ? 'ore' : 'herb');  // 宝箱 8.3% / 矿石~42% / 灵草~50%
+      nodes.push({ x: gx, y: gy, type: type, pulse: Math.random() * 6.2832 });
+      placed++;
+    }
+  }
+  function updateGather(dt) {
+    var g = player.gatherTarget;
+    if (!g) return;
+    if (nodes.indexOf(g) < 0) { player.gatherTarget = null; return; }   // 已被采掉
+    if (Math.hypot(player.mx - g.x, player.my - g.y) < 0.9) {
+      var idx = nodes.indexOf(g);
+      if (idx >= 0) { gatherNode(g); nodes.splice(idx, 1); }
+      player.gatherTarget = null;
+    }
+  }
+  function gatherNode(n) {
+    if (n.type === 'herb') {
+      var g = rndInt(8, 15);
+      player.stones += g; bagDirty = true;
+      addFloater(n.x, n.y - 0.3, '+' + g + ' 银两', '#8bf3ff');
+    } else if (n.type === 'ore') {
+      var o = rndInt(14, 25);
+      player.stones += o; bagDirty = true;
+      addFloater(n.x, n.y - 0.3, '+' + o + ' 银两', '#8bf3ff');
+    } else {   // chest：银两 + 妖丹 + 25% 装备
+      var cs = rndInt(40, 90);
+      player.stones += cs; bagDirty = true;
+      var cd = rndInt(1, 3);
+      collectItem('yaodan', cd, n.x, n.y);
+      addFloater(n.x, n.y - 0.3, '+' + cs + ' 银两 · 妖丹×' + cd, '#ffdf9b');
+      var gotGear = Math.random() < 0.25;
+      if (gotGear) {
+        var gg = rollGear(false);
+        if (gearInv.length < gearCap()) collectGear(gg, n.x, n.y);
+        else { player.stones += 30; addFloater(n.x, n.y - 0.6, '行囊满 +30 银两', '#8bf3ff'); gotGear = false; }
+      }
+      toast('开启宝箱：' + cs + ' 银两 · 妖丹×' + cd + (gotGear ? ' · 得一件装备！' : ''));
+    }
+  }
+  function drawNodes() {
+    for (var i = 0; i < nodes.length; i++) drawNode(nodes[i]);
+  }
+  function drawNode(n) {
+    var p = isoToScreen(n.x, n.y);
+    var baseY = p.y;
+    ctx.save();
+    var br = 0.82 + 0.18 * Math.sin(time * 3 + n.pulse);    // 呼吸
+    ctx.globalAlpha = 0.26; ctx.fillStyle = '#0b1a12';
+    ctx.beginPath(); ctx.ellipse(p.x, baseY, 11 * Z, 5 * Z, 0, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (n.type === 'herb') {
+      for (var b = 0; b < 3; b++) {
+        var ang = -Math.PI / 2 + (b - 1) * 0.5;
+        var lx = p.x + Math.cos(ang) * 8 * Z * br;
+        var ly = baseY + Math.sin(ang) * 13 * Z * br;
+        ctx.fillStyle = b === 1 ? '#74e07a' : '#4cbf68';
+        ctx.beginPath();
+        ctx.moveTo(p.x, baseY);
+        ctx.quadraticCurveTo(p.x + Math.cos(ang) * 5 * Z, baseY + Math.sin(ang) * 9 * Z, lx, ly);
+        ctx.quadraticCurveTo(p.x + Math.cos(ang) * 3 * Z, baseY + Math.sin(ang) * 6 * Z, p.x, baseY);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 0.55 * br; ctx.fillStyle = '#b6ffce';
+      ctx.beginPath(); ctx.arc(p.x, baseY - 13 * Z, 1.6 * Z, 0, 6.2832); ctx.fill();
+    } else if (n.type === 'ore') {
+      var cols = ['#a6bccf', '#cfe2f4', '#88a0b4'];
+      for (var k = 0; k < 3; k++) {
+        var ox = (k - 1) * 5 * Z, oy = baseY - (k % 2 ? 7 : 3) * Z;
+        ctx.fillStyle = cols[k];
+        ctx.beginPath();
+        ctx.moveTo(p.x + ox, baseY);
+        ctx.lineTo(p.x + ox - 4 * Z, baseY - 7 * Z);
+        ctx.lineTo(p.x + ox, baseY - 14 * Z * br);
+        ctx.lineTo(p.x + ox + 4 * Z, baseY - 7 * Z);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 0.6 * Z; ctx.stroke();
+      }
+    } else {   // chest
+      var w = 22 * Z, h = 16 * Z;
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(p.x, baseY + 2 * Z, w * 0.6, h * 0.3, 0, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#8a5a2b'; ctx.fillRect(p.x - w / 2, baseY - h, w, h);
+      ctx.fillStyle = '#6e4420'; ctx.fillRect(p.x - w / 2, baseY - h, w, h * 0.4);
+      ctx.strokeStyle = '#3e2613'; ctx.lineWidth = 1.4 * Z; ctx.strokeRect(p.x - w / 2, baseY - h, w, h);
+      ctx.fillStyle = '#ffd86b'; ctx.fillRect(p.x - 2 * Z, baseY - h * 0.62, 4 * Z, 5 * Z);
+      ctx.globalAlpha = 0.55 * br; ctx.fillStyle = '#ffe9a8';
+      ctx.beginPath(); ctx.arc(p.x, baseY - h - 4 * Z, 2 * Z, 0, 6.2832); ctx.fill();
+    }
+    ctx.restore();
   }
   var bag = {};              // 物品键 → 数量（heal / mat / rare 都在这里；银两不入包）
   var bagDirty = true;       // HUD 脏标记（数量变了才碰 DOM）
@@ -8265,6 +8392,17 @@
       }
     }
     player.targetFoe = null;
+    player.gatherTarget = null;   // 点空地 = 取消采集目标
+    // v47：采集点优先于空地移动 —— 点中灵草/矿石/宝箱则走过去，到达自动采集（见 updateGather）
+    for (var ni = 0; ni < nodes.length; ni++) {
+      var nd = nodes[ni];
+      if (Math.hypot(nd.x - cx, nd.y - cy) < 0.8) {
+        player.gatherTarget = nd;
+        var gtx = Math.round(cx), gty = Math.round(cy);
+        if (setTargetCell(gtx, gty)) clickMark = { mx: gtx, my: gty, life: 2.4, max: 2.4 };
+        return false;
+      }
+    }
     var tx = Math.round(cx), ty = Math.round(cy);
     if (setTargetCell(tx, ty)) clickMark = { mx: tx, my: ty, life: 2.4, max: 2.4 };
     return false;
