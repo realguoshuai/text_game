@@ -2805,6 +2805,153 @@
             K.noStoneOk && K.wornOk && K.unequipOk);
           pc.textContent = JSON.stringify(K);
         }
+        if (at === 'shop') {
+          /* ?map=<图>&autotest=shop —— 坊市（v56）
+           * 用户原话：「是不是应该出一个商店系统，让银两可以用」。
+           * 判据只认"看得见的东西 + 真的发生的事"，另加一条**经济硬约束**：
+           *   ① 货架真的有 4 件、位数不重复、每件 key/品质/价格都合法（不是空壳）
+           *   ② ★ **买入价 > 该品质的最高熔炼价**。这是防"买来立刻熔炼"套利的唯一防线，
+           *      而且必须取**上界**比（六种器型 × 满词缀 × 逐属性堆满），不能只拿一件平均货比 ——
+           *      平均货比得再顺，只要存在一件能套利的极端货，经济就是破的。
+           *   ③ 买丹药：钱真的减（数额 = 标价）、背包真的多一个；钱不够则**一分不减、一个不给**
+           *   ④ 买装备：钱减得正好 = 标价、货架真少一件、**到手的就是货架上那件**（对象同一性）
+           *   ⑤ 行囊满：必须拒绝，且**钱一分不动**（专防"钱扣了、装备没进包"这种无声损失）
+           *   ⑥ 买不起时按钮必须是 disabled（灰按钮本身就是"还差多少钱"的提示）
+           *   ⑦ 点得到：elementFromPoint 在圆钮中心要命中它自己（v50 那类 pointer-events 故障）
+           *   ⑧ 补货**按位补**：挖掉位 0 → 补回来的仍是位 0，且位数不重复
+           *   ⑨ 开关商店零副作用；存档能带住现货（买走的不会因为"存→读"又回到货架）
+           * 反向对照：把 buyStock 的"行囊满"守卫挪到扣钱之后 → ⑤ 必须变红。
+           * ⚠ 命中判据一律 elementFromPoint —— el.click() 不经过命中测试（本项目老坑）。
+           * ⚠ 用例会写档位一，最后连 raw 一起还原，别吃掉玩家的档。 */
+          var ps = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe';
+            d.style.display = 'none'; document.body.appendChild(d); return d;
+          })();
+          var S2 = {};
+          var bakSlot1 = null;
+          try { bakSlot1 = localStorage.getItem(slotKey(1)); } catch (e) { }
+          // ── ① 货架：4 件、位不重复、字段合法 ──
+          shopStock = []; restockShop();
+          var sSeen = {}, sLegal = true, sx;
+          for (sx = 0; sx < shopStock.length; sx++) {
+            var stx = shopStock[sx];
+            if (sSeen[stx.slot]) sLegal = false;
+            sSeen[stx.slot] = 1;
+            if (!GEAR_BASES[stx.g.key] || !TIERS[stx.g.t] || !(stx.price > 0)) sLegal = false;
+          }
+          S2.stock = shopStock.length;
+          S2.stockLegal = sLegal;
+          S2.stockSlots = Object.keys(sSeen).sort().join(',');
+          // ── ② ★ 经济硬约束：每个品质的**最高**熔炼价都必须低于该品质售价 ──
+          var worst = [0, 0, 0, 0], q, w, ab;
+          for (q = 0; q < TIERS.length; q++) {
+            var mq = TIERS[q], cap = mq.affix[1];      // 词缀条数取区间上限
+            for (w = 0; w < AFFIX_POOL.length; w++) {  // 逐属性把词缀堆满（单属性极限最贵）
+              var one = { atk: 0, def: 0, maxhp: 0 };
+              one[AFFIX_POOL[w].k] = AFFIX_POOL[w].max * cap;
+              for (ab = 0; ab < GEAR_BASE_KEYS.length; ab++) {
+                var bk2 = GEAR_BASE_KEYS[ab];
+                var bs2 = gearBaseSt(GEAR_BASES[bk2], mq);
+                var st2 = { atk: bs2.atk + one.atk, def: bs2.def + one.def,
+                            maxhp: bs2.maxhp + one.maxhp };
+                if (st2.def < 0 && mq.t <= 1) st2.def = 0;
+                var v2 = gearValue({ id: 0, key: bk2, t: q, st: st2 });
+                if (v2 > worst[q]) worst[q] = v2;
+              }
+            }
+          }
+          S2.worstMelt = worst.join('/');
+          S2.priceLine = SHOP_TIER_PRICE.join('/');
+          S2.noArb = true;
+          for (q = 0; q < 4; q++) if (!(SHOP_TIER_PRICE[q] > worst[q])) S2.noArb = false;
+          // ── ⑦ 入口点得到吗（命中测试，不用 el.click 自欺） ──
+          bag = {}; gearInv = [];
+          equipped = { weapon: null, armor: null, trinket: null };
+          player.stones = 99999;
+          recalcStats(); bagBuilt = false; buildBagUI(); bagToggle(true);
+          var sBtn = document.getElementById('shopBtn'), sHit = null;
+          if (sBtn) {
+            var rr = sBtn.getBoundingClientRect();
+            sHit = document.elementFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2);
+          }
+          S2.hit = (sBtn && sHit && (sHit === sBtn || sBtn.contains(sHit)))
+            ? 'ok' : ('miss:' + (sHit ? (sHit.className || sHit.tagName) : 'null'));
+          S2.open = shopToggle(true) === true && shopOpen();
+          // ── ③ 买丹药（够钱 / 不够钱） ──
+          var pc0 = bag.jinchuang | 0, pm0 = player.stones;
+          S2.buyPotion = buyPotion('jinchuang') === true;
+          S2.potionPaid = pm0 - player.stones;
+          S2.potionWant = SHOP_POTION_PRICE.jinchuang;
+          S2.potionGot = (bag.jinchuang | 0) - pc0;
+          player.stones = 3;
+          var dc0 = bag.dahuan | 0;
+          S2.poorReject = buyPotion('dahuan') === false && player.stones === 3;
+          S2.poorNoGift = (bag.dahuan | 0) === dc0;
+          // ── ⑥ 买不起 → 所有价格按钮必须 disabled ──
+          player.stones = 0; renderShop();
+          var bEls = document.querySelectorAll('#shop button.buy'), bAll = bEls.length > 0, bq;
+          for (bq = 0; bq < bEls.length; bq++) if (!bEls[bq].disabled) bAll = false;
+          S2.poorDisabled = bAll && bEls.length === SHOP_POTIONS.length + shopStock.length;
+          player.stones = 99999; renderShop();
+          // ── ④ 买装备：钱减得正好、货架少一件、到手的就是那件 ──
+          var tgt = shopStock[0], inv0 = gearInv.length, gm0 = player.stones,
+            sl0 = shopStock.length;
+          S2.buyGear = buyStock(0) === true;
+          S2.gearPaid = gm0 - player.stones;
+          S2.gearWant = tgt.price;
+          S2.gearGot = (gearInv.length - inv0 === 1) && gearInv[0] === tgt.g;
+          S2.stockDown = shopStock.length === sl0 - 1;
+          // ── ⑤ 行囊满：拒绝 + 钱一分不动 + 货还在架上 ──
+          var keepInv = gearInv.slice(), full = [], fi;
+          for (fi = 0; fi < GEAR_CAP; fi++) {
+            full.push({ id: 95000 + fi, key: 'ge_jian', t: 0, st: { atk: 5 } });
+          }
+          gearInv = full;
+          var fm0 = player.stones, fsl = shopStock.length;
+          S2.fullReject = buyStock(0) === false;
+          S2.fullNoPay = player.stones === fm0;
+          S2.fullNoTake = shopStock.length === fsl;
+          gearInv = keepInv;
+          // ── ⑧ 补货按位补（挖掉位 0 后补回来的仍是位 0，且位数不重复） ──
+          shopStock = shopStock.filter(function (s) { return s.slot !== 0; });
+          restockShop();
+          var sSeen2 = {}, sDup = false;
+          for (sx = 0; sx < shopStock.length; sx++) {
+            if (sSeen2[shopStock[sx].slot]) sDup = true;
+            sSeen2[shopStock[sx].slot] = 1;
+          }
+          S2.refill = shopStock.length === SHOP_STOCK_MAX && !!sSeen2[0] && !sDup;
+          // ── ⑨ 开关零副作用 + 存档带住现货 ──
+          var tm = player.stones, tinv = gearInv.length, tst = shopStock.length;
+          shopToggle(false); shopToggle(true);
+          S2.toggleClean = player.stones === tm && gearInv.length === tinv &&
+            shopStock.length === tst;
+          var ids0 = shopStock.map(function (s) { return s.g.id; }).join(',');
+          saveGame(true, 1);
+          applySave(readSlot(1));
+          S2.saveKeeps = shopStock.map(function (s) { return s.g.id; }).join(',') === ids0 &&
+            shopStock.length === tst;
+          // 复位：档位一原样还回去，别吃掉玩家的档
+          try {
+            if (bakSlot1 === null) localStorage.removeItem(slotKey(1));
+            else localStorage.setItem(slotKey(1), bakSlot1);
+          } catch (e) { }
+          shopToggle(false);
+          bag = {}; gearInv = [];
+          equipped = { weapon: null, armor: null, trinket: null };
+          player.stones = 0;
+          recalcStats(); player.hp = player.maxhp;
+          bagDirty = true; lastGearSig = ''; bagToggle(false);
+          shopStock = []; restockShop();
+          S2.pass = !!(S2.stock === SHOP_STOCK_MAX && S2.stockLegal && S2.stockSlots === '0,1,2,3' &&
+            S2.noArb && S2.hit === 'ok' && S2.open &&
+            S2.buyPotion && S2.potionPaid === S2.potionWant && S2.potionGot === 1 &&
+            S2.poorReject && S2.poorNoGift && S2.poorDisabled &&
+            S2.buyGear && S2.gearPaid === S2.gearWant && S2.gearGot && S2.stockDown &&
+            S2.fullReject && S2.fullNoPay && S2.fullNoTake &&
+            S2.refill && S2.toggleClean && S2.saveKeeps);
+          ps.textContent = JSON.stringify(S2);
+        }
         if (at === 'saveload') {
           /* ?map=<图>&autotest=saveload —— 「小数坐标存档」验收（2026-09-18 用户报
            * 「加载失败 · Cannot read properties of undefined (reading '12.32')」）。
@@ -4040,6 +4187,10 @@
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
     player.dead = false;
+    /* 坊市换货：**只在换图时补**（规矩 ④）—— 若改成"打开商店就补"，
+     * "开→关→开"即可无限刷货，现货的稀缺性与"换张图看看货"的动力一起消失。
+     * 放在 saveGame 之前，让新货跟着这一笔一起落盘。 */
+    restockShop();
     /* 换图必存：地图入口/密度各不相同，读档落回最近一张图比落回入口图体感好得多。
      * silent=true（不弹提示），否则每次过传送门都被提示刷屏。 */
     saveGame(true);
@@ -4195,6 +4346,12 @@
      * 漏了这层，玩家在卡片上按 Esc 会连带把世界地图也关了。 */
     if (cardOpen()) {
       if (k === 'Escape' || k === 'Enter') { e.preventDefault(); closeGearCard(); }
+      else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
+      return;
+    }
+    /* 坊市（z-index 135，比操作卡还高）：开着时按键全归它，同样别让角色在背后走位。 */
+    if (shopOpen()) {
+      if (k === 'Escape' || k === 'Enter') { e.preventDefault(); closeShop(); }
       else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
       return;
     }
@@ -5586,6 +5743,222 @@
       ev.stopPropagation(); closeGearCard();
     });
   }
+  /* ═════════ 坊市 · 银两的出口（v56）════════
+   * 用户一句「是不是应该出一个商店系统，让银两可以用」—— 查了一遍，银两的病是**只进不出**：
+   *   产出三条（杀怪必给 / 掉落物拾取 / 熔炼装备），消耗只有一条「倒地折损 30%」，
+   *   而那一条是惩罚，不是玩家主动花的钱。于是它一路单调上涨，攒到五位数也不改变任何事 ——
+   *   与 v54 之前的妖丹是同一类病（捡起来就只是计数）。
+   *
+   * 商品两类，各管一件事：
+   *   ① **丹药**（常备、无限量）：补给 —— "钱换命"，买了立刻有用且永不贬值。
+   *   ② **现货装备**（有限、买走即无）：银两的大目标 —— "钱换实力"，
+   *      顺手补上「脸黑一直掉不到装备」这条路：**掉落给运气，商店给积累**。
+   *
+   * 四条规矩，改以前先读：
+   *   ★ ① **买入价必须永远高于熔炼价**。熔炼一件装备值 25~272 银两（看品质与词缀），
+   *        所以最低一档也定在 90 —— 否则会出现"买来立刻熔炼"的稳定套利，经济当场崩。
+   *        `?autotest=shop` 里有一条断言专门守它（三档品质各验一次）。
+   *   ★ ② **现货明码标价，不是盲盒**。花 750 买一件不知道属性的东西，脸黑一次就再也不想进店。
+   *        摆出「攻 +18 · 气血 +34」，玩家才知道自己在为什么攒钱；副作用是"同价位里挑属性
+   *        最合心意的那件"变成了乐趣（要堆气血就挑堆气血的）。
+   *   ★ ③ **价格只由品质决定，不随属性浮动**。同上：价格浮动会让"淘货"退化成"按价格排序"。
+   *   ★ ④ **补货只发生在换地图时，不在每次打开商店时**。否则"开→关→开"就能无限刷货，
+   *        现货的稀缺性（以及"换张图看看货"的动力）就没了。
+   */
+  var SHOP_POTIONS = ['jinchuang', 'xiaohuan', 'dahuan'];
+  var SHOP_POTION_PRICE = { jinchuang: 15, xiaohuan: 35, dahuan: 85 };
+  /* 现货定价（下标 = 品质下标：凡/灵/宝/仙）。
+   * 必须守住"买 > 卖"：熔炼价 凡 25~50 / 灵 60~130 / 宝 110~230 / 仙 200~272。 */
+  var SHOP_TIER_PRICE = [90, 260, 750, 1800];
+  var SHOP_STOCK_MAX = 4;
+  /* 货架的品质分布（下标 = 货架位）：**刻意做成有梯度的**，不是纯随机。
+   * 纯随机会出现"四件全是凡品"—— 玩家攒了一千银两进店，发现没东西可买，那商店就白做了。
+   * 四个位 = 垫底一件（新手买得起）+ 低档一件 + 中档一件 + 高档一件（有钱就能升级）。 */
+  var SHOP_STOCK_TIER = [
+    [0, 60, 35, 5],      /* 位 0：灵品为主，偶尔宝 / 仙 */
+    [0, 70, 30, 0],      /* 位 1：灵 / 宝 */
+    [50, 50, 0, 0],      /* 位 2：凡 / 灵 */
+    [100, 0, 0, 0]       /* 位 3：凡品垫底 */
+  ];
+  var shopStock = [];        // [{ slot, g: 装备实例, price }]
+  var shopSeq = 90000;       // 现货实例号（与掉落的 gearSeq 分开编号，避免存档里认错人）
+
+  /** 指定品质搓一件装备（与 rollGear 同口径：器型裸值 × 品质 + 词缀）。
+   *  不能直接调 rollGear —— 那里面品质是随机摇的，而货架的品质由位次决定。 */
+  function makeShopGear(ti) {
+    var bk = GEAR_BASE_KEYS[rndInt(0, GEAR_BASE_KEYS.length - 1)];
+    var b = GEAR_BASES[bk], tier = TIERS[ti], k;
+    var st = gearBaseSt(b, tier);
+    var af = rollAffix(tier);
+    for (k in af) if (af.hasOwnProperty(k)) st[k] = (st[k] || 0) + af[k];
+    if (st.def < 0 && tier.t <= 1) st.def = 0;   // 与 rollGear 同款：低品别跌成负数让人困惑
+    return { id: shopSeq++, key: bk, t: ti, st: st };
+  }
+  /** 按位补齐货架（**只在换地图时调**，见规矩 ④）。
+   *  按位补而不是"补到 4 件"：只补末尾会让"位 0 的仙品被买走后由凡品顶上空缺"，
+   *  货架梯度立刻错乱 —— 有钱的玩家进店反而只剩凡品可买。 */
+  function restockShop() {
+    if (!shopStock) shopStock = [];
+    var have = {}, i;
+    for (i = 0; i < shopStock.length; i++) have[shopStock[i].slot] = 1;
+    for (i = 0; i < SHOP_STOCK_MAX; i++) {
+      if (have[i]) continue;
+      var ti = pickW(SHOP_STOCK_TIER[i]);
+      shopStock.push({ slot: i, g: makeShopGear(ti), price: SHOP_TIER_PRICE[ti] });
+    }
+    shopStock.sort(function (a, b) { return a.slot - b.slot; });
+  }
+  function buyPotion(key) {
+    var price = SHOP_POTION_PRICE[key] | 0;
+    if (price <= 0 || !ITEMS[key]) return false;
+    if (player.stones < price) {
+      toast('银两不足 —— ' + ITEMS[key].cn + ' 要 ' + price + '，现有 ' + player.stones);
+      return false;
+    }
+    player.stones -= price;
+    bag[key] = (bag[key] | 0) + 1;
+    bagDirty = true;
+    toast('买到 ' + ITEMS[key].cn + ' ×1（余 ' + player.stones + ' 银两）');
+    return true;
+  }
+  function buyStock(idx) {
+    var it = shopStock[idx];
+    if (!it) return false;
+    /* 行囊满必须先判，再扣钱 —— 反过来会做出"钱扣了、装备没进包"，
+     * 那是最坏的一类 bug：损失无声无息，玩家只会觉得"钱少了"。 */
+    if (gearInv.length >= GEAR_CAP) {
+      toast('行囊已满（' + GEAR_CAP + ' 件）—— 先熔炼几件再来');
+      return false;
+    }
+    if (player.stones < it.price) {
+      toast('银两不足 —— 要 ' + it.price + '，现有 ' + player.stones);
+      return false;
+    }
+    player.stones -= it.price;
+    shopStock.splice(idx, 1);
+    gearInv.unshift(it.g);
+    bagDirty = true; lastGearSig = '';   // 强制重建装备区，否则新买的这件不显示
+    toast('买到 ' + gearName(it.g) + '（' + it.price + ' 银两）\n' + gearStatsLine(it.g, '　'));
+    return true;
+  }
+  function shopOpen() {
+    var el = document.getElementById('shop');
+    return !!el && !el.hasAttribute('hidden');
+  }
+  function closeShop() {
+    var el = document.getElementById('shop');
+    if (el) el.setAttribute('hidden', '');
+    var b = document.getElementById('shopBtn');
+    if (b) b.classList.remove('on');
+  }
+  /** 一行货：图标 + 名称/说明 + 价格按钮。data-a / data-k 供事件委托与自测定位。
+   *  价格**写在按钮上**，玩家不用去别处对照 —— 摆一个只说"购买"的按钮等于让人猜。 */
+  function shopRow(host, o) {
+    var row = document.createElement('div');
+    row.className = 'it';
+    row.setAttribute('data-a', o.act);
+    row.setAttribute('data-k', String(o.key));
+    var ic = document.createElement('div');
+    ic.className = 'ic';
+    var ico = o.pz ? bagIconEl(o.pz, o.name, 34) : null;
+    if (ico) ic.appendChild(ico);
+    else {
+      var s = document.createElement('span');
+      s.style.cssText = 'font-size:15px;color:#ffe6a6';
+      s.textContent = String(o.name).slice(-1);
+      ic.appendChild(s);
+    }
+    row.appendChild(ic);
+    var tx = document.createElement('div');
+    tx.className = 'tx';
+    var nm = document.createElement('div');
+    nm.className = 'nm'; nm.textContent = o.name;
+    if (o.col) nm.style.color = o.col;
+    tx.appendChild(nm);
+    var ds = document.createElement('div');
+    ds.className = 'ds'; ds.textContent = o.desc;
+    tx.appendChild(ds);
+    row.appendChild(tx);
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'buy';
+    b.textContent = o.price + ' 银两';
+    /* 买不起 = 灰掉且不可点（而不是点了才弹"银两不足"）——
+     * 灰按钮本身就是"还差多少钱"的提示，少一次无用点击。 */
+    if (!o.afford) b.disabled = true;
+    row.appendChild(b);
+    host.appendChild(row);
+  }
+  function renderShop() {
+    var p = document.getElementById('shPurse');
+    if (p) p.textContent = player.stones;
+    var po = document.getElementById('shPotion');
+    if (po) {
+      po.innerHTML = '';
+      SHOP_POTIONS.forEach(function (key) {
+        var it = ITEMS[key];
+        if (!it) return;
+        var price = SHOP_POTION_PRICE[key] | 0;
+        shopRow(po, {
+          act: 'potion', key: key, name: it.cn, price: price,
+          desc: it.desc + '\n现有 ' + (bag[key] | 0) + ' 个',
+          pz: piece(it.icon + '_big') || piece(it.icon),
+          afford: player.stones >= price
+        });
+      });
+    }
+    var ge = document.getElementById('shGear');
+    if (ge) {
+      ge.innerHTML = '';
+      if (!shopStock.length) {
+        var e = document.createElement('div');
+        e.className = 'empty';
+        e.textContent = '货已售罄 —— 换一张地图再来看';
+        ge.appendChild(e);
+      } else {
+        shopStock.forEach(function (st, i) {
+          var g = st.g;
+          shopRow(ge, {
+            act: 'gear', key: i, name: gearName(g), price: st.price, col: gearTier(g).col,
+            desc: gearBase(g).cn + ' · ' + gearTier(g).cn + '\n' + gearStatsLine(g, '　'),
+            pz: piece(g.key + '_big') || piece(g.key),
+            afford: player.stones >= st.price
+          });
+        });
+      }
+    }
+  }
+  function shopToggle(open) {
+    var el = document.getElementById('shop');
+    if (!el) return false;
+    var want = (open === undefined) ? !shopOpen() : !!open;
+    if (want) renderShop();
+    if (want) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+    var b = document.getElementById('shopBtn');
+    if (b) b.classList.toggle('on', want);
+    return want;
+  }
+  function wireShop() {
+    var box = document.getElementById('shop');
+    if (box) box.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var t = ev.target;
+      if (!t) return;
+      if (t.id === 'shMask' || t.id === 'shClose') { closeShop(); return; }   // 点遮罩 = 取消
+      var row = t.closest ? t.closest('.it') : null;
+      if (!row) return;
+      ev.preventDefault();
+      var a = row.getAttribute('data-a');
+      if (a === 'potion') buyPotion(row.getAttribute('data-k'));
+      else if (a === 'gear') buyStock(+row.getAttribute('data-k'));
+      renderShop();     // 买完立刻重绘：钱变了、按钮该变灰、装备该从架上消失
+    });
+    var b = document.getElementById('shopBtn');
+    if (b) b.addEventListener('click', function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      shopToggle();
+    });
+  }
+
   /** 熔炼：换银两（装备操作卡里的按钮）。
    *  **只接受行囊里的** —— 身上那件要先卸下：熔炼是不可逆销毁，把"已装备"也开放给它，
    *  误触的代价是"攻/御突然掉一截"且卡片已经关了、玩家说不清刚才发生了什么。 */
@@ -5795,6 +6168,23 @@
     var mx = gearSeq;
     gi.forEach(function (g) { if (g.id >= mx) mx = g.id + 1; });
     gearSeq = mx;
+    /* 坊市现货：逐项校验再收下 —— 器型表改过之后老档里可能留着已经不存在的 key。
+     * 沿用本项目的坏档原则：**坏的那一项丢掉，不整档作废**（银两/装备还是好的）。 */
+    shopStock = [];
+    if (o.shop && o.shop.length) {
+      for (k = 0; k < o.shop.length; k++) {
+        var sh = o.shop[k];
+        if (!sh || !sh.g || !GEAR_BASES[sh.g.key]) continue;
+        var sTi = Math.max(0, Math.min(TIERS.length - 1, sh.g.t | 0));
+        shopStock.push({
+          slot: Math.max(0, Math.min(SHOP_STOCK_MAX - 1, sh.slot | 0)),
+          price: (+sh.price > 0) ? +sh.price : SHOP_TIER_PRICE[sTi],
+          g: { id: (+sh.g.id) || (shopSeq++), key: sh.g.key, t: sTi,
+               st: sh.g.st || { atk: 0, def: 0, maxhp: 0 } }
+        });
+      }
+      shopStock.sort(function (a, b) { return a.slot - b.slot; });
+    }
     player.exp = o.exp || 0;
     player.stones = o.stones || 0;
     window.__kills = o.kills || 0;
@@ -5824,9 +6214,14 @@
       var o = { v: SAVE_VER, t: Date.now(), map: CUR.id,
         x: +player.mx.toFixed(2), y: +player.my.toFixed(2),
         hp: player.hp, exp: player.exp, stones: player.stones,
-        kills: window.__kills || 0, bag: {}, gear: gearInv, eq: {} };
+        kills: window.__kills || 0, bag: {}, gear: gearInv, eq: {}, shop: [] };
       for (var k in bag) if (bag.hasOwnProperty(k)) o.bag[k] = bag[k] | 0;
       GEAR_SLOTS.forEach(function (sl) { o.eq[sl.key] = equipped[sl.key] || null; });
+      /* 坊市现货也进档：否则"买走 → 存 → 读"会把买走的那件还回货架，
+       * 玩家看到"我明明买了怎么又有了一件"（虽然不构成套利，但像 bug）。 */
+      o.shop = shopStock.map(function (s) {
+        return { slot: s.slot, price: s.price, g: s.g };
+      });
       localStorage.setItem(slotKey(slot), JSON.stringify(o));
       lastSaveMs = o.t;
       updateSaveUI();
@@ -7266,6 +7661,7 @@
     if (bb) bb.onclick = function () { bagToggle(); };
     wireSaveUI();          // 存档按钮 + 离场落盘（挂在 IIFE 里：此时 DOM 必定已就绪）
     wireGearCard();        // 装备操作卡的按钮派发（同一时刻 DOM 必定已就绪）
+    wireShop();            // 坊市：入口圆钮 + 货架购买的事件委托（同一时刻 DOM 必就绪）
     syncLeftBtns();        // 左列圆钮先按当前面板高度排一次（药格是脚本后建的，心跳会再校正）
     var x = document.getElementById('worldClose');
     if (x) x.onclick = closeWorld;

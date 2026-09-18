@@ -486,6 +486,30 @@ results.push(run('装备 操作卡与按钮', 'autotest=card', ({ probe }) => {
     && K.pass === true;
 }, { budget: 20000 }));
 
+// 8.4c) 坊市（v56）：银两的出口 —— 丹药（常备）+ 现货装备（买走即无）。
+//       为什么必须单独立一条：商店是**唯一能从系统里凭空拿走钱、也能凭空印出钱**的地方 ——
+//       ① 买入价若低于熔炼价，就是一条稳定的"买→熔"套利流水线（经济当场崩）；
+//          而且必须比**上界**（六种器型 × 满词缀逐属性堆满）才守得住，比平均货等于没守。
+//       ② "行囊满"若判在扣钱之后，就是无声吞钱 —— 玩家只会觉得"钱少了"，说不清为什么。
+//       这两条都不是"看一眼就能确认"的事，只能靠跑。
+//       ⚠ 命中判据走 elementFromPoint（`el.click()` 不经过命中测试，pointer-events 类故障抓不到）。
+results.push(run('坊市 买卖与防套利', 'autotest=shop', ({ probe }) => {
+  if (!probe) return false;
+  const S = probe;
+  return S.stock === 4 && S.stockLegal === true && S.stockSlots === '0,1,2,3'  // 货架有序有质
+    && S.noArb === true                          // ★ 每个品质的进货价都高于其最高熔炼价
+    && S.hit === 'ok' && S.open === true          // 圆钮点得到、货架真的开得出来
+    && S.buyPotion === true && S.potionPaid === S.potionWant && S.potionGot === 1
+    && S.poorReject === true && S.poorNoGift === true   // 钱不够：一分不减、一个不给
+    && S.poorDisabled === true                    // 买不起 → 按钮灰掉且不可点
+    && S.buyGear === true && S.gearPaid === S.gearWant && S.gearGot === true
+    && S.stockDown === true                       // 买走的那件真的从架上消失
+    && S.fullReject === true && S.fullNoPay === true && S.fullNoTake === true  // 行囊满：不吞钱
+    && S.refill === true                          // 补货按位补（位 0 补回来还是位 0）
+    && S.toggleClean === true && S.saveKeeps === true    // 开关无副作用、存档带得住现货
+    && S.pass === true;
+}, { budget: 20000 }));
+
 // 8.5) 战斗手感：① 攻击动画必须能完整播完（冷却 ≥ 动作时长，旧版 0.45 < 0.65 会截断在第四帧）
 //      ② 伤害不再恒定（有浮动/暴击/连击）③ 背对目标砍不中、挥空自动转身。
 //      50 刀逐帧推进，预算要给足。

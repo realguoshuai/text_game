@@ -480,6 +480,55 @@
   #gearMenu button.bad{border-color:rgba(226,90,80,.55);color:#ffb9ae}
   #gearMenu button.ghost{background:transparent;border-color:rgba(160,180,210,.45);color:#cfcbe8}
   body.touch #gearMenu button{padding:10px 16px;font-size:13px}
+
+  /* ── 坊市（v56）：银两的出口 ──
+     为什么要做（用户的直觉是对的）：查了一遍才发现银两**只进不出** ——
+       产出三条（杀怪必给 / 掉落物 / 熔炼装备），消耗只有一条「倒地折损 30%」，
+       而那一条是惩罚、不是玩家主动花的钱。于是它一路单调上涨，攒到五位数也不改变任何事。
+     商品两类：丹药（常备无限量，钱换命）与现货装备（有限、买走即无，钱换实力）。
+     与 #confirm / #gearMenu 同款：居中浮层、放 body 下、**不带 .hud 类**
+       （带了会被 .hud{pointer-events:none} 继承掉，按钮点不到 —— 本项目踩过两次）。 */
+  #shop{position:fixed;inset:0;z-index:135;display:flex;align-items:center;justify-content:center;padding:16px}
+  #shop[hidden]{display:none}
+  #shop .msk{position:absolute;inset:0;background:rgba(6,10,20,.76);backdrop-filter:blur(3px)}
+  #shop .dlg{position:relative;width:min(430px,93vw);max-height:88vh;display:flex;flex-direction:column;
+    border-radius:13px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(26,30,46,.99),rgba(11,15,26,.99));
+    border:1px solid rgba(226,192,110,.6);box-shadow:0 14px 46px rgba(0,0,0,.62);
+    color:#f0e3c2;text-align:left}
+  #shop .sh{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 16px 10px;border-bottom:1px solid rgba(214,178,96,.28)}
+  #shop .sh .tt{font-size:15px;letter-spacing:4px;color:#ffd88a}
+  #shop .sh .purse{font-size:12.5px;color:#cfe0f5;font-family:ui-monospace,Consolas,monospace}
+  #shop .sh .purse b{color:#ffd24a;font-size:14px}
+  /* 货架区必须显式放行纵向滚动（全局 touch-action 下，手机上长货架才拉得动） */
+  #shop .sc{overflow:auto;padding:11px 14px 6px;touch-action:pan-y}
+  #shop .grp{font-size:11.5px;color:#8bf3ff;letter-spacing:2px;margin:7px 0 8px;
+    padding-bottom:5px;border-bottom:1px dashed rgba(139,243,255,.2)}
+  #shop .grp:first-child{margin-top:0}
+  #shop .it{display:flex;align-items:center;gap:10px;padding:8px 9px;margin-bottom:7px;
+    border-radius:9px;background:rgba(10,16,30,.6);border:1px solid rgba(120,146,190,.3)}
+  #shop .it .ic{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center}
+  #shop .it .ic canvas{display:block}
+  #shop .it .tx{flex:1;min-width:0}
+  #shop .it .nm{font-size:12.5px;line-height:1.4}
+  #shop .it .ds{font-size:11px;color:#8ea3bf;margin-top:2px;line-height:1.5;
+    font-family:ui-monospace,Consolas,monospace;white-space:pre-line}
+  #shop .empty{font-size:11.5px;color:#8ea3bf;text-align:center;padding:12px 4px;line-height:1.7}
+  /* 价格按钮本身写价，玩家不用去别处对照 —— 摆一个只说"购买"的按钮等于让人猜 */
+  #shop button.buy{flex:none;min-width:74px;font:inherit;font-size:12px;text-align:center;cursor:pointer;
+    padding:8px 11px;border-radius:8px;font-family:ui-monospace,Consolas,monospace;
+    background:rgba(58,44,22,.92);color:#ffe0a0;border:1px solid rgba(226,192,110,.55)}
+  #shop button.buy:hover:not(:disabled){background:#4a3a1c;border-color:#ffd24a;color:#fff}
+  #shop button.buy:active:not(:disabled){transform:translateY(1px)}
+  /* 买不起 = 灰掉且不可点（而不是点了才弹"银两不足"）—— 灰按钮本身就是"还差多少钱"的提示 */
+  #shop button.buy:disabled{opacity:.4;cursor:not-allowed;color:#b8a98a}
+  #shop .sf{display:flex;gap:10px;justify-content:center;padding:11px 16px 13px;
+    border-top:1px solid rgba(214,178,96,.22)}
+  #shop .sf button{font:inherit;font-size:12.5px;cursor:pointer;padding:8px 20px;border-radius:8px;
+    background:transparent;color:#cfcbe8;border:1px solid rgba(160,180,210,.45)}
+  #shop .sf button:hover{border-color:#cfcbe8}
+  body.touch #shop button.buy{padding:11px 13px;font-size:12.5px}
   /* 触屏：面板缩一点、挪到**屏幕中下方**。
      为什么不贴右边：右下是技能盘（right:14/bottom:14）、右上是一排面板，都占满了。
      为什么不贴左下：摇杆是"按哪出现在哪"的浮动盘，左下正是它最常出现的位置。 */
@@ -641,6 +690,18 @@
   #bagBtn.hasnew .dot{display:block}
   body.touch #bagBtn{top:auto;bottom:68px;left:14px}  /* 手机：在「世界地图」圆钮正上方 */
 
+  /* 坊市入口（v56）：第三个圆钮，同样跟着 --tlb 走（上面板一长高它自动让位）；
+     手机端顺着左下角往上排（14 / 68 / 122），与另两个同宽同高、只换主色为铜金。 */
+  #shopBtn{position:fixed;left:14px;top:calc(var(--tlb,110px) + 104px);z-index:12;width:44px;height:44px;border-radius:50%;
+    pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 35% 25%,#6d5230,#2b1d0d 70%);
+    border:2px solid rgba(255,206,120,.75);box-shadow:0 3px 10px rgba(0,0,0,.45);
+    transition:border-color .15s,box-shadow .15s;font-family:inherit}
+  #shopBtn:hover{border-color:#ffd24a;box-shadow:0 0 12px rgba(255,210,74,.55)}
+  #shopBtn.on{border-color:#ffd24a;box-shadow:0 0 14px rgba(255,210,74,.65)}
+  #shopBtn svg{display:block}
+  body.touch #shopBtn{top:auto;bottom:122px;left:14px}
+
   /* 缩放兜底出口：拦截脚本在部分机/浏览器上拦不住时，页面真被放大 → 显示这个按钮彻底复位 */
   #viewfix{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:90;display:none;
     font-family:inherit;font-size:12px;padding:7px 14px;border-radius:20px;cursor:pointer;
@@ -693,7 +754,8 @@
   <div class="gears" id="gearGrid"></div>
   <div class="tip">点<b>装备格</b>弹出操作卡：<b>装备 / 卸下 / 重铸 / 熔炼 / 丢弃</b><br>
     按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药　·　<b>妖丹</b>点一下全部炼化成修为（攒够自动突破境界）<br>
-    <b>玄铁令</b>攒着，在装备的操作卡里点「重铸」洗词缀</div>
+    <b>玄铁令</b>攒着，在装备的操作卡里点「重铸」洗词缀<br>
+    银两攒着没处花？左下角<b>坊市</b>买丹药与装备</div>
   <div class="tip" id="saveRow">
     <div class="svhint">存档 · <i id="saveInfo">尚未存档</i></div>
     <div id="slotList"></div>
@@ -706,6 +768,11 @@
 <!-- 世界地图入口：桌面 Tab 开关，手机点此图标；点开是诸天万界总览，点节点即传送 -->
 <button id="worldBtn" title="世界地图（Tab 开启）" aria-label="世界地图">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z"/><path d="M9 3v16"/><path d="M15 5v16"/></svg>
+</button>
+
+<!-- 坊市入口（v56）：银两的出口。铜钱图标，位置跟着上面板底边（--tlb）走 -->
+<button id="shopBtn" title="坊市（用银两买丹药与装备）" aria-label="坊市">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><rect x="9.1" y="9.1" width="5.8" height="5.8" rx="1.1"/></svg>
 </button>
 
 <div id="rightcol">
@@ -851,6 +918,25 @@
   </div>
 </div>
 
+<!-- 坊市（v56）：银两的出口。丹药常备无限量；装备是「现货」——
+     属性明码标价、买走即无、换地图时按位补货。同样**不带 .hud 类**。 -->
+<div id="shop" hidden>
+  <div class="msk" id="shMask"></div>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+    <div class="sh">
+      <span class="tt" id="shTitle">坊 市</span>
+      <span class="purse">银两 <b id="shPurse">0</b></span>
+    </div>
+    <div class="sc">
+      <div class="grp">丹药 · 常备</div>
+      <div id="shPotion"></div>
+      <div class="grp">现货 · 装备（买走即无，换地图补货）</div>
+      <div id="shGear"></div>
+    </div>
+    <div class="sf"><button id="shClose" type="button">关闭</button></div>
+  </div>
+</div>
+
 <script>
 /* ────────────────── 手机端「视口防线」 ──────────────────
    为什么必须有：`maximum-scale=1, user-scalable=no` 从 iOS 10 起被 Safari 忽略
@@ -932,6 +1018,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=55"></script>
+<script src="js/game.js?v=56"></script>
 </body>
 </html>
