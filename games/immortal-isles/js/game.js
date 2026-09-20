@@ -47,19 +47,33 @@
    * act 指定施法动作（素材只有 6 个动作，技能复用攻击动作）。
    * 按键从 key 字段自动生成映射（SKILL_KEYS），加技能只改这张表。 */
   var SKILLS = [
-    { id: 'sword', name: '御剑诀', key: 'u', cd: 4.0, mul: 1.35, reach: 4.2, wide: 0.95,
+    { id: 'sword', name: '御剑诀', key: 'u', el: '金', cd: 4.0, mul: 1.35, reach: 4.2, wide: 0.95,
       kind: 'line', color: '#6fd8ff', act: 'atkA', tip: '前方直线剑气，穿透多个目标' },
-    { id: 'thunder', name: '雷罡咒', key: 'i', cd: 9.0, mul: 1.05, reach: 3.0,
+    { id: 'thunder', name: '雷罡咒', key: 'i', el: '水', cd: 9.0, mul: 1.05, reach: 3.0,
       kind: 'aoe', color: '#ffcf3a', act: 'atkB', knock: 1.1, fx: 'lightning', tip: '以自身为中心雷爆，击退周围妖兽' },
-    { id: 'swordfield', name: '太虚剑域', key: 'o', cd: 20.0, mul: 2.4, reach: 2.8,
+    { id: 'swordfield', name: '太虚剑域', key: 'o', el: '木', cd: 20.0, mul: 2.4, reach: 2.8,
       kind: 'target', color: '#ff8ad0', act: 'atkB', tip: '锁定最近目标落下剑雨，范围重创' },
-    { id: 'fireball', name: '炎爆术', key: 'p', cd: 2.5, mul: 1.2, reach: 9, spd: 6.2,
+    { id: 'fireball', name: '炎爆术', key: 'p', el: '火', cd: 2.5, mul: 1.2, reach: 9, spd: 6.2,
       kind: 'proj', fx: 'fireball', impact: 'blast', splash: 0.55, splashR: 1.6,
       color: '#ff9a3d', act: 'atkB', tip: '掷出火球，命中爆炸并波及周围妖兽' }
   ];
   // 按键 → 技能序号（数据驱动：技能表的 key 字段就是键盘键）
   var SKILL_KEYS = {};
   (function () { for (var i = 0; i < SKILLS.length; i++) SKILL_KEYS[SKILLS[i].key] = i; })();
+  /* ═══ 元素克制（v49③）═══
+   * 五行相克：金克木、木克土、土克水、水克火、火克金；"无"=中立不参与。
+   * 玩家攻击元素 = 技能自带元素（4 个技能各一系）/ 普攻·重击 = 兵器自带元素（rollGear 随机分配）。
+   * 克制 +30% 并飘"克制 +30%"，被克 -20% 飘"被克 -20%"；让装备/技能搭配从"数值越大越好"变成真有策略。 */
+  var EL_CYC = { '金': '木', '木': '土', '土': '水', '水': '火', '火': '金' };
+  var EL_LIST = ['金', '木', '水', '火', '土'];
+  var EL_COLOR = { '金': '#ffe27a', '木': '#7be07b', '水': '#7ab8ff', '火': '#ff8a5a', '土': '#d9b38c', '无': '#cccccc' };
+  function elMul(atkEl, defEl) {
+    if (!atkEl || !defEl || atkEl === '无' || defEl === '无') return { mul: 1, tag: '' };
+    if (EL_CYC[atkEl] === defEl) return { mul: 1.3, tag: '克制' };
+    if (EL_CYC[defEl] === atkEl) return { mul: 0.8, tag: '被克' };
+    return { mul: 1, tag: '' };
+  }
+  function weaponEl() { return (equipped.weapon && equipped.weapon.el) || '无'; }
   var RUN_MUL = 1.0;       // 取消冲刺加速（Shift/摇杆推满不再提速）
   var ATK_B_CD = 2.2;      // 重击（攻击 B）冷却
   // 怪物（侧视多动作素材）一次性动作的播放时长（秒）；循环动作 idle/walk/run 按 fps 推进
@@ -406,7 +420,7 @@
     for (var i = 0; i < BEASTS.length; i++) {
       var b = BEASTS[i];
       FOE_DEFS[b.key] = {
-        key: b.key, name: b.cn, hp: b.hp, atk: b.atk, def: b.def, exp: b.exp,
+        key: b.key, name: b.cn, el: b.el || '无', hp: b.hp, atk: b.atk, def: b.def, exp: b.exp,
         stones: b.stones, mv: b.mv, fh: b.fh, elite: !!b.elite, side: 1,
         // 仇恨半径：不填就跟全局 AGGRO。调大的怪会主动从远处扑过来打人。
         aggro: b.aggro || 0, srcFace: b.srcFace || 'right',
@@ -577,11 +591,11 @@
     for (k in af) if (af.hasOwnProperty(k)) st[k] = (st[k] || 0) + af[k];
     // 负值得留着（重刃 -1 防是它的代价），但别把属性跌成负数让玩家困惑
     if (st.def < 0 && tier.t <= 1) st.def = 0;
-    return { id: gearSeq++, key: bk, t: ti, st: st };
+    return { id: gearSeq++, key: bk, t: ti, st: st, el: EL_LIST[rndInt(0, EL_LIST.length - 1)] };
   }
   function gearTier(g) { return TIERS[g.t] || TIERS[0]; }
   function gearBase(g) { return GEAR_BASES[g.key]; }
-  function gearName(g) { return gearTier(g).cn + '·' + gearBase(g).cn; }
+  function gearName(g) { return gearTier(g).cn + '·' + gearBase(g).cn + ((g && g.el && g.el !== '无') ? '〔' + g.el + '〕' : ''); }
   /** 槽位中文名（'weapon' → '兵器'） */
   function gearSlotCn(key) {
     for (var i = 0; i < GEAR_SLOTS.length; i++) if (GEAR_SLOTS[i].key === key) return GEAR_SLOTS[i].cn;
@@ -5146,7 +5160,7 @@
       var cell = snapWalkable(CUR, s.x, s.y);
       var aggro = d.aggro || AGGRO;
       return {
-        def_: d, key: d.key, name: d.name,
+        def_: d, key: d.key, name: d.name, el: d.el || '无',
         x: cell.x, y: cell.y, home: cell,
         hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, exp: d.exp, stones: d.stones,
         face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0,
@@ -5194,8 +5208,9 @@
     var rate = o.heavy ? CRIT_RATE * 2 : CRIT_RATE;
     var crit = Math.random() < rate;
     var cMul = 1 + Math.min(player.combo, COMBO_MAX) * COMBO_STEP;
-    var dmg = base * jitter * cMul * (crit ? CRIT_MUL : 1);
-    return { dmg: Math.max(1, Math.round(dmg)), crit: crit, base: base };
+    var em = (o.atkEl && o.defEl) ? elMul(o.atkEl, o.defEl) : { mul: 1, tag: '' };
+    var dmg = base * jitter * cMul * (crit ? CRIT_MUL : 1) * em.mul;
+    return { dmg: Math.max(1, Math.round(dmg)), crit: crit, base: base, el: em.tag, elMul: em.mul };
   }
   /** 命中即累计连击；换目标自动断连（不能拿 A 攒连击去打 B） */
   function bumpCombo(f) {
@@ -5272,12 +5287,14 @@
       }
     }
     if (!best) return;
-    var hit = rollDamage(player.atk, best.def);
+    var hit = rollDamage(player.atk, best.def, { atkEl: weaponEl(), defEl: best.el });
     best.hp -= hit.dmg;
     best.flash = hit.crit ? 0.4 : 0.22;
     bumpCombo(best);
     addFloater(best.x, best.y - 0.3, (hit.crit ? '暴击 -' : '-') + hit.dmg,
       hit.crit ? '#ffe66b' : '#ffd36b', { crit: hit.crit });
+    if (hit.el) addFloater(best.x, best.y - 0.9, (hit.elMul > 1 ? '克制 +30%' : '被克 -20%'),
+      hit.elMul > 1 ? '#9dff9d' : '#ff9d9d', {});
     if (hit.crit) { player.critT = 0.45; screenShake = Math.max(screenShake, 0.22); addFloater(best.x, best.y - 1.1, '暴击！', '#ff9f43', { crit: true }); }
     if (best.hp <= 0) killFoe(best); else hurtFoe(best);
   }
@@ -5337,11 +5354,13 @@
     var crits = 0;
     for (var j = 0; j < hit.length; j++) {
       var g = hit[j];
-      var r = rollDamage(player.atk * 2, g.def, { heavy: true });
+      var r = rollDamage(player.atk * 2, g.def, { heavy: true, atkEl: weaponEl(), defEl: g.el });
       if (r.crit) crits++;
       g.hp -= r.dmg; g.flash = r.crit ? 0.5 : 0.3;
       addFloater(g.x, g.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
         r.crit ? '#ffe66b' : '#ffd36b', { crit: r.crit });
+      if (r.el) addFloater(g.x, g.y - 0.9, (r.elMul > 1 ? '克制 +30%' : '被克 -20%'),
+        r.elMul > 1 ? '#9dff9d' : '#ff9d9d', {});
       var dx = g.x - player.mx, dy = g.y - player.my, dd = Math.hypot(dx, dy) || 1;
       for (var s = 0; s < 3; s++) {                       // 把妖兽推开
         if (couldStand(g.x + dx / dd * 0.3, g.y)) g.x += dx / dd * 0.3;
@@ -5556,12 +5575,14 @@
     var crits = 0, sum = 0;
     for (var j = 0; j < hits.length; j++) {
       var g = hits[j];
-      var r = rollDamage(player.atk * s.mul, g.def, { heavy: true });
+      var r = rollDamage(player.atk * s.mul, g.def, { heavy: true, atkEl: s.el || '无', defEl: g.el });
       if (r.crit) crits++;
       sum += r.dmg;
       g.hp -= r.dmg; g.flash = r.crit ? 0.5 : 0.3;
       addFloater(g.x, g.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
         r.crit ? '#ffe66b' : (s.color || '#ffd36b'), { crit: r.crit });
+      if (r.el) addFloater(g.x, g.y - 0.9, (r.elMul > 1 ? '克制 +30%' : '被克 -20%'),
+        r.elMul > 1 ? '#9dff9d' : '#ff9d9d', {});
       if (s.knock) {                                   // 雷罡咒：把周围妖兽炸开
         var dx = g.x - player.mx, dy = g.y - player.my, dd = Math.hypot(dx, dy) || 1;
         for (var st = 0; st < 4; st++) {
@@ -7291,7 +7312,7 @@
           slot: Math.max(0, Math.min(SHOP_STOCK_MAX - 1, sh.slot | 0)),
           price: (+sh.price > 0) ? +sh.price : SHOP_TIER_PRICE[sTi],
           g: { id: (+sh.g.id) || (shopSeq++), key: sh.g.key, t: sTi,
-               st: sh.g.st || { atk: 0, def: 0, maxhp: 0 } }
+               st: sh.g.st || { atk: 0, def: 0, maxhp: 0 }, el: sh.g.el || '无' }
         });
       }
       shopStock.sort(function (a, b) { return a.slot - b.slot; });
@@ -8139,6 +8160,13 @@
       ctx.font = 'bold ' + (12 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
       ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.82)';
       ctx.strokeText(f.name, p.x, ty); ctx.fillStyle = '#ffd0c0'; ctx.fillText(f.name, p.x, ty);
+      if (f.el && f.el !== '无') {
+        var ew = ctx.measureText(f.name).width;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = EL_COLOR[f.el] || '#fff';
+        ctx.fillText('〔' + f.el + '〕', p.x + ew / 2 + 3 * Z, ty);
+        ctx.textAlign = 'center';
+      }
       var bw = Math.max(40 * Z, ow * 0.7), bh = 5 * Z, bx = p.x - bw / 2, by = ty - 14 * Z;
       ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = f.def_.boss ? '#ff5a5a' : (f.def_.elite ? '#ffb24d' : '#7be07b');
