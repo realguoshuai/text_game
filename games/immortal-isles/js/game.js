@@ -1517,6 +1517,7 @@
         var sx = q.get('x') !== null ? +q.get('x') : (svMapId && start === svMapId ? sv.x : (useCfg ? data.start.x : m.home.x));
         var sy = q.get('y') !== null ? +q.get('y') : (svMapId && start === svMapId ? sv.y : (useCfg ? data.start.y : m.home.y));
         if (sv) applySave(sv);        // 装备/背包/银两先回位，再落点
+        else harvested = {};          // 新开局：清空"已采记录"，从一张干净的世界开始
         switchTo(m.id, sx, sy, true);
         document.getElementById('loader').style.display = 'none';
         ready = true;
@@ -5927,16 +5928,39 @@
       toast('拾得玄铁令 —— 点它取出，再点装备格即可重铸词缀');
     }
   }
-  /* ═════════ 探索与随机（v47）：地图采集点 / 宝箱 ═════════
+  /* ═════════ 探索与随机（v47 + v49 防刷）：地图采集点 / 宝箱 ═════════
    * 设计取舍：
-   *   ① 采集点按地图随机刷（换图重随，与 foes 同生命周期，不存盘）；坐标全部取整
-   *      —— 避免浮点格 → CUR.ground[20.32] 抛错的老坑。
+   *   ① 采集点按地图**确定性**刷（同一张图永远同一套坐标，seed = 地图 id 哈希），
+   *      不再每次进图重随机 —— 这样"已采坐标"才能稳定地对上号、被永久排除。
+   *      坐标全部取整 —— 避免浮点格 → CUR.ground[20.32] 抛错的老坑。
    *   ② 三类：herb 灵草 / ore 矿石（直接化银两）、chest 宝箱（银两+妖丹+低概率装备）。
    *      奖励的消耗方都已在游戏内存在（银两消费 / 妖丹炼修为 / 装备穿·熔），不构成无底洞。
    *   ③ 交互走与「点怪」「点空地」同一入口 tapMap：点中节点 → 走过去 → updateGather 到达自动采。
    *   ④ 渲染画在地面层之上、物件之下（不参与深度排序，小地面物可接受被树/墙遮）。
-   *   ⚠ 防刷待办：本版不做"已采存档"，重进图会重随——收益温和（银两少、宝箱≤1/图、装备 25%），
-   *      且重进图要花时间走图，成本在；后续若要根治再加"已采记录进存档"。 */
+   *   ★ v49 防刷根治：harvested[mapId]["x,y"]=1 记录"这张图哪个采集点已被收过"。
+   *      进图生成时跳过已采的；采集即写入；随档持久化（saveGame 每 15s 自动落盘）。
+   *      → 重进同一张图，已开的宝箱/采过的草矿不再刷出来，杜绝反复进出刷银两/妖丹。
+   *      每张图布局固定，故"宝箱点"被采后该图即少一只宝箱，符合单机 RPG 的常理。 */
+  // harvested：mapId -> { "x,y": 1 }，内存态；随档序列化进 o.harvested。
+  var harvested = {};
+  /** 字符串 → 32 位无符号种子（xmur3 变体），给每张图一个稳定 seed。 */
+  function strSeed32(str) {
+    var h = 1779033703 ^ str.length;
+    for (var i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return h >>> 0;
+  }
+  /** mulberry32：小巧确定性强随机数发生器，同 seed 必同序列。 */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
   function makeNodes() {
     nodes = [];
     if (!CUR || !CUR.ground) return;
@@ -5945,17 +5969,22 @@
       for (var x = 0; x < CUR.w; x++)
         if (walkable(x, y)) cells.push(x + ',' + y);
     if (!cells.length) return;
-    for (var i = cells.length - 1; i > 0; i--) {            // Fisher–Yates 打乱
-      var j = Math.floor(Math.random() * (i + 1));
+    // ★ v49：同一张图用稳定 seed 的 rng 打乱 → 布局确定，已采坐标才能对得上。
+    var rng = mulberry32(strSeed32(CUR.id));
+    for (var i = cells.length - 1; i > 0; i--) {            // Fisher–Yates 打乱（确定性）
+      var j = Math.floor(rng() * (i + 1));
       var t = cells[i]; cells[i] = cells[j]; cells[j] = t;
     }
     var occ = {};                                            // 排除 foe / 出生点所在格
     for (var fi = 0; fi < foes.length; fi++) occ[foes[fi].x + ',' + foes[fi].y] = 1;
     occ[Math.round(player.mx) + ',' + Math.round(player.my)] = 1;
+    // ★ v49：已采过的点直接并入 occ，既不生成也不重复判定
+    var hv = harvested[CUR.id] || {};
+    for (var hk in hv) if (hv.hasOwnProperty(hk)) occ[hk] = 1;
     var total = Math.max(3, Math.floor(cells.length * 0.012));
     var placed = 0;
     // 宝箱保底：每图至少 1 个，让"逛图找宝箱"体验成立（旧 8.3% 概率使多数图 0 宝箱）。
-    // 大图（total>=8）额外 50% 概率再放 1 个。
+    // 大图（total>=8）额外 50% 概率再放 1 个。确定性布局下，已被采的宝箱点会落到这里被 occ 跳过。
     if (cells.length) {
       for (var ci = 0; ci < cells.length && placed < total; ci++) {
         var cp = cells[ci].split(','), cgx = +cp[0], cgy = +cp[1];
@@ -5965,7 +5994,7 @@
         placed++;
         break;
       }
-      if (total >= 8 && Math.random() < 0.5) {
+      if (total >= 8 && rng() < 0.5) {
         for (var cj = 0; cj < cells.length && placed < total; cj++) {
           var dp = cells[cj].split(','), dgx = +dp[0], dgy = +dp[1];
           if (occ[dgx + ',' + dgy]) continue;
@@ -5980,7 +6009,7 @@
       var pa = cells[c].split(','), gx = +pa[0], gy = +pa[1];
       if (occ[gx + ',' + gy]) continue;
       occ[gx + ',' + gy] = 1;
-      var r = Math.random();
+      var r = rng();
       var type = r < 0.42 ? 'ore' : 'herb';  // 矿石~42% / 灵草~58%（宝箱已保底放置）
       nodes.push({ x: gx, y: gy, type: type, pulse: Math.random() * 6.2832 });
       placed++;
@@ -5997,6 +6026,11 @@
     }
   }
   function gatherNode(n) {
+    // ★ v49 防刷：记下该采集点已收过（随档持久化，重进同一张图不再刷出来）
+    if (CUR) {
+      if (!harvested[CUR.id]) harvested[CUR.id] = {};
+      harvested[CUR.id][n.x + ',' + n.y] = 1;
+    }
     if (n.type === 'herb') {
       var g = rndInt(8, 15);
       player.stones += g; bagDirty = true;
@@ -7265,6 +7299,14 @@
     player.exp = o.exp || 0;
     player.stones = o.stones || 0;
     window.__kills = o.kills || 0;
+    // ★ v49 防刷：从存档恢复"已采采集点"（mapId -> {"x,y":1}），重进图跳过这些格
+    harvested = {};
+    if (o.harvested && typeof o.harvested === 'object') {
+      for (var hm in o.harvested) if (o.harvested.hasOwnProperty(hm)) {
+        var hs = o.harvested[hm]; harvested[hm] = {};
+        if (hs && typeof hs === 'object') for (var hk in hs) if (hs.hasOwnProperty(hk)) harvested[hm][hk] = 1;
+      }
+    }
     /* v58 秘宝的永久增量：老档没有这两项 → 按"没买过"处理（0），不需要迁移。
      * ⚠ vaultLv 必须在任何 getGearCap 之前就位 —— 读档后马上会有人拿它算行囊上限。 */
     vaultLv = Math.max(0, Math.min(VAULT_MAX, o.vault | 0));
@@ -7301,7 +7343,9 @@
         /* v58：秘宝的两个**永久增量**。刻意不升 SAVE_VER ——
          * 老档没有这两个字段，读档时按 0/未买过处理即可，没有任何需要迁移的状态。
          * （升版本号会让所有老档作废，代价远大于收益。） */
-        vault: vaultLv | 0, cult: [cultBuyRealm | 0, cultBuyN | 0] };
+        vault: vaultLv | 0, cult: [cultBuyRealm | 0, cultBuyN | 0],
+        /* v49 防刷：已采采集点随档持久化（mapId -> {"x,y":1}），重进图不再刷出来。 */
+        harvested: harvested };
       for (var k in bag) if (bag.hasOwnProperty(k)) o.bag[k] = bag[k] | 0;
       GEAR_SLOTS.forEach(function (sl) { o.eq[sl.key] = equipped[sl.key] || null; });
       /* 坊市现货也进档：否则"买走 → 存 → 读"会把买走的那件还回货架，
