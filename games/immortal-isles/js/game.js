@@ -4092,15 +4092,22 @@
       return true;
     }
 
-    function drawGround() {
+    /* ★ v49④ 地表绘制缓存（安全版）：逐格的「取图 / 水面变体 / 侧壁判定 / 取整」全部与相机无关，
+     * 只在切图或缩放(Z)变化时算一次，结果存 CUR._gnd[idx]；每帧只做廉价的 isoToScreen +
+     * 视口裁剪 + drawImage 重放，输出像素与原来逐字一致（同一套取整公式）。
+     * 去掉的是每帧上千次的 tileHash / waterAround / PAL / piece 查表开销，弱机直接减负，
+     * 且零对齐风险、零额外内存（仅一张 ~w*h 的小对象数组）。 */
+    function buildGroundCache() {
       var tw = TILE_W * Z, th = TILE_H * Z;
       var GT = CUR.groundTop;
+      var cache = new Array(CUR.w * CUR.h);
       for (var y = 0; y < CUR.h; y++) {
         var row = CUR.ground[y];
         for (var x = 0; x < CUR.w; x++) {
+          var idx = y * CUR.w + x;
           var ch = row[x];
           var file = PAL[ch];
-          if (!file) continue;
+          if (!file) { cache[idx] = null; continue; }
           var name = file, top = false;
           var vs = GT && GT[ch];
           if (vs && vs.length) {
@@ -4119,37 +4126,38 @@
             }
           }
           var pz = piece(name);
-          if (!pz) continue;
-          var p = isoToScreen(x, y);
-          if (p.x < -tw * 1.6 || p.x > W + tw * 1.6 || p.y < -th * 4 || p.y > H + th * 4) continue;
-          // 统一按宽度归一到 TILE_W*Z，保证菱形水平对角线与网格严格对齐。
-          // 顶面瓦再放大 3%：缩放比不是整数（120/119），密铺时边缘会差半像素露缝，
-          // 略微重叠就盖住了；相邻格重叠区颜色一致，看不出来。
+          if (!pz) { cache[idx] = null; continue; }
           var s = tw / pz.w;
           var over = (top && WATER.indexOf(ch) >= 0) ? TOP_OVER_WATER : TOP_OVER;
           var dw = top ? tw * over : tw;
           var dh = pz.h * s * (top ? over : 1);
-          // ★ 落点与尺寸一起吸到整数像素栅格 —— 手机端"瓦片之间露缝"的根因就是这里。
-          //   相邻格在屏幕上的横向间距**恰好等于 dw**（同一行相邻格 p.x 相差 HW*Z=tw/2，
-          //   而屏幕上真正相邻的是 (x+1,y-1)，相差整好 tw=dw）。只要 dw 取整、并且落点
-          //   也是整数，左边缘就构成等差数列 round(p.x0-dw/2) + i*dw —— 严格密铺，
-          //   既不重叠也不露缝。分数坐标 + imageSmoothingEnabled=false 时浏览器会各自
-          //   取整，误差逐格累积，于是出现 1px 的透明/底色缝。
-          //   （物件层 paintObj 早就在 Math.round，地面层是唯一的例外 —— 就是它漏了。）
-          var dwr = Math.round(dw), dhr = Math.round(dh);
-          var dxr = Math.round(p.x - dw / 2);
-          var dyr = Math.round(p.y - (dh - pz.h * s) / 2);
+          cache[idx] = { img: pz.img, sx: pz.sx, sy: pz.sy, sw: pz.w, sh: pz.h,
+                         dw: dw, dh: dh, dyOff: (dh - pz.h * s) / 2 };
+        }
+      }
+      CUR._gnd = cache; CUR._gndZ = Z;
+    }
+    function drawGround() {
+      var tw = TILE_W * Z, th = TILE_H * Z;
+      if (!CUR._gnd || CUR._gndZ !== Z) buildGroundCache();
+      var cache = CUR._gnd;
+      for (var y = 0; y < CUR.h; y++) {
+        for (var x = 0; x < CUR.w; x++) {
+          var c = cache[y * CUR.w + x];
+          if (!c) continue;
+          var p = isoToScreen(x, y);
+          if (p.x < -tw * 1.6 || p.x > W + tw * 1.6 || p.y < -th * 4 || p.y > H + th * 4) continue;
+          // 与旧版完全相同的取整公式 → 输出像素逐字一致
+          var dwr = Math.round(c.dw), dhr = Math.round(c.dh);
+          if (dwr < 1 || dhr < 1) continue;
+          var dxr = Math.round(p.x - c.dw / 2);
+          var dyr = Math.round(p.y - c.dyOff);
           if (GND.on) {
-            // 量的是**真正交给 drawImage 的那四个值**，不是"原值是不是整数" ——
-            // 后者恒为真（tw*Z 基本不会是整数），没有任何可证伪性。
-            // 这里只要有任何一个不是整数，浏览器就会对这块瓦单独取整 → 误差累积成缝。
             GND.n++;
             if (dxr !== Math.round(dxr) || dyr !== Math.round(dyr) ||
               dwr !== Math.round(dwr) || dhr !== Math.round(dhr)) GND.frac++;
           }
-          if (dwr >= 1 && dhr >= 1) {
-            ctx.drawImage(pz.img, pz.sx, pz.sy, pz.w, pz.h, dxr, dyr, dwr, dhr);
-          }
+          ctx.drawImage(c.img, c.sx, c.sy, c.sw, c.sh, dxr, dyr, dwr, dhr);
         }
       }
     }
