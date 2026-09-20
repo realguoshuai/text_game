@@ -8914,46 +8914,79 @@
 
   var last = 0;
   var bagDbgTick = 0;   // 状态行强刷计数：每 30 帧（≈0.5s）重写一次
+  // ---------------- 主循环崩溃隔离（P0） ----------------
+  // 旧版 loop 没有任何 try/catch：update/render 任意一行抛错 → requestAnimationFrame
+  // 不再续帧 → 整游戏无声冻结，且 boot().catch 吞异常，控制台也空。现在把整帧包进
+  // try/catch，崩了也续帧 + 在左下角常驻错误条上写出原因（不阻断游戏），并节流打印。
+  var loopErrEl = null, loopErrKey = '', loopErrLast = 0;
+  function onLoopError(err) {
+    var key = (err && err.message) ? err.message : String(err);
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (key !== loopErrKey || now - loopErrLast > 2000) {   // 节流：同错或 2s 内不重复刷
+      loopErrKey = key; loopErrLast = now;
+      if (typeof console !== 'undefined') console.error('[loop crash]', err && err.stack ? err.stack : err);
+    }
+    if (!loopErrEl) {
+      loopErrEl = document.createElement('div');
+      loopErrEl.id = 'loopErr';
+      loopErrEl.style.cssText = 'position:fixed;left:8px;bottom:8px;max-width:62%;z-index:9999;' +
+        'background:rgba(140,0,0,.85);color:#fff;font:12px/1.5 monospace;padding:6px 9px;' +
+        'border-radius:6px;white-space:pre-wrap;pointer-events:none;';
+      document.body.appendChild(loopErrEl);
+    }
+    if (loopErrEl.textContent.indexOf(key) !== 0) {        // 文案变了才重写，避免每帧布局抖动
+      loopErrEl.textContent = '⚠ 运行出错（已自动续帧，游戏可能卡住）\n' + key + '\n详见控制台';
+    }
+    loopErrEl.style.display = 'block';
+  }
   function loop(ts) {
-    if (!last) last = ts;
-    var dt = Math.min(0.05, (ts - last) / 1000);
-    last = ts;
-    if (!held && !pauseOpen) update(dt);
-    if (ready) updateHUD();
-    render();
-    // ★2 震屏：零侵入方案 —— 用 CSS transform 抖整个 canvas，不碰 render 内部的 ctx 配平
-    if (screenShake > 0) {
-      var s2 = screenShake * 9;
-      canvas.style.transform = 'translate(' + ((Math.random() * 2 - 1) * s2).toFixed(1) + 'px,' + ((Math.random() * 2 - 1) * s2).toFixed(1) + 'px)';
-      screenShake = Math.max(0, screenShake - dt * 1.6);
-    } else if (canvas.style.transform) { canvas.style.transform = ''; }
-    /* ★ 背包兜底轮询（v42）：事件驱动的 dirty 链只要**任何一环**死过
-     * （dirty 丢标 / bagBuilt 翻转 / 格子失联 / 赋值中断），格子就永远停在过去。
-     * 这里每 0.5s 无条件把整条链拉回正确状态 —— 类似心跳包，不依赖任何事件。
-     * 5 个格子的 DOM 同步成本可忽略。 */
-    if (ready && (++bagDbgTick % 30 === 0)) {
-      if (!bagBuilt || __bagOrphan > 0) buildBagUI();   // 构建标志没了/格子失联 → 先重建
-      if (!quickBuilt) buildQuickUI();                  // 快捷药栏（左上常驻）同样兜底重建
-      bagDirty = true;                                  // 强制走一次完整刷新
-      renderBag();
-      renderQuick();                                    // 心跳：不依赖任何事件也保证药栏是对的
-      renderBuffs();                                    // v58：符箓倒计时（有就显示、没有就收起来）
-      syncShopBtn();                                    // v58：换图后坊市入口的可用态（城镇才有）
-      /* 左列圆钮避让也挂在这条心跳上（v53）：面板高度会被各种事件改（目标血条出现、
-       * 提示文案换行、字体加载完导致行高变化…），逐个入口去补迟早漏一个。
-       * 值没变时 syncLeftBtns 直接 return，所以这只是每 0.5s 一次 offsetHeight。 */
-      syncLeftBtns();
+    try {
+      if (!last) last = ts;
+      var dt = Math.min(0.05, (ts - last) / 1000);
+      last = ts;
+      if (!held && !pauseOpen) update(dt);
+      if (ready) updateHUD();
+      render();
+      // ★2 震屏：零侵入方案 —— 用 CSS transform 抖整个 canvas，不碰 render 内部的 ctx 配平
+      if (screenShake > 0) {
+        var s2 = screenShake * 9;
+        canvas.style.transform = 'translate(' + ((Math.random() * 2 - 1) * s2).toFixed(1) + 'px,' + ((Math.random() * 2 - 1) * s2).toFixed(1) + 'px)';
+        screenShake = Math.max(0, screenShake - dt * 1.6);
+      } else if (canvas.style.transform) { canvas.style.transform = ''; }
+      /* ★ 背包兜底轮询（v42）：事件驱动的 dirty 链只要**任何一环**死过
+       * （dirty 丢标 / bagBuilt 翻转 / 格子失联 / 赋值中断），格子就永远停在过去。
+       * 这里每 0.5s 无条件把整条链拉回正确状态 —— 类似心跳包，不依赖任何事件。
+       * 5 个格子的 DOM 同步成本可忽略。 */
+      if (ready && (++bagDbgTick % 30 === 0)) {
+        if (!bagBuilt || __bagOrphan > 0) buildBagUI();   // 构建标志没了/格子失联 → 先重建
+        if (!quickBuilt) buildQuickUI();                  // 快捷药栏（左上常驻）同样兜底重建
+        bagDirty = true;                                  // 强制走一次完整刷新
+        renderBag();
+        renderQuick();                                    // 心跳：不依赖任何事件也保证药栏是对的
+        renderBuffs();                                    // v58：符箓倒计时（有就显示、没有就收起来）
+        syncShopBtn();                                    // v58：换图后坊市入口的可用态（城镇才有）
+        /* 左列圆钮避让也挂在这条心跳上（v53）：面板高度会被各种事件改（目标血条出现、
+         * 提示文案换行、字体加载完导致行高变化…），逐个入口去补迟早漏一个。
+         * 值没变时 syncLeftBtns 直接 return，所以这只是每 0.5s 一次 offsetHeight。 */
+        syncLeftBtns();
+      }
+      if (window.__dbg && CUR) {
+        window.__dbg.textContent = JSON.stringify({
+          map: CUR.id, fade: +fadeA.toFixed(2), held: held,
+          mx: +player.mx.toFixed(2), my: +player.my.toFixed(2),
+          face: player.face, walk: +player.walk.toFixed(2),
+          zoom: +Z.toFixed(3), zoomT: +Zt.toFixed(3),
+          actors: _draw.actor, npcs: _draw.npc, foes: foes.length
+        });
+      }
+      if (loopErrEl && loopErrEl.style.display !== 'none') {  // 本帧正常 → 收起错误条
+        loopErrEl.style.display = 'none';
+        loopErrKey = '';
+      }
+    } catch (err) {
+      onLoopError(err);
     }
-    if (window.__dbg && CUR) {
-      window.__dbg.textContent = JSON.stringify({
-        map: CUR.id, fade: +fadeA.toFixed(2), held: held,
-        mx: +player.mx.toFixed(2), my: +player.my.toFixed(2),
-        face: player.face, walk: +player.walk.toFixed(2),
-        zoom: +Z.toFixed(3), zoomT: +Zt.toFixed(3),
-        actors: _draw.actor, npcs: _draw.npc, foes: foes.length
-      });
-    }
-    requestAnimationFrame(loop);
+    requestAnimationFrame(loop);   // ★ 永远在 try/catch 之外续帧：崩了也不会冻结
   }
 
   // ---------------- 调试接口（供 headless 验证） ----------------
