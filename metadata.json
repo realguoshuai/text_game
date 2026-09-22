@@ -1,0 +1,6 @@
+{
+  "name": "修仙小游戏 · 入口",
+  "description": "纯原生 Canvas 2D + Vanilla JS 的修仙小游戏合集，包含仙岛寻踪、修仙坊市、凡人修仙录实时版和凡人问道录。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -55,3 +55,4 @@ games/immortal-isles/_cc0/
 # 2026-09-16 重组新增：工作区级归档与公共素材库（本地资产，不入公共仓库）
 _archive/
 assets_library/
+node_modules/

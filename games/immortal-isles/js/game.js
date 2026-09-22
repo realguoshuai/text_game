@@ -372,6 +372,10 @@
     { x: 10, y: 20, t: 'dummy' }, { x: 16, y: 19, t: 'dummy' }, { x: 22, y: 20, t: 'dummy' },
     { x: 13, y: 25, t: 'dummy' }, { x: 21, y: 25, t: 'dummy' }
   ];
+  // 太虚山门 = 仙宗新境：东侧演武场设玄铁试招木桩
+  var SHANMEN_SPAWNS = [
+    { x: 18, y: 11, t: 'dummy' }, { x: 20, y: 12, t: 'dummy' }, { x: 18, y: 13, t: 'dummy' }
+  ];
   /* 灵泉灵瀑的怪：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 9 只，来自 sucai 下 CraftPix 怪物包。
    * 属性、刷怪格、动作帧率全部写在 tools/beast_packs.json，由 build_beasts_atlas.py 生成
    * assets/beasts.json，启动时灌进 FOE_DEFS 与 LINGQUAN_SPAWNS ——
@@ -932,13 +936,13 @@
       //   → fxFrame 'noRect' 全灭 → 火球/爆炸/落雷全部静默不画（炎爆术没特效的真根因）。
       { url: 'assets/fx_atlas.json?v=2', json: true, atlas: 'fx', weight: 1, label: '读取特效索引' },
       { url: 'assets/beasts.json?v=3', json: true, weight: 2, label: '读取怪物图录' },
-      /* v58：图集从 12 帧长到 17 帧（符箓 ×3 + 秘宝 ×2），96KB → 125KB。
+      /* v58：图集从 12 帧长到 17 帧（符箓 ×3 + 秘宝 ×2），全新高精国风仙侠物品绘制。
        * 改图集必须同时做两件事：① `?v=` 递增（按 URL 缓存，不升会接着用旧图）
        * ② weight 改成**新的真实传输 KB**（进度条按权重加权，写小了表现为"卡在这一步"）。 */
-      { url: 'assets/items_atlas.png?v=4', atlas: 'items', weight: 125, label: '载入物品图标' },
+      { url: 'assets/items_atlas.png?v=5', atlas: 'items', weight: 135, label: '载入物品图标' },
       // ⚠ atlas 字段两张都要写：boot 里是按 `p.atlas === 'items'` 把值填进 ATLAS.items 的。
       //   首版漏了 json 这张，导致 json 下载了却没人接（ATLAS.items.rect 恒 null）。
-      { url: 'assets/items_atlas.json?v=4', atlas: 'items', json: true, weight: 2, label: '读取物品图录' }
+      { url: 'assets/items_atlas.json?v=5', atlas: 'items', json: true, weight: 3, label: '读取物品图录' }
     ];
 
   /* ── 按需图集（懒加载）────────────────────────────────────────────────
@@ -4646,6 +4650,7 @@
     refreshWorldOn();        // 世界地图总览里当前节点同步高亮
     var hintEl = document.getElementById('hint');
     if (silent) hintEl.textContent = '踩上青色光门即可切换地图';
+    else if (CUR.id === 'shanmen_new') hintEl.textContent = '太虚山门 · 仙宗福地：迎客石坊、镇山神兽、九龙神鼎、太虚主殿。东侧演武场设试招木桩，坊市可采买丹药法宝';
     else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试招（J 攻击A / K 重击B / U 御剑诀 / I 雷罡咒 / O 太虚剑域 / 1~6 试动作）';
     else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 ' + LINGQUAN_SPAWNS.length + ' 只（J 普攻 / K 重击 / U·I·O 三招技能，Shift 奔跑）';
     else if (CUR.id === 'dungeon') hintEl.textContent = '幽冥地宫 · 尸气弥漫：小僵尸 ' + DUNGEON_SPAWNS.length + ' 只盘踞各处，南/西/东三门分别通往青玄山门 / 灵泉灵瀑 / 碑林石阵';
@@ -4654,9 +4659,10 @@
     else if (CUR.id === 'flare_grass_empyrean_campaign_lochport_cemetery')
       hintEl.textContent = '洛赫港墓园 · 尸气盘桓：' + CEMETERY_SPAWNS.length + ' 只（小僵尸成群 + 牛魔守陵），越往里越硬';
     else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
-    // 刷怪表：碑林石阵（猎场）/ 青玄山门（调试场）/ 灵泉灵瀑（五族）/ 幽冥地宫（僵尸群）
+    // 刷怪表：碑林石阵（猎场）/ 太虚山门（演武场）/ 青玄山门（调试场）/ 灵泉灵瀑（五族）/ 幽冥地宫（僵尸群）
     // / 洛赫港（绿林劫道）/ 洛赫港墓园（僵尸盘桓）；其它图清空战斗状态
     if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：老猎场
+    else if (CUR.id === 'shanmen_new') { foes = makeFoes(SHANMEN_SPAWNS); } // 太虚山门：仙宗演武场木桩
     else if (CUR.id === 'qingxuan') { foes = makeFoes(QINGXUAN_SPAWNS); }  // 青玄山门：调试场
     else if (CUR.id === 'lingquan') { foes = makeFoes(LINGQUAN_SPAWNS); }  // 灵泉灵瀑：五族怪物
     else if (CUR.id === 'dungeon') { foes = makeFoes(DUNGEON_SPAWNS); }    // 幽冥地宫：小僵尸群
@@ -4833,6 +4839,12 @@
     if (shopOpen()) { closeShop(); return 'shop'; }
     if (worldOpen) { closeWorld(); return 'world'; }
     if (bagOpen) { bagToggle(false); return 'bag'; }
+    var tl = document.getElementById('topleft');
+    if (tl && tl.classList.contains('open')) {
+      tl.classList.remove('open');
+      syncLeftBtns();
+      return 'topleft';
+    }
     return '';
   }
   window.addEventListener('keydown', function (e) {
@@ -4860,12 +4872,21 @@
       else if (k === 'Tab' || k.indexOf('Arrow') === 0 || k.length === 1) e.preventDefault();
       return;
     }
-    // Tab 开/关世界地图（打开时背后游戏暂停移动）。都拦掉默认行为避免焦点乱跳。
-    if (k === 'Tab') { e.preventDefault(); toggleWorld(); return; }
+    // M / Tab 开/关世界地图（打开时背后游戏暂停移动）。都拦掉默认行为避免焦点乱跳。
+    var isInput = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+    if (k === 'm' || k === 'M' || k === 'Tab') {
+      if (!isInput || k === 'Tab') {
+        e.preventDefault();
+        toggleWorld();
+        return;
+      }
+    }
     if (worldOpen) return;
+    // 输入框聚焦时不触发其它游戏快捷键
+    if (isInput) return;
     keys[k.toLowerCase()] = 1;
     if (k.indexOf('Arrow') === 0) e.preventDefault();
-    // 出手：J / F / 空格 = 攻击 A（普攻）；K = 攻击 B（重击）
+    // 出手：Space / J / F = 攻击 A（普攻）；K = 攻击 B（重击）
     if (k === ' ' || k === 'Spacebar') { e.preventDefault(); attackNearest(); return; }
     if (k === 'j' || k === 'J' || k === 'f' || k === 'F') { e.preventDefault(); attackNearest(); return; }
     if (k === 'k' || k === 'K') { e.preventDefault(); powerAttack(); return; }
@@ -4874,6 +4895,16 @@
     if (ski !== undefined) { e.preventDefault(); castSkill(ski); return; }
     // 背包：B 开关
     if (k === 'b' || k === 'B') { e.preventDefault(); bagToggle(); return; }
+    // 人物属性：C 展开/收起角色属性详情
+    if (k === 'c' || k === 'C') {
+      e.preventDefault();
+      var tl = document.getElementById('topleft');
+      if (tl) {
+        tl.classList.toggle('open');
+        syncLeftBtns();
+      }
+      return;
+    }
     // 服药：1 / 2 / 3 对应 金创药 / 小还丹 / 大还丹（1~3 是玩家最顺手的键位，给药不亏）
     if (k === '1' || k === '2' || k === '3') {
       e.preventDefault();
@@ -6612,6 +6643,12 @@
     b.setAttribute('data-a', act);
     b.className = cls || '';
     b.textContent = label;
+    if (act === 'close') {
+      var kbd = document.createElement('kbd');
+      kbd.className = 'esc-badge';
+      kbd.textContent = 'Esc';
+      b.appendChild(kbd);
+    }
     host.appendChild(b);
     return b;
   }
@@ -6764,6 +6801,7 @@
    * 16 张图来回横跳几十秒就能把货架刷成任意想要的，现货的稀缺性等于零。
    * 副作用是好事：城镇 = 补给点，野外 = 猎场，地图之间终于有了功能差异。 */
   var TOWN_MAPS = {
+    shanmen_new: 1,
     qingxuan: 1,
     flare_grass_empyrean_campaign_black_oak_city: 1,
     flare_grass_empyrean_campaign_lochport: 1
@@ -8799,6 +8837,8 @@
     var bs = document.querySelectorAll('#heroBtns button');
     for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', +bs[i].dataset.n === h.n);
     document.getElementById('hint').textContent = '主角已换为 ' + (h.nick || ('免费包第 ' + h.n + ' 号角色'));
+    var nowEl = document.getElementById('heroNow');
+    if (nowEl) nowEl.textContent = h.nick || h.label;
   }
   function buildHeroUI(preferN) {
     var box = document.getElementById('heroBtns');
@@ -8824,6 +8864,7 @@
 
   function buildButtons() {
     var box = document.getElementById('mapBtns');
+    if (!box) return;
     box.innerHTML = '';
     MAPS.forEach(function (m) {
       var b = document.createElement('button');
@@ -8839,6 +8880,7 @@
   function initToprightFold() {
     var panel = document.getElementById('topright');
     var head = document.getElementById('trHead');
+    var rcol = document.getElementById('rightcol');
     if (!panel || !head) return;
     var saved = null;
     try { saved = localStorage.getItem('isles.trFold'); } catch (e) { }
@@ -8846,8 +8888,10 @@
     // 这里若自己再查 matchMedia，?touch=1 的无头验证会漏掉强制场景）。
     var fold = saved !== null ? saved === '1' : document.body.classList.contains('touch');
     panel.classList.toggle('folded', fold);
+    if (rcol) rcol.classList.toggle('open', !fold);
     head.onclick = function () {
       var now = panel.classList.toggle('folded');
+      if (rcol) rcol.classList.toggle('open', !now);
       try { localStorage.setItem('isles.trFold', now ? '1' : '0'); } catch (e) { }
     };
   }

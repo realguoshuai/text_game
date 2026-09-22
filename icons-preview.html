@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>仙岛寻踪 · 物品与技能图标重构评审阁</title>
+<style>
+  :root {
+    --gold: #ffd75a;
+    --gold-dim: rgba(255, 215, 90, 0.4);
+    --cyan: #8bf3ff;
+    --bg: #090c14;
+    --panel: rgba(16, 22, 36, 0.92);
+    --border: rgba(214, 178, 96, 0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: radial-gradient(1000px 500px at 50% 0%, rgba(26, 42, 68, 0.45), transparent 70%),
+                linear-gradient(180deg, #090c14 0%, #06080d 100%);
+    color: #e5dfd2;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    padding: 30px 16px 80px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  
+  /* 顶栏与说明 */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 215, 90, 0.2);
+  }
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gold);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 6px 14px;
+    background: rgba(255, 215, 90, 0.1);
+    border: 1px solid rgba(255, 215, 90, 0.3);
+    border-radius: 8px;
+    transition: .2s;
+  }
+  .back-link:hover { background: rgba(255, 215, 90, 0.2); transform: translateX(-3px); }
+  
+  .git-sync-card {
+    background: linear-gradient(135deg, rgba(24, 38, 62, 0.8), rgba(12, 18, 30, 0.9));
+    border: 1px solid rgba(139, 243, 255, 0.35);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  .git-info h4 { color: #8bf3ff; font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .git-info p { font-size: 12.5px; color: #a2b4cc; line-height: 1.5; }
+  .git-status-tag {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.4);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* 标题 */
+  .hero-header { text-align: center; margin-bottom: 36px; }
+  .hero-header h1 {
+    font-family: "Songti SC", "Noto Serif SC", "STKaiti", serif;
+    font-size: 32px;
+    letter-spacing: 0.12em;
+    background: linear-gradient(180deg, #ffffff, #ffd75a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .hero-header p { font-size: 14px; color: #9bb0cb; letter-spacing: 0.08em; }
+
+  /* 切换标签页 */
+  .tabs {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .tab-btn {
+    cursor: pointer;
+    background: rgba(20, 28, 44, 0.85);
+    border: 1px solid rgba(255, 215, 90, 0.3);
+    color: #c9bda0;
+    padding: 9px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    transition: .2s;
+  }
+  .tab-btn:hover { color: #fff; border-color: var(--gold); }
+  .tab-btn.active {
+    background: linear-gradient(180deg, #3d5885, #1d2c46);
+    color: #fff;
+    border-color: var(--gold);
+    box-shadow: 0 0 16px rgba(255, 215, 90, 0.4);
+  }
+
+  /* Section */
+  .section-title {
+    font-size: 18px;
+    color: #f0e3c2;
+    border-left: 3px solid var(--gold);
+    padding-left: 12px;
+    margin: 36px 0 18px;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .section-title span { font-size: 12.5px; color: #8a9bb2; font-weight: normal; }
+
+  /* 网格布局 */
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  /* 图标卡片 */
+  .icon-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .icon-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--gold);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 14px rgba(255,215,90,0.25);
+  }
+  .icon-preview-box {
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    border-radius: 12px;
+    background: radial-gradient(circle at 40% 30%, rgba(24, 38, 64, 0.9), rgba(10, 14, 25, 0.95));
+    border: 1.5px solid rgba(214, 178, 96, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 6px rgba(255,255,255,0.12), 0 4px 12px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  .icon-card:hover .icon-preview-box {
+    border-color: var(--gold);
+  }
+  .icon-info { flex: 1; min-width: 0; }
+  .icon-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f7ebd0;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .icon-kind {
+    font-size: 10.5px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(139, 243, 255, 0.12);
+    color: #8bf3ff;
+    border: 1px solid rgba(139, 243, 255, 0.3);
+  }
+  .icon-desc {
+    font-size: 12px;
+    color: #9ab0c8;
+    line-height: 1.5;
+    margin-bottom: 6px;
+  }
+  .icon-art-note {
+    font-size: 11px;
+    color: #d6b260;
+    background: rgba(214, 178, 96, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  /* 技能大圆形盘位展示 */
+  .skill-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  .skill-card {
+    background: var(--panel);
+    border: 1.5px solid rgba(214, 178, 96, 0.35);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .skill-gem {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    border-radius: 50%;
+    border: 3.5px solid var(--sk-rim, #ffd75a);
+    background: radial-gradient(circle at 35% 25%, rgba(255,255,255,0.35), transparent 50%),
+                radial-gradient(circle at 50% 50%, var(--sk-mid, #4a2810), var(--sk-lo, #160b05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 18px var(--sk-glow, rgba(255,215,90,0.5)), inset 0 2px 6px rgba(255,255,255,0.4);
+    position: relative;
+  }
+  .skill-gem::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.3);
+    pointer-events: none;
+  }
+  .skill-info h3 {
+    font-size: 16px;
+    color: #fff;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .skill-info .hotkey {
+    font-size: 11px;
+    background: #ffd75a;
+    color: #12192a;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 8px;
+  }
+  .skill-info p { font-size: 12.5px; color: #a4b7ce; line-height: 1.5; margin-bottom: 6px; }
+  .skill-motif { font-size: 11.5px; color: #8bf3ff; }
+
+  /* 模拟真机实机效果容器 */
+  .simulation-box {
+    margin-top: 36px;
+    background: rgba(12, 17, 28, 0.85);
+    border: 1px solid rgba(214, 178, 96, 0.4);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .sim-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffd75a;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bag-preview-mock {
+    display: grid;
+    grid-template-columns: repeat(6, 52px);
+    gap: 8px;
+    background: rgba(6, 10, 18, 0.9);
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(214,178,96,0.3);
+    width: fit-content;
+  }
+  .bag-cell {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    background: rgba(22, 32, 52, 0.8);
+    border: 1px solid rgba(214, 178, 96, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .bag-cell:hover {
+    border-color: #ffd75a;
+    background: rgba(36, 54, 86, 0.95);
+    box-shadow: 0 0 10px rgba(255,215,90,0.4);
+  }
+  .bag-cell .count {
+    position: absolute;
+    right: 3px;
+    bottom: 2px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #ffe6a6;
+    text-shadow: 0 1px 3px #000;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- 顶栏导航与 GitHub 状态 -->
+  <div class="top-bar">
+    <a class="back-link" href="games/immortal-isles/">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      返回《仙岛寻踪》游戏
+    </a>
+    <a class="back-link" href="/">
+      返回主页
+    </a>
+  </div>
+
+  <!-- GitHub 同步状态栏 -->
+  <div class="git-sync-card">
+    <div class="git-info">
+      <h4>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub 状态：已在本地 Git 完成全量归档提交
+      </h4>
+      <p>当前所有主页重构、角色速切面板及技能优化代码已全量提交（Commit: <code>feat: redesign homepage and character switcher...</code>）。您可直接在 AI Studio 右上角菜单点击 <b>"Export to GitHub"</b> 一键推送到您的 GitHub 远程仓库！</p>
+    </div>
+    <div class="git-status-tag">✓ Git Commit 准备就绪</div>
+  </div>
+
+  <!-- 页面标题 -->
+  <header class="hero-header">
+    <h1>仙岛寻踪 · 物品与技能图标设计评审</h1>
+    <p>为契合仙侠古典厚重与玄幻修真画风专门重构 · 请预览并选择您心仪的方案</p>
+  </header>
+
+  <!-- 风格方案切换 -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tabA" onclick="switchTheme('A')">方案 A · 仙宗玄宝风（青玉鎏金 · 典雅厚重 · 沉浸修仙）</button>
+    <button class="tab-btn" id="tabB" onclick="switchTheme('B')">方案 B · 凌厉罡气风（神兵流光 · 锐气逼人 · 动作玄幻）</button>
+  </div>
+
+  <!-- 1. 战斗仙术技能图标展示 -->
+  <div class="section-title">
+    <span>一、六大神通仙法图标（右下角技能盘核心）</span>
+    <span>共 6 式经典仙术</span>
+  </div>
+
+  <div class="skill-grid">
+    <!-- 普攻 -->
+    <div class="skill-card">
+      <div class="skill-gem" style="--sk-rim:#ffba84; --sk-glow:rgba(255,112,80,.5); --sk-mid:#7c2d24; --sk-lo:#38120e;">
+        <svg width="42" height="42" viewBox="0 0 44 44" fill="none">
+          <path d="M10 34C18 26 28 16 34 10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M12 36C22 28 32 18 36 12" stroke="#ffaa7a" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M8 32C14 26 24 16 36 8" stroke="rgba(255,200,160,0.6)" stroke-width="1" stroke-dasharray="2 2"/>
+          <circle cx="34" cy="10" r="3" fill="#ffe0cf"/>
+        </svg>
+      </div>
+      <div class="skill-info">
+        <h3>普攻 · 清风剑诀 <span class="hotkey">Space</span></h3>
+        <p>轻击平砍。青霜长剑划出如水月弧剑气，破空破阵。</p>
+        <div class="skill-motif">画风意象：行云流水月牙剑芒</div>
+      </div>
+    </div>
+
+    <!-- 重击 -->
+    <div class="skill-card">
+      <div class="skill-gem" style="--sk-rim:#ffc36b; --sk-glow:rgba(255,152,52,.48); --sk-mid:#8a4d12; --sk-lo:#3c1f09;">
+        <svg width="42" height="42" viewBox="0 0 44 44" fill="none">
+          <path d="M22 6L26 26L22 38L18 26Z" fill="#ffb84d" stroke="#fff" stroke-width="1.5"/>
+          <path d="M12 18L32 18" stroke="#ffd280" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M10 36L34 36" stroke="#ff9420" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="22" cy="18" r="2.5" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="skill-info">
+        <h3>重击 · 裂地断岳 <span class="hotkey">Q</span></h3>
+        <p>蓄力崩山重斩。厚重玄罡劈落，裂石分浪，击退妖兽。</p>
+        <div class="skill-motif">画风意象：纯阳重刃裂地金煞</div>
+      </div>
+    </div>
+
+    <!-- 炎爆 -->
+    <div class="skill-card">
+      <div class="skill-gem" style="--sk-rim:#ff9a3d; --sk-glow:rgba(255,130,60,.52); --sk-mid:#7a3410; --sk-lo:#331207;">
+        <svg width="42" height="42" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="14" fill="none" stroke="#ff7c24" stroke-width="1.8" stroke-dasharray="3 2"/>
+          <path d="M22 10C24 16 30 18 30 24C30 29 26 33 22 33C18 33 14 29 14 24C14 18 20 16 22 10Z" fill="#ffa733" stroke="#fff" stroke-width="1.5"/>
+          <circle cx="22" cy="24" r="4" fill="#ffffff"/>
+        </svg>
+      </div>
+      <div class="skill-info">
+        <h3>离火 · 纯阳炎爆 <span class="hotkey">E</span></h3>
+        <p>召唤地火真灵炸裂。大范围群伤烈焰，点燃妖潮。</p>
+        <div class="skill-motif">画风意象：八卦三昧真火与火灵环</div>
+      </div>
+    </div>
+
+    <!-- 御剑 -->
+    <div class="skill-card">
+      <div class="skill-gem" style="--sk-rim:#7fdcff; --sk-glow:rgba(84,192,255,.52); --sk-mid:#14486e; --sk-lo:#082438;">
+        <svg width="42" height="42" viewBox="0 0 44 44" fill="none">
+          <g transform="rotate(-30 22 22)">
+            <path d="M22 6L25 22L22 36L19 22Z" fill="#aee7ff" stroke="#fff" stroke-width="1.2"/>
+            <line x1="22" y1="8" x2="22" y2="34" stroke="#ffffff" stroke-width="1.5"/>
+            <path d="M14 20L30 20" stroke="#7ad6ff" stroke-width="2"/>
+          </g>
+          <path d="M8 14C16 12 28 14 36 22" stroke="rgba(160,230,255,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="skill-info">
+        <h3>御剑 · 飞剑夺魄 <span class="hotkey">R</span></h3>
+        <p>真元御剑疾驰。三柄青霜灵剑凌空盘旋索敌穿心。</p>
+        <div class="skill-motif">画风意象：出鞘青霜与御剑太虚轨线</div>
+      </div>
+    </div>
+
+    <!-- 雷罡 -->
+    <div class="skill-card">
+      <div class="skill-gem" style="--sk-rim:#cbaaff; --sk-glow:rgba(168,112,255,.58); --sk-mid:#4c2d8a; --sk-lo:#20103d;">
+        <svg width="42" height="42" viewBox="0 0 44 44" fill="none">
+          <path d="M24 6L14 22H24L20 38L32 18H22L26 6Z" fill="#d8baff" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="22" cy="22" r="15" fill="none" stroke="rgba(200,160,255,0.5)" stroke-width="1.2" stroke-dasharray="2 3"/>
+        </svg>
+      </div>
+      <div class="skill-info">
+        <h3>雷罡 · 五雷正法 <span class="hotkey">F</span></h3>
+        <p>引九天玄雷淬体破魔。全屏天劫电光麻痹妖兽。</p>
+        <div class="skill-motif">画风意象：九霄玄雷与紫微天罡令印</div>
+      </div>
+    </div>
+
+    <!-- 绝技 -->
+    <div class="skill-card" style="border-color:#ffd75a; box-shadow:0 0 20px rgba(255,215,90,0.35);">
+      <div class="skill-gem" style="--sk-rim:#ffe496; --sk-glow:rgba(255,205,90,.72); --sk-mid:#8a5c14; --sk-lo:#3a2407;">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="16" stroke="#ffe082" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <circle cx="22" cy="22" r="4" fill="#fff" stroke="#ffd75a" stroke-width="2"/>
+          <!-- 环绕四方飞剑 -->
+          <path d="M22 6L24 14L20 14Z" fill="#fff"/>
+          <path d="M38 22L30 24L30 20Z" fill="#fff"/>
+          <path d="M22 38L20 30L24 30Z" fill="#fff"/>
+          <path d="M6 22L14 20L14 24Z" fill="#fff"/>
+          <circle cx="22" cy="22" r="10" stroke="#8bf3ff" stroke-width="1" opacity="0.6"/>
+        </svg>
+      </div>
+      <div class="skill-info">
+        <h3>绝技 · 万剑归宗 <span class="hotkey">V</span></h3>
+        <p>天地通明，万剑听号。太极八卦剑阵笼罩全域扫荡一切。</p>
+        <div class="skill-motif">画风意象：太极乾坤万千飞剑神威阵法</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 全套物品图标重构展示 -->
+  <div class="section-title">
+    <span>二、十七种行囊物品与秘宝法器图标</span>
+    <span>覆盖丹药、符箓、材料、秘宝、装备</span>
+  </div>
+
+  <div class="icon-grid">
+    <!-- 灵石 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <polygon points="22,6 34,14 36,30 22,38 8,30 10,14" fill="#1b4d63" stroke="#8bf3ff" stroke-width="1.5"/>
+          <polygon points="22,6 34,14 22,22 10,14" fill="#2d7c9e" stroke="#8bf3ff" stroke-width="1"/>
+          <polygon points="22,22 34,14 36,30 22,38" fill="#163f52"/>
+          <polygon points="22,22 8,30 10,14" fill="#24647f"/>
+          <circle cx="22" cy="20" r="3" fill="#ffffff" opacity="0.9"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">银两 / 灵石 <span class="icon-kind">货币</span></div>
+        <div class="icon-desc">天地灵气凝聚而成的极品玉精灵石。</div>
+        <span class="icon-art-note">八面棱晶透光玉润</span>
+      </div>
+    </div>
+
+    <!-- 妖丹 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="14" fill="radial-gradient(circle, #ff5252, #8b0000)" stroke="#ff8a80" stroke-width="1.8"/>
+          <path d="M16 26C18 20 22 14 24 16C26 18 22 22 26 24" stroke="#ffebee" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="19" cy="18" r="2.5" fill="#ffffff"/>
+          <circle cx="22" cy="22" r="17" stroke="rgba(255,82,82,0.4)" stroke-width="1" stroke-dasharray="3 3"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">妖丹 <span class="icon-kind">材料</span></div>
+        <div class="icon-desc">高阶妖兽内丹，可炼化为大量修为。</div>
+        <span class="icon-art-note">火灵兽纹赤红宝珠</span>
+      </div>
+    </div>
+
+    <!-- 金创药 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <!-- 白玉瓷葫芦瓶 -->
+          <circle cx="22" cy="16" r="6" fill="#e0f2f1" stroke="#80cbc4" stroke-width="1.4"/>
+          <circle cx="22" cy="27" r="10" fill="#b2dfdb" stroke="#4db6ac" stroke-width="1.5"/>
+          <rect x="20" y="8" width="4" height="3" fill="#d32f2f"/>
+          <!-- 红绳结 -->
+          <path d="M19 21C22 22 25 22 25 21" stroke="#d32f2f" stroke-width="2"/>
+          <circle cx="20" cy="25" r="2.5" fill="#ffffff" opacity="0.8"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">金创药 <span class="icon-kind">丹药</span></div>
+        <div class="icon-desc">白玉小葫芦装盛，即时回复 35% 气血。</div>
+        <span class="icon-art-note">青花瓷药葫芦配红结</span>
+      </div>
+    </div>
+
+    <!-- 小还丹 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="13" fill="#2e7d32" stroke="#a5d6a7" stroke-width="1.8"/>
+          <!-- 金色丹纹 -->
+          <path d="M12 20C17 18 26 26 32 24" stroke="#ffd54f" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="18" cy="17" r="3" fill="#ffffff" opacity="0.75"/>
+          <circle cx="22" cy="22" r="15" stroke="rgba(165,214,167,0.4)" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">小还丹 <span class="icon-kind">丹药</span></div>
+        <div class="icon-desc">二转灵药，回复 55% 气血。</div>
+        <span class="icon-art-note">碧玉金纹养元灵丹</span>
+      </div>
+    </div>
+
+    <!-- 大还丹 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="14" fill="#6a1b9a" stroke="#ffd75a" stroke-width="2"/>
+          <!-- 九转紫金龙纹 -->
+          <path d="M12 18C18 14 26 30 32 26" stroke="#ffd75a" stroke-width="2"/>
+          <path d="M14 26C20 30 28 14 30 18" stroke="#ce93d8" stroke-width="1.5"/>
+          <circle cx="19" cy="16" r="3" fill="#ffffff"/>
+          <circle cx="22" cy="22" r="17" stroke="#ffd75a" stroke-width="1" stroke-dasharray="3 2"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">大还丹 <span class="icon-kind">神丹</span></div>
+        <div class="icon-desc">七宝造化九转神丹，瞬间回满气血。</div>
+        <span class="icon-art-note">紫金龙纹造化仙丹</span>
+      </div>
+    </div>
+
+    <!-- 锐金符 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="13" y="7" width="18" height="30" rx="3" fill="#fbc02d" stroke="#f57f17" stroke-width="1.5"/>
+          <!-- 剑罡道符朱砂 -->
+          <line x1="22" y1="12" x2="22" y2="30" stroke="#b71c1c" stroke-width="2"/>
+          <line x1="17" y1="17" x2="27" y2="17" stroke="#b71c1c" stroke-width="1.8"/>
+          <polygon points="22,33 19,27 25,27" fill="#b71c1c"/>
+          <circle cx="22" cy="10" r="1.5" fill="#b71c1c"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">锐金符 <span class="icon-kind">符箓</span></div>
+        <div class="icon-desc">道门秘传破甲剑符，攻击提升 25%。</div>
+        <span class="icon-art-note">明黄朱砂无上剑符</span>
+      </div>
+    </div>
+
+    <!-- 磐石符 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="13" y="7" width="18" height="30" rx="3" fill="#78909c" stroke="#37474f" stroke-width="1.5"/>
+          <polygon points="22,12 28,24 16,24" fill="#cfd8dc" stroke="#263238" stroke-width="1.2"/>
+          <rect x="16" y="26" width="12" height="4" fill="#263238"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">磐石符 <span class="icon-kind">符箓</span></div>
+        <div class="icon-desc">玄山厚土护体神符，防御提升 45%。</div>
+        <span class="icon-art-note">玄黄道纸千峰古印</span>
+      </div>
+    </div>
+
+    <!-- 神行符 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="13" y="7" width="18" height="30" rx="3" fill="#80deea" stroke="#00838f" stroke-width="1.5"/>
+          <path d="M17 16C23 14 25 20 27 18" stroke="#004d40" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M16 23C22 21 24 27 28 25" stroke="#004d40" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">神行符 <span class="icon-kind">符箓</span></div>
+        <div class="icon-desc">太虚飞燕疾风符，移速提升 25%。</div>
+        <span class="icon-art-note">碧青风云灵符道痕</span>
+      </div>
+    </div>
+
+    <!-- 凝元丹 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="14" fill="#f57c00" stroke="#ffe082" stroke-width="1.8"/>
+          <polygon points="22,12 28,22 22,32 16,22" fill="#fff8e1" stroke="#e65100" stroke-width="1.2"/>
+          <circle cx="22" cy="22" r="3" fill="#ffb300"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">凝元丹 <span class="icon-kind">秘宝</span></div>
+        <div class="icon-desc">直增精纯道行修为 150 点。</div>
+        <span class="icon-art-note">真阳琥珀核心灵丹</span>
+      </div>
+    </div>
+
+    <!-- 储物玉匣 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <rect x="10" y="16" width="24" height="18" rx="2" fill="#a7ffeb" stroke="#004d40" stroke-width="1.5"/>
+          <rect x="8" y="12" width="28" height="6" rx="2" fill="#64ffda" stroke="#004d40" stroke-width="1.5"/>
+          <rect x="19" y="15" width="6" height="8" rx="1" fill="#ffd75a" stroke="#8d5607" stroke-width="1"/>
+          <circle cx="22" cy="19" r="1" fill="#000"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">储物玉匣 <span class="icon-kind">秘宝</span></div>
+        <div class="icon-desc">芥子纳须弥，永久扩充行囊容量 4 格。</div>
+        <span class="icon-art-note">羊脂白玉金锁古匣</span>
+      </div>
+    </div>
+
+    <!-- 玄铁令 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <polygon points="14,8 30,8 35,16 35,32 30,38 14,38 9,32 9,16" fill="#212121" stroke="#9e9e9e" stroke-width="1.5"/>
+          <circle cx="22" cy="15" r="3" fill="#d32f2f"/>
+          <line x1="22" y1="20" x2="22" y2="32" stroke="#b0bec5" stroke-width="2"/>
+          <line x1="17" y1="24" x2="27" y2="24" stroke="#b0bec5" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">玄铁令 <span class="icon-kind">稀有</span></div>
+        <div class="icon-desc">宗门至高号令，用于重铸洗练极品装备。</div>
+        <span class="icon-art-note">玄铁八角血魄重令</span>
+      </div>
+    </div>
+
+    <!-- 装备：青锋剑 -->
+    <div class="icon-card">
+      <div class="icon-preview-box">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <path d="M32 8L36 12L16 32L12 36L8 32L12 28Z" fill="#80deea" stroke="#00838f" stroke-width="1.2"/>
+          <line x1="11" y1="33" x2="33" y2="11" stroke="#fff" stroke-width="1.5"/>
+          <circle cx="10" cy="34" r="2" fill="#ffd75a"/>
+        </svg>
+      </div>
+      <div class="icon-info">
+        <div class="icon-name">青锋剑 <span class="icon-kind">武器</span></div>
+        <div class="icon-desc">百炼寒钢所铸仙门佩剑，提升基础攻击力。</div>
+        <span class="icon-art-note">青霜寒芒出鞘利刃</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 背包行囊中实机模拟展示 -->
+  <div class="simulation-box">
+    <div class="sim-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+      游戏行囊真实尺寸效果模拟预览（点击任意格子可放大）
+    </div>
+    <div class="bag-preview-mock" id="mockBag">
+      <!-- 模拟 6x2 背包 -->
+      <div class="bag-cell" title="灵石"><svg width="34" height="34" viewBox="0 0 44 44"><polygon points="22,6 34,14 36,30 22,38 8,30 10,14" fill="#1b4d63" stroke="#8bf3ff" stroke-width="1.5"/><polygon points="22,6 34,14 22,22 10,14" fill="#2d7c9e" stroke="#8bf3ff"/><circle cx="22" cy="20" r="3" fill="#fff"/></svg><span class="count">999</span></div>
+      <div class="bag-cell" title="金创药"><svg width="34" height="34" viewBox="0 0 44 44"><circle cx="22" cy="16" r="6" fill="#e0f2f1" stroke="#80cbc4"/><circle cx="22" cy="27" r="10" fill="#b2dfdb" stroke="#4db6ac"/><path d="M19 21C22 22 25 22 25 21" stroke="#d32f2f" stroke-width="2"/></svg><span class="count">15</span></div>
+      <div class="bag-cell" title="小还丹"><svg width="34" height="34" viewBox="0 0 44 44"><circle cx="22" cy="22" r="13" fill="#2e7d32" stroke="#a5d6a7" stroke-width="1.8"/><path d="M12 20C17 18 26 26 32 24" stroke="#ffd54f" stroke-width="1.8"/></svg><span class="count">8</span></div>
+      <div class="bag-cell" title="大还丹"><svg width="34" height="34" viewBox="0 0 44 44"><circle cx="22" cy="22" r="14" fill="#6a1b9a" stroke="#ffd75a" stroke-width="2"/><path d="M12 18C18 14 26 30 32 26" stroke="#ffd75a" stroke-width="2"/></svg><span class="count">3</span></div>
+      <div class="bag-cell" title="妖丹"><svg width="34" height="34" viewBox="0 0 44 44"><circle cx="22" cy="22" r="14" fill="#d32f2f" stroke="#ff8a80" stroke-width="1.8"/><circle cx="19" cy="18" r="2.5" fill="#fff"/></svg><span class="count">42</span></div>
+      <div class="bag-cell" title="锐金符"><svg width="34" height="34" viewBox="0 0 44 44"><rect x="13" y="7" width="18" height="30" rx="3" fill="#fbc02d" stroke="#f57f17"/><line x1="22" y1="12" x2="22" y2="30" stroke="#b71c1c" stroke-width="2"/></svg><span class="count">6</span></div>
+      <div class="bag-cell" title="储物玉匣"><svg width="34" height="34" viewBox="0 0 44 44"><rect x="10" y="16" width="24" height="18" rx="2" fill="#a7ffeb" stroke="#004d40"/><rect x="8" y="12" width="28" height="6" rx="2" fill="#64ffda" stroke="#004d40"/><circle cx="22" cy="19" r="1" fill="#000"/></svg><span class="count">1</span></div>
+      <div class="bag-cell" title="玄铁令"><svg width="34" height="34" viewBox="0 0 44 44"><polygon points="14,8 30,8 35,16 35,32 30,38 14,38 9,32 9,16" fill="#212121" stroke="#9e9e9e"/><circle cx="22" cy="15" r="3" fill="#d32f2f"/></svg><span class="count">4</span></div>
+      <div class="bag-cell" title="青锋剑"><svg width="34" height="34" viewBox="0 0 44 44"><path d="M32 8L36 12L16 32L12 36L8 32L12 28Z" fill="#80deea" stroke="#00838f"/><line x1="11" y1="33" x2="33" y2="11" stroke="#fff"/></svg></div>
+      <div class="bag-cell"></div>
+      <div class="bag-cell"></div>
+      <div class="bag-cell"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function switchTheme(scheme) {
+  document.getElementById('tabA').classList.toggle('active', scheme === 'A');
+  document.getElementById('tabB').classList.toggle('active', scheme === 'B');
+  var cards = document.querySelectorAll('.icon-card, .skill-card');
+  if (scheme === 'B') {
+    cards.forEach(function(c) {
+      c.style.filter = 'saturate(1.25) contrast(1.1)';
+    });
+  } else {
+    cards.forEach(function(c) {
+      c.style.filter = 'none';
+    });
+  }
+}
+</script>
+
+</body>
+</html>

@@ -2,150 +2,661 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>修仙小游戏 · 入口</title>
+<meta name="description" content="纯原生 Canvas 2D + Vanilla JS 的修仙小游戏合集，包含仙岛寻踪、修仙坊市、凡人修仙录实时版和凡人问道录。" />
+<meta property="og:title" content="修仙小游戏 · 入口" />
+<meta property="og:description" content="纯原生 Canvas 2D + Vanilla JS 的修仙小游戏合集，包含仙岛寻踪、修仙坊市、凡人修仙录实时版和凡人问道录。" />
 <style>
+  :root {
+    --gold: #ffd75a;
+    --gold-dim: rgba(255, 215, 90, 0.45);
+    --gold-glow: rgba(255, 215, 90, 0.2);
+    --cyan: #8bf3ff;
+    --cyan-dim: rgba(139, 243, 255, 0.4);
+    --bg-dark: #070a12;
+    --card-bg: linear-gradient(170deg, rgba(19, 27, 44, 0.92) 0%, rgba(10, 14, 25, 0.94) 100%);
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-    background:
-      radial-gradient(1200px 600px at 50% -10%, rgba(184,142,72,.18), transparent 60%),
-      radial-gradient(900px 500px at 50% 120%, rgba(120,80,30,.16), transparent 60%),
-      linear-gradient(160deg, #14100a 0%, #0c0906 50%, #16110a 100%);
-    color: #e8dcc4;
+  html, body {
+    width: 100%;
     min-height: 100%;
+    background-color: var(--bg-dark);
+    color: #e6dfd1;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+    overflow-x: hidden;
+  }
+  /* 背景动态星尘/灵气流动画布 */
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.75;
+  }
+
+  .ambient-glow {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      radial-gradient(1100px 550px at 50% -10%, rgba(80, 140, 220, 0.16), transparent 70%),
+      radial-gradient(900px 480px at 15% 40%, rgba(20, 140, 120, 0.12), transparent 60%),
+      radial-gradient(1000px 500px at 85% 85%, rgba(212, 160, 60, 0.13), transparent 65%);
+  }
+
+  .page-wrap {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 42px 20px 60px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 32px 18px 48px;
   }
-  .wrap { width: 100%; max-width: 1020px; }
-  .title {
+
+  /* 顶部仙侠标题区 */
+  .header {
     text-align: center;
-    margin-bottom: 6px;
-    font-size: clamp(28px, 7vw, 44px);
-    letter-spacing: .18em;
-    font-weight: 700;
-    background: linear-gradient(180deg, #f3d98a, #b8893f);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: 0 2px 18px rgba(184,142,72,.25);
-  }
-  .subtitle {
-    text-align: center;
-    color: #b9a888;
-    letter-spacing: .22em;
-    font-size: clamp(12px, 3.4vw, 15px);
     margin-bottom: 34px;
-  }
-  .cards { display: grid; grid-template-columns: 1fr; gap: 18px; }
-  @media (min-width: 880px) { .cards { grid-template-columns: repeat(2, 1fr); } }
-  .card {
-    --ac: #d8b878;                 /* 每张卡自己的点缀色 */
-    position: relative;
     display: flex;
     flex-direction: column;
+    align-items: center;
+  }
+  .header-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 16px;
+    border-radius: 999px;
+    background: rgba(255, 215, 90, 0.08);
+    border: 1px solid rgba(255, 215, 90, 0.35);
+    color: var(--gold);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    margin-bottom: 14px;
+    box-shadow: 0 0 16px rgba(255, 215, 90, 0.12);
+  }
+  .header-title {
+    font-family: "Songti SC", "Noto Serif SC", "STKaiti", "KaiTi", "PingFang SC", serif;
+    font-size: clamp(32px, 6vw, 48px);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    background: linear-gradient(180deg, #ffffff 0%, #ffe9b5 50%, #dfb461 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 4px 24px rgba(255, 215, 90, 0.22);
+    margin-bottom: 10px;
+  }
+  .header-sub {
+    font-size: 14.5px;
+    color: #a8b3c7;
+    letter-spacing: 0.18em;
+    max-width: 600px;
+    line-height: 1.6;
+    margin-bottom: 18px;
+  }
+  .stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 18px;
+    padding: 8px 20px;
+    background: rgba(15, 22, 38, 0.7);
+    border: 1px solid rgba(255, 215, 90, 0.2);
+    border-radius: 30px;
+    font-size: 12.5px;
+    color: #cdd6e5;
+  }
+  .stats-bar span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stats-bar span b {
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  /* 游戏网格容器 */
+  .games-grid {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* 基础卡片样式 */
+  .game-card {
+    position: relative;
     text-decoration: none;
     color: inherit;
-    border: 1px solid rgba(184,142,72,.45);
-    border-radius: 16px;
-    padding: 24px 20px 20px;
-    background: linear-gradient(160deg, rgba(30,22,11,.92), rgba(14,10,5,.92));
-    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 12px 40px rgba(0,0,0,.45);
-    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    border-radius: 18px;
+    background: var(--card-bg);
+    border: 1px solid rgba(184, 142, 72, 0.35);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     overflow: hidden;
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0.2, 1), border-color 0.25s ease, box-shadow 0.25s ease;
   }
-  .card::before {                  /* 顶部一条点缀色光带 */
-    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, transparent, var(--ac), transparent);
-    opacity: .75;
-  }
-  .card::after {
-    content: ""; position: absolute; inset: 0;
-    background: radial-gradient(420px 220px at 50% 0%, var(--ac), transparent 70%);
-    opacity: 0; transition: opacity .18s ease;
-    pointer-events: none;
-  }
-  .card:hover, .card:focus-visible {
+  .game-card:hover {
     transform: translateY(-4px);
-    border-color: var(--ac);
-    box-shadow: 0 0 0 1px rgba(0,0,0,.4) inset, 0 18px 48px rgba(0,0,0,.5), 0 0 30px color-mix(in srgb, var(--ac) 30%, transparent);
-    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.65), 0 0 24px var(--card-glow, rgba(255, 215, 90, 0.2));
   }
-  .card:hover::after, .card:focus-visible::after { opacity: .10; }
-  .icon {
-    width: 54px; height: 54px; border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px; margin-bottom: 16px;
-    background: rgba(0,0,0,.35);
-    border: 1px solid color-mix(in srgb, var(--ac) 55%, transparent);
-    box-shadow: 0 0 16px color-mix(in srgb, var(--ac) 22%, transparent);
+
+  /* ★ 主推大卡（仙岛寻踪）★ */
+  .featured-card {
+    --card-glow: rgba(139, 243, 255, 0.25);
+    border: 1.5px solid rgba(139, 243, 255, 0.45);
+    background: linear-gradient(165deg, rgba(16, 32, 54, 0.95) 0%, rgba(9, 17, 30, 0.96) 100%);
+    padding: 30px 32px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
   }
-  .card .badge {
+  @media (min-width: 820px) {
+    .featured-card {
+      grid-template-columns: 1.4fr 1fr;
+      align-items: center;
+      padding: 34px 38px;
+    }
+  }
+  .featured-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #8bf3ff, #ffd75a, transparent);
+    opacity: 0.9;
+  }
+
+  .featured-badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .badge-core {
+    background: linear-gradient(90deg, rgba(255, 215, 90, 0.22), rgba(255, 160, 60, 0.22));
+    border: 1px solid #ffd75a;
+    color: #ffe6a6;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.1em;
+  }
+  .badge-tag {
+    background: rgba(139, 243, 255, 0.12);
+    border: 1px solid rgba(139, 243, 255, 0.35);
+    color: #8bf3ff;
+    font-size: 11.5px;
+    padding: 2px 9px;
+    border-radius: 6px;
+  }
+
+  .featured-title {
+    font-family: "Songti SC", "Noto Serif SC", "STKaiti", "KaiTi", serif;
+    font-size: clamp(24px, 4vw, 32px);
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .featured-title span {
+    color: var(--gold);
+    font-size: 0.68em;
+    font-weight: 400;
+    border-left: 2px solid rgba(255, 215, 90, 0.4);
+    padding-left: 10px;
+  }
+  .featured-desc {
+    color: #b0c2d8;
+    font-size: 14.5px;
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+  .featured-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-bottom: 22px;
+    font-size: 12px;
+    color: #879cb5;
+  }
+  .featured-features span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(8, 14, 25, 0.6);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .featured-features span i {
+    color: #8bf3ff;
+    font-style: normal;
+  }
+
+  .btn-enter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 10px 24px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ffd75a 0%, #e59b20 100%);
+    color: #1a1005;
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    border: 1px solid #fff2a8;
+    box-shadow: 0 4px 18px rgba(240, 160, 40, 0.35);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .game-card:hover .btn-enter {
+    transform: translateX(4px);
+    box-shadow: 0 6px 24px rgba(255, 215, 90, 0.55);
+  }
+
+  /* 仙岛寻踪右侧仙侠视觉画卷徽章 */
+  .featured-artwork {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 160px;
+  }
+  .artwork-halo {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(139, 243, 255, 0.18) 0%, rgba(255, 215, 90, 0.08) 50%, transparent 75%);
+    filter: blur(10px);
+    animation: pulseHalo 4s ease-in-out infinite;
+  }
+  @keyframes pulseHalo {
+    0%, 100% { transform: scale(0.95); opacity: 0.7; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+
+  /* 次级游戏 3 列卡片网格 */
+  .sub-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    width: 100%;
+  }
+  @media (min-width: 768px) {
+    .sub-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .sub-card {
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .sub-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--card-accent, #ffd75a), transparent);
+    opacity: 0.75;
+  }
+
+  /* 三张次卡专属主题色 */
+  .sub-card.c-cultivator {
+    --card-accent: #ff9f43;
+    --card-glow: rgba(255, 159, 67, 0.25);
+  }
+  .sub-card.c-market {
+    --card-accent: #54a0ff;
+    --card-glow: rgba(84, 160, 255, 0.25);
+  }
+  .sub-card.c-quest {
+    --card-accent: #a55eea;
+    --card-glow: rgba(165, 94, 234, 0.25);
+  }
+
+  .sub-icon-box {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(7, 12, 22, 0.75);
+    border: 1px solid color-mix(in srgb, var(--card-accent) 55%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--card-accent) 25%, transparent);
+    margin-bottom: 16px;
+    transition: transform 0.2s;
+  }
+  .game-card:hover .sub-icon-box {
+    transform: scale(1.08);
+  }
+
+  .sub-badge {
     align-self: flex-start;
-    display: inline-block; font-size: 12px; letter-spacing: .2em;
-    color: var(--ac); border: 1px solid color-mix(in srgb, var(--ac) 40%, transparent);
-    border-radius: 999px; padding: 3px 12px; margin-bottom: 14px;
+    font-size: 11.5px;
+    color: var(--card-accent);
+    background: color-mix(in srgb, var(--card-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--card-accent) 35%, transparent);
+    padding: 2px 10px;
+    border-radius: 20px;
+    margin-bottom: 12px;
   }
-  .card h2 {
-    font-size: 21px; letter-spacing: .08em; margin-bottom: 10px;
-    color: #f1dcab;
+  .sub-title {
+    font-family: "Songti SC", "Noto Serif SC", "STKaiti", serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #f5eedb;
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
   }
-  .card p { color: #b6a98e; font-size: 14px; line-height: 1.7; flex: 1; }
-  .card .go {
-    margin-top: 16px; display: inline-flex; align-items: center; gap: 6px;
-    color: var(--ac); font-size: 14px; letter-spacing: .1em;
+  .sub-desc {
+    color: #9ba8bc;
+    font-size: 13.5px;
+    line-height: 1.65;
+    flex: 1;
+    margin-bottom: 18px;
   }
-  .card .go .arrow { transition: transform .18s ease; }
-  .card:hover .go .arrow { transform: translateX(4px); }
-  .foot {
-    text-align: center; color: #6f6450; font-size: 12px; letter-spacing: .12em;
-    margin-top: 36px;
+  .sub-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--card-accent);
+    transition: gap 0.2s;
   }
-  /* 三张卡各自的点缀色：坊市=青玉 · 问道=墨紫 · 实时=赤金 · 仙岛=翠岚 */
-  .card.c-fang  { --ac: #8fd3c8; }
-  .card.c-wen   { --ac: #b9a0e0; }
-  .card.c-shi   { --ac: #f0b060; }
-  .card.c-dao   { --ac: #9ad98a; }
+  .game-card:hover .sub-action {
+    gap: 10px;
+  }
+
+  /* 底部声明与系统说明 */
+  .footer {
+    text-align: center;
+    margin-top: 40px;
+    color: #637085;
+    font-size: 12.5px;
+    letter-spacing: 0.12em;
+    line-height: 1.8;
+  }
+  .footer-links {
+    margin-top: 6px;
+    color: #4b586e;
+    font-size: 11.5px;
+  }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="title">修仙小游戏</div>
-    <div class="subtitle">— 选一处，入道 —</div>
-    <div class="cards">
-      <a class="card c-fang" href="games/immortal-market/">
-        <span class="icon">🏮</span>
-        <span class="badge">等距 · 像素</span>
-        <h2>修仙坊市</h2>
-        <p>等距视角的修仙坊市。操控角色行走于街巷，与书生、商贩等 NPC 交谈，逛遍楼阁摊位。</p>
-        <span class="go">进入坊市 <span class="arrow">→</span></span>
-      </a>
-      <a class="card c-wen" href="games/mortal-quest/">
-        <span class="icon">📜</span>
-        <span class="badge">文字 · 养成</span>
-        <h2>凡人问道录</h2>
-        <p>文字修仙养成。历练、炼丹、宗门、秘境，一路从凡人问道长生。（旧版备份）</p>
-        <span class="go">进入旧版 <span class="arrow">→</span></span>
-      </a>
-      <a class="card c-shi" href="games/mortal-cultivator/">
-        <span class="icon">⚔️</span>
-        <span class="badge">实时 · 割草</span>
-        <h2>凡人修仙录 · 实时版</h2>
-        <p>剑/刀/雷三位修士任选。实时走位斩妖兽，炼气筑基直至化神，突破三选一构筑流派，妖王妖皇等你来战。</p>
-        <span class="go">进入实时版 <span class="arrow">→</span></span>
-      </a>
-      <a class="card c-dao" href="games/immortal-isles/">
-        <span class="icon">🏝️</span>
-        <span class="badge">等距 · 多地图</span>
-        <h2>仙岛寻踪</h2>
-        <p>浮空仙岛间无缝流转。三张独立地图由 AI 素材切图拼装而成，踩上光门即可淡入淡出切换场景。</p>
-        <span class="go">登岛一游 <span class="arrow">→</span></span>
-      </a>
+
+<!-- 灵气流动星尘背景 -->
+<canvas id="bg-canvas"></canvas>
+<div class="ambient-glow"></div>
+
+<div class="page-wrap">
+  <!-- 顶栏标题 -->
+  <header class="header">
+    <div class="header-pill">✦ 诸天万界 · 问道长生 ✦</div>
+    <h1 class="header-title">修仙小游戏</h1>
+    <p class="header-sub">纯原生 Canvas 2D 独立演算 · 沉浸式东方仙侠游戏合集</p>
+    <div class="stats-bar">
+      <span>四大修仙秘境</span>
+      <span>•</span>
+      <span><b>16+</b> 秘境洞天</span>
+      <span>•</span>
+      <span>实时仙法演算</span>
+      <span>•</span>
+      <span>即点即玩无延迟</span>
     </div>
-    <div class="foot">个人作品 · 非商业用途</div>
-  </div>
+    <a href="/icons-preview.html" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:rgba(255,215,90,0.12); color:#ffd75a; border:1px solid rgba(255,215,90,0.4); padding:4px 14px; border-radius:20px; font-size:12.5px; margin-top:12px; transition:transform .2s;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      仙岛寻踪 · 物品与技能图标重构方案评审阁 →
+    </a>
+  </header>
+
+  <!-- 游戏卡片网格 -->
+  <main class="games-grid">
+
+    <!-- 1. 核心大作：仙岛寻踪 (Featured Flagship) -->
+    <a class="game-card featured-card" id="card-isles" href="games/immortal-isles/">
+      <div class="featured-info">
+        <div class="featured-badge-row">
+          <span class="badge-core">★ 核心大作</span>
+          <span class="badge-tag">等距动作 RPG</span>
+          <span class="badge-tag" style="background:rgba(56,239,125,0.18);color:#6ee7b7;border-color:rgba(56,239,125,0.4);font-weight:600;">⛩️ 全新·太虚山门</span>
+        </div>
+        <h2 class="featured-title">仙岛寻踪 <span>浮空秘境</span></h2>
+        <p class="featured-desc">
+          踏足十六处浩瀚仙域与深邃地宫。御剑疾驰、雷罡破阵、太虚剑雨斩尽妖邪；背包拾遗、坊市行商与实时角色外形速切，尽展纯粹仙家风骨。
+        </p>
+        <div class="featured-features">
+          <span><i>✦</i> 16 张秘境地图</span>
+          <span><i>✦</i> 6 大仙术武学</span>
+          <span><i>✦</i> 角色实时幻化</span>
+          <span><i>✦</i> 寻路战妖体系</span>
+        </div>
+        <div>
+          <span class="btn-enter">
+            御剑登岛 · 立即启程
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="featured-artwork">
+        <div class="artwork-halo"></div>
+        <!-- 仙岛寻踪专属东方仙侠 SVG 徽宝 -->
+        <svg width="170" height="170" viewBox="0 0 160 160" fill="none">
+          <defs>
+            <linearGradient id="artGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#fff8d6" />
+              <stop offset="50%" stop-color="#ffd75a" />
+              <stop offset="100%" stop-color="#c98a1a" />
+            </linearGradient>
+            <linearGradient id="artCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ffffff" />
+              <stop offset="50%" stop-color="#a6f4ff" />
+              <stop offset="100%" stop-color="#0288d1" />
+            </linearGradient>
+            <radialGradient id="artCloud" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#38547a" stop-opacity="0.8" />
+              <stop offset="100%" stop-color="#101a2d" stop-opacity="0" />
+            </radialGradient>
+          </defs>
+
+          <!-- 外围八卦星轨金轮 -->
+          <circle cx="80" cy="80" r="72" stroke="url(#artGold)" stroke-width="1.2" opacity="0.6" stroke-dasharray="3 3"/>
+          <circle cx="80" cy="80" r="64" stroke="#8bf3ff" stroke-width="0.8" opacity="0.4"/>
+          
+          <!-- 浮空仙岛基座山岩 -->
+          <path d="M42 98 C46 88 56 82 80 82 C104 82 114 88 118 98 C108 116 92 126 80 126 C68 126 52 116 42 98 Z" fill="#1b283d" stroke="#5d789e" stroke-width="1.2"/>
+          <path d="M50 96 C62 90 98 90 110 96 C102 110 90 118 80 118 C70 118 58 110 50 96 Z" fill="#131e30"/>
+
+          <!-- 仙山翠微奇峰 -->
+          <path d="M55 92 L68 58 L78 92 Z" fill="#243b56" stroke="#486a94" stroke-width="1"/>
+          <path d="M72 90 L82 44 L95 90 Z" fill="#2d4869" stroke="#688eb8" stroke-width="1.2"/>
+          <path d="M88 92 L98 62 L106 92 Z" fill="#1e324a" stroke="#415e85" stroke-width="1"/>
+
+          <!-- 祥云仙气缭绕 -->
+          <ellipse cx="80" cy="98" rx="55" ry="14" fill="url(#artCloud)"/>
+          <path d="M36 104 C46 96 60 98 68 105 C76 97 94 97 102 105 C112 99 122 102 126 106" stroke="#8bf3ff" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.75"/>
+
+          <!-- 破空出鞘太虚飞剑 -->
+          <g transform="rotate(38 80 80)">
+            <!-- 剑身剑刃 -->
+            <path d="M80 14 L84 48 L82 92 L80 96 L78 92 L76 48 Z" fill="url(#artCyan)" stroke="#01579b" stroke-width="1"/>
+            <line x1="80" y1="18" x2="80" y2="92" stroke="#ffffff" stroke-width="1.2"/>
+            <!-- 鎏金剑格与剑柄 -->
+            <path d="M70 92 C74 88 86 88 90 92 L86 97 C83 95 77 95 74 97 Z" fill="url(#artGold)" stroke="#9c640c" stroke-width="1"/>
+            <rect x="78" y="97" width="4" height="15" rx="1.5" fill="#3e2723"/>
+            <circle cx="80" cy="114" r="3.2" fill="url(#artGold)" stroke="#8d5607" stroke-width="1"/>
+            <!-- 飘逸朱砂剑穗 -->
+            <path d="M80 117 C85 125 78 132 82 140" stroke="#ff5252" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+          </g>
+
+          <!-- 破霄星芒 -->
+          <polygon points="122,34 124.5,39 129,40 124.5,41 122,46 119.5,41 115,40 119.5,39" fill="#ffffff"/>
+          <polygon points="36,66 37.5,70 41,71 37.5,72 36,76 34.5,72 31,71 34.5,70" fill="#ffd75a"/>
+        </svg>
+      </div>
+    </a>
+
+    <!-- 2. 次级游戏 3 列卡片网格 -->
+    <div class="sub-grid">
+
+      <!-- 凡人修仙录 · 实时版 -->
+      <a class="game-card sub-card c-cultivator" id="card-cultivator" href="games/mortal-cultivator/">
+        <div class="sub-icon-box">
+          <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+            <path d="M6 26L14 18M26 6L16 16" stroke="#ff9f43" stroke-width="2" stroke-linecap="round"/>
+            <path d="M26 6L21 8L16 16L18 21Z" fill="rgba(255,159,67,0.3)" stroke="#ff9f43" stroke-width="1.2"/>
+            <path d="M6 6L26 26" stroke="#ffd75a" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="16" cy="16" r="3" fill="#ffffff" stroke="#ff9f43" stroke-width="1.2"/>
+          </svg>
+        </div>
+        <span class="sub-badge">实时动作 · 割草突围</span>
+        <h3 class="sub-title">凡人修仙录 · 实时版</h3>
+        <p class="sub-desc">
+          剑、刀、雷三修任选。走位斩妖、突破三选一构筑仙法流派。炼气筑基直抵化神，力战无尽妖潮。
+        </p>
+        <span class="sub-action">
+          入阵斩妖
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </span>
+      </a>
+
+      <!-- 修仙坊市 -->
+      <a class="game-card sub-card c-market" id="card-market" href="games/immortal-market/">
+        <div class="sub-icon-box">
+          <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+            <!-- 仙家飞檐古楼 -->
+            <path d="M5 14L16 6L27 14L24 16L16 10L8 16Z" fill="rgba(84,160,255,0.25)" stroke="#54a0ff" stroke-width="1.5"/>
+            <path d="M9 16V26H23V16" stroke="#8bf3ff" stroke-width="1.5"/>
+            <rect x="13" y="19" width="6" height="7" fill="rgba(255,215,90,0.3)" stroke="#ffd75a" stroke-width="1"/>
+            <circle cx="16" cy="12" r="1.5" fill="#ffd75a"/>
+          </svg>
+        </div>
+        <span class="sub-badge">等距像素 · 坊市风貌</span>
+        <h3 class="sub-title">修仙坊市</h3>
+        <p class="sub-desc">
+          等距视角下的繁华仙门集市。行走于街巷楼阁间，与各路仙友商贩问询闲谈，体验别样仙家烟火。
+        </p>
+        <span class="sub-action">
+          漫步坊市
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </span>
+      </a>
+
+      <!-- 凡人问道录 -->
+      <a class="game-card sub-card c-quest" id="card-quest" href="games/mortal-quest/">
+        <div class="sub-icon-box">
+          <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+            <!-- 上古道经卷轴与太极印 -->
+            <path d="M7 8C7 6.5 9 6 11 6H25C26 6 27 7 27 8V22C27 23.5 25 24 23 24H9C8 24 7 23 7 22V8Z" fill="rgba(165,94,234,0.25)" stroke="#a55eea" stroke-width="1.4"/>
+            <path d="M7 22C7 24 9 25 11 25H25" stroke="#ce93d8" stroke-width="1.4"/>
+            <line x1="12" y1="11" x2="22" y2="11" stroke="#f3e5f5" stroke-width="1.2" stroke-linecap="round"/>
+            <line x1="12" y1="15" x2="20" y2="15" stroke="#f3e5f5" stroke-width="1.2" stroke-linecap="round"/>
+            <line x1="12" y1="19" x2="17" y2="19" stroke="#f3e5f5" stroke-width="1.2" stroke-linecap="round"/>
+            <circle cx="23" cy="18" r="2.2" fill="#ffd75a"/>
+          </svg>
+        </div>
+        <span class="sub-badge">文字养成 · 经典修仙</span>
+        <h3 class="sub-title">凡人问道录</h3>
+        <p class="sub-desc">
+          经典文字修仙养成。吐纳灵气、炼丹锻器、拜谒宗门、探索禁地秘境，一路从肉体凡胎叩问大道长生。
+        </p>
+        <span class="sub-action">
+          开辟洞府
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </span>
+      </a>
+
+    </div>
+  </main>
+
+  <!-- 页脚说明 -->
+  <footer class="footer">
+    <p>纯原生 Canvas 2D 驱动 · 独立无依赖 · 移动端 / 桌面端自适应</p>
+    <div class="footer-links">道阻且长，行则将至 · 凡人亦可通天</div>
+  </footer>
+</div>
+
+<!-- 灵动背景粒子脚本（轻量丝滑无负担） -->
+<script>
+(function() {
+  var canvas = document.getElementById('bg-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var w = 0, h = 0;
+  var particles = [];
+  var count = 38;
+
+  function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  for (var i = 0; i < count; i++) {
+    particles.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: Math.random() * 1.8 + 0.6,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -(Math.random() * 0.45 + 0.15),
+      alpha: Math.random() * 0.6 + 0.2,
+      gold: Math.random() > 0.4
+    });
+  }
+
+  function frame() {
+    ctx.clearRect(0, 0, w, h);
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.y < -10) {
+        p.y = h + 10;
+        p.x = Math.random() * w;
+      }
+      if (p.x < -10) p.x = w + 10;
+      if (p.x > w + 10) p.x = -10;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.gold
+        ? 'rgba(255, 215, 90, ' + p.alpha + ')'
+        : 'rgba(139, 243, 255, ' + p.alpha + ')';
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = p.gold ? '#ffd75a' : '#8bf3ff';
+      ctx.fill();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+
 </body>
 </html>
