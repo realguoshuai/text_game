@@ -717,6 +717,8 @@
     if (player.hp > player.maxhp) player.hp = player.maxhp;
   }
   var lootDrops = [];        // 地上的掉落物 { mx,my,key,n,life,tossT,vy,vx,pop } 或 { gear:实例 }
+  var lootAttractParticles = []; // 自动拾取掉落物时汇入背包图标的灵光吸引粒子
+  var lootBursts = [];           // 粒子抵达背包图标时的微小灵气散逸光斑
   var LOOT_LIFE = 42;        // 掉落物停留秒数（够你打完这波再回头捡）
   /* 拾取半径（格）。原来是 0.72 —— 比一格还小，用户反馈「拾取不方便」：
    * 斜向走过去、或贴边绕过那格，距离就永远差一点点，东西明明在脚边却捡不起来。
@@ -2673,23 +2675,16 @@
           var clickMe = { id: 98001, key: 'ge_jian', t: 2, st: { atk: 11, def: 3, maxhp: 40 } };
           gearInv = [clickMe]; equipped = { weapon: null, armor: null, trinket: null };
           recalcStats(); bagDirty = true; lastGearSig = ''; renderBag();
+          openPause();
           G.hit = {
             healCell: hitSelf(document.querySelector('#bagGrid .cell')),   // 对照组
             gearCell: hitSelf(document.querySelector('#gearGrid .g:not(.empty)')),
             eqCell: hitSelf(document.querySelector('#eqGrid .g')),
             svClear: hitSelf(document.getElementById('svClear')),
-            /* 存档按钮从"全局三颗"改成了"每槽三颗"（v52）——  probes 的命中对象得跟着换，
-             * 否则 headless 里 hit(id) 拿到 null，这条"按钮点得到"的防线就悄悄失效了。 */
+            /* 存档按钮移入系统设置面板（v60）—— 打开设置面板测真实命中 */
             svSlotSave: hitSelf(document.querySelector('#slotList .svrow[data-slot="1"] [data-a="save"]')),
             svSlotDel: hitSelf(document.querySelector('#slotList .svrow[data-slot="1"] [data-a="del"]'))
           };
-          /* 命中 OK 之后再补一条**真点击**（合成 MouseEvent 走完整冒泡），
-           * 证明"点得到"且"监听器真的会做事"，而不是只有一条 CSS 摆在那儿。 */
-          var real = document.querySelector('#gearGrid .g:not(.empty)');
-          if (real && G.hit.gearCell === 'ok') {
-            real.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-            G.realClickEquip = !!equipped.weapon && equipped.weapon.id === 98001;
-          } else G.realClickEquip = 'skip';
           var svRow = document.querySelector('#slotList .svrow[data-slot="1"]');
           var svb = svRow && svRow.querySelector('[data-a="save"]');
           if (svb && G.hit.svSlotSave === 'ok') {
@@ -2697,6 +2692,14 @@
             svb.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
             G.realClickSave = !!readSlot(1) && curSlot === 1;
           } else G.realClickSave = 'skip';
+          closePause();
+          /* 命中 OK 之后再补一条**真点击**（合成 MouseEvent 走完整冒泡），
+           * 证明"点得到"且"监听器真的会做事"，而不是只有一条 CSS 摆在那儿。 */
+          var real = document.querySelector('#gearGrid .g:not(.empty)');
+          if (real && G.hit.gearCell === 'ok') {
+            real.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            G.realClickEquip = !!equipped.weapon && equipped.weapon.id === 98001;
+          } else G.realClickEquip = 'skip';
           bagToggle(false);
           gp.textContent = JSON.stringify(G);
         }
@@ -4780,6 +4783,8 @@
     // 地上的掉落物是「这张图的」，换图一律清掉 —— 不然坐标会飘到新图的地上。
     // 背包（bag）与银两是**角色**的，跨图保留。
     lootDrops = [];
+    lootAttractParticles = [];
+    lootBursts = [];
     makeNodes();   // v47：按地图随机刷采集点 / 宝箱（与 foes 同生命周期：换图重随，不存盘）
     // 重置主角动作，避免带着上一张图的攻击/倒地状态进来
     player.act = 'idle'; player.actT = 0; player.actHold = 0;
@@ -6100,8 +6105,232 @@
       lootDrops.splice(i, 1);
     }
   }
+  /** 获取背包入口圆钮在游戏画布中的中心像素坐标 (x, y) */
+  function getBagBtnScreenPos() {
+    var btn = document.getElementById('bagBtn');
+    if (btn && canvas) {
+      var rect = btn.getBoundingClientRect();
+      var canRect = canvas.getBoundingClientRect();
+      return {
+        x: (rect.left + rect.width / 2) - canRect.left,
+        y: (rect.top + rect.height / 2) - canRect.top
+      };
+    }
+    return { x: 36, y: 180 };
+  }
+
+  /** 掉落物被吸入背包时的背包按钮微动动画反馈 */
+  function triggerBagInhaleFeedback() {
+    var btn = document.getElementById('bagBtn');
+    if (!btn) return;
+    btn.classList.remove('inhale');
+    void btn.offsetWidth; // 触发重绘以重启关键帧动画
+    btn.classList.add('inhale');
+  }
+
+  /** 生成掉落物平滑汇入背包图标的微小粒子吸引光效 */
+  function spawnLootAttract(mx, my, key, gear, n) {
+    if (typeof mx !== 'number' || typeof my !== 'number') return;
+    var startScreen = isoToScreen(mx, my);
+    var sx = startScreen.x;
+    var sy = startScreen.y + HH * Z; // 掉落物地面中心位置
+
+    var target = getBagBtnScreenPos();
+    var dx = target.x - sx, dy = target.y - sy;
+    var dist = Math.hypot(dx, dy);
+
+    // 配色与光晕：匹配对应掉落物品质或类别（仙光流华）
+    var colorRgb = '255,215,90'; // 默认仙金
+    if (gear) {
+      var tier = gearTier(gear);
+      colorRgb = hexToRgbStr(tier.col);
+    } else if (key) {
+      var it = ITEMS[key];
+      if (key === 'lingshi') colorRgb = '139,243,255'; // 灵石青蓝
+      else if (it && it.kind === 'heal') colorRgb = '255,160,195'; // 灵丹桃花粉
+      else if (it && it.kind === 'rare') colorRgb = '255,214,130'; // 稀有暖金
+      else if (key === 'yaodan') colorRgb = '214,154,255'; // 妖丹紫华
+      else colorRgb = '159,232,200'; // 天材地宝翠青
+    }
+
+    // 优美优雅的仙家弧线控制点（自然上扬后加速汇向行囊）
+    var midX = (sx + target.x) * 0.5;
+    var midY = (sy + target.y) * 0.5;
+    var arch = Math.min(130, Math.max(45, dist * 0.28));
+
+    // 1 颗引灵主光核 + 6 颗微小尾随灵尘
+    var count = 7;
+    for (var i = 0; i < count; i++) {
+      var isLead = (i === 0);
+      var delay = isLead ? 0 : (0.02 + i * 0.016 + Math.random() * 0.02);
+      var dur = 0.42 + Math.random() * 0.12;
+
+      var sideJitter = (Math.random() - 0.5) * 36;
+      var vertJitter = (Math.random() - 0.5) * 24;
+      var ctrlX = midX + sideJitter;
+      var ctrlY = midY - arch + vertJitter;
+
+      lootAttractParticles.push({
+        sx: sx + (Math.random() - 0.5) * 8,
+        sy: sy + (Math.random() - 0.5) * 8,
+        ctrlX: ctrlX,
+        ctrlY: ctrlY,
+        curX: sx,
+        curY: sy,
+        delay: delay,
+        t: 0,
+        dur: dur,
+        color: colorRgb,
+        isLead: isLead,
+        size: isLead ? (4.2 * Math.min(1.4, Math.max(0.8, Z))) : (2.2 * Math.min(1.4, Math.max(0.8, Z))),
+        phase: Math.random() * 6.28,
+        trail: []
+      });
+    }
+  }
+
+  /** 更新吸引粒子飞行与背包到达微爆发效果 */
+  function updateLootAttract(dt) {
+    var target = getBagBtnScreenPos();
+
+    // 更新吸引粒子
+    for (var i = lootAttractParticles.length - 1; i >= 0; i--) {
+      var p = lootAttractParticles[i];
+      if (p.delay > 0) {
+        p.delay -= dt;
+        continue;
+      }
+      p.t += dt / p.dur;
+      if (p.t >= 1) {
+        // 到达背包图标：生成微小散逸灵气光斑
+        for (var k = 0; k < (p.isLead ? 4 : 2); k++) {
+          var ang = Math.random() * 6.2832;
+          var sp = 25 + Math.random() * 50;
+          lootBursts.push({
+            x: target.x + (Math.random() - 0.5) * 6,
+            y: target.y + (Math.random() - 0.5) * 6,
+            vx: Math.cos(ang) * sp,
+            vy: Math.sin(ang) * sp,
+            color: p.color,
+            size: 1.8 + Math.random() * 1.5,
+            life: 0.22,
+            maxLife: 0.22
+          });
+        }
+        if (p.isLead) {
+          triggerBagInhaleFeedback();
+        }
+        lootAttractParticles.splice(i, 1);
+        continue;
+      }
+
+      // 缓动曲线：先平滑起升、而后加速汇入行囊
+      var progress = p.t;
+      var ease = progress * progress * (3 - 2 * progress); // smoothstep
+      ease = ease * 0.7 + (progress * progress) * 0.3;     // 尾端加速汇入
+
+      var u = 1 - ease;
+      var cx = u * u * p.sx + 2 * u * ease * p.ctrlX + ease * ease * target.x;
+      var cy = u * u * p.sy + 2 * u * ease * p.ctrlY + ease * ease * target.y;
+
+      // 微弱仙光灵气扰动
+      var swirl = Math.sin(progress * 10 + p.phase) * (1 - progress) * 6;
+      cx += swirl * 0.6;
+      cy += swirl * 0.3;
+
+      p.curX = cx;
+      p.curY = cy;
+
+      // 记录轨迹点（用于柔滑拖尾）
+      p.trail.unshift({ x: cx, y: cy });
+      if (p.trail.length > 5) p.trail.pop();
+    }
+
+    // 更新背包抵达散逸光斑
+    for (var b = lootBursts.length - 1; b >= 0; b--) {
+      var burst = lootBursts[b];
+      burst.life -= dt;
+      burst.x += burst.vx * dt;
+      burst.y += burst.vy * dt;
+      burst.vx *= 0.92;
+      burst.vy *= 0.92;
+      if (burst.life <= 0) lootBursts.splice(b, 1);
+    }
+  }
+
+  /** 绘制吸引粒子、柔和光尾与背包抵达光斑 */
+  function drawLootAttract() {
+    if (!lootAttractParticles.length && !lootBursts.length) return;
+
+    ctx.save();
+    // 1. 绘制微粒拖尾
+    for (var i = 0; i < lootAttractParticles.length; i++) {
+      var p = lootAttractParticles[i];
+      if (p.delay > 0 || !p.trail || !p.trail.length) continue;
+
+      for (var t = 0; t < p.trail.length; t++) {
+        var pt = p.trail[t];
+        var alpha = (1 - t / p.trail.length) * (1 - p.t * 0.2) * (p.isLead ? 0.45 : 0.28);
+        var r = p.size * (1 - t * 0.16);
+        if (r <= 0.4) continue;
+        ctx.fillStyle = 'rgba(' + p.color + ',' + alpha.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, r, 0, 6.2832);
+        ctx.fill();
+      }
+    }
+
+    // 2. 绘制微粒本体与柔光光晕
+    for (var j = 0; j < lootAttractParticles.length; j++) {
+      var pt = lootAttractParticles[j];
+      if (pt.delay > 0) continue;
+
+      var cx = pt.curX, cy = pt.curY;
+      var auraR = pt.size * (pt.isLead ? 3.2 : 2.4);
+
+      // 外圈柔光晕
+      var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, auraR);
+      grad.addColorStop(0, 'rgba(' + pt.color + ', 0.85)');
+      grad.addColorStop(0.45, 'rgba(' + pt.color + ', 0.32)');
+      grad.addColorStop(1, 'rgba(' + pt.color + ', 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, auraR, 0, 6.2832);
+      ctx.fill();
+
+      // 中心亮核
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(0.8, pt.size * 0.48), 0, 6.2832);
+      ctx.fill();
+
+      // 引灵光核的微小十字星芒闪光
+      if (pt.isLead) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 1;
+        var flareLen = pt.size * 1.6;
+        ctx.beginPath();
+        ctx.moveTo(cx - flareLen, cy); ctx.lineTo(cx + flareLen, cy);
+        ctx.moveTo(cx, cy - flareLen); ctx.lineTo(cx, cy + flareLen);
+        ctx.stroke();
+      }
+    }
+
+    // 3. 绘制背包图标处散逸的微小灵光
+    for (var k = 0; k < lootBursts.length; k++) {
+      var lb = lootBursts[k];
+      var q = Math.max(0, lb.life / lb.maxLife);
+      ctx.fillStyle = 'rgba(' + lb.color + ',' + (q * 0.85).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(lb.x, lb.y, lb.size * q, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   /** 真正入账。银两是货币（走 player.stones），其馀进背包；装备实例进 gearInv。 */
   function pickUp(L) {
+    spawnLootAttract(L.mx, L.my, L.key, L.gear, L.n);
     if (L.gear) { collectGear(L.gear, L.mx, L.my); return; }
     var it = ITEMS[L.key];
     if (!it) return;
@@ -6270,21 +6499,30 @@
       var g = rndInt(8, 15);
       player.stones += g; bagDirty = true;
       addFloater(n.x, n.y - 0.3, '+' + g + ' 银两', '#8bf3ff');
+      spawnLootAttract(n.x, n.y, 'lingshi');
     } else if (n.type === 'ore') {
       var o = rndInt(14, 25);
       player.stones += o; bagDirty = true;
       addFloater(n.x, n.y - 0.3, '+' + o + ' 银两', '#8bf3ff');
+      spawnLootAttract(n.x, n.y, 'lingshi');
     } else {   // chest：银两 + 妖丹 + 25% 装备
       var cs = rndInt(40, 90);
       player.stones += cs; bagDirty = true;
       var cd = rndInt(1, 3);
       collectItem('yaodan', cd, n.x, n.y);
+      spawnLootAttract(n.x, n.y, 'yaodan');
       addFloater(n.x, n.y - 0.3, '+' + cs + ' 银两 · 妖丹×' + cd, '#ffdf9b');
       var gotGear = Math.random() < 0.25;
       if (gotGear) {
         var gg = rollGear(false);
-        if (gearInv.length < gearCap()) collectGear(gg, n.x, n.y);
-        else { player.stones += 30; addFloater(n.x, n.y - 0.6, '行囊满 +30 银两', '#8bf3ff'); gotGear = false; }
+        if (gearInv.length < gearCap()) {
+          collectGear(gg, n.x, n.y);
+          spawnLootAttract(n.x, n.y, null, gg);
+        } else {
+          player.stones += 30;
+          addFloater(n.x, n.y - 0.6, '行囊满 +30 银两', '#8bf3ff');
+          gotGear = false;
+        }
       }
       toast('开启宝箱：' + cs + ' 银两 · 妖丹×' + cd + (gotGear ? ' · 得一件装备！' : ''));
     }
@@ -8263,6 +8501,7 @@
       var p = particles[j]; p.life -= dt; p.mx += p.vx * dt; p.my += p.vy * dt; p.vy += 6 * dt;
       if (p.life <= 0) particles.splice(j, 1);
     }
+    updateLootAttract(dt);
   }
   // 图集键是 `base_idle_xxx` / `base_attack_xxx` 这种带状态后缀的，
   // 而 foes 对象里只存了 base（f.key）。这里按「攻击帧优先、否则待机帧、再兜底取首帧」拼出真实键，
@@ -8556,6 +8795,7 @@
       var s = 4 * Z; ctx.fillRect(q.x - s / 2, q.y - s / 2, s, s);
     }
     ctx.globalAlpha = 1;
+    drawLootAttract();
   }
   function updateHUD() {
     var hpv = document.getElementById('hpv'); if (hpv) hpv.textContent = Math.max(0, Math.round(player.hp)) + '/' + player.maxhp;
@@ -9117,11 +9357,14 @@
   function openPause() {
     if (player.dead || worldOpen) return;   // 死了或开地图时不叠暂停
     pauseOpen = true;
+    updateSaveUI();                         // 每次开设置面板刷新一次存档槽位信息
     var pp = document.getElementById('pausePanel'); if (pp) pp.hidden = false;
+    var pbtn = document.getElementById('pauseBtn'); if (pbtn) pbtn.classList.add('on');
   }
   function closePause() {
     pauseOpen = false;
     var pp = document.getElementById('pausePanel'); if (pp) pp.hidden = true;
+    var pbtn = document.getElementById('pauseBtn'); if (pbtn) pbtn.classList.remove('on');
   }
   function openWorld() {
     var wm = document.getElementById('worldmap'); if (!wm) return;
@@ -9167,18 +9410,28 @@
     if (sb) sb.addEventListener('input', function () { filterWorldNodes(sb.value); });
     var wm = document.getElementById('worldmap');
     if (wm) wm.addEventListener('click', function (e) { if (e.target === wm) closeWorld(); });
-    // ★3 暂停面板按钮
+    // ★3 系统设置/存档面板按钮
     var pp = document.getElementById('pausePanel');
-    if (pp) pp.querySelectorAll('button').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var act = b.dataset.act;
-        if (act === 'resume') closePause();
-        else if (act === 'reload') location.reload();
-        else if (act === 'world') { closePause(); openWorld(); }
+    if (pp) {
+      pp.querySelectorAll('button[data-act]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var act = b.dataset.act;
+          if (act === 'resume') closePause();
+          else if (act === 'reload') location.reload();
+          else if (act === 'world') { closePause(); openWorld(); }
+        });
       });
-    });
+      var pc = document.getElementById('pauseClose');
+      if (pc) pc.addEventListener('click', closePause);
+      pp.addEventListener('click', function (e) {
+        if (e.target === pp || e.target.classList.contains('pmsk')) closePause();
+      });
+    }
     var pbtn = document.getElementById('pauseBtn');
-    if (pbtn) pbtn.addEventListener('click', openPause);
+    if (pbtn) pbtn.addEventListener('click', function () {
+      if (pauseOpen) closePause();
+      else openPause();
+    });
   })();
 
   function resize() {

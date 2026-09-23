@@ -465,32 +465,40 @@
      为什么必须分档：只有一个存档时，"换个路线试试" 就等于 "先毁掉这一条命"，
      玩家不敢试；而这套游戏的核心乐趣恰恰是摸地图。分档之后删哪个都是单独一次确认。
      每行 = 一个槽：标题行（编号 + 存/读/删），下面一行是该档的时间与地图名。 */
-  #saveRow{display:flex;flex-direction:column;gap:6px;align-items:stretch;width:100%}
-  #saveRow .svhint{font-size:10.5px;color:#8ea3bf;line-height:1.5}
-  #saveRow .svhint i{font-style:normal;color:#ffd88a;font-family:ui-monospace,Consolas,monospace}
-  #saveRow .svbtns{display:flex;gap:6px}
-  #slotList{display:flex;flex-direction:column;gap:5px;width:100%;pointer-events:auto}
-  #saveRow .svrow{border:1px solid rgba(150,170,200,.24);border-radius:7px;padding:5px 6px;
-    background:rgba(8,14,26,.55);display:flex;flex-direction:column;gap:4px;min-width:0}
-  #saveRow .svrow.cur{border-color:rgba(255,206,120,.75);background:rgba(46,36,16,.5)}
+  /* ── 存档栏（v52 + v60）：从背包移入「系统设置」面板 ──
+     为什么必须分档：只有一个存档时，"换个路线试试" 就等于 "先毁掉这一条命"，
+     玩家不敢试；而这套游戏的核心乐趣恰恰是摸地图。分档之后删哪个都是单独一次确认。
+     每行 = 一个槽：标题行（编号 + 存/读/删），下面一行是该档的时间与地图名。 */
+  #saveRow{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%;margin:12px 0 14px;
+    padding:11px 13px;background:rgba(10,14,24,.75);border:1px solid rgba(214,178,96,.38);border-radius:10px;
+    box-sizing:border-box;text-align:left}
+  #saveRow .svhint{font-size:12px;color:#a8bedc;line-height:1.5;display:flex;align-items:center;justify-content:space-between}
+  #saveRow .svhint i{font-style:normal;color:#ffd88a;font-family:ui-monospace,Consolas,monospace;font-weight:600}
+  #saveRow .svbtns{display:flex;gap:6px;margin-top:3px}
+  #slotList{display:flex;flex-direction:column;gap:7px;width:100%;pointer-events:auto;margin:3px 0}
+  #saveRow .svrow{border:1px solid rgba(150,170,200,.24);border-radius:8px;padding:6px 9px;
+    background:rgba(8,14,26,.65);display:flex;flex-direction:column;gap:4px;min-width:0;transition:border-color .15s}
+  #saveRow .svrow.cur{border-color:rgba(255,206,120,.85);background:rgba(46,36,16,.65);box-shadow:0 0 10px rgba(255,206,120,.12)}
   #saveRow .svrow .r1{display:flex;align-items:center;justify-content:space-between;gap:6px}
-  #saveRow .svrow .nm{font-size:11px;color:#e6dcc0;letter-spacing:.5px;display:flex;align-items:center;gap:4px}
-  #saveRow .svrow .nm b{font-size:9px;font-weight:700;color:#1d1608;border-radius:3px;padding:0 3px;
+  #saveRow .svrow .nm{font-size:12px;color:#e6dcc0;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+  #saveRow .svrow .nm b{font-size:10px;font-weight:700;color:#1d1608;border-radius:3px;padding:1px 4px;
     background:linear-gradient(180deg,#ffd977,#f5b13c)}
-  #saveRow .svrow .ops{display:flex;gap:4px}
-  #saveRow .svrow .ds{font-size:10px;color:#8ea3bf;font-family:ui-monospace,Consolas,monospace;
+  #saveRow .svrow .ops{display:flex;gap:5px}
+  #saveRow .svrow .ds{font-size:11px;color:#8ea3bf;font-family:ui-monospace,Consolas,monospace;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #saveRow .svrow.cur .ds{color:#cfd8e6}
-  #saveRow button{font:inherit;font-size:11px;color:#e6dcc0;cursor:pointer;padding:2px 7px;
-    border-radius:5px;background:rgba(28,36,52,.92);border:1px solid rgba(214,178,96,.45)}
+  #saveRow .svrow.cur .ds{color:#d6e4f8}
+  #saveRow button{font:inherit;font-size:11.5px;color:#e6dcc0;cursor:pointer;padding:3px 9px;
+    border-radius:5px;background:rgba(28,36,52,.92);border:1px solid rgba(214,178,96,.45);transition:background .15s,border-color .15s}
   #saveRow button:hover{background:#2b2438;border-color:rgba(255,214,130,.85)}
   #saveRow button:active{transform:translateY(1px)}
-  #saveRow button.del{border-color:rgba(226,90,80,.5)}
+  #saveRow button.del{border-color:rgba(226,90,80,.5);color:#ff9e9e}
+  #saveRow button.del:hover{background:rgba(80,20,30,.8);border-color:#ff7675}
   #saveRow button:disabled{opacity:.32;cursor:default}
-  #saveRow button:disabled:hover{background:rgba(28,36,52,.92);border-color:rgba(214,178,96,.45)}
-  #saveRow .svbtns #svClear{width:100%;padding:4px 8px}
+  #saveRow button:disabled:hover{background:rgba(28,36,52,.92);border-color:rgba(214,178,96,.45);color:#e6dcc0}
+  #saveRow .svbtns #svClear{width:100%;padding:6px 12px;font-size:12px;color:#ffb3c8;border-color:rgba(255,140,170,.4);background:rgba(38,20,32,.75)}
+  #saveRow .svbtns #svClear:hover{background:rgba(60,24,42,.9);border-color:#ff85a2;color:#fff}
   /* 手指比鼠标粗：三个小按钮在触屏上要吃得住点击 */
-  body.touch #saveRow button{padding:5px 11px;font-size:12px}
+  body.touch #saveRow button{padding:6px 13px;font-size:13px}
   /* ── 通用确认框（v52）：重开 / 删档这类"点了回不来"的动作必须拦一道 ──
      ⚠ 刻意不用 window.confirm：部分内嵌 WebView（微信/QQ 内置浏览器）会直接吞掉
        confirm 并返回 false，玩家点了"确定"却毫无反应 —— 比没弹窗更难排查。 */
@@ -593,8 +601,6 @@
      为什么不贴左下：摇杆是"按哪出现在哪"的浮动盘，左下正是它最常出现的位置。 */
   body.touch #bag{left:50%;top:auto;bottom:12px;max-height:64vh;transform:translateX(-50%) scale(.86);
     transform-origin:center bottom}
-  /* ★ 存档那行不能连着 .tip 一起隐藏 —— 手机玩家更需要一个"我现在存档了吗"的确认 */
-  body.touch #bag .tip:not(#saveRow){display:none}
   body.touch #bag .grid{grid-template-columns:repeat(5,46px)}
   body.touch #bag .cell{width:46px;height:46px}
 
@@ -746,6 +752,13 @@
     background:#ff5a8a;color:#fff;font-size:10.5px;line-height:16px;text-align:center;
     padding:0 3px;font-family:ui-monospace,Consolas,monospace;display:none}
   #bagBtn.hasnew .dot{display:block}
+  @keyframes bagInhale{
+    0%{transform:scale(1);box-shadow:0 3px 12px rgba(0,0,0,.5)}
+    32%{transform:scale(1.18);border-color:#ffe68a;box-shadow:0 0 20px rgba(255,215,90,.9),0 0 8px rgba(255,255,255,.75)}
+    68%{transform:scale(0.96)}
+    100%{transform:scale(1);border-color:rgba(235,198,118,.8);box-shadow:0 3px 12px rgba(0,0,0,.5)}
+  }
+  #bagBtn.inhale{animation:bagInhale .36s cubic-bezier(.175,.885,.32,1.275)}
   body.touch #bagBtn{top:auto;bottom:68px;left:14px}  /* 手机：在「世界地图」圆钮正上方 */
 
   /* 坊市入口（v56）：第三个圆钮，同样跟着 --tlb 走（上面板一长高它自动让位）；
@@ -772,28 +785,35 @@
     box-shadow:0 4px 16px rgba(0,0,0,.4)}
   #viewfix.on{display:block}
 
-  /* ★3 独立暂停/设置面板：含继续/重新载入/返回地图 + 操作提示。
+  /* ★3 系统设置与存档面板：含三档存档/读档/重开 + 继续历练/重新载入/返回地图 + 操作指引。
      不带 .hud 类、显式 pointer-events:auto（否则会被 .hud{pointer-events:none} 继承掉，按钮点不到）。 */
   #pausePanel{position:fixed;inset:0;z-index:160;display:flex;align-items:center;justify-content:center;pointer-events:auto}
   #pausePanel[hidden]{display:none}
   #pausePanel .pmsk{position:absolute;inset:0;background:rgba(6,10,20,.78);backdrop-filter:blur(3px)}
-  #pausePanel .pdlg{position:relative;width:min(360px,92vw);padding:22px 20px;border-radius:14px;
+  #pausePanel .pdlg{position:relative;width:min(440px,94vw);max-height:90vh;overflow-y:auto;padding:22px 22px 20px;border-radius:14px;
     background:linear-gradient(180deg,rgba(26,30,46,.99),rgba(11,15,26,.99));
-    border:1px solid rgba(214,178,96,.6);box-shadow:0 14px 46px rgba(0,0,0,.62);color:#f0e3c2;text-align:center}
-  #pausePanel .pt{font-size:20px;letter-spacing:6px;color:#ffd88a;margin-bottom:12px}
-  #pausePanel .pinfo{font-size:12px;line-height:1.9;color:#9fb3d0;margin-bottom:16px;font-family:ui-monospace,Consolas,monospace}
+    border:1px solid rgba(214,178,96,.6);box-shadow:0 14px 46px rgba(0,0,0,.62);color:#f0e3c2;text-align:center;box-sizing:border-box}
+  #pausePanel .pclose{position:absolute;right:14px;top:14px;width:28px;height:28px;border-radius:50%;
+    background:rgba(255,255,255,.06);border:1px solid rgba(214,178,96,.3);color:#ffd88a;font-size:16px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;transition:background .15s,border-color .15s}
+  #pausePanel .pclose:hover{background:rgba(255,214,130,.2);border-color:#ffd88a}
+  #pausePanel .pt{font-size:18px;letter-spacing:2px;color:#ffd88a;margin-bottom:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}
+  #pausePanel .pinfo{font-size:11.5px;line-height:1.7;color:#9fb3d0;margin-bottom:14px;font-family:ui-monospace,Consolas,monospace;text-align:center;background:rgba(8,12,22,.45);padding:8px 10px;border-radius:7px;border:1px solid rgba(150,170,200,.15)}
   #pausePanel .pbtns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
-  #pausePanel button{font:inherit;font-size:13px;cursor:pointer;padding:10px 16px;border-radius:8px;
-    background:rgba(28,36,52,.92);color:#e6dcc0;border:1px solid rgba(214,178,96,.5)}
+  #pausePanel button{font:inherit;font-size:13px;cursor:pointer;padding:9px 16px;border-radius:8px;
+    background:rgba(28,36,52,.92);color:#e6dcc0;border:1px solid rgba(214,178,96,.5);transition:background .15s,border-color .15s}
   #pausePanel button:hover{background:#2b2438;border-color:rgba(255,214,130,.9)}
   #pausePanel button:active{transform:translateY(1px)}
-  /* 暂停/设置入口：第四个圆钮，与世界地图、行囊、坊市同款，竖排在坊市下方；手机移到左下，彻底杜绝遮挡右下角技能与攻击按键 */
+  #pausePanel button.btn-pri{background:linear-gradient(180deg,#3d3254,#201a2d);border-color:#ffd75a;color:#fff2b8;box-shadow:0 0 10px rgba(255,215,90,.25)}
+  #pausePanel button.btn-pri:hover{background:linear-gradient(180deg,#523e74,#2b2040);border-color:#ffe88a;box-shadow:0 0 14px rgba(255,215,90,.45)}
+  /* 系统设置入口：第四个圆钮，与世界地图、行囊、坊市同款，竖排在坊市下方；手机移到左下，彻底杜绝遮挡右下角技能与攻击按键 */
   #pauseBtn{position:fixed;left:14px;top:calc(var(--tlb,110px) + 156px);z-index:12;width:44px;height:44px;border-radius:50%;
     pointer-events:auto;cursor:pointer;color:#ffe9b8;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 35% 25%,#35445d,#131a26 72%);
     border:2px solid rgba(226,192,110,.75);box-shadow:0 3px 10px rgba(0,0,0,.45);
     transition:border-color .15s,box-shadow .15s;font-family:inherit}
   #pauseBtn:hover{border-color:#ffd75a;box-shadow:0 0 12px rgba(255,215,90,.55)}
+  #pauseBtn.on{border-color:#ffd75a;box-shadow:0 0 14px rgba(255,215,90,.65)}
   #pauseBtn:active{transform:translateY(1px)}
   #pauseBtn svg{display:block}
   body.touch #pauseBtn{top:auto;bottom:176px;left:14px}
@@ -870,14 +890,7 @@
   <div class="gears" id="gearGrid"></div>
   <div class="tip">点<b>装备格</b>弹操作卡：<b>装备 / 卸下 / 重铸 / 熔炼 / 丢弃</b>　·　按 <b>1</b>/<b>2</b>/<b>3</b> 服丹药<br>
     <b>妖丹</b>点一下炼化成修为　·　<b>符箓</b>点一下即生效（限时增益，倒地会散）<br>
-    <b>玄铁令</b>在装备卡里点「重铸」洗词缀　·　<b>银两</b>去<b>城镇</b>坊市花　·　<b>Esc</b> 关最上层面板</div>
-  <div class="tip" id="saveRow">
-    <div class="svhint">存档 · <i id="saveInfo">尚未存档</i></div>
-    <div id="slotList"></div>
-    <div class="svbtns">
-      <button id="svClear" title="放弃当前进度、从头开始（存档档位保留）">重开</button>
-    </div>
-  </div>
+    <b>玄铁令</b>在装备卡里点「重铸」洗词缀　·　<b>银两</b>去<b>城镇</b>坊市花　·　<b>Esc</b> 打开系统设置与存档</div>
 </div>
 
 <!-- 世界地图入口：桌面 M / Tab 开关，手机点此图标；点开是诸天万界总览，点节点即传送 -->
@@ -912,27 +925,42 @@
   </svg>
 </button>
 
-<!-- ★3 暂停/宗门心法：位于左列第四个圆钮（与世界地图、行囊、坊市成列，不挡右侧技能与攻击键） -->
-<button id="pauseBtn" title="暂停 / 宗门心法（Esc）" aria-label="暂停">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <!-- 乾坤静心八卦外环 -->
-    <circle cx="12" cy="12" r="9.5" stroke="#ffd75a" stroke-width="1.5" fill="rgba(255,215,90,0.15)"/>
-    <!-- 双柱静心法印 -->
-    <rect x="7.8" y="6.8" width="2.8" height="10.4" rx="1.4" fill="#ffd88a" stroke="#d49a30" stroke-width="0.7"/>
-    <rect x="13.4" y="6.8" width="2.8" height="10.4" rx="1.4" fill="#ffd88a" stroke="#d49a30" stroke-width="0.7"/>
-    <circle cx="12" cy="12" r="1.4" fill="#74b9ff"/>
+<!-- ★3 系统设置 / 仙途存档入口：位于左列第四个圆钮（与世界地图、行囊、坊市成列，不挡右侧技能与攻击键） -->
+<button id="pauseBtn" title="系统设置 · 仙途存档（Esc）" aria-label="系统设置">
+  <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 八卦灵阵/齿轮外环 -->
+    <path d="M12 2.2a2 2 0 0 1 2 2v0.3a8.2 8.2 0 0 0 1.9 1.1l0.3-0.2a2 2 0 0 1 2.8 0.8l1 1.7a2 2 0 0 1-0.7 2.7l-0.3 0.2a8.2 8.2 0 0 0 0 2.2l0.3 0.2a2 2 0 0 1 0.7 2.7l-1 1.7a2 2 0 0 1-2.8 0.8l-0.3-0.2a8.2 8.2 0 0 0-1.9 1.1v0.3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-0.3a8.2 8.2 0 0 0-1.9-1.1l-0.3 0.2a2 2 0 0 1-2.8-0.8l-1-1.7a2 2 0 0 1 0.7-2.7l0.3-0.2a8.2 8.2 0 0 0 0-2.2l-0.3-0.2a2 2 0 0 1-0.7-2.7l1-1.7a2 2 0 0 1 2.8-0.8l0.3 0.2a8.2 8.2 0 0 0 1.9-1.1V4.2a2 2 0 0 1 2-2h2z" fill="rgba(255,215,90,0.22)" stroke="#ffd75a" stroke-width="1.4"/>
+    <!-- 乾坤中心灵核 -->
+    <circle cx="12" cy="12" r="3.2" stroke="#ffeaa7" stroke-width="1.3" fill="rgba(116,185,255,0.45)"/>
+    <circle cx="12" cy="12" r="1.2" fill="#ffffff"/>
   </svg>
   <kbd class="btn-kb">Esc</kbd>
 </button>
 <div id="pausePanel" class="hud" hidden>
   <div class="pmsk"></div>
   <div class="pdlg">
-    <div class="pt">已 暂 停</div>
-    <div class="pinfo">移动 WASD/方向键 · 攻击 Space/J · 重击 K · 技能 123<br>走位锁定怪物自动出手 · 拾取 B 背包 · M 地图 · C 属性 · Esc 暂停/继续</div>
+    <button class="pclose" id="pauseClose" title="关闭设置（Esc）" aria-label="关闭设置">✕</button>
+    <div class="pt">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;display:inline-block;color:#ffd75a"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      系统设置 · 仙途存档
+    </div>
+
+    <!-- 仙途三槽存档区 -->
+    <div id="saveRow">
+      <div class="svhint"><span>仙途存档（每15秒自动落盘）</span><i id="saveInfo">尚未存档</i></div>
+      <div id="slotList"></div>
+      <div class="svbtns">
+        <button id="svClear" title="放弃当前进度、从头开始（已有存档档位保留）">重开这一局</button>
+      </div>
+    </div>
+
+    <!-- 快捷按键指引 -->
+    <div class="pinfo">移动 WASD/方向键 · 攻击 Space/J · 重击 K · 技能 123<br>走位锁定怪物自动出手 · 拾取 B 背包 · M 地图 · C 属性 · Esc 设置/暂停</div>
+
     <div class="pbtns">
-      <button data-act="resume">继续 <kbd class="esc-badge">Esc</kbd></button>
-      <button data-act="reload">重新载入</button>
+      <button data-act="resume" class="btn-pri">继续历练 <kbd class="esc-badge">Esc</kbd></button>
       <button data-act="world">返回地图 <kbd class="esc-badge">M</kbd></button>
+      <button data-act="reload">重新载入游戏</button>
     </div>
   </div>
 </div>
@@ -983,7 +1011,7 @@
   <span class="hl">修为攒满自动突破境界</span>（攻 / 御 / 气血上限一起抬）　·　
   <b>玄铁令</b>在操作卡里点 <span class="hl">重铸词缀</span>（一次一枚）　·　
   进度 <span class="hl">每 15 秒自动存档</span>，
-  行囊底部可切成 <span class="hl">三个存档档位</span>：逐档 <b>存 / 读 / 删</b>，
+  <span class="hl">系统设置</span> 内置 <span class="hl">三个存档档位</span>：逐档 <b>存 / 读 / 删</b>，
   <span class="hl">重开</span>只重来当前进度、不删档位　·　<span class="hl">Alt+1~6</span> 试动作
   </div>
 </div>
