@@ -2265,6 +2265,33 @@ GAME.UI = {
         this.updateUI();
     },
 
+    // ---------- 渡劫破境天道诏书弹窗 ----------
+    showBreakthroughModal: function (realmName, details) {
+        var modal = this.$("breakthrough-modal");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "breakthrough-modal";
+            modal.className = "modal";
+            modal.innerHTML = '<div class="modal-content" style="max-width:440px;text-align:center;border:2px solid #ffd700;box-shadow:0 0 25px rgba(255,215,0,0.5);background:linear-gradient(180deg,#121b2d 0%,#20162b 100%);">' +
+                '<div style="color:#ffd700;font-size:14px;letter-spacing:4px;margin-bottom:6px;">✦ 九 霄 雷 劫 · 功 成 证 道 ✦</div>' +
+                '<h2 id="bt-modal-title" style="color:#fff056;font-size:24px;margin:8px 0;text-shadow:0 0 12px rgba(255,215,0,0.8);">境界突破</h2>' +
+                '<div id="bt-modal-desc" style="color:#ffd384;font-size:14px;margin:12px 0;line-height:1.6;"></div>' +
+                '<div id="bt-modal-stats" style="color:#70a1ff;font-size:13px;font-weight:bold;margin:12px 0;"></div>' +
+                '<button id="btn-bt-ok" class="btn-gold" style="margin-top:14px;width:100%;padding:10px 0;font-size:15px;letter-spacing:3px;">收 纳 灵 气 · 稳 固 根 基</button>' +
+                '</div>';
+            document.body.appendChild(modal);
+        }
+        var title = this.$("bt-modal-title");
+        var desc = this.$("bt-modal-desc");
+        var stats = this.$("bt-modal-stats");
+        var btn = this.$("btn-bt-ok");
+        if (title) title.innerText = "【 " + realmName + " 】";
+        if (desc) desc.innerText = "九霄天劫已过，天地灵气灌顶！周身经脉洗髓伐毛，肉身与神识蜕变圆满。";
+        if (stats) stats.innerText = details || "";
+        modal.style.display = "flex";
+        if (btn) btn.onclick = function () { modal.style.display = "none"; };
+    },
+
     // ---------- 官方筑基期体验存档 ----------
     startPresetZhuji: function () {
         var active = GAME.Storage.getActiveSlot();

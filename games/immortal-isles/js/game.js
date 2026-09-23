@@ -237,7 +237,395 @@
     return { atk: BASE_STATS.atk + (b.atk | 0), def: BASE_STATS.def + (b.def | 0),
              maxhp: BASE_STATS.maxhp + (b.maxhp | 0) };
   }
-  var realmFx = 0;                   // 突破的金环特效计时（绘制见 drawRealmFx）
+  /* ---------------- 渡劫天雷与境界突破异象系统 ---------------- */
+  var audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx && typeof window !== 'undefined') {
+      var AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        try { audioCtx = new AudioContext(); } catch (e) {}
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(function () {});
+    }
+    return audioCtx;
+  }
+
+  function playTribulationThunderSound(intensity) {
+    var ac = getAudioCtx();
+    if (!ac) return;
+    try {
+      var now = ac.currentTime;
+      var osc = ac.createOscillator();
+      var gain = ac.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(115, now);
+      osc.frequency.exponentialRampToValueAtTime(24, now + 0.85);
+      gain.gain.setValueAtTime(0.32 * (intensity || 1), now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.start(now);
+      osc.stop(now + 0.9);
+
+      var bufSize = Math.floor(ac.sampleRate * 0.4);
+      var buffer = ac.createBuffer(1, bufSize, ac.sampleRate);
+      var data = buffer.getChannelData(0);
+      for (var i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+      var noise = ac.createBufferSource();
+      noise.buffer = buffer;
+      var filter = ac.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(850, now);
+      filter.Q.setValueAtTime(2.0, now);
+      var ngain = ac.createGain();
+      ngain.gain.setValueAtTime(0.28 * (intensity || 1), now);
+      ngain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      noise.connect(filter);
+      filter.connect(ngain);
+      ngain.connect(ac.destination);
+      noise.start(now);
+    } catch (e) {}
+  }
+
+  function playBreakthroughChimeSound() {
+    var ac = getAudioCtx();
+    if (!ac) return;
+    try {
+      var now = ac.currentTime;
+      var freqs = [523.25, 659.25, 783.99, 1046.5];
+      freqs.forEach(function (f, idx) {
+        var osc = ac.createOscillator();
+        var gain = ac.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, now + idx * 0.09);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.09);
+        gain.gain.linearRampToValueAtTime(0.18, now + idx * 0.09 + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 1.6);
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.start(now + idx * 0.09);
+        osc.stop(now + idx * 0.09 + 1.7);
+      });
+    } catch (e) {}
+  }
+
+  var TRIBULATION_MOTTOS = {
+    '炼气期': '「 灵 气 入 体 · 凡 胎 渐 蜕 」',
+    '筑基期': '「 褪 去 凡 骨 · 气 贯 丹 田 」',
+    '金丹期': '「 九 转 凝 丹 · 寿 享 八 百 」',
+    '元婴期': '「 元 神 破 壳 · 逍 遥 天 地 」',
+    '化神期': '「 意 融 乾 坤 · 执 掌 天 道 」'
+  };
+
+  var tribulation = {
+    active: false,
+    timer: 0,
+    maxT: 3.8,
+    strikes: [0.18, 0.75, 1.40],
+    strikeIndex: 0,
+    bolts: [],
+    sparks: [],
+    shockwaves: [],
+    realmName: '',
+    motto: '',
+    bonusText: ''
+  };
+
+  function generateFractalLightning(x1, y1, x2, y2, displace, iter) {
+    if (iter <= 0) return [[x1, y1], [x2, y2]];
+    var midX = (x1 + x2) / 2 + (Math.random() * 2 - 1) * displace;
+    var midY = (y1 + y2) / 2 + (Math.random() * 2 - 1) * (displace * 0.4);
+    var left = generateFractalLightning(x1, y1, midX, midY, displace * 0.55, iter - 1);
+    var right = generateFractalLightning(midX, midY, x2, y2, displace * 0.55, iter - 1);
+    return left.slice(0, -1).concat(right);
+  }
+
+  function triggerTribulationStrike(intensity) {
+    var p = isoToScreen(player.mx, player.my);
+    var headX = p.x, headY = p.y - 36 * Z;
+    var skyX = headX + (Math.random() * 2 - 1) * 80 * Z;
+    var skyY = -10 * Z;
+
+    var mainBolt = generateFractalLightning(skyX, skyY, headX, headY, 42 * Z, 5);
+    tribulation.bolts.push({ pts: mainBolt, life: 0.22, maxLife: 0.22, width: 4.8 * Z, color: '#ffffff' });
+
+    for (var b = 0; b < 2; b++) {
+      var midIdx = Math.floor(mainBolt.length * (0.3 + b * 0.3));
+      var startPt = mainBolt[midIdx] || [skyX, skyY];
+      var endX = startPt[0] + (Math.random() * 2 - 1) * 85 * Z;
+      var endY = startPt[1] + 55 * Z + Math.random() * 35 * Z;
+      var branch = generateFractalLightning(startPt[0], startPt[1], endX, endY, 22 * Z, 4);
+      tribulation.bolts.push({ pts: branch, life: 0.18, maxLife: 0.18, width: 2.2 * Z, color: '#a29bfe' });
+    }
+
+    screenShake = Math.max(screenShake, 0.45 * intensity);
+    playTribulationThunderSound(intensity);
+
+    tribulation.shockwaves.push({
+      x: p.x, y: p.y + HH * Z, r: 12 * Z, maxR: 160 * Z, life: 0.65, maxLife: 0.65, color: '#ffd700'
+    });
+
+    for (var k = 0; k < 24; k++) {
+      var ang = Math.random() * Math.PI * 2;
+      var spd = Math.random() * 180 + 60;
+      tribulation.sparks.push({
+        x: headX, y: headY,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd * 0.6 - 45,
+        life: 0.4 + Math.random() * 0.35,
+        maxLife: 0.75,
+        size: 2.6 + Math.random() * 2.5,
+        hue: Math.random() < 0.5 ? '#fff056' : '#70a1ff'
+      });
+    }
+  }
+
+  function startTribulationBreakthrough(newRealmName) {
+    tribulation.active = true;
+    tribulation.timer = 0;
+    tribulation.strikeIndex = 0;
+    tribulation.bolts = [];
+    tribulation.sparks = [];
+    tribulation.shockwaves = [];
+    tribulation.realmName = newRealmName;
+    tribulation.motto = TRIBULATION_MOTTOS[newRealmName] || '「 破 障 功 成 · 仙 道 永 昌 」';
+    tribulation.bonusText = '气血充盈回满 · 攻 ' + player.atk + ' · 御 ' + player.def + ' · 气血上限 ' + player.maxhp;
+    playBreakthroughChimeSound();
+  }
+
+  function updateTribulation(dt) {
+    if (!tribulation.active) return;
+    tribulation.timer += dt;
+
+    while (tribulation.strikeIndex < tribulation.strikes.length &&
+           tribulation.timer >= tribulation.strikes[tribulation.strikeIndex]) {
+      var intens = 1.0 + tribulation.strikeIndex * 0.25;
+      triggerTribulationStrike(intens);
+      tribulation.strikeIndex++;
+    }
+
+    for (var i = tribulation.bolts.length - 1; i >= 0; i--) {
+      var b = tribulation.bolts[i];
+      b.life -= dt;
+      if (b.life <= 0) tribulation.bolts.splice(i, 1);
+    }
+    for (var j = tribulation.sparks.length - 1; j >= 0; j--) {
+      var s = tribulation.sparks[j];
+      s.life -= dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.vy += 220 * dt;
+      if (s.life <= 0) tribulation.sparks.splice(j, 1);
+    }
+    for (var w = tribulation.shockwaves.length - 1; w >= 0; w--) {
+      var sw = tribulation.shockwaves[w];
+      sw.life -= dt;
+      var prog = 1 - sw.life / sw.maxLife;
+      sw.r = 12 * Z + prog * (sw.maxR - 12 * Z);
+      if (sw.life <= 0) tribulation.shockwaves.splice(w, 1);
+    }
+
+    if (tribulation.timer >= tribulation.maxT) {
+      tribulation.active = false;
+    }
+  }
+
+  function drawTribulation() {
+    if (!tribulation.active && realmFx <= 0) return;
+    var tTime = tribulation.timer;
+    var maxT = tribulation.maxT;
+    var p = isoToScreen(player.mx, player.my);
+
+    ctx.save();
+
+    // 1. 全屏劫云暗化与电闪
+    var skyDark = 0;
+    if (tTime < 1.8) skyDark = Math.min(0.55, tTime / 0.4);
+    else if (tTime < maxT) skyDark = Math.max(0, (maxT - tTime) / (maxT - 1.8) * 0.55);
+
+    if (skyDark > 0.01) {
+      ctx.fillStyle = 'rgba(6, 10, 24, ' + skyDark.toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // 2. 地面太极八卦破境法阵与通天神光柱
+    var auraAlpha = Math.min(1, Math.sin((tTime / maxT) * Math.PI) * 1.3);
+    var feetY = p.y + HH * Z;
+    var rot = tTime * 1.8;
+
+    // 八卦太极外金环
+    var baseR = 72 * Z;
+    ctx.strokeStyle = 'rgba(255, 215, 0, ' + (auraAlpha * 0.85).toFixed(3) + ')';
+    ctx.lineWidth = 3.5 * Z;
+    ctx.beginPath();
+    ctx.ellipse(p.x, feetY, baseR, baseR * 0.48, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(112, 161, 255, ' + (auraAlpha * 0.55).toFixed(3) + ')';
+    ctx.lineWidth = 2 * Z;
+    ctx.beginPath();
+    ctx.ellipse(p.x, feetY, baseR * 0.68, baseR * 0.33, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 八方灵卦刻痕
+    for (var gi = 0; gi < 8; gi++) {
+      var ga = rot + gi * (Math.PI / 4);
+      var gx = p.x + Math.cos(ga) * baseR;
+      var gy = feetY + Math.sin(ga) * (baseR * 0.48);
+      ctx.fillStyle = '#ffeaa7';
+      ctx.beginPath();
+      ctx.arc(gx, gy, 3.2 * Z, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 地面冲击光环
+    for (var swi = 0; swi < tribulation.shockwaves.length; swi++) {
+      var sh = tribulation.shockwaves[swi];
+      var swAlpha = (sh.life / sh.maxLife) * 0.8;
+      ctx.strokeStyle = 'rgba(255, 220, 80, ' + swAlpha.toFixed(3) + ')';
+      ctx.lineWidth = 3 * Z;
+      ctx.beginPath();
+      ctx.ellipse(sh.x, sh.y, sh.r, sh.r * 0.48, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 通天紫金灵柱
+    var pillarW = (32 + Math.sin(tTime * 6) * 6) * Z;
+    var pGrad = ctx.createLinearGradient(0, p.y - 280 * Z, 0, feetY);
+    pGrad.addColorStop(0, 'rgba(255, 215, 0, 0)');
+    pGrad.addColorStop(0.3, 'rgba(255, 230, 110, ' + (auraAlpha * 0.42).toFixed(3) + ')');
+    pGrad.addColorStop(0.8, 'rgba(112, 161, 255, ' + (auraAlpha * 0.6).toFixed(3) + ')');
+    pGrad.addColorStop(1, 'rgba(255, 215, 0, ' + (auraAlpha * 0.85).toFixed(3) + ')');
+    ctx.fillStyle = pGrad;
+    ctx.beginPath();
+    ctx.moveTo(p.x - pillarW, feetY);
+    ctx.lineTo(p.x + pillarW, feetY);
+    ctx.lineTo(p.x + pillarW * 0.5, p.y - 280 * Z);
+    ctx.lineTo(p.x - pillarW * 0.5, p.y - 280 * Z);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. 环绕金丹/元神流光法球
+    for (var oi = 0; oi < 4; oi++) {
+      var orbAng = rot * 2.2 + oi * (Math.PI / 2);
+      var orbRx = 38 * Z, orbRy = 18 * Z;
+      var ox = p.x + Math.cos(orbAng) * orbRx;
+      var oy = (p.y - 20 * Z) + Math.sin(orbAng) * orbRy;
+      ctx.fillStyle = '#fff056';
+      ctx.shadowColor = 'rgba(255, 215, 0, 0.9)';
+      ctx.shadowBlur = 10 * Z;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 4.2 * Z, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    // 4. 真实分形天雷电芒
+    for (var bi = 0; bi < tribulation.bolts.length; bi++) {
+      var bolt = tribulation.bolts[bi];
+      var bAlpha = bolt.life / bolt.maxLife;
+      ctx.save();
+      ctx.strokeStyle = bolt.color;
+      ctx.lineWidth = bolt.width;
+      ctx.shadowColor = '#00d2d3';
+      ctx.shadowBlur = 16 * Z;
+      ctx.beginPath();
+      for (var pt = 0; pt < bolt.pts.length; pt++) {
+        if (pt === 0) ctx.moveTo(bolt.pts[pt][0], bolt.pts[pt][1]);
+        else ctx.lineTo(bolt.pts[pt][0], bolt.pts[pt][1]);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 5. 飞溅雷火粒子
+    for (var si = 0; si < tribulation.sparks.length; si++) {
+      var sp = tribulation.sparks[si];
+      var spAlpha = sp.life / sp.maxLife;
+      ctx.fillStyle = sp.hue;
+      ctx.globalAlpha = spAlpha;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, sp.size * Z, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // 6. 天道金诏 · 境界突破敕封横幅
+    if (tTime >= 0.4 && tTime <= maxT) {
+      var bAlpha = 1.0;
+      if (tTime < 0.9) bAlpha = (tTime - 0.4) / 0.5;
+      else if (tTime > maxT - 0.7) bAlpha = (maxT - tTime) / 0.7;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, bAlpha));
+
+      var bw = 380 * Z, bh = 94 * Z;
+      var bx = W / 2 - bw / 2;
+      var by = 55 * Z;
+
+      // 金丝底纹衬板
+      var bgGrad = ctx.createLinearGradient(0, by, 0, by + bh);
+      bgGrad.addColorStop(0, 'rgba(16, 24, 48, 0.94)');
+      bgGrad.addColorStop(0.5, 'rgba(32, 20, 42, 0.96)');
+      bgGrad.addColorStop(1, 'rgba(16, 24, 48, 0.94)');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(bx, by, bw, bh);
+
+      // 双层紫金边框
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2.5 * Z;
+      ctx.strokeRect(bx, by, bw, bh);
+
+      ctx.strokeStyle = 'rgba(255, 230, 120, 0.4)';
+      ctx.lineWidth = 1.2 * Z;
+      ctx.strokeRect(bx + 4 * Z, by + 4 * Z, bw - 8 * Z, bh - 8 * Z);
+
+      // 四角祥云金纹
+      ctx.fillStyle = '#ffd700';
+      var cs = 8 * Z;
+      ctx.fillRect(bx - cs / 2, by - cs / 2, cs, cs);
+      ctx.fillRect(bx + bw - cs / 2, by - cs / 2, cs, cs);
+      ctx.fillRect(bx - cs / 2, by + bh - cs / 2, cs, cs);
+      ctx.fillRect(bx + bw - cs / 2, by + bh - cs / 2, cs, cs);
+
+      // 诏书主标题
+      ctx.textAlign = 'center';
+      ctx.font = 'bold ' + (21 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+      ctx.fillStyle = '#fff056';
+      ctx.shadowColor = 'rgba(255, 215, 0, 0.9)';
+      ctx.shadowBlur = 12 * Z;
+      ctx.fillText('✦ 境 界 突 破 · ' + tribulation.realmName + ' ✦', W / 2, by + 28 * Z);
+      ctx.shadowBlur = 0;
+
+      // 古韵四字真言批注
+      ctx.font = '500 ' + (13.5 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+      ctx.fillStyle = '#ffd384';
+      ctx.fillText(tribulation.motto, W / 2, by + 52 * Z);
+
+      // 属性增益明细
+      ctx.font = 'bold ' + (12 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
+      ctx.fillStyle = '#70a1ff';
+      ctx.fillText(tribulation.bonusText, W / 2, by + 74 * Z);
+
+      // 朱红天道印鉴
+      var sealX = bx + bw - 38 * Z, sealY = by + 24 * Z, sealS = 22 * Z;
+      ctx.strokeStyle = '#ff4757';
+      ctx.lineWidth = 1.8 * Z;
+      ctx.strokeRect(sealX, sealY, sealS, sealS);
+      ctx.font = 'bold ' + (9 * Z).toFixed(1) + 'px sans-serif';
+      ctx.fillStyle = '#ff4757';
+      ctx.fillText('得道', sealX + sealS / 2, sealY + sealS * 0.46);
+      ctx.fillText('证果', sealX + sealS / 2, sealY + sealS * 0.84);
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  var realmFx = 0;                   // 突破的金环特效计时（向后兼容）
   /** 加修为。★ 突破判定只在这里 —— 修为只有这一个入口，不可能有第二条触发路径。 */
   function gainCult(amount) {
     amount = Math.max(0, Math.round(amount || 0));
@@ -259,41 +647,19 @@
     if (up > 0) {
       player.hp = player.maxhp;       // 突破回满：让"变强"在血条上也看得见
       realmFx = 1.2;
-      /* 刻意**不用** player.flash —— 那套闪白在本游戏里是"挨打"的语义
-       * （见受伤分支 player.flash = 0.25），突破时闪一下会被读成被偷袭。金环够表达。 */
-      toast('境界突破 · ' + player.realmName + '\n攻 ' + player.atk + ' · 御 ' + player.def +
+      startTribulationBreakthrough(player.realmName);
+      toast('九霄天雷 · 境界突破至 ' + player.realmName + '\n攻 ' + player.atk + ' · 御 ' + player.def +
         ' · 气血 ' + player.maxhp);
     }
     quest.breaks++; checkQuest();   // ★4 任务：突破进度
     bagDirty = true;
     return up;
   }
-  /** 突破时的地面金环（比服药涟漪大一号，且往上冒一圈光柱） */
+  /** 突破时的地面金环与渡劫异象统一入口 */
   function drawRealmFx() {
-    if (realmFx <= 0) return;
-    var p = isoToScreen(player.mx, player.my);
-    var q = realmFx / 1.2;                 // 1 → 0
-    var rr = (1 - q) * 120 * Z + 18 * Z;
-    ctx.save();
-    ctx.globalAlpha = q * 0.85;
-    ctx.strokeStyle = '#ffd977'; ctx.lineWidth = 3 * Z;
-    ctx.beginPath(); ctx.ellipse(p.x, p.y + HH * Z, rr, rr * 0.5, 0, 0, 6.2832); ctx.stroke();
-    ctx.globalAlpha = q * 0.45;
-    ctx.lineWidth = 1.8 * Z;
-    ctx.beginPath(); ctx.ellipse(p.x, p.y + HH * Z, rr * 0.62, rr * 0.31, 0, 0, 6.2832); ctx.stroke();
-    // 光柱：从脚底往上收，像"气机拔高"
-    ctx.globalAlpha = q * 0.30;
-    var gr = ctx.createLinearGradient(0, p.y - 150 * Z, 0, p.y + HH * Z);
-    gr.addColorStop(0, 'rgba(255,217,119,0)');
-    gr.addColorStop(1, 'rgba(255,217,119,.9)');
-    ctx.fillStyle = gr;
-    var bw = (0.45 + q * 0.25) * 26 * Z;
-    ctx.beginPath();
-    ctx.moveTo(p.x - bw, p.y + HH * Z); ctx.lineTo(p.x + bw, p.y + HH * Z);
-    ctx.lineTo(p.x + bw * 0.45, p.y - 150 * Z); ctx.lineTo(p.x - bw * 0.45, p.y - 150 * Z);
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
+    drawTribulation();
   }
+
   var player = { mx: 12, my: 20, tx: 12, ty: 20, face: 'down', walk: 0, path: null,
     hp: BASE_STATS.maxhp, maxhp: BASE_STATS.maxhp,
     atk: BASE_STATS.atk, def: BASE_STATS.def, exp: 0, stones: 0, realmName: '炼气期',
@@ -5197,6 +5563,7 @@
     if (healCd > 0) { healCd = Math.max(0, healCd - dt); bagDirty = true; }   // 冷却结束要立刻解除格子的灰化
     if (healFx > 0) healFx = Math.max(0, healFx - dt);
     if (realmFx > 0) realmFx = Math.max(0, realmFx - dt);
+    updateTribulation(dt);
     updateLoot(dt);            // 掉落物：老化 + 拾取判定
     updateGather(dt);          // v47：走到采集点/宝箱跟前自动采集/开启
     for (var sk = 0; sk < player.skillCd.length; sk++) {

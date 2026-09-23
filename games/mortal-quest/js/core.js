@@ -712,6 +712,9 @@ GAME.Core = {
             p.currentHp = p.maxHp;
             p.changchunLevel += 1;   // 《青木功》随破境而深，每层 +5% 命中 / +10% 异常抗性
             GAME.UI.log("【突破成功】破境功成！你已踏入 " + newRealm.name + "！", "success");
+            if (GAME.UI.showBreakthroughModal) {
+                GAME.UI.showBreakthroughModal(newRealm.name, "气血上限 " + oldMaxHp + " → " + p.maxHp + "　｜　法力上限 " + p.maxMp + (isZhuji ? "　｜　寿元延至 " + newRealm.maxAge + " 岁" : ""));
+            }
             if (GAME.Moments) {
                 GAME.Moments.fire("first_breakthrough", newRealm.name);
                 if (isZhuji) GAME.Moments.fire("first_zhuji");
