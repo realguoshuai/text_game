@@ -372,10 +372,6 @@
     { x: 10, y: 20, t: 'dummy' }, { x: 16, y: 19, t: 'dummy' }, { x: 22, y: 20, t: 'dummy' },
     { x: 13, y: 25, t: 'dummy' }, { x: 21, y: 25, t: 'dummy' }
   ];
-  // 太虚山门 = 仙宗新境：东侧演武场设玄铁试招木桩
-  var SHANMEN_SPAWNS = [
-    { x: 18, y: 11, t: 'dummy' }, { x: 20, y: 12, t: 'dummy' }, { x: 18, y: 13, t: 'dummy' }
-  ];
   /* 灵泉灵瀑的怪：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 9 只，来自 sucai 下 CraftPix 怪物包。
    * 属性、刷怪格、动作帧率全部写在 tools/beast_packs.json，由 build_beasts_atlas.py 生成
    * assets/beasts.json，启动时灌进 FOE_DEFS 与 LINGQUAN_SPAWNS ——
@@ -758,6 +754,8 @@
    *     战斗里任何"自动镜头"都动不了它（现在没有，将来谁加也过不了这道闸）。 */
   var ZDEF = 1, zLock = false;
   var fadeA = 0, fadeDir = 0, pending = null, portalLock = 0;
+  var fadeTarget = null;
+  var FADE_OUT_DUR = 0.36, FADE_IN_DUR = 0.36;
   var HOLD = false, held = false;
   var cloudCv = null;
   var NPC_FILES = {};
@@ -1201,37 +1199,72 @@
     }
   }
 
-  /** 切图守卫：目标图的数据/图集没就绪就先补，再走原来的同步 switchTo。
-   *  已就绪时（绝大多数情况：首屏就是它，或后台预取已完成）等于零开销直接切 ——
-   *  所以按钮、传送门、调试 API 都可以无脑走它。 */
-  function goTo(id, x, y, silent) {
+  /** 切图守卫与平滑淡入淡出转场调度：
+   *  - 正常游戏下：触发自然淡出遮罩 -> 完全黑屏中转时段准备数据/图集并切图落点 -> 平滑淡入新场景
+   *  - instant=true 或无头自测环境（?autotest=）：零延迟瞬切，保证测试确定性
+   *  - 返回 Promise，转场结束或切图落定后 resolve。 */
+  function goTo(id, x, y, silent, instant) {
     var m = IDX[id] || MAPS[0];
+    if (!m) return Promise.resolve();
     var an = mapAtlas(m);
     var names = an ? [an] : [];
-    // 落点缺省 = 这张图的出生点。归一化只写这一处，两条分支共用 ——
-    // 曾经只有「补载后切」那条做了缺省，而地图按钮就是 goTo(m.id) 不带坐标：
-    // 外来图一进首屏（走同步分支），点按钮立刻把 undefined 传进
-    // switchTo → snapWalkable → walkable(undefined) 抛异常，rAF 循环当场死掉、画面卡住。
-    function land() {
-      switchTo(m.id, x === undefined ? m.home.x : x, y === undefined ? m.home.y : y, silent);
-    }
-    if (!(m.src && !m._data) && extrasReady(names)) {
-      land();
+
+    // 若目标已是当前地图且未指定不同坐标，无需重复切图
+    if (CUR && CUR.id === m.id && (x === undefined || (Math.abs(player.mx - x) < 0.3 && Math.abs(player.my - y) < 0.3))) {
       return Promise.resolve();
     }
-    var base = 0, span = 1;
-    function tick(f) { mapLoadTip('正在载入「' + m.name + '」…', Math.min(0.99, base + f * span)); }
-    mapLoadTip('正在载入「' + m.name + '」…', 0);
-    return ensureMapData(m, tick)
-      .then(function () {
-        // 两段进度：地形数据 0~35%，图集 35~100%（140KB 对 950KB 的量级差）
-        base = 0.35; span = 0.65;
-        return ensureExtras(names, tick);
-      })
-      .then(function () {
-        mapLoadTip(null);
-        land();
-      });
+
+    var isAutoTest = false;
+    try {
+      isAutoTest = !!(window.location && new URLSearchParams(window.location.search).get('autotest'));
+    } catch (e) {}
+
+    function landSync() {
+      switchTo(m.id, x === undefined ? m.home.x : x, y === undefined ? m.home.y : y, silent);
+      portalLock = 0.8;
+    }
+
+    // 瞬切分支（测试或显式 instant）
+    if (instant || isAutoTest) {
+      if (!(m.src && !m._data) && extrasReady(names)) {
+        landSync();
+        return Promise.resolve();
+      }
+      var base = 0, span = 1;
+      function tick(f) { mapLoadTip('正在载入「' + m.name + '」…', Math.min(0.99, base + f * span)); }
+      mapLoadTip('正在载入「' + m.name + '」…', 0);
+      return ensureMapData(m, tick)
+        .then(function () {
+          base = 0.35; span = 0.65;
+          return ensureExtras(names, tick);
+        })
+        .then(function () {
+          mapLoadTip(null);
+          landSync();
+        });
+    }
+
+    // 平滑淡入淡出转场分支
+    return new Promise(function (resolve, reject) {
+      player.path = null;
+      player.tx = player.mx;
+      player.ty = player.my;
+      if (typeof closeWorld === 'function' && worldOpen) closeWorld();
+
+      fadeTarget = {
+        id: m.id,
+        name: m.name,
+        region: mapRegion(m),
+        note: m.note || '',
+        x: x,
+        y: y,
+        silent: silent,
+        resolve: resolve,
+        reject: reject
+      };
+      // 启动淡出阶段
+      fadeDir = 1;
+    });
   }
 
   /** 进游戏后空闲预取按需图集 —— 用户点按钮时就不用等了。
@@ -4620,10 +4653,87 @@
       ctx.fillRect(0, 0, W, H);
     }
 
-    if (fadeA > 0) {
-      ctx.fillStyle = 'rgba(7,12,26,' + fadeA.toFixed(3) + ')';
-      ctx.fillRect(0, 0, W, H);
+  /** 地图流转淡入淡出过渡绘制：
+   *  非线性正弦缓动 + 仙境深邃幽玄背景 + 空间暗角 + 雅致仙门铭文题记 */
+  function drawMapTransition() {
+    if (fadeA <= 0) return;
+    var rawA = Math.min(1, Math.max(0, fadeA));
+    // smoothstep 缓动曲线：两端渐缓，消减机械线性生硬感
+    var ease = rawA * rawA * (3 - 2 * rawA);
+
+    ctx.save();
+    // 1. 底层：深邃仙夜幽玄底色
+    ctx.fillStyle = 'rgba(7, 12, 24, ' + ease.toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+
+    // 2. 径向渐变虚空暗角：四周略深，中央透出幽微玄气
+    var maxDim = Math.max(W, H);
+    var minDim = Math.min(W, H);
+    var grad = ctx.createRadialGradient(W * 0.5, H * 0.5, minDim * 0.15, W * 0.5, H * 0.5, maxDim * 0.72);
+    grad.addColorStop(0, 'rgba(12, 28, 48, ' + (ease * 0.28).toFixed(3) + ')');
+    grad.addColorStop(0.55, 'rgba(6, 12, 22, ' + (ease * 0.65).toFixed(3) + ')');
+    grad.addColorStop(1, 'rgba(2, 4, 10, ' + (ease * 0.98).toFixed(3) + ')');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 3. 转场铭文与仙境名提示：在淡出深处自然浮现与消隐
+    var targetInfo = fadeTarget;
+    var mapName = targetInfo ? targetInfo.name : (CUR ? CUR.name : '');
+    var mapNote = targetInfo ? (targetInfo.region || targetInfo.note || '') : (CUR ? (CUR.region || CUR.note || '') : '');
+
+    if (mapName && ease > 0.35) {
+      var textAlpha = Math.min(1, (ease - 0.35) / 0.45);
+      if (fadeDir === -1) {
+        textAlpha = Math.min(textAlpha, rawA / 0.85);
+      }
+      if (textAlpha > 0.02) {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        var cy = H * 0.46;
+        var lineLen = Math.min(120, W * 0.2);
+        // 饰线：左右两道淡青灵光
+        var strokeGradL = ctx.createLinearGradient(W * 0.5 - lineLen - 50, cy, W * 0.5 - 50, cy);
+        strokeGradL.addColorStop(0, 'rgba(139, 243, 255, 0)');
+        strokeGradL.addColorStop(1, 'rgba(139, 243, 255, ' + (textAlpha * 0.45).toFixed(3) + ')');
+        ctx.strokeStyle = strokeGradL;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(W * 0.5 - lineLen - 50, cy);
+        ctx.lineTo(W * 0.5 - 50, cy);
+        ctx.stroke();
+
+        var strokeGradR = ctx.createLinearGradient(W * 0.5 + 50, cy, W * 0.5 + lineLen + 50, cy);
+        strokeGradR.addColorStop(0, 'rgba(139, 243, 255, ' + (textAlpha * 0.45).toFixed(3) + ')');
+        strokeGradR.addColorStop(1, 'rgba(139, 243, 255, 0)');
+        ctx.strokeStyle = strokeGradR;
+        ctx.beginPath();
+        ctx.moveTo(W * 0.5 + 50, cy);
+        ctx.lineTo(W * 0.5 + lineLen + 50, cy);
+        ctx.stroke();
+
+        // 核心地标名称：典雅衬线宋体字
+        var titleSize = Math.max(18, Math.min(30, Math.round(W * 0.035)));
+        ctx.font = '600 ' + titleSize + 'px "Noto Serif SC", "Songti SC", STSong, "Source Han Serif SC", serif';
+        ctx.shadowColor = 'rgba(139, 243, 255, 0.6)';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = 'rgba(235, 250, 255, ' + textAlpha.toFixed(3) + ')';
+        ctx.fillText(mapName, W * 0.5, cy);
+        ctx.shadowBlur = 0;
+
+        // 辅助说明或修真地域标注
+        if (mapNote) {
+          var subNote = (mapNote.length > 28 ? mapNote.slice(0, 28) + '…' : mapNote);
+          ctx.font = '400 ' + Math.max(11, Math.round(titleSize * 0.48)) + 'px sans-serif';
+          ctx.fillStyle = 'rgba(170, 215, 235, ' + (textAlpha * 0.72).toFixed(3) + ')';
+          ctx.fillText(subNote, W * 0.5, cy + titleSize * 1.05);
+        }
+      }
     }
+    ctx.restore();
+  }
+
+    drawMapTransition();
     drawHealFx();      // 服药的脚下涟漪（没在服药时零开销）
     drawRealmFx();     // 突破的金环 + 光柱（同上，realmFx=0 时立刻 return）
     updateHUD();
@@ -4650,7 +4760,6 @@
     refreshWorldOn();        // 世界地图总览里当前节点同步高亮
     var hintEl = document.getElementById('hint');
     if (silent) hintEl.textContent = '踩上青色光门即可切换地图';
-    else if (CUR.id === 'shanmen_new') hintEl.textContent = '太虚山门 · 仙宗福地：迎客石坊、镇山神兽、九龙神鼎、太虚主殿。东侧演武场设试招木桩，坊市可采买丹药法宝';
     else if (CUR.id === 'qingxuan') hintEl.textContent = '青玄山门 · 人物调试场：空地试移动，石傀试招（J 攻击A / K 重击B / U 御剑诀 / I 雷罡咒 / O 太虚剑域 / 1~6 试动作）';
     else if (CUR.id === 'lingquan') hintEl.textContent = '灵泉灵瀑 · 妖兽领地：牛魔 / 游方 / 蛇妖 / 铠甲卫 / 小僵尸 五族共 ' + LINGQUAN_SPAWNS.length + ' 只（J 普攻 / K 重击 / U·I·O 三招技能，Shift 奔跑）';
     else if (CUR.id === 'dungeon') hintEl.textContent = '幽冥地宫 · 尸气弥漫：小僵尸 ' + DUNGEON_SPAWNS.length + ' 只盘踞各处，南/西/东三门分别通往青玄山门 / 灵泉灵瀑 / 碑林石阵';
@@ -4659,10 +4768,9 @@
     else if (CUR.id === 'flare_grass_empyrean_campaign_lochport_cemetery')
       hintEl.textContent = '洛赫港墓园 · 尸气盘桓：' + CEMETERY_SPAWNS.length + ' 只（小僵尸成群 + 牛魔守陵），越往里越硬';
     else hintEl.textContent = '已传送至「' + CUR.name + '」 · ' + CUR.note;
-    // 刷怪表：碑林石阵（猎场）/ 太虚山门（演武场）/ 青玄山门（调试场）/ 灵泉灵瀑（五族）/ 幽冥地宫（僵尸群）
+    // 刷怪表：碑林石阵（猎场）/ 青玄山门（调试场）/ 灵泉灵瀑（五族）/ 幽冥地宫（僵尸群）
     // / 洛赫港（绿林劫道）/ 洛赫港墓园（僵尸盘桓）；其它图清空战斗状态
     if (CUR.id === 'beilin') { foes = makeFoes(BEILIN_SPAWNS); }          // 碑林石阵：老猎场
-    else if (CUR.id === 'shanmen_new') { foes = makeFoes(SHANMEN_SPAWNS); } // 太虚山门：仙宗演武场木桩
     else if (CUR.id === 'qingxuan') { foes = makeFoes(QINGXUAN_SPAWNS); }  // 青玄山门：调试场
     else if (CUR.id === 'lingquan') { foes = makeFoes(LINGQUAN_SPAWNS); }  // 灵泉灵瀑：五族怪物
     else if (CUR.id === 'dungeon') { foes = makeFoes(DUNGEON_SPAWNS); }    // 幽冥地宫：小僵尸群
@@ -4995,14 +5103,61 @@
     if (autosaveT >= AUTOSAVE_EVERY) { autosaveT = 0; saveGame(true); }
     if (portalLock > 0) portalLock -= dt;
 
-    // —— 过渡状态机 ——
+    // —— 过渡状态机（地图切换平滑淡入淡出） ——
     if (fadeDir === 1) {
-      fadeA += dt / 0.42;
+      fadeA += dt / FADE_OUT_DUR;
       if (HOLD && fadeA >= 0.55) { fadeA = 0.55; held = true; }
-      if (fadeA >= 1) { fadeA = 1; var pt = pending; pending = null; goTo(pt.to, pt.spawnX, pt.spawnY, false); fadeDir = -1; }
+      if (fadeA >= 1) {
+        fadeA = 1;
+        var tgt = fadeTarget || pending;
+        fadeTarget = null;
+        pending = null;
+        if (tgt) {
+          var targetId = tgt.id || tgt.to;
+          var targetX = tgt.x !== undefined ? tgt.x : tgt.spawnX;
+          var targetY = tgt.y !== undefined ? tgt.y : tgt.spawnY;
+          var tm = IDX[targetId] || MAPS[0];
+          var an = mapAtlas(tm);
+          var names = an ? [an] : [];
+
+          function applyTransitionLand() {
+            switchTo(tm.id, targetX === undefined ? tm.home.x : targetX, targetY === undefined ? tm.home.y : targetY, tgt.silent);
+            portalLock = 0.8;
+            fadeDir = -1; // 场景与角色落定后，平滑淡入
+            if (tgt.resolve) {
+              tgt.resolve();
+              tgt.resolve = null;
+            }
+          }
+
+          if (!(tm.src && !tm._data) && extrasReady(names)) {
+            applyTransitionLand();
+          } else {
+            mapLoadTip('正在载入「' + tm.name + '」…', 0);
+            ensureMapData(tm, function (f) { mapLoadTip('正在载入「' + tm.name + '」…', Math.min(0.99, f * 0.35)); })
+              .then(function () {
+                return ensureExtras(names, function (f) { mapLoadTip('正在载入「' + tm.name + '」…', Math.min(0.99, 0.35 + f * 0.65)); });
+              })
+              .then(function () {
+                mapLoadTip(null);
+                applyTransitionLand();
+              })
+              .catch(function (err) {
+                mapLoadTip(null);
+                applyTransitionLand();
+                if (tgt.reject) tgt.reject(err);
+              });
+          }
+        } else {
+          fadeDir = -1;
+        }
+      }
     } else if (fadeDir === -1) {
-      fadeA -= dt / 0.42;
-      if (fadeA <= 0) { fadeA = 0; fadeDir = 0; }
+      fadeA -= dt / FADE_IN_DUR;
+      if (fadeA <= 0) {
+        fadeA = 0;
+        fadeDir = 0;
+      }
     }
     if (fadeDir !== 0) { updateCam(dt); return; }
 
@@ -5135,7 +5290,11 @@
       for (var i = 0; i < CUR.portals.length; i++) {
         var pt = CUR.portals[i];
         var onCell = (Math.abs(player.mx - pt.x) < 0.34 && Math.abs(player.my - pt.y) < 0.34);
-        if (onCell) { pending = pt; fadeDir = 1; player.path = null; player.tx = player.mx; player.ty = player.my; break; }
+        if (onCell) {
+          spawnPortalFx(pt.x, pt.y);
+          goTo(pt.to, pt.spawnX, pt.spawnY, false);
+          break;
+        }
       }
     }
     if (player.attackCd > 0) player.attackCd = Math.max(0, player.attackCd - dt);
@@ -5263,6 +5422,22 @@
     for (var i = 0; i < 10; i++) {
       var a = Math.random() * 6.2832, sp = 1.5 + Math.random() * 2.5;
       particles.push({ mx: mx, my: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5, life: 0.6, max: 0.6, color: '#ffe1a0' });
+    }
+  }
+  /** 踩上传送阵脚下喷薄升腾的青莲灵光粒子 */
+  function spawnPortalFx(mx, my) {
+    if (!particles) return;
+    for (var i = 0; i < 16; i++) {
+      var a = Math.random() * 6.2832, sp = 1.0 + Math.random() * 2.2;
+      particles.push({
+        mx: mx + (Math.random() - 0.5) * 0.3,
+        my: my + (Math.random() - 0.5) * 0.3,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 2.0,
+        life: 0.65,
+        max: 0.65,
+        color: '#8bf3ff'
+      });
     }
   }
   // 居中提示条：把"被击退/折损银两"这类事件说清楚，避免玩家只看到画面一跳却没有解释
@@ -6801,7 +6976,6 @@
    * 16 张图来回横跳几十秒就能把货架刷成任意想要的，现货的稀缺性等于零。
    * 副作用是好事：城镇 = 补给点，野外 = 猎场，地图之间终于有了功能差异。 */
   var TOWN_MAPS = {
-    shanmen_new: 1,
     qingxuan: 1,
     flare_grass_empyrean_campaign_black_oak_city: 1,
     flare_grass_empyrean_campaign_lochport: 1
@@ -8660,6 +8834,7 @@
    * 返回 true 表示这一下点的是妖兽。
    * ⚠ 倒地中的怪（dying>0，alive 还是 true）点不动 —— 它已经死了，锁上去只会站着干等。 */
   function tapMap(cx, cy) {
+    if (fadeDir !== 0 && fadeA > 0.35) return false;
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i]; if (!f.alive || f.dying > 0) continue;
       if (Math.hypot(f.x - cx, f.y - cy) < 0.8) {

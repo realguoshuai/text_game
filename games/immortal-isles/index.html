@@ -950,14 +950,6 @@
   <div id="herobar">
     <div class="heros" id="heroBtns"></div>
   </div>
-  <div class="shanmen-switcher" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:4px;">
-    <button id="btnGotoShanmenNew" style="flex:1;padding:4px 6px;font-size:11px;font-family:inherit;border-radius:4px;border:1px solid rgba(139,243,255,0.45);background:rgba(20,50,70,0.7);color:#8bf3ff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;" title="前往重新设计的全新太虚山门">
-      <span>⛩️</span><span>太虚新山门</span>
-    </button>
-    <button id="btnGotoQingxuan" style="flex:1;padding:4px 6px;font-size:11px;font-family:inherit;border-radius:4px;border:1px solid rgba(255,255,255,0.18);background:rgba(30,30,40,0.5);color:#d1d5db;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;" title="对比原青玄山门旧址">
-      <span>🏔️</span><span>青玄旧址</span>
-    </button>
-  </div>
 </div>
 
 <!-- 场景缩略图：跟着地图面板排在同一列，标题条点一下收起，展开时点地图任意一格即寻路过去 -->
@@ -1381,52 +1373,6 @@
 })();
 </script>
 
-<script src="js/game.js?v=67"></script>
-<script>
-(function() {
-  var bNew = document.getElementById('btnGotoShanmenNew');
-  var bOld = document.getElementById('btnGotoQingxuan');
-  if (bNew) {
-    bNew.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (window.ISLES && window.ISLES.goto) window.ISLES.goto('shanmen_new');
-      else location.search = '?map=shanmen_new';
-    });
-  }
-  if (bOld) {
-    bOld.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (window.ISLES && window.ISLES.goto) window.ISLES.goto('qingxuan');
-      else location.search = '?map=qingxuan';
-    });
-  }
-  function syncShanmenBtn() {
-    var cur = (window.ISLES && window.ISLES.map) || '';
-    if (bNew) {
-      if (cur === 'shanmen_new') {
-        bNew.style.borderColor = '#38ef7d';
-        bNew.style.background = 'rgba(16,80,60,0.85)';
-        bNew.style.color = '#a7f3d0';
-      } else {
-        bNew.style.borderColor = 'rgba(139,243,255,0.45)';
-        bNew.style.background = 'rgba(20,50,70,0.7)';
-        bNew.style.color = '#8bf3ff';
-      }
-    }
-    if (bOld) {
-      if (cur === 'qingxuan') {
-        bOld.style.borderColor = '#38ef7d';
-        bOld.style.background = 'rgba(16,80,60,0.85)';
-        bOld.style.color = '#a7f3d0';
-      } else {
-        bOld.style.borderColor = 'rgba(255,255,255,0.18)';
-        bOld.style.background = 'rgba(30,30,40,0.5)';
-        bOld.style.color = '#d1d5db';
-      }
-    }
-  }
-  setInterval(syncShanmenBtn, 500);
-})();
-</script>
+<script src="js/game.js?v=69"></script>
 </body>
 </html>
