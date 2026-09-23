@@ -336,13 +336,14 @@
   function checkQuest() {
     if (quest.done) return;
     var q = QUESTS[quest.step];
-    if (!q) { quest.done = true; toast('新手任务已全部完成，少侠前途无量！'); return; }
+    if (!q) { quest.done = true; toast('新手任务已全部完成，少侠前途无量！'); saveGame(true); return; }
     if ((quest[q.key] || 0) >= q.need) {
       quest.step++;
       if (q.id === 'kill') { player.stones += 60; toast('任务达成：击杀妖兽 ×5，奖励 60 银两'); }
       else if (q.id === 'gather') { player.stones += 50; toast('任务达成：采集 ×3，奖励 50 银两'); }
       else if (q.id === 'break') { player.stones += 100; toast('任务达成：突破 ×1，奖励 100 银两'); }
       bagDirty = true;
+      saveGame(true); // 关键历练达成：自动存档并触发金色涟漪反馈
       checkQuest();   // 可能一步连过两阶段
     }
   }
@@ -3899,8 +3900,17 @@
               }
               res[si3].dmg2 = hb2 - tg3.hp;
             }
+            // ★ 验证自动攻击连击时打断平A施法（用户反馈：自动攻击时点击技能释放不出来）
+            setup();
+            player.targetFoe = tg3;
+            player.act = 'atkA';
+            player.actHold = 0.35;
+            player.attackCd = 0.45;
+            player.skillCd[0] = 0;
+            var castDuringAutoAtk = castSkill(0);
           }
           pbs.textContent = JSON.stringify({ n: SKILLS.length, skills: res,
+            castDuringAutoAtk: castDuringAutoAtk === true,
             fxDrawn: (window.__fxDrawn || 0),   // 真实画帧数（≥4 = 四招特效真的上屏，不是只入队）
             fxMissWhy: window.__fxMissWhy || null,
             fxImg: !!(ATLAS.fx && ATLAS.fx.img), fxRect: !!(ATLAS.fx && ATLAS.fx.rect) });
@@ -5248,24 +5258,26 @@
       } else {
         faceToward(tf.x, tf.y);                   // 无论要走还是要打，先朝它
         if (tdist > MELEE - 0.1) {
-          var tux = tdx / (tdist || 1), tuy = tdy / (tdist || 1), tsp = speed * dt;
-          var px1 = player.mx, py1 = player.my;
-          if (couldStand(player.mx + tux * tsp, player.my)) player.mx += tux * tsp;
-          if (couldStand(player.mx, player.my + tuy * tsp)) player.my += tuy * tsp;
-          player.walk = player.walk + dt;
-          var stick = (Math.abs(player.mx - px1) < 1e-6 && Math.abs(player.my - py1) < 1e-6);
-          player.foeStuck = stick ? player.foeStuck + dt : 0;
-          if (player.foeStuck > 0.5 && !player.foeChased) {
-            player.foeChased = true;              // 只试一次，别每 0.5 秒跑一遍 BFS
-            var rt = findPath(Math.round(player.mx), Math.round(player.my),
-              Math.round(tf.x), Math.round(tf.y));
-            if (rt && rt.length) {
-              player.path = rt;                   // 交给点击寻路分支绕过去（它会接管移动）
-              player.tx = Math.round(tf.x); player.ty = Math.round(tf.y);
-              player.foeStuck = 0;
-            } else {
-              player.targetFoe = null;
-              toast('那只妖兽过不去 —— 隔着水面或断崖');
+          if (player.actHold <= 0) {
+            var tux = tdx / (tdist || 1), tuy = tdy / (tdist || 1), tsp = speed * dt;
+            var px1 = player.mx, py1 = player.my;
+            if (couldStand(player.mx + tux * tsp, player.my)) player.mx += tux * tsp;
+            if (couldStand(player.mx, player.my + tuy * tsp)) player.my += tuy * tsp;
+            player.walk = player.walk + dt;
+            var stick = (Math.abs(player.mx - px1) < 1e-6 && Math.abs(player.my - py1) < 1e-6);
+            player.foeStuck = stick ? player.foeStuck + dt : 0;
+            if (player.foeStuck > 0.5 && !player.foeChased) {
+              player.foeChased = true;              // 只试一次，别每 0.5 秒跑一遍 BFS
+              var rt = findPath(Math.round(player.mx), Math.round(player.my),
+                Math.round(tf.x), Math.round(tf.y));
+              if (rt && rt.length) {
+                player.path = rt;                   // 交给点击寻路分支绕过去（它会接管移动）
+                player.tx = Math.round(tf.x); player.ty = Math.round(tf.y);
+                player.foeStuck = 0;
+              } else {
+                player.targetFoe = null;
+                toast('那只妖兽过不去 —— 隔着水面或断崖');
+              }
             }
           }
         } else {
@@ -5385,10 +5397,58 @@
   }
   function addFloater(mx, my, text, color, opts) {
     var o = opts || {};
+    var isCrit = !!o.crit;
+    var dur = isCrit ? 1.25 : (o.dur || 0.95);
+    var jx = (o.jx !== undefined) ? o.jx : ((Math.random() * 2 - 1) * (isCrit ? 12 : 8));
     floaters.push({
-      mx: mx, my: my, off: 0, text: text, color: color,
-      life: o.crit ? 1.3 : 0.95, max: o.crit ? 1.3 : 0.95,
-      crit: !!o.crit, rise: o.crit ? 54 : 34      // 暴击飘得更久更高，一眼能分辨
+      mx: mx, my: my, off: 0, jx: jx, text: String(text), color: color,
+      life: dur, max: dur, crit: isCrit,
+      type: o.type || (isCrit ? 'crit' : 'phys'),
+      el: o.el || '',
+      rise: o.rise || (isCrit ? 56 : 38)
+    });
+  }
+
+  /** 战斗伤害漂浮数字核心入口：
+   *  根据伤害类型（暴击、物理、法术五行、妖兽伤害）自动分发专属配色、字号与光晕 */
+  function addDamageFloater(mx, my, dmg, type, opts) {
+    var o = opts || {};
+    var isCrit = (type === 'crit' || !!o.crit);
+    var dVal = Math.max(1, Math.round(dmg));
+    var color = '#ffffff';
+    var text = '-' + dVal;
+
+    if (isCrit) {
+      type = 'crit';
+      color = '#fff056'; // 耀眼真金 · 暴击
+      text = '⚡ ' + dVal;
+    } else if (type === 'phys') {
+      color = '#ffffff'; // 纯白剑芒 · 物理
+      text = '-' + dVal;
+    } else if (type === 'spell') {
+      var el = o.el || '金';
+      if (el === '火') color = '#ff5722';       // 烈焰朱雀
+      else if (el === '水') color = '#00d2d3';  // 玄冥寒冰 / 惊雷
+      else if (el === '木') color = '#ff78c4';  // 太虚剑阵 / 青木幽光
+      else if (el === '金') color = '#70a1ff';  // 白虎庚金
+      else if (el === '土') color = '#f39c12';  // 戊土厚岩
+      else color = o.color || '#54a0ff';
+      text = '-' + dVal;
+    } else if (type === 'foe') {
+      color = '#ff4d4f'; // 妖兽爪击 · 猩红
+      text = '-' + dVal;
+    } else if (type === 'foe_skill') {
+      color = '#ff1744'; // 妖兽重击/AOE · 破防危色
+      text = '危 -' + dVal;
+    }
+
+    addFloater(mx, my, text, color, {
+      crit: isCrit,
+      type: type,
+      el: o.el,
+      jx: (Math.random() * 2 - 1) * (isCrit ? 14 : 9),
+      rise: isCrit ? 60 : 40,
+      dur: isCrit ? 1.25 : 0.95
     });
   }
   /** 目标是否落在角色「面朝方向」的扇形内（cos 值越小扇形越宽）
@@ -5510,11 +5570,16 @@
     best.hp -= hit.dmg;
     best.flash = hit.crit ? 0.4 : 0.22;
     bumpCombo(best);
-    addFloater(best.x, best.y - 0.3, (hit.crit ? '暴击 -' : '-') + hit.dmg,
-      hit.crit ? '#ffe66b' : '#ffd36b', { crit: hit.crit });
-    if (hit.el) addFloater(best.x, best.y - 0.9, (hit.elMul > 1 ? '克制 +30%' : '被克 -20%'),
-      hit.elMul > 1 ? '#9dff9d' : '#ff9d9d', {});
-    if (hit.crit) { player.critT = 0.45; screenShake = Math.max(screenShake, 0.22); addFloater(best.x, best.y - 1.1, '暴击！', '#ff9f43', { crit: true }); }
+    if (hit.crit) {
+      addDamageFloater(best.x, best.y - 0.3, hit.dmg, 'crit', { el: weaponEl() });
+      player.critT = 0.45; screenShake = Math.max(screenShake, 0.22);
+    } else {
+      var wel = weaponEl();
+      if (wel && wel !== '无') addDamageFloater(best.x, best.y - 0.3, hit.dmg, 'spell', { el: wel });
+      else addDamageFloater(best.x, best.y - 0.3, hit.dmg, 'phys');
+    }
+    if (hit.el) addFloater(best.x, best.y - 0.85, (hit.elMul > 1 ? '克制 +30%' : '被克 -20%'),
+      hit.elMul > 1 ? '#9dff9d' : '#ff9d9d', { dur: 0.85, rise: 30 });
     if (best.hp <= 0) killFoe(best); else hurtFoe(best);
   }
   // 玩家主动出手（J/空格/点击妖兽）：锁定仇恨内最近的妖兽并打一下
@@ -5559,6 +5624,7 @@
     }
     if (near && nd <= MELEE + 1.4) faceToward(near.x, near.y);
     player.act = 'atkB'; player.actT = 0; player.actHold = ACT_DUR.atkB;
+    player.attackCd = Math.max(player.attackCd, ACT_DUR.atkB); // 保护重击动作不被自动平A覆盖
     // 重击是横扫，扇形比普攻宽（±90°），但依然要求大致朝着目标
     var reach = MELEE + 0.55, hit = [];
     for (var i = 0; i < foes.length; i++) {
@@ -5576,10 +5642,16 @@
       var r = rollDamage(player.atk * 2, g.def, { heavy: true, atkEl: weaponEl(), defEl: g.el });
       if (r.crit) crits++;
       g.hp -= r.dmg; g.flash = r.crit ? 0.5 : 0.3;
-      addFloater(g.x, g.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
-        r.crit ? '#ffe66b' : '#ffd36b', { crit: r.crit });
-      if (r.el) addFloater(g.x, g.y - 0.9, (r.elMul > 1 ? '克制 +30%' : '被克 -20%'),
-        r.elMul > 1 ? '#9dff9d' : '#ff9d9d', {});
+      var wEl = weaponEl();
+      if (r.crit) {
+        addDamageFloater(g.x, g.y - 0.3, r.dmg, 'crit', { el: wEl });
+      } else if (wEl && wEl !== '无') {
+        addDamageFloater(g.x, g.y - 0.3, r.dmg, 'spell', { el: wEl });
+      } else {
+        addDamageFloater(g.x, g.y - 0.3, r.dmg, 'phys');
+      }
+      if (r.el) addFloater(g.x, g.y - 0.85, (r.elMul > 1 ? '克制 +30%' : '被克 -20%'),
+        r.elMul > 1 ? '#9dff9d' : '#ff9d9d', { dur: 0.85, rise: 30 });
       var dx = g.x - player.mx, dy = g.y - player.my, dd = Math.hypot(dx, dy) || 1;
       for (var s = 0; s < 3; s++) {                       // 把妖兽推开
         if (couldStand(g.x + dx / dd * 0.3, g.y)) g.x += dx / dd * 0.3;
@@ -5703,7 +5775,7 @@
       } else if (player.invuln <= 0 && !player.dead &&
                  Math.hypot(player.mx - p.x, player.my - p.y) < 0.5) {
         player.hp -= p.dmg; player.flash = 0.25;
-        addFloater(player.mx, player.my - 0.35, '-' + p.dmg, '#ff6b6b'); screenShake = Math.max(screenShake, 0.3);
+        addDamageFloater(player.mx, player.my - 0.35, p.dmg, 'foe'); screenShake = Math.max(screenShake, 0.3);
         impactFx(p.x, p.y, 0.7);
         if (player.hp <= 0) playerDown(null);
         projectiles.splice(i, 1);
@@ -5713,10 +5785,15 @@
   /** 玩家弹道命中：直击全额 + 爆炸波及周围（splash 倍率、splashR 半径），统一走 rollDamage */
   function projHitFoe(p, f) {
     var s = p.skill;
-    var r = rollDamage(player.atk * s.mul, f.def, { heavy: true });
+    var r = rollDamage(player.atk * s.mul, f.def, { heavy: true, atkEl: s.el, defEl: f.el });
     f.hp -= r.dmg; f.flash = r.crit ? 0.5 : 0.3;
-    addFloater(f.x, f.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
-      r.crit ? '#ffe66b' : (s.color || '#ffd36b'), { crit: r.crit });
+    if (r.crit) {
+      addDamageFloater(f.x, f.y - 0.3, r.dmg, 'crit', { el: s.el });
+    } else {
+      addDamageFloater(f.x, f.y - 0.3, r.dmg, 'spell', { el: s.el, color: s.color });
+    }
+    if (r.el) addFloater(f.x, f.y - 0.85, (r.elMul > 1 ? '克制 +30%' : '被克 -20%'),
+      r.elMul > 1 ? '#9dff9d' : '#ff9d9d', { dur: 0.85, rise: 30 });
     if (f.hp <= 0) killFoe(f); else hurtFoe(f);
     bumpCombo(f);
     if (r.crit) player.critT = 0.45; screenShake = Math.max(screenShake, 0.22);
@@ -5725,9 +5802,10 @@
         var g = foes[j];
         if (g === f || !g.alive || g.dying > 0) continue;
         if (Math.hypot(g.x - p.x, g.y - p.y) <= (s.splashR || 1.5)) {
-          var r2 = rollDamage(player.atk * s.mul * s.splash, g.def, {});
+          var r2 = rollDamage(player.atk * s.mul * s.splash, g.def, { atkEl: s.el, defEl: g.el });
           g.hp -= r2.dmg; g.flash = 0.25;
-          addFloater(g.x, g.y - 0.3, '-' + r2.dmg, s.color || '#ffd36b');
+          if (r2.crit) addDamageFloater(g.x, g.y - 0.3, r2.dmg, 'crit', { el: s.el });
+          else addDamageFloater(g.x, g.y - 0.3, r2.dmg, 'spell', { el: s.el, color: s.color });
           if (g.hp <= 0) killFoe(g); else hurtFoe(g);
         }
       }
@@ -5746,16 +5824,35 @@
   }
   function castSkill(i) {
     var s = SKILLS[i];
-    if (!s || player.dead) return false;
+    if (!s) {
+      if (console && console.warn) console.warn('[Skill] 未知技能序号:', i);
+      return false;
+    }
+    if (player.dead) {
+      if (console && console.log) console.log('[Skill] 玩家倒地，无法释放:', s.name);
+      return false;
+    }
     var h0 = document.getElementById('hint');
     if (player.skillCd[i] > 0) {
       if (h0) h0.textContent = s.name + ' 冷却中（剩 ' + player.skillCd[i].toFixed(1) + ' 秒）';
+      if (console && console.log) console.log('[Skill] 技能冷却中:', s.name, '剩余CD:', player.skillCd[i].toFixed(2) + 's');
       return false;
     }
-    if (player.actHold > 0 || player.attackCd > 0) return false;   // 上一刀没播完，别掐断
-    // 自动锁定（v45）：半径取「技能射程」与默认仇恨的较大者 —— **技能范围内有怪必选中**，
-    // 并自动转向它；范围内没怪则保持当前朝向，朝角色正前方释放。
-    var t = nearestFoe(Math.max(AGGRO * 1.8, (s.reach || 0) + 1.2));
+    // ★ 关键修复：技能是高优先级动作，支持打断普攻（Skill Canceling），不能被普攻冷却或动作残余卡死
+    // 自动锁定：优先选择当前已锁定的活体妖兽，无锁定则自动搜索范围内最近的目标
+    var tf = (player.targetFoe && player.targetFoe.alive && player.targetFoe.dying <= 0) ? player.targetFoe : null;
+    var t = tf || nearestFoe(Math.max(AGGRO * 1.8, (s.reach || 0) + 1.2));
+    if (console && console.log) {
+      console.log('[Skill] 释放技能:', s.name, {
+        index: i,
+        prevAct: player.act,
+        actHold: +player.actHold.toFixed(2),
+        attackCd: +player.attackCd.toFixed(2),
+        lockedFoe: tf ? tf.name : null,
+        target: t ? t.name : '无(朝向正前方)'
+      });
+    }
+    window.__lastSkillCast = { id: s.id, name: s.name, time: Date.now(), interruptedAct: player.act };
     if (t) setFaceFromDelta(t.x - player.mx, t.y - player.my);
     var v = FACE_VEC[player.face] || FACE_VEC.down;
     var cx = player.mx, cy = player.my;
@@ -5773,6 +5870,7 @@
       }
       player.skillCd[i] = s.cd;
       player.act = s.act; player.actT = 0; player.actHold = ACT_DUR[s.act];
+      player.attackCd = Math.max(player.attackCd, ACT_DUR[s.act]); // 保护施法动作不被自动平A覆盖
       projectiles.push({ x: player.mx + pvx * 0.4, y: player.my + pvy * 0.4,
         vx: pvx, vy: pvy, spd: s.spd || 6, life: (s.reach || 9) / (s.spd || 6),
         side: 'player', fx: s.fx || 'fireball', skill: s });
@@ -5783,6 +5881,7 @@
     var hits = skillTargets(s, cx, cy);
     player.skillCd[i] = s.cd;
     player.act = s.act; player.actT = 0; player.actHold = ACT_DUR[s.act];
+    player.attackCd = Math.max(player.attackCd, ACT_DUR[s.act]); // 保护施法动作不被自动平A覆盖
     var dur = s.kind === 'target' ? 0.8 : 0.5;
     skillFx.push({ kind: s.kind, x: cx, y: cy, r: s.reach, color: s.color, dir: v, life: dur, max: dur,
       fx: s.fx, seed: (Math.random() * 0x7fffffff) | 0 });
@@ -5798,10 +5897,13 @@
       if (r.crit) crits++;
       sum += r.dmg;
       g.hp -= r.dmg; g.flash = r.crit ? 0.5 : 0.3;
-      addFloater(g.x, g.y - 0.3, (r.crit ? '暴击 -' : '-') + r.dmg,
-        r.crit ? '#ffe66b' : (s.color || '#ffd36b'), { crit: r.crit });
-      if (r.el) addFloater(g.x, g.y - 0.9, (r.elMul > 1 ? '克制 +30%' : '被克 -20%'),
-        r.elMul > 1 ? '#9dff9d' : '#ff9d9d', {});
+      if (r.crit) {
+        addDamageFloater(g.x, g.y - 0.3, r.dmg, 'crit', { el: s.el });
+      } else {
+        addDamageFloater(g.x, g.y - 0.3, r.dmg, 'spell', { el: s.el, color: s.color });
+      }
+      if (r.el) addFloater(g.x, g.y - 0.85, (r.elMul > 1 ? '克制 +30%' : '被克 -20%'),
+        r.elMul > 1 ? '#9dff9d' : '#ff9d9d', { dur: 0.85, rise: 30 });
       if (s.knock) {                                   // 雷罡咒：把周围妖兽炸开
         var dx = g.x - player.mx, dy = g.y - player.my, dd = Math.hypot(dx, dy) || 1;
         for (var st = 0; st < 4; st++) {
@@ -7803,6 +7905,53 @@
     bagDirty = true;
     return true;
   }
+  /* ── 仙途存档微光动画（自动/手动/历练完成落盘反馈） ── */
+  var __lastSaveAnimMs = 0;
+  function triggerSaveAnim() {
+    var now = Date.now();
+    if (now - __lastSaveAnimMs < 900) return;   // 节流防抖
+    __lastSaveAnimMs = now;
+    // 1. 设置/存档入口按钮光环脉冲
+    var pb = document.getElementById('pauseBtn');
+    if (pb) {
+      pb.classList.remove('saving');
+      void pb.offsetWidth;                     // 触发 reflow 重新播动画
+      pb.classList.add('saving');
+      setTimeout(function () { if (pb) pb.classList.remove('saving'); }, 1300);
+    }
+    // 2. 在 HUD 动态位置生成向上扩散消失的金色光圈涟漪
+    var host = document.getElementById('saveFxHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'saveFxHost';
+      document.body.appendChild(host);
+    }
+    var item = document.createElement('div');
+    item.className = 'save-ripple-item';
+    var top = 260, left = 68;
+    if (pb) {
+      var r = pb.getBoundingClientRect();
+      left = Math.max(14, r.right + 10);
+      top = Math.max(14, r.top + (r.height - 24) / 2);
+    }
+    item.style.left = left + 'px';
+    item.style.top = top + 'px';
+    item.innerHTML =
+      '<div class="save-ring">' +
+        '<div class="save-wave"></div>' +
+        '<svg width="14" height="14" viewBox="0 0 20 20" fill="none">' +
+          '<circle cx="10" cy="10" r="8.5" stroke="#ffd75a" stroke-width="1.4"/>' +
+          '<circle cx="10" cy="10" r="3.5" fill="#ffeaa7"/>' +
+          '<path d="M10 2v3M10 15v3M2 10h3M15 10h3" stroke="#ffd75a" stroke-width="1.2" stroke-linecap="round"/>' +
+        '</svg>' +
+      '</div>' +
+      '<span>仙途落盘</span>';
+    host.appendChild(item);
+    setTimeout(function () {
+      if (item && item.parentNode) item.parentNode.removeChild(item);
+    }, 1400);
+  }
+
   /** 落盘。不传 slot = 写「当前认领的槽」；传了就写指定槽（手动点「存」时用）。
    *  ★ curSlot === 0（没认领）时**什么都不写**：玩家刚把档全删了，
    *    这时候自作主张重建一个档，等于把他刚才的删除操作吃掉一半。 */
@@ -7835,6 +7984,7 @@
       localStorage.setItem(slotKey(slot), JSON.stringify(o));
       lastSaveMs = o.t;
       updateSaveUI();
+      triggerSaveAnim();           // ★ 触发微光金色光圈涟漪向上扩散
       if (!silent) toast('已存入档位' + SLOT_CN[slot - 1] + ' · ' + CUR.name);
       return true;
     } catch (e) {
@@ -8351,7 +8501,7 @@
             if (cd2 < cr && !player.dead && player.invuln <= 0) {
               var big = Math.max(1, Math.round(f.atk * (f.isBoss ? 2.2 : 1.5) - player.def * 0.5));
               player.hp -= big; player.flash = 0.3;
-              addFloater(player.mx, player.my - 0.4, '-' + big, '#ff3b3b', { crit: true });
+              addDamageFloater(player.mx, player.my - 0.4, big, 'foe_skill');
               screenShake = Math.max(screenShake, 0.4);
               if (player.hp <= 0) playerDown(f);
             }
@@ -8774,15 +8924,79 @@
     for (var i = 0; i < floaters.length; i++) {
       var f = floaters[i];
       var p = isoToScreen(f.mx, f.my);
-      var y = p.y - 46 * Z - f.off;
-      ctx.globalAlpha = Math.max(0, Math.min(1, f.life / f.max * 1.4));
+      var maxLife = f.max || 1;
+      var curLife = Math.max(0, f.life);
+      var t = 1 - curLife / maxLife; // 进度 [0, 1]
+
+      // 向上滑动阻尼曲线（Ease-out 上滑）
+      var ease = 1 - Math.pow(1 - t, 2.2);
+      var y = p.y - 46 * Z - (f.rise ? ease * f.rise * Z : f.off);
+      var x = p.x + (f.jx || 0) * Z;
+
+      // 击中瞬间弹跳放大动效（Pop Bounce）
+      var pop = 1.0;
+      if (t < 0.16) {
+        pop = 1.0 + Math.sin((t / 0.16) * Math.PI) * (f.crit ? 0.38 : (f.type === 'spell' ? 0.24 : 0.18));
+      }
+
+      // 平滑淡入与向上淡出（Alpha Curve）
+      var alpha = 1.0;
+      if (t > 0.62) {
+        alpha = Math.max(0, (1 - t) / 0.38);
+      } else if (t < 0.08) {
+        alpha = Math.min(1, t / 0.08);
+      }
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
       ctx.textAlign = 'center';
-      // 暴击数字更大、带描边光晕，扫一眼就知道这一下不一样
-      var fs = (f.crit ? 23 : 15) * Z;
-      ctx.font = 'bold ' + fs.toFixed(1) + 'px "Microsoft YaHei",sans-serif';
-      ctx.lineWidth = (f.crit ? 5 : 3.5) * Z; ctx.strokeStyle = 'rgba(6,12,24,.85)';
-      if (f.crit) { ctx.shadowColor = 'rgba(255,190,60,.95)'; ctx.shadowBlur = 12 * Z; }
-      ctx.strokeText(f.text, p.x, y); ctx.fillStyle = f.color; ctx.fillText(f.text, p.x, y);
+
+      // 根据类型区分字号、描边与光晕
+      var fs = 15;
+      var strokeW = 3.5;
+      var strokeColor = 'rgba(6,12,24,.9)';
+      var shadowColor = null;
+      var shadowBlur = 0;
+
+      if (f.crit || f.type === 'crit') {
+        fs = 23;
+        strokeW = 5;
+        strokeColor = 'rgba(38,12,4,.95)';
+        shadowColor = 'rgba(255,190,50,.95)';
+        shadowBlur = 14 * Z;
+      } else if (f.type === 'spell') {
+        fs = 17.5;
+        strokeW = 4;
+        strokeColor = 'rgba(10,18,36,.92)';
+        shadowColor = f.color;
+        shadowBlur = 9 * Z;
+      } else if (f.type === 'phys') {
+        fs = 16;
+        strokeW = 3.8;
+        strokeColor = 'rgba(12,16,28,.95)';
+      } else if (f.type === 'foe_skill') {
+        fs = 20;
+        strokeW = 4.5;
+        strokeColor = 'rgba(40,4,10,.95)';
+        shadowColor = 'rgba(255,20,50,.85)';
+        shadowBlur = 12 * Z;
+      } else if (f.type === 'foe') {
+        fs = 15.5;
+        strokeW = 3.5;
+        strokeColor = 'rgba(32,4,8,.9)';
+        shadowColor = 'rgba(255,60,80,.6)';
+        shadowBlur = 6 * Z;
+      }
+
+      var finalFs = (fs * pop * Z).toFixed(1);
+      ctx.font = 'bold ' + finalFs + 'px "Microsoft YaHei",sans-serif';
+      ctx.lineWidth = strokeW * Z;
+      ctx.strokeStyle = strokeColor;
+      if (shadowColor) {
+        ctx.shadowColor = shadowColor;
+        ctx.shadowBlur = shadowBlur;
+      }
+      ctx.strokeText(f.text, x, y);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, x, y);
       ctx.shadowBlur = 0;
     }
     ctx.globalAlpha = 1;
@@ -8814,7 +9028,7 @@
     var sdf = document.getElementById('sdef'); if (sdf) sdf.textContent = player.def;
     var srm = document.getElementById('srealm'); if (srm) srm.textContent = player.realmName;
     // ★4 任务追踪行
-    var tr = document.getElementById('taskRow');
+    var tr = document.getElementById('taskText') || document.getElementById('taskRow');
     if (tr) {
       if (quest.done) tr.textContent = '任务 · 全部达成 ✓';
       else { var qt = QUESTS[quest.step]; tr.textContent = '任务 · ' + qt.text + ' ' + Math.min(quest[qt.key] || 0, qt.need) + '/' + qt.need; }

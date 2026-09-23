@@ -48,7 +48,8 @@
   #topleft .statbar{display:flex;gap:12px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(214,178,96,.28);font-size:11.5px;color:#c9bda0;white-space:nowrap}
   #topleft .statbar b{color:#8bf3ff;font-weight:600}
   #topleft .statbar .atk{color:#ffb38a}
-  #topleft .taskbar{margin-top:6px;padding-top:6px;border-top:1px solid rgba(214,178,96,.28);font-size:11.5px;color:#ffd88a;white-space:nowrap}
+  #topleft .taskbar{margin-top:6px;padding-top:6px;border-top:1px solid rgba(214,178,96,.28);font-size:11.5px;color:#ffd88a;white-space:nowrap;display:flex;align-items:center;gap:6px}
+  #topleft .taskbar svg{flex:none;filter:drop-shadow(0 0 4px rgba(255,214,130,.4))}
   #topleft .row{font-size:11.5px;color:#c9bda0;margin-top:4px;line-height:1.55}
   #topleft .row b{color:#8bf3ff;font-weight:600}
   #topleft .row b.hpnum{color:#ff9a9a}
@@ -575,7 +576,7 @@
   #shop .grp:first-child{margin-top:0}
   #shop .it{display:flex;align-items:center;gap:10px;padding:8px 9px;margin-bottom:7px;
     border-radius:9px;background:rgba(10,16,30,.6);border:1px solid rgba(120,146,190,.3)}
-  #shop .it .ic{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center}
+  #shop .it .ic{position:relative;flex:none;width:34px;height:34px;border-radius:6px;background:rgba(8,14,26,.65);border:1px solid rgba(214,178,96,.3);display:flex;align-items:center;justify-content:center}
   #shop .it .ic canvas{display:block}
   #shop .it .tx{flex:1;min-width:0}
   #shop .it .nm{font-size:12.5px;line-height:1.4}
@@ -778,6 +779,10 @@
   #shopBtn svg{display:block}
   body.touch #shopBtn{top:auto;bottom:122px;left:14px}
 
+  /* 统一 SVG 图标渲染模式：几何保真、防高分屏/不同倍率模糊 */
+  svg{shape-rendering:geometricPrecision;text-rendering:geometricPrecision}
+  button svg{display:block;overflow:visible}
+
   /* 缩放兜底出口：拦截脚本在部分机/浏览器上拦不住时，页面真被放大 → 显示这个按钮彻底复位 */
   #viewfix{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:90;display:none;
     font-family:inherit;font-size:12px;padding:7px 14px;border-radius:20px;cursor:pointer;
@@ -817,6 +822,54 @@
   #pauseBtn:active{transform:translateY(1px)}
   #pauseBtn svg{display:block}
   body.touch #pauseBtn{top:auto;bottom:176px;left:14px}
+
+  /* ── 仙途存档微光涟漪动画（自动与关键历练落盘反馈） ── */
+  #pauseBtn.saving::after{
+    content:"";position:absolute;inset:-4px;border-radius:50%;
+    border:2px solid rgba(255,215,90,.9);
+    box-shadow:0 0 16px rgba(255,215,90,.75);
+    animation:saveBtnPulse 1.25s cubic-bezier(.2,.8,.3,1) forwards;
+    pointer-events:none;
+  }
+  @keyframes saveBtnPulse{
+    0%{transform:scale(.85);opacity:1}
+    100%{transform:scale(1.7);opacity:0}
+  }
+
+  .save-ripple-item{
+    position:fixed;display:flex;align-items:center;gap:7px;
+    padding:4px 11px 4px 8px;border-radius:20px;
+    background:linear-gradient(180deg,rgba(32,26,14,.92),rgba(12,16,28,.95));
+    border:1px solid rgba(255,215,90,.75);
+    box-shadow:0 0 16px rgba(255,210,74,.4),inset 0 0 8px rgba(255,215,90,.25);
+    color:#ffeaa7;font-size:11.5px;letter-spacing:1px;font-family:ui-monospace,Consolas,monospace;
+    pointer-events:none;z-index:96;white-space:nowrap;
+    animation:saveFloatUp 1.35s cubic-bezier(.25,1,.5,1) forwards;
+  }
+  .save-ripple-item .save-ring{
+    position:relative;width:15px;height:15px;display:flex;align-items:center;justify-content:center;flex:none;
+  }
+  .save-ripple-item .save-ring svg{
+    animation:saveRingSpin 2s linear infinite;
+  }
+  .save-ripple-item .save-wave{
+    position:absolute;inset:-5px;border-radius:50%;border:1.5px solid rgba(255,225,110,.95);
+    animation:saveWaveOut 1.2s ease-out forwards;
+  }
+  @keyframes saveWaveOut{
+    0%{transform:scale(.6);opacity:1}
+    100%{transform:scale(2.2);opacity:0}
+  }
+  @keyframes saveRingSpin{
+    0%{transform:rotate(0deg)}
+    100%{transform:rotate(360deg)}
+  }
+  @keyframes saveFloatUp{
+    0%{opacity:0;transform:translate(0, 8px) scale(.85)}
+    15%{opacity:1;transform:translate(0, 0) scale(1)}
+    70%{opacity:.95;transform:translate(0, -18px) scale(1.02)}
+    100%{opacity:0;transform:translate(0, -32px) scale(1.08)}
+  }
 </style>
 </head>
 <body>
@@ -836,7 +889,16 @@
     <span>御 <b id="sdef">0</b></span>
     <span>境界 <b id="srealm">炼气期</b></span>
   </div>
-  <div class="taskbar" id="taskRow">任务 · 击杀妖兽 0/5</div>
+  <div class="taskbar" id="taskRow">
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+      <rect x="2" y="3" width="2" height="14" rx="1" fill="#ffeaa7" stroke="#d48806" stroke-width="0.8"/>
+      <rect x="16" y="3" width="2" height="14" rx="1" fill="#ffeaa7" stroke="#d48806" stroke-width="0.8"/>
+      <rect x="3.5" y="4.5" width="13" height="11" rx="0.5" fill="rgba(255,230,150,0.25)" stroke="#ffd24a" stroke-width="0.9"/>
+      <path d="M6 7.5h8M6 10h5M6 12.5h7" stroke="#ffeaa7" stroke-width="1" stroke-linecap="round"/>
+      <circle cx="13.5" cy="11.5" r="1.5" fill="#ff7675" stroke="#d63031" stroke-width="0.6"/>
+    </svg>
+    <span id="taskText">任务 · 击杀妖兽 0/5</span>
+  </div>
   <div id="foetarget">
     <div class="ftname"></div>
     <div class="ftbar"><div class="ftfill"></div></div>
@@ -856,19 +918,41 @@
 </div>
 
 <!-- 背包入口：仙家乾坤袋/储物囊，桌面 B 键开关，手机点此图标 -->
-<button id="bagBtn" title="乾坤行囊（B 开启）" aria-label="背包">
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <!-- 乾坤袋束口花边折褶 -->
-    <path d="M7 6c1-1.6 2.8-2.2 5-2.2s4 0.6 5 2.2c-1 0.7-2.2 1-5 1S8 6.7 7 6z" fill="rgba(255,215,90,0.3)" stroke="#ffd75a" stroke-width="1.4"/>
-    <!-- 金色束口系绳 -->
-    <path d="M8 8.5h8" stroke="#ffeaa7" stroke-width="2"/>
-    <!-- 翠玉同心扣与朱砂流苏 -->
-    <circle cx="12" cy="11.2" r="1.5" fill="#38ef7d" stroke="#11998e" stroke-width="0.9"/>
-    <path d="M10.8 12.5L9 16.2M13.2 12.5L15 16.2" stroke="#ff7675" stroke-width="1.5"/>
-    <!-- 饱满锦缎囊体 -->
-    <path d="M8 8.5C5.8 10.5 4.5 13.5 4.5 16.5 4.5 19.8 7.8 22 12 22s7.5-2.2 7.5-5.5c0-3-1.3-6-3.5-8" fill="rgba(255,180,80,0.18)" stroke="#ffe9b8" stroke-width="1.7"/>
+<button id="bagBtn" title="乾坤储物袋（B 开启）" aria-label="背包">
+  <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+    <defs>
+      <linearGradient id="gBagSilk" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7d5ba6"/>
+        <stop offset="60%" stop-color="#4a2e72"/>
+        <stop offset="100%" stop-color="#2a1645"/>
+      </linearGradient>
+      <linearGradient id="gBagGold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#fff4c2"/>
+        <stop offset="50%" stop-color="#ffd24a"/>
+        <stop offset="100%" stop-color="#cf941a"/>
+      </linearGradient>
+      <radialGradient id="gBagGlow" cx="50%" cy="40%" r="50%">
+        <stop offset="0%" stop-color="rgba(255,230,150,0.4)"/>
+        <stop offset="100%" stop-color="rgba(255,230,150,0)"/>
+      </radialGradient>
+    </defs>
+    <!-- 囊体阴影与外发光底衬 -->
+    <path d="M10 11.5C6.5 14.5 5 18.5 5 22.5c0 4.5 4.8 7.5 11 7.5s11-3 11-7.5c0-4-1.5-8-5-11" fill="url(#gBagSilk)" stroke="url(#gBagGold)" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M10 11.5C6.5 14.5 5 18.5 5 22.5c0 4.5 4.8 7.5 11 7.5s11-3 11-7.5c0-4-1.5-8-5-11" fill="url(#gBagGlow)"/>
+    <!-- 束口双层仙云褶皱 -->
+    <path d="M9 11c1.5-2.8 4-4.5 7-4.5s5.5 1.7 7 4.5c-2 1.2-4.2 1.8-7 1.8S11 12.2 9 11z" fill="#9b72c9" stroke="url(#gBagGold)" stroke-width="1.4"/>
+    <path d="M11 7.5c1.5-2 3.2-3.2 5-3.2s3.5 1.2 5 3.2" stroke="url(#gBagGold)" stroke-width="1.3" stroke-linecap="round"/>
+    <!-- 金丝束口编织绳结 -->
+    <path d="M9.5 12h13" stroke="#ffeaa7" stroke-width="2" stroke-linecap="round"/>
+    <!-- 辟邪羊脂灵玉佩 -->
+    <circle cx="16" cy="15.5" r="2.4" fill="#a8ffeb" stroke="#16a085" stroke-width="1"/>
+    <circle cx="16" cy="15.5" r="0.9" fill="#ffffff"/>
+    <!-- 朱砂如意流苏双穗 -->
+    <path d="M14.5 17.5L12 23M17.5 17.5L20 23" stroke="#ff6b6b" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="23.5" r="0.8" fill="#ffd24a"/>
+    <circle cx="20" cy="23.5" r="0.8" fill="#ffd24a"/>
     <!-- 囊腹金丝祥云暗纹 -->
-    <path d="M8.8 16c1.8-1.3 4.6-1.3 6.4 0" stroke="#f6b93b" stroke-width="1.3"/>
+    <path d="M11 20.5c2.5-2 7.5-2 10 0M13 24c1.8-1.2 4.2-1.2 6 0" stroke="url(#gBagGold)" stroke-width="1.2" stroke-linecap="round" opacity="0.85"/>
   </svg>
   <span class="dot" id="bagDot"></span>
   <kbd class="btn-kb">B</kbd>
@@ -894,45 +978,105 @@
 </div>
 
 <!-- 世界地图入口：桌面 M / Tab 开关，手机点此图标；点开是诸天万界总览，点节点即传送 -->
-<button id="worldBtn" title="世界地图（M / Tab 开启）" aria-label="世界地图">
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <!-- 左玉轴轴杆与轴首 -->
-    <line x1="3.2" y1="4.5" x2="3.2" y2="19.5" stroke="#48dbfb" stroke-width="2"/>
-    <circle cx="3.2" cy="3.5" r="1.3" fill="#e0f9ff" stroke="#0abde3" stroke-width="1"/>
-    <circle cx="3.2" cy="20.5" r="1.3" fill="#e0f9ff" stroke="#0abde3" stroke-width="1"/>
-    <!-- 右玉轴轴杆与轴首 -->
-    <line x1="20.8" y1="4.5" x2="20.8" y2="19.5" stroke="#48dbfb" stroke-width="2"/>
-    <circle cx="20.8" cy="3.5" r="1.3" fill="#e0f9ff" stroke="#0abde3" stroke-width="1"/>
-    <circle cx="20.8" cy="20.5" r="1.3" fill="#e0f9ff" stroke="#0abde3" stroke-width="1"/>
-    <!-- 展开的山海画卷 -->
-    <rect x="4.5" y="5" width="15" height="14" rx="1.5" fill="rgba(255,235,180,0.18)" stroke="#ffeaa7" stroke-width="1.5"/>
-    <!-- 画卷内山川河岳与红日 -->
-    <path d="M7 16l3.5-5 3 3.8 2.2-2.5 2.8 3.7" stroke="#81ecec" stroke-width="1.4"/>
-    <circle cx="15.8" cy="8.5" r="1.4" fill="#ff7675" stroke="#d63031" stroke-width="0.8"/>
+<button id="worldBtn" title="九州舆图（M / Tab 开启）" aria-label="世界地图">
+  <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+    <defs>
+      <linearGradient id="gScrollBg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#2a3d5b"/>
+        <stop offset="50%" stop-color="#16253d"/>
+        <stop offset="100%" stop-color="#0c1729"/>
+      </linearGradient>
+      <linearGradient id="gJadeAxle" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#d4fff5"/>
+        <stop offset="50%" stop-color="#48dbfb"/>
+        <stop offset="100%" stop-color="#0abde3"/>
+      </linearGradient>
+      <linearGradient id="gGoldSilk" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#ffeaa7"/>
+        <stop offset="50%" stop-color="#ffd34e"/>
+        <stop offset="100%" stop-color="#cf941a"/>
+      </linearGradient>
+    </defs>
+    <!-- 左青玉轴杆与轴首 -->
+    <rect x="3" y="5" width="2.6" height="22" rx="1.3" fill="url(#gJadeAxle)" stroke="#0984e3" stroke-width="0.8"/>
+    <circle cx="4.3" cy="4" r="2" fill="#e0f9ff" stroke="#00cec9" stroke-width="1"/>
+    <circle cx="4.3" cy="28" r="2" fill="#e0f9ff" stroke="#00cec9" stroke-width="1"/>
+    <!-- 右青玉轴杆与轴首 -->
+    <rect x="26.4" y="5" width="2.6" height="22" rx="1.3" fill="url(#gJadeAxle)" stroke="#0984e3" stroke-width="0.8"/>
+    <circle cx="27.7" cy="4" r="2" fill="#e0f9ff" stroke="#00cec9" stroke-width="1"/>
+    <circle cx="27.7" cy="28" r="2" fill="#e0f9ff" stroke="#00cec9" stroke-width="1"/>
+    <!-- 展开的山海舆图丝绢 -->
+    <rect x="5.2" y="6" width="21.6" height="20" rx="1.5" fill="url(#gScrollBg)" stroke="url(#gGoldSilk)" stroke-width="1.5"/>
+    <!-- 水墨灵山叠峦 -->
+    <path d="M8 22l4.5-6.5 4 4.5 3.5-4 4 6" stroke="#81ecec" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M6.5 23h19" stroke="url(#gGoldSilk)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+    <!-- 仙山云海流云 -->
+    <path d="M8 18.5c2-1.5 5-1.5 7 0" stroke="rgba(255,255,255,0.4)" stroke-width="1.1" stroke-linecap="round"/>
+    <!-- 诸天指南星宿 / 纯阳朱砂赤日 -->
+    <circle cx="22" cy="10.5" r="2.2" fill="#ff7675" stroke="#d63031" stroke-width="1"/>
+    <circle cx="22" cy="10.5" r="0.8" fill="#ffffff"/>
+    <!-- 北斗引路星芒 -->
+    <path d="M12 9.5l0.8 1.8 1.8 0.8-1.8 0.8-0.8 1.8-0.8-1.8-1.8-0.8 1.8-0.8z" fill="#ffeaa7"/>
   </svg>
   <kbd class="btn-kb">M</kbd>
 </button>
 
-<!-- 坊市入口（v56）：银两的出口。金元宝图标，位置跟着上面板底边（--tlb）走 -->
-<button id="shopBtn" title="坊市（仅城镇：青玄山门 / 黑橡城 / 洛赫港）" aria-label="坊市">
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <!-- 金元宝外弧与两端圆润金翘 -->
-    <path d="M2.5 11c0-1.8 1.8-3.2 4.2-3.8 1.8-.4 3.5-.7 5.3-.7s3.5.3 5.3.7c2.4.6 4.2 2 4.2 3.8 0 2.8-2.6 5.8-5.2 8.2l-1 1.3c-.6.8-2 1.2-3.3 1.2s-2.7-.4-3.3-1.2l-1-1.3C5.1 16.8 2.5 13.8 2.5 11z" fill="rgba(255,215,90,0.22)" stroke="#ffd75a" stroke-width="1.6"/>
-    <!-- 中央隆起纯阳金核 -->
-    <path d="M8 10.5c0-2.2 1.8-4 4-4s4 1.8 4 4" fill="rgba(255,245,170,0.3)" stroke="#fff0a0" stroke-width="1.5"/>
-    <!-- 元宝腰身光弧 -->
-    <path d="M5.5 12.5c2 2.2 4.2 3.2 6.5 3.2s4.5-1 6.5-3.2" stroke="#e1a118" stroke-width="1.3"/>
+<!-- 坊市入口（v56）：银两的出口。仙阁珍宝阁图标，位置跟着上面板底边（--tlb）走 -->
+<button id="shopBtn" title="坊市仙阁（仅城镇：青玄山门 / 黑橡城 / 洛赫港）" aria-label="坊市">
+  <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+    <defs>
+      <linearGradient id="gPavRoof" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ffd875"/>
+        <stop offset="60%" stop-color="#e1a118"/>
+        <stop offset="100%" stop-color="#a86e08"/>
+      </linearGradient>
+      <linearGradient id="gPavBase" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4a3525"/>
+        <stop offset="100%" stop-color="#24160d"/>
+      </linearGradient>
+      <linearGradient id="gGoldRing" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#fff8d8"/>
+        <stop offset="50%" stop-color="#ffd24a"/>
+        <stop offset="100%" stop-color="#d48806"/>
+      </linearGradient>
+    </defs>
+    <!-- 宝阁底层基台 -->
+    <path d="M5 26h22l-1.5 3H6.5L5 26z" fill="url(#gPavBase)" stroke="url(#gGoldRing)" stroke-width="1.3"/>
+    <!-- 宝阁朱砂殿身与门柱 -->
+    <rect x="9" y="15" width="14" height="11" rx="0.5" fill="rgba(40,22,15,0.9)" stroke="url(#gGoldRing)" stroke-width="1.2"/>
+    <path d="M13.5 19v7M18.5 19v7" stroke="url(#gGoldRing)" stroke-width="1"/>
+    <!-- 殿前金漆拱门灵光 -->
+    <path d="M14 26v-4.5c0-1.1 0.9-2 2-2s2 0.9 2 2V26" fill="rgba(255,215,90,0.35)" stroke="#ffeaa7" stroke-width="1.1"/>
+    <!-- 下层重檐飞翼 -->
+    <path d="M4 16.5C7 16 11 13.5 16 13.5s9 2.5 12 3c-1.5-1.8-3.5-3-6.5-3.5H10.5C7.5 13.5 5.5 14.7 4 16.5z" fill="url(#gPavRoof)" stroke="#ffeaa7" stroke-width="1.3" stroke-linejoin="round"/>
+    <!-- 上层歇山顶飞檐殿顶 -->
+    <path d="M6 10C9.5 9.5 12.5 7.5 16 7.5s6.5 2 10 2.5c-1.8-2-4.5-3.5-7.5-4h-5C10.5 6.5 7.8 8 6 10z" fill="url(#gPavRoof)" stroke="#ffeaa7" stroke-width="1.4" stroke-linejoin="round"/>
+    <!-- 宝阁顶端辟邪金刹/玲珑聚灵珠 -->
+    <circle cx="16" cy="4.2" r="1.6" fill="#ffeaa7" stroke="#ffd24a" stroke-width="1"/>
+    <!-- 悬挂引客通灵仙幡 -->
+    <path d="M6.5 16.5v4.5M25.5 16.5v4.5" stroke="#ff6b6b" stroke-width="1.2" stroke-linecap="round"/>
+    <circle cx="6.5" cy="21.5" r="0.7" fill="#ffd24a"/>
+    <circle cx="25.5" cy="21.5" r="0.7" fill="#ffd24a"/>
   </svg>
 </button>
 
 <!-- ★3 系统设置 / 仙途存档入口：位于左列第四个圆钮（与世界地图、行囊、坊市成列，不挡右侧技能与攻击键） -->
 <button id="pauseBtn" title="系统设置 · 仙途存档（Esc）" aria-label="系统设置">
-  <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <!-- 八卦灵阵/齿轮外环 -->
-    <path d="M12 2.2a2 2 0 0 1 2 2v0.3a8.2 8.2 0 0 0 1.9 1.1l0.3-0.2a2 2 0 0 1 2.8 0.8l1 1.7a2 2 0 0 1-0.7 2.7l-0.3 0.2a8.2 8.2 0 0 0 0 2.2l0.3 0.2a2 2 0 0 1 0.7 2.7l-1 1.7a2 2 0 0 1-2.8 0.8l-0.3-0.2a8.2 8.2 0 0 0-1.9 1.1v0.3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-0.3a8.2 8.2 0 0 0-1.9-1.1l-0.3 0.2a2 2 0 0 1-2.8-0.8l-1-1.7a2 2 0 0 1 0.7-2.7l0.3-0.2a8.2 8.2 0 0 0 0-2.2l-0.3-0.2a2 2 0 0 1-0.7-2.7l1-1.7a2 2 0 0 1 2.8-0.8l0.3 0.2a8.2 8.2 0 0 0 1.9-1.1V4.2a2 2 0 0 1 2-2h2z" fill="rgba(255,215,90,0.22)" stroke="#ffd75a" stroke-width="1.4"/>
-    <!-- 乾坤中心灵核 -->
-    <circle cx="12" cy="12" r="3.2" stroke="#ffeaa7" stroke-width="1.3" fill="rgba(116,185,255,0.45)"/>
-    <circle cx="12" cy="12" r="1.2" fill="#ffffff"/>
+  <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+    <defs>
+      <linearGradient id="gPauseGold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#fff4c2"/>
+        <stop offset="50%" stop-color="#ffd24a"/>
+        <stop offset="100%" stop-color="#cf941a"/>
+      </linearGradient>
+    </defs>
+    <!-- 八卦罗盘齿牙与天衍外环 -->
+    <path d="M16 5.5l1.6 2.2a9.5 9.5 0 0 1 3.2 1.3l2.6-.7 1.4 2.5-1.9 1.9a9.5 9.5 0 0 1 0 3.6l1.9 1.9-1.4 2.5-2.6-.7a9.5 9.5 0 0 1-3.2 1.3L16 26.5l-1.6-2.2a9.5 9.5 0 0 1-3.2-1.3l-2.6.7-1.4-2.5 1.9-1.9a9.5 9.5 0 0 1 0-3.6l-1.9-1.9 1.4-2.5 2.6.7a9.5 9.5 0 0 1 3.2-1.3L16 5.5z" fill="rgba(255,215,90,0.18)" stroke="url(#gPauseGold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- 乾坤内景两仪金环 -->
+    <circle cx="16" cy="16" r="5.8" stroke="url(#gPauseGold)" stroke-width="1.3" fill="rgba(10,20,38,0.7)"/>
+    <!-- 阴阳聚灵核心玉珠 -->
+    <circle cx="16" cy="16" r="2.8" fill="#48dbfb" stroke="#e0f7fa" stroke-width="1.1"/>
+    <circle cx="16" cy="16" r="0.9" fill="#ffffff"/>
   </svg>
   <kbd class="btn-kb">Esc</kbd>
 </button>
@@ -941,7 +1085,12 @@
   <div class="pdlg">
     <button class="pclose" id="pauseClose" title="关闭设置（Esc）" aria-label="关闭设置">✕</button>
     <div class="pt">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;display:inline-block;color:#ffd75a"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="vertical-align:-3px;margin-right:6px;display:inline-block">
+        <circle cx="12" cy="12" r="9.5" stroke="#ffd75a" stroke-width="1.6" fill="rgba(255,215,90,0.12)"/>
+        <circle cx="12" cy="12" r="4.2" stroke="#ffd75a" stroke-width="1.3"/>
+        <circle cx="12" cy="12" r="1.6" fill="#ffeaa7"/>
+        <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" stroke="#ffd75a" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
       系统设置 · 仙途存档
     </div>
 
@@ -968,7 +1117,7 @@
 <div id="rightcol">
 <div id="topright" class="hud panel">
   <div class="t" id="trHead" title="点击折叠 / 展开">
-    <span class="tr-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;display:inline-block;color:#8bf3ff"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>角色速切</span>
+    <span class="tr-label"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:5px;display:inline-block"><circle cx="10" cy="6.5" r="3.2" stroke="#8bf3ff" stroke-width="1.4" fill="rgba(139,243,255,0.2)"/><path d="M4 17c0-3 2.7-5.5 6-5.5s6 2.5 6 5.5" stroke="#8bf3ff" stroke-width="1.4" stroke-linecap="round"/><path d="M15.5 4l2.5-2.5M16.5 3l-1.5 1.5" stroke="#ffd24a" stroke-width="1.2" stroke-linecap="round"/></svg>角色速切</span>
     <b id="heroNow">1 号</b>
     <span class="tg" id="trTg">▾</span>
   </div>
