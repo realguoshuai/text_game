@@ -7,7 +7,8 @@
 
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
-  var W = 0, H = 0;
+  var W = 0, H = 0;          // 逻辑尺寸（CSS 像素），所有游戏坐标都用它，与物理分辨率解耦
+  var DPR = 1;               // 物理/逻辑像素比（devicePixelRatio）。高分屏缓冲 = W*DPR，渲染前 ctx.setTransform(DPR)
   var TILE_W = 120, TILE_H = 60, HW = 60, HH = 30, THICK = 15;
 
   // 角色 sprite sheet（6列×5行，64×64/格）：行0=正面 行1=右 行2=左 行3=背
@@ -4875,6 +4876,9 @@
 
   function render() {
     _draw.actor = 0; _draw.npc = 0; _draw.paint = 0;
+    // 高分屏适配（手机端"地形缝隙+水波浪"根因）：把逻辑坐标 ×DPR 映射到物理像素，
+    // 瓦片整数对齐严格成立，不再被浏览器放大时摊到亚像素 → 缝隙/波浪消失。桌面 DPR=1 恒等于原行为。
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     // Z<=1 保持硬边像素观感；放大时开插值，避免就近邻放大出锯齿方块
     ctx.imageSmoothingEnabled = Z > 1.02;
     drawSky();
@@ -10021,15 +10025,19 @@
     //   「大视口（地址栏收起）/ 小视口（地址栏展开）」之间跳。两者不相等时画布位图被浏览器
     //   拉伸去填 CSS 盒 → 每一格瓦片都落在像素栅格之外 → 缝隙、错位一起出来。
     //   clientWidth/clientHeight 就是 CSS 盒本身，与 100% 恒等，一条都对不上。
-    var w = canvas.clientWidth || window.innerWidth;
-    var h = canvas.clientHeight || window.innerHeight;
+    var dpr = window.devicePixelRatio || 1;          // 高分屏：缓冲区按物理像素，渲染前 ctx.setTransform(DPR)
+    var w = Math.round(canvas.clientWidth || window.innerWidth);
+    var h = Math.round(canvas.clientHeight || window.innerHeight);
     syncLeftBtns();      // 窗口尺寸变 → 上面板的行可能重新换行 → 左列圆钮要重排（v53）
-    // ★ 尺寸没变就**一个字都不做**：给 canvas.width 赋值会清空整块画布并重置 ctx 状态。
+    // ★ 逻辑尺寸与 DPR 都没变就**一个字都不做**：给 canvas.width 赋值会清空整块画布并重置 ctx 状态。
     //   手机上拖动时地址栏动画会连发 resize，每次清一屏 → 看到的就是"地图一块一块地漏出来"。
-    //   原来没有这道早退，等于每帧把自己擦一遍。
-    if (w === W && h === H) return;
-    W = w; H = h;
-    canvas.width = w; canvas.height = h;
+    //   原来没有这道早退，等于每帧把自己擦一遍。dpr 也纳入判断：跨屏/旋转后 dpr 变了缓冲区要重设。
+    if (w === W && h === H && dpr === DPR) return;
+    W = w; H = h; DPR = dpr;
+    canvas.width = Math.round(w * DPR);
+    canvas.height = Math.round(h * DPR);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
     ctx.imageSmoothingEnabled = false;
     // 视口尺寸一变就立刻把相机对准主角。只改 W/H 的话，相机要等 updateCam 平滑
     // 几帧才归位 —— 拖拽窗口时会看到画面滑动，首屏（boot 时拿到的是默认窗口尺寸）
