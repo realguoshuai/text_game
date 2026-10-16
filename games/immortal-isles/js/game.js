@@ -1111,6 +1111,43 @@
       '%（耗 ' + c + ' 银两，熔炼不返还）');
     return true;
   }
+  /* ═════════ 装备升阶（品质跃迁 · v73：比淬炼更深的「双重沉没口」）════════
+   * 为什么不会变成"升阶→熔炼"刷银两（v54/v56 同款无底洞病）？
+   *   熔炼价 gearValue 随 g.t、g.st 涨；升阶把两者都抬高，熔炼返还确实增加。
+   *   但升阶主成本是**玄铁令**（坊市 220 银两/枚、精英掉落），熔炼**绝不返还玄铁令**，
+   *   所以"升阶→熔炼"净亏一枚玄铁令 ≥220 银两，不可能成环。稀缺代币当闸门 = 银两只进不出。
+   * 机制：g.t+1，并把当前 g.st 按 新档mul/旧档mul 放大（保留词缀比例，装备"自然长大"而非重掷）；
+   *   g.lv（淬炼）保留 → 升阶与淬炼乘性叠加，投资越深越贵，鼓励把银两+玄铁令一起沉淀。
+   * g.t 已在 gearSig 内 → 升阶后 DOM 自动重建；g.t/g.st 随 gearInv 整体进档，老档零迁移。 */
+  var PROMOTE_XT = 1;     // 每次升阶消耗玄铁令数（稀缺代币闸门，熔炼不返还 → 纯沉没）
+  function promoteCost(g) {
+    // 当前品质越高、淬炼越深，银两部分越贵（把银两和玄铁令一起沉淀进来）
+    return Math.round(60 * gearTier(g).t * (1 + (g.lv | 0) * 0.15));
+  }
+  function promoteGear(g) {
+    if (!g) return false;
+    if (g.t >= TIERS.length - 1) { toast('「' + gearName(g) + '」已是最高品质 ' + TIERS[TIERS.length - 1].cn); return false; }
+    if (gearInv.indexOf(g) < 0 && !wornSlotOf(g)) { bagDirty = true; return false; }
+    var nx = TIERS[g.t + 1];
+    var xt = bag.xuantie | 0;
+    if (xt < PROMOTE_XT) { toast('玄铁令不足 —— 升阶需 ' + PROMOTE_XT + ' 枚（精英妖兽才出，坊市亦可购）'); bagDirty = true; return false; }
+    var c = promoteCost(g);
+    if (player.stones < c) { toast('银两不足，还差 ' + (c - player.stones) + ' 银两'); return false; }
+    /* 放大当前属性到新品质：按两档 mul 之比，保留词缀比例 —— 同件装备"自然长大"，不是重掷到陌生数值。 */
+    var ratio = nx.mul / gearTier(g).mul, k;
+    for (k in g.st) if (g.st.hasOwnProperty(k)) {
+      var raw = g.st[k];
+      if (typeof raw === 'number' && isFinite(raw)) g.st[k] = Math.round(raw * ratio);
+    }
+    g.t += 1;                       // 品质跃迁（不能超过仙品，上面已拦）
+    bag.xuantie = xt - PROMOTE_XT; if (bag.xuantie <= 0) delete bag.xuantie;
+    player.stones -= c;
+    recalcStats(); lastGearSig = ''; bagDirty = true;   // 属性变了 → 强制重建装备区
+    addFloater(player.mx, player.my - 0.5, '升阶 ' + gearName(g), '#ff9be0');
+    toast('升阶 ' + gearName(g) + '（属性 ' + Math.round((ratio - 1) * 100) +
+      '%）· 耗 ' + PROMOTE_XT + ' 玄铁令 + ' + c + ' 银两，熔炼不返还');
+    return true;
+  }
   /** 穿上：同槽位自动换下（旧装备回行囊，不会凭空消失）。 */
   function equipGear(g) {
     var b = gearBase(g); if (!b) return false;
@@ -7579,7 +7616,7 @@
       }
       c.title = gearName(g) + '（' + gearTier(g).cn + '）\n' +
         gearStatsLine(g, '\n') + '\n' + gearBase(g).note +
-        '\n点一下打开操作卡（装备 / 淬炼 / 融炼 / 丢弃）';
+        '\n点一下打开操作卡（装备 / 淬炼 / 升阶 / 融炼 / 丢弃）';
       c.addEventListener('click', function (ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         openGearCard(g);
@@ -7685,6 +7722,16 @@
       } else {
         cardBtn(btns, '已满淬 ' + ENH_MAX + ' 阶', 'enhance', 'disabled');
       }
+      /* 升阶（品质跃迁）：玄铁令 + 银两的双重沉没口。已是最高品质就不显示这个按钮。
+       * 没玄铁令或缺银两就灰掉，灰按钮本身提示"还差什么"。 */
+      if (g.t < TIERS.length - 1) {
+        var nx2 = TIERS[g.t + 1], pc = promoteCost(g), pxt2 = bag.xuantie | 0;
+        var pLack = pc - player.stones, pNoXt = pxt2 < PROMOTE_XT;
+        var plabel = '升阶 → ' + nx2.cn + ' · ' + PROMOTE_XT + '令+' + pc + '银' +
+          (pNoXt ? '（无玄铁令）' : (pLack > 0 ? '（差 ' + pLack + '银）' : ''));
+        var pb = cardBtn(btns, plabel, 'promote', (pNoXt || pLack > 0) ? 'disabled' : '');
+        if (pNoXt || pLack > 0) pb.disabled = true;
+      }
       /* 重铸：有玄铁令才出现（没有就不给这个按钮 —— 摆一个点了只弹提示的按钮更像 bug）。
        * 已装备的也能洗，不必先卸下。 */
       if (bag.xuantie | 0) cardBtn(btns, '重铸（耗 1 令）', 'reforge');
@@ -7706,6 +7753,7 @@
     if (a === 'unequip') { if (slot) unequipGear(slot); return; }
     if (a === 'reforge') { reforgeGear(g); return; }
     if (a === 'enhance') { enhanceGear(g); return; }
+    if (a === 'promote') { promoteGear(g); return; }
     if (a === 'melt') { if (!slot) meltGear(g); else toast('先卸下再熔炼'); return; }
     if (a === 'dump') {
       if (slot) { toast('已装备的不能丢弃，先卸下'); return; }
