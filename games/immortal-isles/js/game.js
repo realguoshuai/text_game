@@ -726,6 +726,48 @@
     // 训练靶（青玄山门调试场专供）：不移动、不还手、打不死 —— 只用来试攻击与技能
     dummy:    { key: 'golem',    name: '练功石傀',     hp: 99999, atk: 0, def: 0, exp: 0, stones: [0, 0],  mv: 0,    fh: 116, dummy: true }
   };
+  /* ══════════ 妖兽变体（零新素材，运行时生成）══════════
+   * 为什么要它：beasts.json 只有 9 种妖兽，铺满十几张图后「遇见的每只都长得一样」，
+   *   重复感比机制不足更劝退。这里用**零新素材**的运行时变体把实际体验扩到 3 倍。
+   * 三档递进（hp/atk/def/exp/妖丹同步上浮）：
+   *   1 狂化   hp×1.5  atk×1.15 exp×1.6 —— 常见，脚步一乱就能认出
+   *   2 元素化 hp×1.8  atk×1.30 exp×2.0 —— 少见，名字与配色按**本怪元素**取（赤炎/玄冥/青藤/素金/厚土）
+   *   3 妖化   hp×2.0  atk×1.35 exp×2.6 —— 极少见（3%），紫色，强度接近精英
+   *     （档 3 刻意压在「精英 ronin_c hp150/atk20」这条线上、而不是远超它：
+   *      玩家炼气期属性几乎全来自装备、底子为 0，太硬的首次遭遇会直接劝退。）
+   * ⚠ 产出纪律：变体**不新增产出种类**，只是把既有的银两/妖丹给得更肥，
+   *   而这三样在游戏里都已有消耗方（坊市 / 炼修为 / 穿·熔），不构成无底洞。
+   * ⚠ 视觉刻意不做「精灵染色」：染色要把每个动作帧烘成缓存图
+   *   （9 怪 × 3 档 × ~30 帧 ≈ 800 张），弱机内存吃不住。
+   *   改用 脚下光环 + 体型 + 血条色 + 名字前缀 区分：零素材、零缓存、零性能开销。
+   * ⚠ 不进存档：foes 本来就不进档（切图重新生成），变体随进图重掷，不产生读档兼容问题。 */
+  var VARIANTS = [
+    null,
+    { tag: '狂化', hp: 1.50, atk: 1.15, def: 1.05, exp: 1.6, scale: 1.10,
+      ring: '255,120,90',  bar: '#ff8a5c' },
+    { tag: '',     hp: 1.80, atk: 1.30, def: 1.15, exp: 2.0, scale: 1.16,
+      ring: '',           bar: '' },        // 名字/配色按元素查 EL_VARIANT
+    { tag: '妖化', hp: 2.00, atk: 1.35, def: 1.25, exp: 2.6, scale: 1.24,
+      ring: '190,90,255', bar: '#c46bff' }
+  ];
+  var EL_VARIANT = {     // 档 2：按本怪元素取名与配色
+    '火': { tag: '赤炎', ring: '255,90,40',   bar: '#ff6b3d' },
+    '水': { tag: '玄冥', ring: '90,200,255',  bar: '#5ac8ff' },
+    '木': { tag: '青藤', ring: '120,230,140', bar: '#78e68c' },
+    '金': { tag: '素金', ring: '255,225,130', bar: '#ffe182' },
+    '土': { tag: '厚土', ring: '200,150,90',  bar: '#c8965a' }
+  };
+  /* 掷变体档：妖化 3% / 元素化 7% / 狂化 15% = 25%。每图 6~12 只怪 ⇒ 约 1~3 只变体，
+   * 不至于满地都是、也就不至于让「变体」失去稀缺感。
+   * 训练靶 / Boss / 精英 一律不叠变体 —— 它们本来就强，再乘系数会失控。 */
+  function rollVariant(d, isBoss, isElite) {
+    if (d.dummy || isBoss || isElite) return 0;
+    var r = Math.random();
+    if (r < 0.03) return 3;
+    if (r < 0.10) return 2;
+    if (r < 0.25) return 1;
+    return 0;
+  }
   // 12 只散布在 30×30 碑林；坐标由 snapWalkable 吸附到最近可走格，故可略放宽。
   var BEILIN_SPAWNS = [
     { x: 6,  y: 6,  t: 'assassin' }, { x: 10, y: 4,  t: 'assassin' }, { x: 22, y: 8,  t: 'assassin' },
@@ -5745,10 +5787,27 @@
       if (!d) { try { console.warn('[foes] 跳过未知怪种:', s.t, '@', s.x + ',' + s.y); } catch (e) {} return null; }
       var cell = snapWalkable(CUR, s.x, s.y);
       var aggro = d.aggro || AGGRO;
+      /* ── 变体（零素材）：属性按**实例**上浮，绝不改写共享的 FOE_DEFS。
+       *   改共享定义的后果是「碑林那只狂化牛魔一出现，隔壁图的普通牛魔也跟着变强」——
+       *   同一个 def 被所有 spawn 点共用，是这个引擎里最容易踩的污染源。
+       *   stones 用 exp 系数 ×0.8：妖丹跟着一起变肥，但别把产出口袋撑爆。 */
+      var vart = rollVariant(d, isBoss5, isElite5);
+      var V = vart ? VARIANTS[vart] : null;
+      var vEl = (vart === 2) ? (EL_VARIANT[d.el] || EL_VARIANT['土']) : null;
+      var vTag = vart ? (V.tag || (vEl && vEl.tag) || '') : '';
+      var vHp = V ? Math.round(d.hp * V.hp) : d.hp;
+      var vSt = V ? [Math.max(1, Math.round(d.stones[0] * V.exp * 0.8)),
+                     Math.max(1, Math.round(d.stones[1] * V.exp * 0.8))] : d.stones;
       return {
         def_: d, key: d.key, name: d.name, el: d.el || '无',
+        // 变体三字段：显示名（带前缀）、脚下光环色（'r,g,b'）、血条色
+        vart: vart, vname: vTag ? (vTag + d.name) : d.name,
+        vRing: vart ? ((V.ring || (vEl && vEl.ring)) || '') : '',
+        vBar: vart ? ((V.bar || (vEl && vEl.bar)) || '') : '',
         x: cell.x, y: cell.y, home: cell,
-        hp: d.hp, maxhp: d.hp, atk: d.atk, def: d.def, exp: d.exp, stones: d.stones,
+        hp: vHp, maxhp: vHp, atk: V ? Math.round(d.atk * V.atk) : d.atk,
+        def: V ? Math.round(d.def * V.def) : d.def,
+        exp: V ? Math.round(d.exp * V.exp) : d.exp, stones: vSt,
         face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0,
         // ★5 Boss/精英读条机制状态
         isBoss: isBoss5, isElite: isElite5,
@@ -9120,9 +9179,26 @@
     ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, shR, shR * 0.5, 0, 0, 6.2832); ctx.fill();
     ctx.restore();
     if (!pz) return;
+    /* 变体脚下光环（零素材矢量）：按格坐标错开相位，所以一群怪站一起也不会齐刷刷同亮。
+     * 画在精灵之前 = 环在身后、被怪身体挡掉一半，视觉上更像「站在光环里」而不是「顶个圈」。 */
+    if (f.vRing) {
+      var vs = 0.72 + 0.28 * Math.sin(time * 3.2 + f.x * 1.7 + f.y * 1.1);
+      var vr = (f.def_.fh || 110) * (0.40 + 0.03 * f.vart) * Z;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.15 * vs;
+      ctx.fillStyle = 'rgb(' + f.vRing + ')';
+      ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, vr, vr * 0.5, 0, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 0.62 * vs;
+      ctx.strokeStyle = 'rgb(' + f.vRing + ')';
+      ctx.lineWidth = Math.max(1.2, 2.2 * Z);
+      ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, vr, vr * 0.5, 0, 0, 6.2832); ctx.stroke();
+      ctx.restore();
+    }
     // 按「目标身高」归一化：图集各帧原始像素尺寸差很大（如石魔 idle 帧 348px 宽），
     // 直接 1:1 画会忽大忽小、且整只偏大。这里统一缩放到 fh，再以脚底 + 锚点对齐格子中心。
     var th = f.def_.fh || 110;
+    if (f.vart) { var vsc = VARIANTS[f.vart]; if (vsc && vsc.scale) th *= vsc.scale; }   // 变体体型更大（脚下影子随 fh 等比，自动跟着涨）
     var k = th / pz.h;
     var ow = pz.w * k * Z, oh = th * Z;
     var dy = Math.round(baseY - oh);
@@ -9136,12 +9212,16 @@
     var dist = Math.hypot(f.x - player.mx, f.y - player.my);
     if (player.targetFoe === f || dist < 3.0) {
       var ty = dy - 6 * Z;
+      // 变体显示带前缀的名字（狂化/赤炎/妖化…），并用它自己的配色；普通怪沿用原样。
+      var fnm = f.vname || f.name;
       ctx.textAlign = 'center';
       ctx.font = 'bold ' + (12 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
       ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.82)';
-      ctx.strokeText(f.name, p.x, ty); ctx.fillStyle = '#ffd0c0'; ctx.fillText(f.name, p.x, ty);
+      ctx.strokeText(fnm, p.x, ty);
+      ctx.fillStyle = f.vBar ? f.vBar : '#ffd0c0';
+      ctx.fillText(fnm, p.x, ty);
       if (f.el && f.el !== '无') {
-        var ew = ctx.measureText(f.name).width;
+        var ew = ctx.measureText(fnm).width;
         ctx.textAlign = 'left';
         ctx.fillStyle = EL_COLOR[f.el] || '#fff';
         ctx.fillText('〔' + f.el + '〕', p.x + ew / 2 + 3 * Z, ty);
@@ -9149,7 +9229,8 @@
       }
       var bw = Math.max(40 * Z, ow * 0.7), bh = 5 * Z, bx = p.x - bw / 2, by = ty - 14 * Z;
       ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = f.def_.boss ? '#ff5a5a' : (f.def_.elite ? '#ffb24d' : '#7be07b');
+      // 变体血条优先用自己的颜色 —— 远看只凭血条颜色就能判断"这只不一般"。
+      ctx.fillStyle = f.vBar ? f.vBar : (f.def_.boss ? '#ff5a5a' : (f.def_.elite ? '#ffb24d' : '#7be07b'));
       ctx.fillRect(bx, by, bw * Math.max(0, f.hp / f.maxhp), bh);
       ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1 * Z; ctx.strokeRect(bx, by, bw, bh);
     }
