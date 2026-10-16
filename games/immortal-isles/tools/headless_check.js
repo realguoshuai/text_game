@@ -474,6 +474,21 @@ results.push(run('成长 妖丹炼化与重铸', 'autotest=growth', ({ probe }) 
     && C.pass === true;
 }, { budget: 20000 }));
 
+// 8.47b) 装备淬炼（v72）：属性按阶放大 + 熔炼价不随强化涨（防"淬炼→熔炼"套利环）。
+//         这条锁的是「不看就不知道对错」的两条链路：① 升阶后面板真的按 (1+ENH_STEP*lv) 放大；
+//         ② gearValue 只认 g.st/g.t、不认 g.lv —— 否则强化投入会被熔炼全额返还，银两无限刷。
+//         ⚠ 断言花括号体 + return（见 8.4 注释：箭头裸表达式会被 `, {budget}` 逗号吃掉变恒真）。
+//         probe 里的 atkMul/defMul/hpMul/meltSame 各自抓一条真 bug：若 recalcStats 没乘 lv 系数，
+//         atkMul 必 false；若 gearValue 误把 lv 算进去，meltSame 必 false —— 用例自身防假绿。
+results.push(run('装备 淬炼属性放大与熔炼价隔离', 'autotest=enhance', ({ probe }) => {
+  if (!probe) return false;
+  const E = probe;
+  return E.atkMul === true && E.defMul === true && E.hpMul === true
+    && E.meltSame === true
+    && E.poorReject === true && E.capped === true
+    && E.pass === true;
+}, { budget: 20000 }));
+
 // 8.4b) 装备操作卡（v55）：点格子弹卡片替代长按熔炼。
 //       为什么必须单独立一条：这套交互"看起来对"和"真的对"差得远 ——
 //       卡片可能打开在错误的位置、按钮可能在但点了没反应、取消可能有副作用、

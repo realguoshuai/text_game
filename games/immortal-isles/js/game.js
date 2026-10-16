@@ -3324,6 +3324,51 @@
             C.ui.act && C.ui.actX && C.ui.cursor === 'pointer' && C.hint.left === 3);
           gp2.textContent = JSON.stringify(C);
         }
+        if (at === 'enhance') {
+          /* ?autotest=enhance —— 装备淬炼（v72）锁死两条「不看不知道对错」的链路：
+           *   ① 属性真的按 g.lv 在 recalcStats 唯一出口放大；
+           *   ② 熔炼价 gearValue 只认 g.st/g.t，**不认** g.lv —— 否则"淬炼→熔炼"会成套利环。
+           * 严格按纪律：期望值由 probe 现算（用 ENH_STEP/ENH_MAX/realmBase/gearValue），
+           * 不硬编码数字；加新装备或改系数也不会红成一片。 */
+          var gpE = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none';
+            document.body.appendChild(d); return d;
+          })();
+          var E = { atkMul: false, defMul: false, hpMul: false, meltSame: false, poorReject: false, capped: false, pass: false };
+          // 造一件属性确定的凡品装备（手写 st 以便逐属性比对）
+          player.realmIdx = 0; player.realmName = REALMS[0].cn; player.exp = 0;
+          var gE = { id: 99101, key: 'ge_ji', t: 0, st: { atk: 10, def: 5, maxhp: 20 }, lv: 0 };
+          // ★ 必须**穿上**才看得到淬炼效果——recalcStats 只遍历 equipped（已穿装备），
+          //   gE 若在 gearInv 行囊里，淬炼只改 g.lv，player 属性纹丝不动（这条正是被抓住的真 bug）。
+          gearInv = []; equipped = { weapon: gE, armor: null, trinket: null };
+          recalcStats();
+          var baseE = realmBase();
+          // ① 属性放大：升 1 阶后，面板与 base 之差 = round(st*(1+ENH_STEP*lv))
+          player.stones = 999999;
+          var okE1 = enhanceGear(gE);                 // lv 0 → 1
+          E.atkMul = okE1 && (player.atk - baseE.atk) === Math.round(gE.st.atk * (1 + ENH_STEP * 1));
+          E.defMul = (player.def - baseE.def) === Math.round(gE.st.def * (1 + ENH_STEP * 1));
+          E.hpMul  = (player.maxhp - baseE.maxhp) === Math.round(gE.st.maxhp * (1 + ENH_STEP * 1));
+          // ② 熔炼价不随强化涨：lv=0 与 lv=ENH_MAX 时 gearValue 必须相等（gearValue 只看 g.st/g.t）
+          var lvA = gE.lv; gE.lv = 0; var vA = gearValue(gE);
+          gE.lv = ENH_MAX; var vB = gearValue(gE);
+          gE.lv = lvA;
+          E.meltSame = (vA === vB) && (gearValue(gE) === vA);
+          // ③ 差钱拒绝：银两不够时 enhanceGear 返回 false，且不扣钱、不动 lv
+          gE.lv = 0; player.stones = 0;
+          var stonesB = player.stones;
+          var okPoor = enhanceGear(gE);
+          E.poorReject = (okPoor === false) && (player.stones === stonesB) && (gE.lv === 0);
+          // ④ 上限封顶：lv 已达 ENH_MAX 时不能再升，且 lv 不变
+          gE.lv = ENH_MAX; player.stones = 999999;
+          var okCap = enhanceGear(gE);
+          E.capped = (okCap === false) && (gE.lv === ENH_MAX);
+          // 复位，别留测试态
+          gE.lv = 0; gearInv = []; equipped = { weapon: null, armor: null, trinket: null };
+          recalcStats(); player.stones = 0;
+          E.pass = E.atkMul && E.defMul && E.hpMul && E.meltSame && E.poorReject && E.capped;
+          gpE.textContent = JSON.stringify(E);
+        }
         if (at === 'card') {
           /* ?map=<图>&autotest=card —— 装备操作卡（v55）
            * 用户原话：「装备长按熔炼能不能改成点击，有装备/使用或熔炼或者丢弃什么的」。
