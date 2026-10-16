@@ -5865,6 +5865,18 @@
       };
     }).filter(function (f) { return !!f; });   // 剔掉上面跳过的未知怪种
   }
+  /** Boss 二阶段：血量过半触发一次。狂暴 = 攻强 + 移速 + 读条更频更狠 + 视觉红环。
+   *  只 buff 不改机制骨架，避免改写共享的 FOE_DEFS（跨图污染）。spdMul/castMul 是乘子，默认 1。 */
+  function triggerBossPhase2(f) {
+    if (f.phase2) return;
+    f.phase2 = true;
+    f.atk = Math.round(f.atk * 1.35);     // 狂暴：攻击 +35%
+    f.spdMul = 1.25;                       // 移速 +25%（在 updateFoes 移动处乘算）
+    f.castMul = 0.7;                       // 读条时长与冷却 ×0.7（更频更狠）
+    f.flash = 0.5;
+    addFloater(f.x, f.y - 0.8, '二阶段·狂暴！', '#ff3b3b');
+    screenShake = Math.max(screenShake, 0.6);
+  }
   function addFloater(mx, my, text, color, opts) {
     var o = opts || {};
     var isCrit = !!o.crit;
@@ -8951,6 +8963,8 @@
         if (f.dying <= 0) { f.dying = 0; f.alive = false; f.respawn = 10 + Math.random() * 6; }
         continue;
       }
+      // ★ Boss 二阶段：血量过半触发一次（狂暴），只改实例不改共享 def_。
+      if (f.isBoss && !f.phase2 && f.hp <= f.maxhp * 0.5) triggerBossPhase2(f);
       if (f.flash > 0) f.flash = Math.max(0, f.flash - dt);
       if (f.atkAnim > 0) f.atkAnim = Math.max(0, f.atkAnim - dt);
       /* 头顶台词计时（v43）：到点随机来一句；全局同时说话 ≤2 只，同屏不吵。
@@ -8974,14 +8988,15 @@
       // 玩家跑出范围也照常释放）；起手期间攻击它即可打断；读条完成若仍在施法半径内则吃大额伤害。
       if (!f.casting) f.castCd -= dt;
       if (f.isBoss || f.isElite) {
+        var cm = (f.phase2 && f.castMul) ? f.castMul : 1;   // 二阶段：读条时长/冷却 ×castMul
         if (f.casting) {
           f.castT -= dt;
           if (f.castT <= 0) {
-            f.casting = false; f.castKind = null; f.castCd = 4 + Math.random() * 3;
+            f.casting = false; f.castKind = null; f.castCd = (4 + Math.random() * 3) * cm;
             var cr = f.isBoss ? 3.4 : 2.6;
             var cd2 = Math.hypot(player.mx - f.x, player.my - f.y);
             if (cd2 < cr && !player.dead && player.invuln <= 0) {
-              var big = Math.max(1, Math.round(f.atk * (f.isBoss ? 2.2 : 1.5) - player.def * 0.5));
+              var big = Math.max(1, Math.round(f.atk * (f.isBoss ? (f.phase2 ? 2.6 : 2.2) : 1.5) - player.def * 0.5));
               player.hp -= big; player.flash = 0.3;
               addDamageFloater(player.mx, player.my - 0.4, big, 'foe_skill');
               screenShake = Math.max(screenShake, 0.4);
@@ -8991,8 +9006,8 @@
         } else if (f.castCd <= 0) {
           var cd = Math.hypot(player.mx - f.x, player.my - f.y);
           if (cd < (f.def_.aggro || AGGRO)) {
-            f.casting = true; f.castT = f.isBoss ? 2.4 : 1.8; f.castMax = f.castT; f.castKind = 'aoe';
-            addFloater(f.x, f.y - 0.6, f.isBoss ? '蓄力·天崩！' : '蓄力·重击！', '#ffae42');
+            f.casting = true; f.castT = (f.isBoss ? 2.4 : 1.8) * cm; f.castMax = f.castT; f.castKind = 'aoe';
+            addFloater(f.x, f.y - 0.6, f.isBoss ? (f.phase2 ? '蓄力·天崩·裂！' : '蓄力·天崩！') : '蓄力·重击！', f.phase2 ? '#ff5a3c' : '#ffae42');
           }
         }
       }
@@ -9014,7 +9029,7 @@
       var hd = Math.hypot(f.x - f.home.x, f.y - f.home.y);   // 离巢距离
       var leashed = hd > f.leash;              // 被引出了领地：停止追击，回巢待命
       if (dist < radius && !player.dead && !leashed) {
-        var sp = f.def_.mv * dt, ux = dx / (dist || 1), uy = dy / (dist || 1);
+        var sp = f.def_.mv * (f.spdMul || 1) * dt, ux = dx / (dist || 1), uy = dy / (dist || 1);
         var sx2 = ux, sy2 = uy;
         // 走到出手距离就停住：引擎原本会一路挤进玩家所在格，画面上整只怪压在主角头上。
         // 停住之后由下面的 MELEE 判定出手，观感才对。
@@ -9081,7 +9096,7 @@
       } else if (hd > 0.6) {
         // 失去仇恨 / 越出领地 / 玩家死亡 → 走回巢穴，回到领地内待命（不追、不打）
         var hxx = f.home.x - f.x, hyy = f.home.y - f.y;
-        var sp2 = f.def_.mv * 0.8 * dt;        // 回巢用 0.8 倍速，不慌不忙
+        var sp2 = f.def_.mv * 0.8 * (f.spdMul || 1) * dt;        // 回巢用 0.8 倍速，不慌不忙
         var sx2b = hxx, sy2b = hyy;
         var hlos = losClear(Math.round(f.x), Math.round(f.y), Math.round(f.home.x), Math.round(f.home.y));
         if (hlos) {
@@ -9247,6 +9262,21 @@
       ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, vr, vr * 0.5, 0, 0, 6.2832); ctx.stroke();
       ctx.restore();
     }
+    // ★ Boss 二阶段：脚下红环脉动（零素材矢量，lighter 叠加）
+    if (f.phase2) {
+      var pps = 0.6 + 0.4 * Math.sin(time * 5 + f.x);
+      var ppr = (f.def_.fh || 110) * 0.5 * Z;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.16 + 0.22 * pps;
+      ctx.fillStyle = 'rgb(255,60,60)';
+      ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, ppr, ppr * 0.5, 0, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 0.7 + 0.3 * pps;
+      ctx.strokeStyle = 'rgb(255,60,60)';
+      ctx.lineWidth = Math.max(1.5, 2.4 * Z);
+      ctx.beginPath(); ctx.ellipse(p.x, baseY - 2, ppr, ppr * 0.5, 0, 0, 6.2832); ctx.stroke();
+      ctx.restore();
+    }
     // 按「目标身高」归一化：图集各帧原始像素尺寸差很大（如石魔 idle 帧 348px 宽），
     // 直接 1:1 画会忽大忽小、且整只偏大。这里统一缩放到 fh，再以脚底 + 锚点对齐格子中心。
     var th = f.def_.fh || 110;
@@ -9270,7 +9300,7 @@
       ctx.font = 'bold ' + (12 * Z).toFixed(1) + 'px "Microsoft YaHei",sans-serif';
       ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(6,12,24,.82)';
       ctx.strokeText(fnm, p.x, ty);
-      ctx.fillStyle = f.vBar ? f.vBar : '#ffd0c0';
+      ctx.fillStyle = f.phase2 ? '#ff8a8a' : (f.vBar ? f.vBar : '#ffd0c0');
       ctx.fillText(fnm, p.x, ty);
       if (f.el && f.el !== '无') {
         var ew = ctx.measureText(fnm).width;
@@ -9291,10 +9321,10 @@
     /* ★5 读条技能：地面预警圈（随进度收紧 + 变亮）+ 头顶进度条 */
     if (f.casting) {
       var prog = 1 - Math.max(0, f.castT) / Math.max(0.01, f.castMax);
-      var gr = (f.isBoss ? 3.4 : 2.6);
+      var gr = (f.isBoss ? 3.4 : 2.6) * (f.phase2 ? 1.15 : 1);
       ctx.save();
       ctx.globalAlpha = 0.18 + 0.32 * prog;
-      ctx.fillStyle = f.isBoss ? 'rgba(255,60,60,.55)' : 'rgba(255,170,60,.5)';
+      ctx.fillStyle = f.phase2 ? 'rgba(255,40,40,.6)' : (f.isBoss ? 'rgba(255,60,60,.55)' : 'rgba(255,170,60,.5)');
       ctx.beginPath();
       ctx.ellipse(p.x, baseY - 2, gr * HW * Z, gr * HH * Z, 0, 0, 6.2832);
       ctx.fill();
@@ -9302,7 +9332,7 @@
       var cty = dy - 6 * Z, cbw = Math.max(46 * Z, ow * 0.8), cbh = 6 * Z;
       var cbx = p.x - cbw / 2, cby = cty - 26 * Z;
       ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(cbx, cby, cbw, cbh);
-      ctx.fillStyle = f.isBoss ? '#ff4d4d' : '#ffb24d';
+      ctx.fillStyle = f.phase2 ? '#ff2d2d' : (f.isBoss ? '#ff4d4d' : '#ffb24d');
       ctx.fillRect(cbx, cby, cbw * prog, cbh);
       ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1 * Z; ctx.strokeRect(cbx, cby, cbw, cbh);
     }
