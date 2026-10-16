@@ -990,6 +990,21 @@
   function gearScore(st) {
     return (st.atk | 0) * 6 + (st.def | 0) * 7 + (st.maxhp | 0) * 0.8;
   }
+  /* ═════════ 装备淬炼（v72：银两的第一个「成长型沉没口」）════════
+   * 起因：银两一直"只进不出 / 进惩罚出口"（v56 坊市补了消费，但都是**消耗品**——
+   *       买丹药用掉、买装备替代，没有"把银两长期沉淀进装备强度"的通道）。
+   *       打怪攒装备→熔炼换银两→银两又只能买消耗品，装备本身永远原地踏步。
+   * 设计：① 只升 g.lv（强化等级），**绝不写进 g.st** —— 否则 gearScore/gearValue 跟着涨，
+   *       熔炼把强化投入全额返还 = 无限刷银两（v54 妖丹、v56 银两同一类病的翻版）；
+   *       ② 属性放大只在 recalcStats 这一个出口按 lv 系数做，UI/熔炼/重铸各算各的互不污染；
+   *       ③ g.lv 随 gearInv 整体 JSON 进档（applySave 原样 push g），老档无 lv 字段 → 0，零迁移。 */
+  var ENH_MAX = 8;          // 单件淬炼上限（阶）
+  var ENH_STEP = 0.09;      // 每阶 +9% 属性
+  var ENH_BASE = 18;        // 基础银两（再乘 品质系数(t+1) 与 当前阶(lv+1)）
+  /** 当前阶 → 下一阶的银两花费。凡品 1→2 阶 = 18，越好的装备、越高的阶越贵。 */
+  function enhCost(g) {
+    return Math.round(ENH_BASE * (gearTier(g).t + 1) * ((g.lv | 0) + 1));
+  }
   /** 掷一件装备。tier 不传就按权重摇（精英传 true 走精英权重）。 */
   function rollGear(elite) {
     var bk = GEAR_BASE_KEYS[rndInt(0, GEAR_BASE_KEYS.length - 1)];
@@ -1011,15 +1026,18 @@
     for (var i = 0; i < GEAR_SLOTS.length; i++) if (GEAR_SLOTS[i].key === key) return GEAR_SLOTS[i].cn;
     return '装备';
   }
-  /** 一行的属性描述（给 title 悬停 / 对比用）：「攻 +8  御 +2」 */
+  /** 一行的属性描述（给 title 悬停 / 对比用）：「攻 +8  御 +2」；淬炼过的把 lv 系数算进最终值。 */
   function gearStatsLine(g, sep) {
-    var out = [], i, s = g.st;
+    var out = [], i, s = g.st, lv = g.lv | 0;
     var order = ['atk', 'def', 'maxhp'], cn = { atk: '攻', def: '御', maxhp: '气血' };
     for (i = 0; i < order.length; i++) {
-      var v = s[order[i]] | 0;
-      if (v) out.push(cn[order[i]] + ' ' + (v > 0 ? '+' : '') + v);
+      var raw = s[order[i]] | 0;
+      if (!raw) continue;
+      var v = Math.round(raw * (1 + ENH_STEP * lv));
+      out.push(cn[order[i]] + ' ' + (v > 0 ? '+' : '') + v);
     }
-    return out.length ? out.join(sep || '  ') : '无附加属性';
+    var line = out.length ? out.join(sep || '  ') : '无附加属性';
+    return lv ? line + ' [+' + lv + '淬]' : line;
   }
   /** 装备折算银两（熔炼用）：品质越高越值钱，再加点属性 amounts。 */
   function gearValue(g) {
@@ -1077,6 +1095,22 @@
       before + '  →  ' + after);
     return true;
   }
+  /** 装备淬炼（v72：银两的成长型沉没口）。规则见上方 ENH_* 注释。
+   *  守卫顺序与 reforgeGear 一致：先确认这件还在（行囊或身上），再确认买得起，最后才扣钱改数据。 */
+  function enhanceGear(g) {
+    if (!g) return false;
+    if ((g.lv | 0) >= ENH_MAX) { toast('「' + gearName(g) + '」已达淬炼上限 ' + ENH_MAX + ' 阶'); return false; }
+    if (gearInv.indexOf(g) < 0 && !wornSlotOf(g)) { bagDirty = true; return false; }
+    var c = enhCost(g);
+    if (player.stones < c) { toast('银两不足，还差 ' + (c - player.stones) + ' 银两'); return false; }
+    player.stones -= c;
+    g.lv = (g.lv | 0) + 1;
+    recalcStats(); lastGearSig = ''; bagDirty = true;   // 属性变了 → 强制重建装备区
+    addFloater(player.mx, player.my - 0.5, '淬炼 ' + gearName(g) + ' +' + g.lv, '#ffd75a');
+    toast('淬炼 ' + gearName(g) + ' 至 ' + g.lv + ' 阶 · 属性 +' + Math.round(ENH_STEP * 100 * g.lv) +
+      '%（耗 ' + c + ' 银两，熔炼不返还）');
+    return true;
+  }
   /** 穿上：同槽位自动换下（旧装备回行囊，不会凭空消失）。 */
   function equipGear(g) {
     var b = gearBase(g); if (!b) return false;
@@ -1108,7 +1142,13 @@
     for (i = 0; i < GEAR_SLOTS.length; i++) {
       sl = GEAR_SLOTS[i].key; g = equipped[sl];
       if (!g) continue;
-      for (k in g.st) if (g.st.hasOwnProperty(k)) s[k] = (s[k] || 0) + (g.st[k] | 0);
+      /* 淬炼：属性按 g.lv 放大（只在这里做，g.st 本身不动 —— 保证熔炼价不跟着涨、防套利）。
+       * 非数字属性（el 之类）一律跳过，只对数值生效。 */
+      var mul = 1 + ENH_STEP * (g.lv | 0);
+      for (k in g.st) if (g.st.hasOwnProperty(k)) {
+        var raw = g.st[k];
+        if (typeof raw === 'number' && isFinite(raw)) s[k] = (s[k] || 0) + Math.round(raw * mul);
+      }
     }
     var base = realmBase();                // v54：底子随境界抬升（原来直接用 BASE_STATS）
     var oldMax = player.maxhp;
@@ -7504,9 +7544,9 @@
     var s = '', i;
     for (i = 0; i < GEAR_SLOTS.length; i++) {
       var g = equipped[GEAR_SLOTS[i].key];
-      s += (g ? (GEAR_SLOTS[i].key + ':' + g.id + ':' + g.t) : GEAR_SLOTS[i].key + ':-') + '|';
+      s += (g ? (GEAR_SLOTS[i].key + ':' + g.id + ':' + g.t + ':' + (g.lv | 0)) : GEAR_SLOTS[i].key + ':-') + '|';
     }
-    for (i = 0; i < gearInv.length; i++) s += gearInv[i].id + ':' + gearInv[i].t + ',';
+    for (i = 0; i < gearInv.length; i++) s += gearInv[i].id + ':' + gearInv[i].t + ':' + (gearInv[i].lv | 0) + ',';
     return s;
   }
   /** 造一枚装备格（行囊 / 已装备槽通用）：图标 + 品质边框 + 悬停详情。
@@ -7527,7 +7567,7 @@
       }
       c.title = gearName(g) + '（' + gearTier(g).cn + '）\n' +
         gearStatsLine(g, '\n') + '\n' + gearBase(g).note +
-        '\n点一下打开操作卡（装备 / 融炼 / 丢弃）';
+        '\n点一下打开操作卡（装备 / 淬炼 / 融炼 / 丢弃）';
       c.addEventListener('click', function (ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         openGearCard(g);
@@ -7610,7 +7650,7 @@
     if (sub) sub.textContent = tier.cn + ' · ' + b.cn + ' · ' +
       (worn ? '已装备（' + gearSlotCn(b.slot) + '位）' : '行囊中');
     /* 属性摊在脸上 —— 手机上 title tooltip 根本不触发，这是玩家唯一能看到自己穿了什么的地方。 */
-    if (st) st.textContent = gearStatsLine(g, '\n') + '\n熔炼可得约 ' + gearValue(g) + ' 银两';
+    if (st) st.textContent = gearStatsLine(g, '\n') + '\n熔炼可得约 ' + gearValue(g) + ' 银两（淬炼投入不返还）';
     if (note) note.textContent = b.note +
       (bag.xuantie | 0 ? '\n（可用玄铁令重铸词缀：只洗词缀，品质与基座不变）' : '');
     if (btns) {
@@ -7621,6 +7661,17 @@
         cardBtn(btns, '装备', 'equip');
         cardBtn(btns, '熔炼 +' + gearValue(g), 'melt', 'warn');
         cardBtn(btns, '丢弃', 'dump', 'bad');
+      }
+      /* 淬炼：银两的成长型沉没口。没满阶且买得起才高亮；差钱就灰掉并显示差额，
+       * 灰按钮本身就是"还差多少"的提示（与坊市买装备一致）。已装备的也能淬，不必先卸下。 */
+      var lv = g.lv | 0;
+      if (lv < ENH_MAX) {
+        var c = enhCost(g), lack = c - player.stones;
+        var eb = cardBtn(btns, '淬炼 ' + (lv ? '至 ' + (lv + 1) + ' 阶' : '1 阶') + ' · ' + c + ' 银两' +
+          (lack > 0 ? '（差 ' + lack + '）' : ''), 'enhance', lack > 0 ? 'disabled' : '');
+        if (lack > 0) eb.disabled = true;
+      } else {
+        cardBtn(btns, '已满淬 ' + ENH_MAX + ' 阶', 'enhance', 'disabled');
       }
       /* 重铸：有玄铁令才出现（没有就不给这个按钮 —— 摆一个点了只弹提示的按钮更像 bug）。
        * 已装备的也能洗，不必先卸下。 */
@@ -7642,6 +7693,7 @@
     if (a === 'equip') { if (!slot) equipGear(g); return; }
     if (a === 'unequip') { if (slot) unequipGear(slot); return; }
     if (a === 'reforge') { reforgeGear(g); return; }
+    if (a === 'enhance') { enhanceGear(g); return; }
     if (a === 'melt') { if (!slot) meltGear(g); else toast('先卸下再熔炼'); return; }
     if (a === 'dump') {
       if (slot) { toast('已装备的不能丢弃，先卸下'); return; }
@@ -10549,7 +10601,7 @@
         }
       }
     } catch (e) {}
-    var mm = /[?&]v=([0-9]+)/.exec(src);
+    var mm = /[?&]v=([\d.]+)/.exec(src);
     var VTAG = mm ? mm[1] : '?';
     window.__VTAG = VTAG;
     try { document.title = '仙岛寻踪 v' + VTAG; } catch (e) {}

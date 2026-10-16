@@ -155,7 +155,7 @@ if (loadPlan) {
     let size = 0;
     try { size = fs.statSync(path.join(ROOT, file)).size; } catch (e) { planIssues.push(file + ' 不存在'); continue; }
     const kb = size / 1024;
-    if (!/\?v=\d+/.test(p.url)) planIssues.push(file + ' 没有 ?v= 版本号（换素材后无法做缓存失效）');
+    if (!/\?v=[\d.]+/.test(p.url)) planIssues.push(file + ' 没有 ?v= 版本号（换素材后无法做缓存失效）');
     if (kb > 20 && Math.abs(p.weight - kb) / kb > 0.3) {
       planIssues.push(file + ' weight=' + p.weight + ' 但实际 ' + kb.toFixed(0) + 'KB（偏差 ' +
         Math.round(Math.abs(p.weight - kb) / kb * 100) + '%）');
