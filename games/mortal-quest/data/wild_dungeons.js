@@ -65,6 +65,36 @@ GAME.DATA.MONSTERS.push(
         stones: [120, 280], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.4],
         loot: [{ id: "beast_soul", chance: 0.7, qty: [1, 2] }, { id: "tianhuo_crystal", chance: 0.3, qty: [1, 1] }],
         desc: "三阶妖兽，鬃毛间火星迸溅，一声长嚎百狼来投——筑基修士亦需结伴而猎。",
+    },
+    /* —— 结丹期野外（下标 22~30）：majorRealm:2，与结丹玩家同境，方有真正较量 —— */
+    {
+        id: "wild_sanxiu_jie", name: "渡劫散修", human: true, tier: 4, majorRealm: 2,
+        hp: 2200, atk: 105, def: 60, speed: 16, spirit: 100, exp: 650,
+        stones: [300, 700], killChance: 0, loseAge: [0, 0], loseStonePct: [0.3, 0.5],
+        loot: [{ id: "tianhuo_crystal", chance: 0.35, qty: [1, 2] }, { id: "pill_jiedan", chance: 0.15, qty: [1, 1] }],
+        desc: "卡在筑基圆满多年、终得凝丹的散修，一身野路子神通，最难缠。",
+    },
+    {
+        id: "wild_yaoxiu", name: "结丹妖修", human: true, tier: 4, majorRealm: 2,
+        hp: 2600, atk: 95, def: 72, speed: 18, spirit: 92, exp: 720,
+        stones: [350, 800], killChance: 0, loseAge: [0, 0], loseStonePct: [0.3, 0.5],
+        loot: [{ id: "beast_soul", chance: 0.5, qty: [1, 2] }, { id: "jinshi", chance: 0.3, qty: [1, 2] }],
+        desc: "由妖兽修成人形的结丹大妖，妖丹与灵智俱全，手段狠辣。",
+    },
+    {
+        id: "wild_jiaolong", name: "赤鳞蛟", isBeast: true, tier: 4, majorRealm: 2,
+        hp: 4200, atk: 120, def: 90, speed: 20, spirit: 110, exp: 980,
+        stones: [400, 900], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.4],
+        loot: [{ id: "beast_soul", chance: 0.7, qty: [2, 3] }, { id: "tianhuo_crystal", chance: 0.4, qty: [1, 2] }],
+        desc: "四阶妖兽，赤鳞如火，盘踞深渊灵脉——结丹修士亦不敢轻易撄其锋。",
+    },
+    {
+        id: "wild_moxiu_jie", name: "魔修巡察使", human: true, tier: 4, majorRealm: 2,
+        hp: 3000, atk: 112, def: 78, speed: 14, spirit: 125, exp: 1050,
+        stones: [450, 1000], killChance: 0, loseAge: [0, 0], loseStonePct: [0.3, 0.5],
+        poisonPlayer: { turns: 3, dmg: 25 },
+        loot: [{ id: "tianhuo_crystal", chance: 0.5, qty: [1, 2] }, { id: "pill_jiedan_zhengpin", chance: 0.12, qty: [1, 1] }],
+        desc: "魔道六宗派驻外域的巡察，专司清剿异己，周身魔焰环绕。",
     }
 );
 
@@ -80,6 +110,10 @@ GAME.DATA.MAP_ENCOUNTERS = {
         { minRealm: 13, maxRealm: 17, monster: "wild_wugong"  },
         { minRealm: 14, maxRealm: 18, monster: "wild_moxiu"   },
         { minRealm: 18, maxRealm: 21, monster: "wild_huolang" },
+        { minRealm: 22, maxRealm: 24, monster: "wild_sanxiu_jie" },
+        { minRealm: 22, maxRealm: 26, monster: "wild_yaoxiu" },
+        { minRealm: 25, maxRealm: 28, monster: "wild_jiaolong" },
+        { minRealm: 27, maxRealm: 30, monster: "wild_moxiu_jie" },
     ],
 };
 
@@ -117,6 +151,17 @@ GAME.DATA.HUNTS = {
                 materials: [{ id: "tianhuo_crystal", qty: 1 }, { id: "beast_soul", qty: 2 }],
                 stones: [400, 800],
                 text: "营垒地宫石门轰开——魔修们来不及带走的重宝，静静躺在祭坛之上。",
+            },
+        },
+        {
+            id: "hunt_luanxing", name: "乱星海·妖修巢", reqRealm: 22,
+            teaser: "碎星海深处妖修盘踞的浮岛群。此处妖物已开灵智、结丹有望，是结丹修士真正的磨刀石。",
+            waves: ["wild_yaoxiu", "wild_sanxiu_jie", "wild_jiaolong"],
+            reward: {
+                equip: ["artifact_zimu_complete", "artifact_zhetian", "artifact_tayun"],
+                materials: [{ id: "tianhuo_crystal", qty: 2 }, { id: "beast_soul", qty: 2 }],
+                stones: [1200, 2400],
+                text: "妖修巢穴尽数踏平。你在巢心密室翻出几件被妖修当作压岛之宝的器物。",
             },
         },
     ],

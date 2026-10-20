@@ -37,11 +37,43 @@ GAME.DATA.FOUNDATION = {
     DAYAN_MAX_LAYER: 4,
 };
 
+/* —— 结丹一层~九层梯度（与 realms.js 中 REALMS[22..30] 一一对应） ——
+ * hp/mp 自筑基九层(2600/900)续涨；sp 神识上限续涨（供傀儡/御物）；
+ * defSuppress 境界免伤压制系数升至 0.88~0.93（结丹受低境攻击削减 88%~93%）。 */
+GAME.DATA.JIEDAN_FOUNDATION = {
+    layers: [
+        { hp: 3200, mp: 1100, sp: 120, defSuppress: 0.88 },  // 结丹一层
+        { hp: 3800, mp: 1300, sp: 135, defSuppress: 0.89 },  // 二层
+        { hp: 4400, mp: 1500, sp: 150, defSuppress: 0.90 },  // 三层
+        { hp: 5100, mp: 1750, sp: 165, defSuppress: 0.905 }, // 四层
+        { hp: 5900, mp: 2000, sp: 180, defSuppress: 0.91 },  // 五层
+        { hp: 6800, mp: 2300, sp: 195, defSuppress: 0.915 }, // 六层
+        { hp: 7900, mp: 2600, sp: 210, defSuppress: 0.92 },  // 七层
+        { hp: 9100, mp: 2900, sp: 225, defSuppress: 0.925 }, // 八层
+        { hp:10500, mp: 3200, sp: 240, defSuppress: 0.93 },  // 九层大圆满
+    ],
+};
+
 /* 将梯度写入 REALMS[13..21]（幂等：重复加载不叠加） */
 (function applyFoundation() {
     var R = GAME.DATA.REALMS;
     var F = GAME.DATA.FOUNDATION.layers;
     var base = GAME.DATA.ZHUJI_GATE_INDEX + 1; // 13
+    for (var i = 0; i < F.length; i++) {
+        var r = R[base + i];
+        if (!r) continue;
+        r.hp = F[i].hp;
+        r.mp = F[i].mp;
+        r.sp = F[i].sp;
+        r.defSuppress = F[i].defSuppress;
+    }
+})();
+
+/* 将结丹梯度写入 REALMS[22..30]（幂等：重复加载不叠加） */
+(function applyJiedan() {
+    var R = GAME.DATA.REALMS;
+    var F = GAME.DATA.JIEDAN_FOUNDATION.layers;
+    var base = GAME.DATA.JIEDAN_GATE_SOURCE + 1; // 22
     for (var i = 0; i < F.length; i++) {
         var r = R[base + i];
         if (!r) continue;

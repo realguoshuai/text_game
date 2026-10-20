@@ -2,7 +2,7 @@
 /* =========================================================
  * test/smoke_endings.js —— 筑基期后多结局系统无头测试
  *   ① 终局前默认全锁定（除条件后解锁）
- *   ② 结丹之路：需李玄尘亲传 + 筑基七层以上
+ *   ② 结丹之路：需李玄尘亲传 + 筑基九层以上
  *   ③ 红尘双修：需凌清沅·暗中护法完成
  *   ④ 孤峰悟道：回绝柳蔓儿 + 斩断温巧兮 + 未结凌清沅
  *   ⑤ 魔焰噬心：阴魂精魄 ≥ 3
@@ -73,13 +73,15 @@ console.log('【1】结局定义与锁定基线');
   assert('破空而去未修阵锁定', G.Endings.canChoose('victory').ok === false);
 }
 
-console.log('【2】结丹之路：李玄尘亲传 + 筑基七层');
+console.log('【2】结丹之路：李玄尘亲传 + 筑基九层');
 {
   const p = reset(16);   // 筑基三层，不足
   p.masterId = 'lihuayuan'; G.Bonds.bonds().lihuayuan = { done: true };
-  assert('亲传但修为不足仍锁定', G.Endings.canChoose('jiedan').ok === false);
-  p.realmIndex = 19;     // 筑基七层
-  assert('亲传 + 筑基七层解锁', G.Endings.canChoose('jiedan').ok === true);
+  assert('亲传但修为不足（<筑基九层）仍锁定', G.Endings.canChoose('jiedan').ok === false);
+  p.realmIndex = 19;     // 筑基七层，仍未到结丹门槛
+  assert('亲传 + 筑基七层仍锁定（须筑基九层）', G.Endings.canChoose('jiedan').ok === false);
+  p.realmIndex = 21;     // 筑基九层（结丹门槛）
+  assert('亲传 + 筑基九层解锁', G.Endings.canChoose('jiedan').ok === true);
   assert('择结丹结局成功', G.Endings.choose('jiedan') === true);
   assert('ending 落定为 jiedan', p.ending === 'jiedan');
   assert('天道点数为正', (p.tiandao || 0) > 0);

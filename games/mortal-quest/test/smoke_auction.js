@@ -7,9 +7,9 @@
  * ② 拍卖会结丹门槛：结丹期(index>=22)解锁，渲染「应价/一口价」按钮可竞拍；
  *    未到结丹期显示锁定提示、拍品区为空、竞拍函数直接拒拍（修为不到不能点击）。
  *
- * 注：当前 REALMS 仅到筑基九层(index21)，故结丹(index22)在真实游戏里尚不可达；
- * 测试以 p.realmIndex=22 直接模拟结丹，并桩掉 updateUI/autoSave（避免 REALMS[22]
- * 越界），以隔离验证拍卖会逻辑本身。
+ * 注：结丹(index22+) 已在 realms.js / realms_foundation.js 落地（applyJiedan 写入
+ * REALMS[22..30] 的 hp/mp/defSuppress）。测试以 p.realmIndex=22 直接模拟结丹，
+ * 桩掉 updateUI/autoSave 隔离 UI 副作用，专注验证拍卖会逻辑本身。
  *
  * 运行： node test/smoke_auction.js
  * ========================================================= */
@@ -81,7 +81,10 @@ sandbox.localStorage = {
 vm.createContext(sandbox);
 
 const html = fs.readFileSync(path.join(BASE, 'index.html'), 'utf8');
-const FILES = (html.match(/<script src="([^"]+)"/g) || []).map(s => s.replace(/<script src="|"/g, ''));
+// 不加载 js/scene.js（它依赖真正的 <canvas> 2D 上下文，裸 node 环境无法提供，且本测试只验 DOM UI 与拍卖逻辑）
+const FILES = (html.match(/<script src="([^"]+)"/g) || [])
+  .map(s => s.replace(/<script src="|"/g, ''))
+  .filter(f => f !== 'js/scene.js');
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BASE, f), 'utf8'), sandbox, { filename: f });
 const G = sandbox.GAME;
 const U = G.UI;
@@ -147,9 +150,12 @@ G.Auction.bid(0);
 G.Auction.buyout(0);
 ok('练气期：竞拍函数拒拍（灵石不变）', a1.spiritStones === stonesBefore);
 
-// 结丹玩家：桩掉 updateUI/autoSave 避免 REALMS[22] 越界，隔离验证拍卖逻辑
+// 结丹玩家：桩掉 updateUI/autoSave 隔离 UI 副作用，验证拍卖逻辑（REALMS[22] 现已真实落地）
 const a2 = G.State.createNewPlayer('wanderer');
 a2.realmIndex = 22;
+ok('结丹一层 REALMS[22] 气血上限已由 foundation 写入(>0)', G.DATA.REALMS[22] && G.DATA.REALMS[22].hp > 0);
+ok('结丹丹药 pill_jiedan 已定义', !!G.DATA.ITEMS.pill_jiedan);
+ok('拍卖缺失拍品已补齐（jinshi / chong_egg）', !!G.DATA.ITEMS.jinshi && !!G.DATA.ITEMS.chong_egg);
 const realUpdate = G.UI.updateUI, realSave = G.UI.autoSave;
 G.UI.updateUI = function () {};
 G.UI.autoSave = function () {};

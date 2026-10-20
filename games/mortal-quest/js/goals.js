@@ -179,18 +179,18 @@ GAME.Goals = {
         {
             id: "jiedan",
             when: function (p) { return p.realmIndex >= 13; },
-            done: function (p) { return p.realmIndex >= 21; },
-            text: "修至筑基九层，冲击结丹",
+            done: function (p) { return p.realmIndex >= 30; },
+            text: "凝丹功成，结丹圆满（结丹九层）",
             hint: function (p) {
-                return "当前 " + GAME.Goals._realmName(p.realmIndex) + "（筑基九层 = 21/21）";
+                return "当前 " + GAME.Goals._realmName(p.realmIndex) + "（结丹圆满 = 30/30）";
             },
             where: "洞府 / 历练"
         },
         {
             id: "endgame",
-            when: function (p) { return p.realmIndex >= 21; },
+            when: function (p) { return p.realmIndex >= 30; },
             done: function () { return false; },
-            text: "结丹在即 · 你的道，该有个交代了",
+            text: "结丹圆满 · 你的道，该有个交代了",
             hint: function () { return "继续修行或了断尘缘，结局由你此前的抉择决定"; },
             where: "乱星海"
         }

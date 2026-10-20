@@ -28,6 +28,9 @@ GAME.DATA.ITEMS = {
     pill_huanglong:{ id:"pill_huanglong", name:"黄龙丹", quality:"灵品", type:"pill", price:80,  desc:"药力浑厚，修为 +25。",   use:{ exp:25 } },
     pill_jinsui:   { id:"pill_jinsui",    name:"金髓丸", quality:"上品", type:"pill", price:220, desc:"易筋洗髓，修为 +80。",   use:{ exp:80 } },
     pill_zhuji:    { id:"pill_zhuji",     name:"筑基丹", quality:"极品", type:"pill", price:800, desc:"冲关筑基之凭。突破筑基时自动消耗一枚。", use:{ zhuji:true } },
+    pill_jiedan:   { id:"pill_jiedan",    name:"凝丹",   quality:"极品", type:"pill", price:1500, realmBand:[21,30], desc:"凝丹之凭。突破结丹时自动消耗一枚（筑基九层圆满方可冲击）。", use:{ jiedan:true } },
+    pill_jiedan_zhengpin: { id:"pill_jiedan_zhengpin", name:"正品凝丹", quality:"极品", type:"pill", price:2200, realmBand:[21,30], desc:"三味天材所炼，药效醇厚。冲击结丹成功率更高、反噬更轻。", use:{ jiedan:true } },
+    fake_jiedan:   { id:"fake_jiedan",    name:"伪凝丹", quality:"上品", type:"pill", price:400,  realmBand:[21,30], desc:"药力虚浮的赝品，冲击结丹成功率低，且失败仍有身陨之危。", use:{ jiedan:true } },
     pill_yanshou:  { id:"pill_yanshou",   name:"延寿丹", quality:"极品", type:"pill", price:600, desc:"夺天地造化以续命，寿元大限 +10 年。练气期唯一续命之法。", use:{ ageBonus:10 } },
 
     // —— 符箓（仅战斗中使用） ——
@@ -118,6 +121,8 @@ GAME.DATA.ITEMS = {
     iron_ore:        { id:"iron_ore",        name:"玄铁矿石", quality:"凡品", type:"material", price:15, desc:"地底玄铁原矿，用于傀儡机括锻造。下矿开采或坊市铁匠铺可得。（噬金虫须喂金石矿料，非此矿。）" },
     tianhuo_crystal: { id:"tianhuo_crystal", name:"天火晶",   quality:"上品", type:"material", price:80, desc:"火系地脉结晶，用于高阶巨猿傀儡与法宝胚胎。魔修尸身或黑市可得。" },
     yin_hun_soul:    { id:"yin_hun_soul",    name:"阴魂精魄", quality:"极品", type:"material", price:0,  desc:"魔修丹田所凝阴魂，傀儡阴煞核心。斩杀魔道筑基修士方有几率到手。" },
+    jinshi:        { id:"jinshi",        name:"玄金石", quality:"上品", type:"material", price:45,  desc:"深埋地脉的奇异金石，傀儡枢轴与凝丹主料。拍卖会或矿脉可得。" },
+    chong_egg:     { id:"chong_egg",     name:"金噬虫卵", quality:"灵品", type:"material", price:300, desc:"传闻可噬金销铁的上古奇虫之卵，以金石灵矿饲之。拍卖会偶有流出，得之可开启灵虫一道。" },
 
     // —— 新增（丹方激活系列）：六色新丹，须先习得对应「丹方」方可开炉 ——
     pill_ningyuan:   { id:"pill_ningyuan",   name:"凝元丹", quality:"灵品", type:"pill", price:120, desc:"筑基通用精进之丹，药力温和。服之修为 +40。", use:{ exp:40 } },
@@ -151,4 +156,5 @@ GAME.DATA.RECIPES = [
     { pill:"pill_xugu",      herbs:{ herb_qiannian:2, jinshi:1 },      stones:120, recipe:"recipe_xugu" },
     { pill:"pill_huasha",    herbs:{ herb_tianling:1, herb_yumo:1 },   stones:60,  recipe:"recipe_huasha" },
     { pill:"pill_yanghun",   herbs:{ beast_soul:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_yanghun" },
+    { pill:"pill_jiedan",    herbs:{ tianhuo_crystal:1, beast_soul:1, jinshi:1 }, stones:300 }, // 凝丹：天火晶＋妖兽精魄＋玄金石；无丹方门槛，集料即炼
 ];

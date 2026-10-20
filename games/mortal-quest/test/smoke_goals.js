@@ -125,7 +125,10 @@ g = G.Goals.current();
 assert('副本通关 → 冲击结丹', g && g.id === 'jiedan');
 P().realmIndex = 21;
 g = G.Goals.current();
-assert('筑基九层 → 结局收束', g && g.id === 'endgame');
+assert('筑基九层 → 冲击结丹（未圆满，目标仍为 jiedan）', g && g.id === 'jiedan');
+P().realmIndex = 30;
+g = G.Goals.current();
+assert('结丹圆满 → 结局收束', g && g.id === 'endgame');
 
 // ---------- ⑤ 边界 ----------
 section('⑤ 边界与清单');

@@ -46,7 +46,21 @@ GAME.DATA.REALMS = [
     { name:"筑基六层",  needExp:2300, breakChance:0.35, failDamage:175, failExpLoss:0.35, deathChance:0.05, maxAge:200, atk:70, def:45, speed:17, spirit:35, meditateMonths:9 },
     { name:"筑基七层",  needExp:2600, breakChance:0.30, failDamage:190, failExpLoss:0.40, deathChance:0.05, maxAge:200, atk:76, def:49, speed:17, spirit:37, meditateMonths:10 },
     { name:"筑基八层",  needExp:2950, breakChance:0.26, failDamage:210, failExpLoss:0.40, deathChance:0.06, maxAge:200, atk:82, def:53, speed:18, spirit:39, meditateMonths:10 },
-    { name:"筑基九层",  needExp:null, breakChance:null, failDamage:null, failExpLoss:0, deathChance:0, maxAge:200, atk:88, def:57, speed:18, spirit:41, meditateMonths:10 },
+    { name:"筑基九层",  needExp:3300, breakChance:null, failDamage:400, failExpLoss:0.20, deathChance:0, maxAge:200, atk:88, def:57, speed:18, spirit:41, meditateMonths:10 },
+
+    /* —— 结丹期（index 22~30）：筑基九层(index21) 经「结丹天堑」凝丹而成。
+     * 寿元跃至 500 岁（呼应凡人流：结丹方脱凡胎）；斗法面板随层暴涨。
+     * 筑基九层→结丹一层走 GAME.DATA.JIEDAN 专用数值（见下方 JIEDAN 表）；
+     * 结丹内部各层为常规修为突破，沿用 realm.breakChance 等字段。 */
+    { name:"结丹一层",  needExp:3300, breakChance:0.30, failDamage:260, failExpLoss:0.35, deathChance:0.06, maxAge:500, atk:120, def:80,  speed:22, spirit:60,  meditateMonths:12 },
+    { name:"结丹二层",  needExp:3800, breakChance:0.26, failDamage:300, failExpLoss:0.38, deathChance:0.07, maxAge:500, atk:135, def:92,  speed:24, spirit:68,  meditateMonths:12 },
+    { name:"结丹三层",  needExp:4400, breakChance:0.22, failDamage:350, failExpLoss:0.40, deathChance:0.08, maxAge:500, atk:150, def:105, speed:26, spirit:76,  meditateMonths:12 },
+    { name:"结丹四层",  needExp:5100, breakChance:0.18, failDamage:410, failExpLoss:0.42, deathChance:0.09, maxAge:500, atk:170, def:120, speed:28, spirit:85,  meditateMonths:12 },
+    { name:"结丹五层",  needExp:5900, breakChance:0.15, failDamage:480, failExpLoss:0.45, deathChance:0.10, maxAge:500, atk:190, def:135, speed:30, spirit:95,  meditateMonths:12 },
+    { name:"结丹六层",  needExp:6800, breakChance:0.12, failDamage:560, failExpLoss:0.48, deathChance:0.11, maxAge:500, atk:210, def:150, speed:32, spirit:105, meditateMonths:12 },
+    { name:"结丹七层",  needExp:7900, breakChance:0.10, failDamage:650, failExpLoss:0.50, deathChance:0.12, maxAge:500, atk:235, def:170, speed:34, spirit:115, meditateMonths:12 },
+    { name:"结丹八层",  needExp:9100, breakChance:0.08, failDamage:760, failExpLoss:0.52, deathChance:0.13, maxAge:500, atk:260, def:190, speed:36, spirit:130, meditateMonths:12 },
+    { name:"结丹九层",  needExp:null, breakChance:null, failDamage:null, failExpLoss:0,    deathChance:0,    maxAge:500, atk:290, def:215, speed:38, spirit:145, meditateMonths:12 },
 ];
 
 /* 筑基丹链触发边界：练气十三层(index12)→筑基一层(index13) 走 GAME.DATA.ZHUJI 专用数值。
@@ -62,7 +76,7 @@ GAME.DATA.isZhuji  = function (p) { return !!p && p.realmIndex > GAME.DATA.ZHUJI
 
 /* 大境界（major realm）：0=练气，1=筑基。供战斗「境界绝对压制」计算双方阶层差。
  * 仅含练气/筑基两阶；未来接入结丹时扩展为按 index 区间映射。 */
-GAME.DATA.majorRealm = function (idx) { return idx >= 13 ? 1 : 0; };
+GAME.DATA.majorRealm = function (idx) { return idx >= 22 ? 2 : (idx >= 13 ? 1 : 0); };
 
 /* —— 筑基冲关数值表（练气十三层 → 筑基专用，由 core.breakthrough 读取）——
  * 伪灵根裸冲：2% 成功，失败 80% 触发【经脉俱断】道消身陨——凡人流的天堑。
@@ -78,4 +92,17 @@ GAME.DATA.ZHUJI = {
     pill:     { chance:0.25, perPill:0.25, perExtra:0.20, cap:1.0 },  // 筑基丹：每多服一枚 +25%，失败保底每档 +20%
     zhengpin: { chance:0.45, perPill:0.45, perExtra:0.20, cap:1.0 },  // 正品筑基丹：45% 起步同链
     fake:     { chance:0.15, deathChance:0.40, dmgMul:1.3 }, // 伪丹：15%，失败 40% 身陨
+};
+
+/* 结丹天堑（筑基九层 index21 → 结丹一层 index22）专用数值，由 core.breakthrough 读取。
+ * 无丹硬冲：3% 成、失败九成五身陨（原著结丹之难，百中无一）；
+ * 凝丹（结丹丹）：35% 起，连服每多一枚累积 +20%、历史失败保底每档 +15%，服丹免死；
+ * 正品凝丹：55% 起同链；伪凝丹：20% 且失败三成身陨。
+ * 《三转归元功》结丹补偿另计（每转 +25%，上限 +75%）。 */
+GAME.DATA.JIEDAN_GATE_SOURCE = 21;   // 筑基九层为结丹突破源（与 ZHUJI_GATE_INDEX=12 对应练气十三层同理）
+GAME.DATA.JIEDAN = {
+    bare:     { chance:0.03, deathChance:0.95, dmg:220 },   // 无丹硬冲：3% 成，失败九成五经脉俱断
+    pill:     { chance:0.35, perPill:0.20, perExtra:0.15, cap:1.0, dmgMul:0.3, deathMul:0 },  // 凝丹：服丹免死
+    zhengpin: { chance:0.55, perPill:0.20, perExtra:0.15, cap:1.0, dmgMul:0.2, deathMul:0 },  // 正品凝丹
+    fake:     { chance:0.20, deathChance:0.30, dmgMul:1.3 }, // 伪凝丹：20%，失败三成身陨
 };

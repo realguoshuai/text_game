@@ -624,7 +624,16 @@ GAME.Core = {
         else if (GAME.State.countItem("pill_zhuji") >= 1) zhujiPill = "pill_zhuji";
         else if (GAME.State.countItem("fake_zhuji") >= 1) zhujiPill = "fake_zhuji";
 
-        var successChance = realm.breakChance, dmgMul = 1, deathMul = 1, bareZhuji = false;
+        // 结丹天堑：筑基九层(index21)→结丹一层(index22)，数值全在 GAME.DATA.JIEDAN，与 ZHUJI 平行：
+        // 无丹硬冲 3%、失败九成五身陨；凝丹 35% 起、连服每多一枚 +20%、服丹免死；
+        // 正品凝丹 55% 起同链；伪凝丹 20% 且失败三成身陨。《三转归元功》每转 +25%（上限 +75%）另计。
+        var atJiedanGate = p.realmIndex === GAME.DATA.JIEDAN_GATE_SOURCE;
+        var jiedanPill = null;
+        if (GAME.State.countItem("pill_jiedan_zhengpin") >= 1) jiedanPill = "pill_jiedan_zhengpin";
+        else if (GAME.State.countItem("pill_jiedan") >= 1) jiedanPill = "pill_jiedan";
+        else if (GAME.State.countItem("fake_jiedan") >= 1) jiedanPill = "fake_jiedan";
+
+        var successChance = realm.breakChance, dmgMul = 1, deathMul = 1, bareZhuji = false, bareJiedan = false, fakeJiedan = false;
         if (isZhuji) {
             var zc = GAME.DATA.ZHUJI;
             // 连服公式：基础 + 每多服一枚(perPill) + 历史失败保底(perExtra×zhujiFails，永久累加)
@@ -642,6 +651,25 @@ GAME.Core = {
                 successChance = zc.bare.chance; dmgMul = 1; deathMul = zc.bare.deathChance;
             }
             if (bareZhuji) GAME.UI.log("筑基天堑！你身负伪灵根，竟欲以肉身硬撼壁障——此乃十死无生之局（成功 " + Math.round(successChance * 100) + "%，失败八成经脉俱断）！", "danger");
+        } else if (atJiedanGate) {
+            var jc = GAME.DATA.JIEDAN;
+            if (jiedanPill === "pill_jiedan_zhengpin") {
+                successChance = Math.min(jc.zhengpin.cap, jc.zhengpin.chance + jc.zhengpin.perPill * (p.jiedanStreak || 0) + jc.zhengpin.perExtra * (p.jiedanFails || 0));
+                dmgMul = jc.zhengpin.dmgMul; deathMul = jc.zhengpin.deathMul;
+            } else if (jiedanPill === "pill_jiedan") {
+                successChance = Math.min(jc.pill.cap, jc.pill.chance + jc.pill.perPill * (p.jiedanStreak || 0) + jc.pill.perExtra * (p.jiedanFails || 0));
+                dmgMul = jc.pill.dmgMul; deathMul = jc.pill.deathMul;
+            } else if (jiedanPill === "fake_jiedan") {
+                successChance = jc.fake.chance; dmgMul = jc.fake.dmgMul; deathMul = jc.fake.deathMul; fakeJiedan = true;
+            } else {
+                bareJiedan = true;
+                successChance = jc.bare.chance; dmgMul = 1; deathMul = jc.bare.deathChance;
+            }
+            // 《三转归元功》结丹补偿：每转 +25%（上限 +75%），仅丹道（非裸冲/非伪丹）享受
+            if (!bareJiedan && !fakeJiedan && GAME.Cultivation && GAME.Cultivation.jiedanBonus) {
+                successChance = Math.min(1.0, successChance + GAME.Cultivation.jiedanBonus());
+            }
+            if (bareJiedan) GAME.UI.log("结丹天堑！你竟欲不假外丹、以肉身硬凝金丹——此乃百中无一之局（成功 " + Math.round(successChance * 100) + "%，失败九成五身陨）！", "danger");
         }
         // 【降尘丹】：筑基后期冲关圣药，突破反噬伤害 -80%（一次性消耗）
         if (GAME.Alchemy && p.jiangchen) dmgMul *= GAME.Alchemy.breakDmgMul();
@@ -651,13 +679,14 @@ GAME.Core = {
             if (successChance < 0.98) successChance = Math.min(0.98, successChance + mindSteps * 0.02);
             dmgMul *= Math.max(0.7, 1 - mindSteps * 0.03);
         }
-        var pillName = zhujiPill ? GAME.DATA.ITEMS[zhujiPill].name : "";
+        var pillName = zhujiPill ? GAME.DATA.ITEMS[zhujiPill].name : (jiedanPill ? GAME.DATA.ITEMS[jiedanPill].name : "");
 
         // 心魔劫：筑基及以上突破，壁障将破时心魔乘虚而入，先定心再破境
         if (p.realmIndex >= GAME.DATA.ZHUJI_GATE_INDEX) {
             p._btCtx = {
                 successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,
-                isZhuji: isZhuji, zhujiPill: zhujiPill, pillName: pillName, bareZhuji: bareZhuji
+                isZhuji: isZhuji, zhujiPill: zhujiPill, pillName: pillName, bareZhuji: bareZhuji,
+                isJiedan: atJiedanGate, jiedanPill: jiedanPill, bareJiedan: bareJiedan, fakeJiedan: fakeJiedan
             };
             GAME.UI.log("壁障将破未破——识海深处黑潮翻涌，旧日心魔乘虚而入，欲扰你道心！", "danger");
             p.pendingEvent = { eventId: "heart_demon", resume: "breakthrough" };
@@ -684,12 +713,14 @@ GAME.Core = {
         var target = GAME.DATA.REALMS[p.realmIndex + 1];
         if (!target) { GAME.UI.updateUI(); return; }
         var isZhuji = ctx.isZhuji, zhujiPill = ctx.zhujiPill, successChance = ctx.successChance, dmgMul = ctx.dmgMul, deathMul = ctx.deathMul, bareZhuji = ctx.bareZhuji, pillName = ctx.pillName;
+        var isJiedan = ctx.isJiedan, jiedanPill = ctx.jiedanPill, bareJiedan = ctx.bareJiedan, fakeJiedan = ctx.fakeJiedan;
 
-        GAME.UI.log("你盘膝而坐，周身灵气开始向壁障冲击……" + (isZhuji ? (bareZhuji ? "" : "【" + pillName + "】化作磅礴药力护住心脉！") : ""), "system");
+        GAME.UI.log("你盘膝而坐，周身灵气开始向壁障冲击……" + ((isZhuji || isJiedan) ? ((bareZhuji || bareJiedan) ? "" : "【" + pillName + "】化作磅礴药力护住心脉！") : ""), "system");
         this.passTime(3);
         if (p.isDead) return;
 
         if (zhujiPill) GAME.State.removeItem(zhujiPill);
+        if (jiedanPill) GAME.State.removeItem(jiedanPill);
 
         var oldMaxHp = p.maxHp;
         if (Math.random() <= successChance) {
@@ -698,6 +729,8 @@ GAME.Core = {
             p.stats.breakthroughs += 1;
             p.zhujiStreak = 0;   // 连服丹链终止于成功
             p.zhujiFails = 0;    // 历史失败保底池一并清空（已筑基，新周期）
+            p.jiedanStreak = 0;  // 结丹连服链终止
+            p.jiedanFails = 0;
             if (p.realmIndex > p.stats.maxRealm) p.stats.maxRealm = p.realmIndex;
             // 魔道入侵四阶段主线：按筑基层数推进（前置数据缺失时静默跳过）
             if (GAME.DemonWar) GAME.DemonWar.checkPhase();
@@ -713,7 +746,7 @@ GAME.Core = {
             p.changchunLevel += 1;   // 《青木功》随破境而深，每层 +5% 命中 / +10% 异常抗性
             GAME.UI.log("【突破成功】破境功成！你已踏入 " + newRealm.name + "！", "success");
             if (GAME.UI.showBreakthroughModal) {
-                GAME.UI.showBreakthroughModal(newRealm.name, "气血上限 " + oldMaxHp + " → " + p.maxHp + "　｜　法力上限 " + p.maxMp + (isZhuji ? "　｜　寿元延至 " + newRealm.maxAge + " 岁" : ""));
+                GAME.UI.showBreakthroughModal(newRealm.name, "气血上限 " + oldMaxHp + " → " + p.maxHp + "　｜　法力上限 " + p.maxMp + ((isZhuji || isJiedan) ? "　｜　寿元延至 " + newRealm.maxAge + " 岁" : ""));
             }
             if (GAME.Moments) {
                 GAME.Moments.fire("first_breakthrough", newRealm.name);
@@ -728,7 +761,7 @@ GAME.Core = {
                 GAME.UI.log("玄机子见你《青木功》已有小成，难得地多说了几句：「火候、药材、心性，缺一不可。」——他传了你《炼丹初步》，丹炉自此可用！", "story");
             }
             GAME.UI.log("气血上限 " + oldMaxHp + " → " + p.maxHp + "，法力上限 " + p.maxMp + "——肉身与神识俱有长进。", "success");
-            if (isZhuji) GAME.UI.log("寿元大限延至 " + newRealm.maxAge + " 岁——你终于在这一界站稳了脚跟！", "success");
+            if (isZhuji || isJiedan) GAME.UI.log("寿元大限延至 " + newRealm.maxAge + " 岁——你终于在这一界站稳了脚跟！", "success");
             // 突破练气四层：苍梧门篇大关卡——六幕剧情推进至此幕的，先播「墨师翻脸·尸虫丸」
             // 逼命叙事（12 个月倒计时），再接玄机子夺舍对决；未推剧情（老档/测试桩）直接开战，行为不变。
             if (p.realmIndex === GAME.DATA.CONTENT.MODAIFU.triggerRealm && !p.moEventDone) {
@@ -740,11 +773,11 @@ GAME.Core = {
             }
         } else {
             if (GAME.Alchemy) GAME.Alchemy.consumeJiangchen();
-            var dmg = bareZhuji ? GAME.DATA.ZHUJI.bare.dmg : Math.round(realm.failDamage * dmgMul);
+            var dmg = bareZhuji ? GAME.DATA.ZHUJI.bare.dmg : (bareJiedan ? GAME.DATA.JIEDAN.bare.dmg : Math.round(realm.failDamage * dmgMul));
             p.currentHp -= dmg;
             // 丹药护心：筑基丹/正品筑基丹护持下的失败，药力吊住心脉——气血不至磨穿（保底 1 点），
             // 否则连服丹链会被反噬逐次放血致死，"资源堆叠抹平资质"便成了空话。伪丹与裸冲不在此列。
-            if (isZhuji && (zhujiPill === "pill_zhuji" || zhujiPill === "pill_zhengpin") && p.currentHp <= 0) {
+            if (((isZhuji && (zhujiPill === "pill_zhuji" || zhujiPill === "pill_zhengpin")) || (isJiedan && (jiedanPill === "pill_jiedan" || jiedanPill === "pill_jiedan_zhengpin"))) && p.currentHp <= 0) {
                 p.currentHp = 1;
                 GAME.UI.log("危急关头，丹药余力护住心脉——你吊住一线生机，未致气绝。", "warning");
             }
@@ -754,6 +787,8 @@ GAME.Core = {
             // 连服进度：本次连服 +1（下一枚 +25%）；成功时连服计数并入历史失败（永久 +20% 保底）
             if (isZhuji && (zhujiPill === "pill_zhuji" || zhujiPill === "pill_zhengpin")) {
                 p.zhujiStreak = (p.zhujiStreak || 0) + 1;
+            } else if (isJiedan && (jiedanPill === "pill_jiedan" || jiedanPill === "pill_jiedan_zhengpin")) {
+                p.jiedanStreak = (p.jiedanStreak || 0) + 1;
             }
             if (bareZhuji) {
                 // 裸冲失败：八成概率【经脉俱断】——玄傀护主可软着陆一次
@@ -765,6 +800,30 @@ GAME.Core = {
                         p.isDead = true;
                         p.deathReason = "筑基裸冲失败，经脉俱断而亡";
                         GAME.UI.log("壁障轰然反震，你全身经脉寸寸崩断——【经脉俱断】，道消身陨！", "danger");
+                    }
+                }
+            } else if (bareJiedan) {
+                // 结丹裸冲失败：九成五概率【经脉俱断】——玄傀护主可软着陆一次
+                if (Math.random() < GAME.DATA.JIEDAN.bare.deathChance) {
+                    if (this.tryRescue("逆冲反震")) {
+                        GAME.UI.log("你从行将崩断的经脉边缘被生生拽回——不假外丹强行结丹，凶险至此！", "danger");
+                    } else {
+                        p.currentHp = 0;
+                        p.isDead = true;
+                        p.deathReason = "结丹裸冲失败，经脉俱断而亡";
+                        GAME.UI.log("壁障轰然反震，你全身经脉寸寸崩断——【经脉俱断】，道消身陨！", "danger");
+                    }
+                }
+            } else if (fakeJiedan) {
+                // 伪凝丹失败：三成概率丹毒攻心而亡
+                if (Math.random() < GAME.DATA.JIEDAN.fake.deathChance) {
+                    if (this.tryRescue("丹毒反噬")) {
+                        GAME.UI.log("玄傀替你逼出几分丹毒，暂保性命。", "danger");
+                    } else {
+                        p.currentHp = 0;
+                        p.isDead = true;
+                        p.deathReason = "服伪凝丹结丹失败，丹毒攻心而亡";
+                        GAME.UI.log("伪丹之毒顺着经脉直侵心脉，你眼前一黑——道消身陨！", "danger");
                     }
                 }
             } else if (Math.random() < realm.deathChance * deathMul) {
@@ -782,6 +841,12 @@ GAME.Core = {
             } else if (isZhuji && zhujiPill === "pill_zhengpin" && GAME.State.countItem("pill_zhengpin") > 0) {
                 var next2 = Math.min(GAME.DATA.ZHUJI.zhengpin.cap, GAME.DATA.ZHUJI.zhengpin.chance + GAME.DATA.ZHUJI.zhengpin.perPill * p.zhujiStreak + GAME.DATA.ZHUJI.zhengpin.perExtra * (p.zhujiFails || 0));
                 GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_zhengpin") + " 枚【正品筑基丹】——连服再冲，成功率累积至 " + Math.round(next2 * 100) + "%。", "warning");
+            } else if (isJiedan && jiedanPill === "pill_jiedan" && GAME.State.countItem("pill_jiedan") > 0) {
+                var next3 = Math.min(GAME.DATA.JIEDAN.pill.cap, GAME.DATA.JIEDAN.pill.chance + GAME.DATA.JIEDAN.pill.perPill * p.jiedanStreak + GAME.DATA.JIEDAN.pill.perExtra * (p.jiedanFails || 0));
+                GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_jiedan") + " 枚【凝丹】——连服再冲，成功率累积至 " + Math.round(next3 * 100) + "%。", "warning");
+            } else if (isJiedan && jiedanPill === "pill_jiedan_zhengpin" && GAME.State.countItem("pill_jiedan_zhengpin") > 0) {
+                var next4 = Math.min(GAME.DATA.JIEDAN.zhengpin.cap, GAME.DATA.JIEDAN.zhengpin.chance + GAME.DATA.JIEDAN.zhengpin.perPill * p.jiedanStreak + GAME.DATA.JIEDAN.zhengpin.perExtra * (p.jiedanFails || 0));
+                GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_jiedan_zhengpin") + " 枚【正品凝丹】——连服再冲，成功率累积至 " + Math.round(next4 * 100) + "%。", "warning");
             }
         }
         this.checkDeath();
