@@ -274,6 +274,90 @@ GAME.UI = {
         }
     },
 
+    // ---------- 破境筹备面板 ----------
+    // 突破不该是"点一下听天由命"：把成功率拆成 底子 + 灵脉 + 护法 + 心境 + 丹道，
+    // 每一股都有对应的获取途径，玩家自己凑。折叠态一行报总概率，展开才铺明细。
+    renderBreakPrep: function (plan) {
+        var box = this.$("bt-prep");
+        if (!box) return;
+        if (plan === undefined) {
+            plan = null;
+            try {
+                plan = (GAME.Breakthrough && GAME.Breakthrough.plan)
+                    ? GAME.Breakthrough.plan(GAME.State.p()) : null;
+            } catch (e) { plan = null; }
+        }
+        if (!plan || !plan.ok) { box.style.display = "none"; return; }
+        box.style.display = "";
+        var pv = GAME.State.p();
+        var pc = function (v) { return Math.round((v || 0) * 100); };
+        var sum = this.$("bt-prep-sum");
+        if (sum) {
+            sum.innerHTML = "破境筹备 · 预计 <b>" + pc(plan.successChance) + "%</b>" +
+                (plan.deathP >= 0.005
+                    ? ' · 身陨 <b class="bt-risk">' + pc(plan.deathP) + "%</b>"
+                    : " · 不致身陨");
+        }
+        var base = this.$("bt-prep-base");
+        if (base) {
+            base.innerHTML = '<span class="bt-rk">' + plan.baseLabel + "</span>" +
+                '<span class="bt-rn">' + (plan.isZhuji || plan.isJiedan ? "关隘底子" : "境界底子") + "</span>" +
+                '<span class="bt-rv">' + pc(plan.baseChance) + "%</span>";
+        }
+        var list = this.$("bt-prep-list");
+        if (list) {
+            var html = "";
+            for (var i = 0; i < plan.parts.length; i++) {
+                var x = plan.parts[i];
+                html += '<div class="bt-row"><span class="bt-rk">' + x.label + "</span>" +
+                    '<span class="bt-rn">' + x.note + "</span>" +
+                    '<span class="bt-rv bt-plus">+' + pc(x.add) + "%</span></div>";
+            }
+            if (!html) {
+                html = '<div class="bt-row"><span class="bt-rn">尚无外缘加成——灵脉、护法、心境都还能再凑</span></div>';
+            }
+            list.innerHTML = html;
+        }
+        var total = this.$("bt-prep-total");
+        if (total) {
+            var txt = "合计 " + pc(plan.successChance) + "%　｜　失败反噬 " + plan.failDmg + " 气血";
+            if (plan.dmgMul < 1) txt += "（已减伤 " + Math.round((1 - plan.dmgMul) * 100) + "%）";
+            txt += "　｜　身陨 " + (plan.deathP < 0.005 ? "0%" : pc(plan.deathP) + "%");
+            if (plan.rescue && plan.deathP >= 0.005) txt += "　｜　玄傀可代死一次";
+            total.innerText = txt;
+        }
+        var act = this.$("bt-prep-act");
+        if (act) {
+            act.innerHTML = "";
+            var adv = [];
+            try { adv = GAME.Breakthrough.advice(pv, plan) || []; } catch (e) { adv = []; }
+            for (var j = 0; j < adv.length; j++) {
+                (function (a) {
+                    var el;
+                    if (typeof a.run === "function") {
+                        el = document.createElement("button");
+                        el.className = "small-btn bt-act-btn";
+                        el.onclick = function () { try { a.run(); } catch (e) { console.error(e); } };
+                    } else {
+                        el = document.createElement("span");
+                        el.className = "bt-act-static";
+                    }
+                    el.innerText = a.text +
+                        (a.cost ? "（" + a.cost + " " + a.currency + "）" : "") +
+                        (a.short ? " · " + a.short : "");
+                    act.appendChild(el);
+                })(adv[j]);
+            }
+            if (plan.guardUsed) {
+                var off = document.createElement("button");
+                off.className = "small-btn bt-act-btn";
+                off.innerText = "撤下玄傀护法";
+                off.onclick = function () { try { GAME.Breakthrough.setGuard(false); } catch (e) { console.error(e); } };
+                act.appendChild(off);
+            }
+        }
+    },
+
     updateUI: function () {
         try {
             if (GAME.scene) GAME.scene.render();   // 重绘像素场景横幅（新增）
@@ -354,22 +438,30 @@ GAME.UI = {
             this.$("btn-meditate").innerText = "闭关打坐 (" + mm + "月+1修为)";
 
             var bt = this.$("btn-breakthrough");
+            // 破境推演：按钮与筹备面板共用同一份 plan，杜绝"显示一套、掷骰另一套"
+            var btPlan = null;
+            try { btPlan = (GAME.Breakthrough && GAME.Breakthrough.plan) ? GAME.Breakthrough.plan(p) : null; } catch (e) { btPlan = null; }
             if (realm.needExp === null) {
                 bt.innerText = "此界圆满"; bt.disabled = true;
                 this._why(bt, "已至当世顶境");
-            } else {
-                var isZhuji = p.realmIndex === GAME.DATA.ZHUJI_GATE_INDEX;
-                var atJiedan = p.realmIndex === GAME.DATA.JIEDAN_GATE_SOURCE;
-                // 门槛境界（筑基九层/练气九层等）breakChance 为 null，不能直接乘 → 否则显示 NaN%
-                var chTxt = (typeof realm.breakChance === "number")
-                    ? (realm.breakChance * 100).toFixed(0) + "%"
-                    : (atJiedan ? "结丹之劫" : isZhuji ? "筑基之劫" : "未知");
-                bt.innerText = "尝试突破 (" + chTxt +
-                    (isZhuji ? "，需筑基丹" : atJiedan ? "，需凝丹" : "") + ")";
+            } else if (btPlan && btPlan.ok) {
+                // 按钮直接报「筹备后的真实成功率」——骰子做重的回报必须立刻看见
+                bt.innerText = "尝试突破 (" + Math.round(btPlan.successChance * 100) + "%)" +
+                    (btPlan.isZhuji ? (btPlan.zhujiPill ? "，服筑基丹" : "，无丹裸冲")
+                        : btPlan.isJiedan ? (btPlan.jiedanPill ? "，服凝丹" : "，无丹裸冲") : "");
                 bt.disabled = lock || p.currentExp < realm.needExp;
                 var lackExp = Math.ceil(realm.needExp - p.currentExp);
                 this._why(bt, lock ? lockWhy : (lackExp > 0 ? "还差 " + lackExp + " 修为" : ""));
+            } else {
+                // 兜底：破境模块未载入时退回旧文案，别让整条渲染链断在这里
+                bt.innerText = "尝试突破 (" +
+                    ((typeof realm.breakChance === "number") ? (realm.breakChance * 100).toFixed(0) + "%" : "未知") + ")";
+                bt.disabled = lock || p.currentExp < realm.needExp;
+                var lackExp2 = Math.ceil(realm.needExp - p.currentExp);
+                this._why(bt, lock ? lockWhy : (lackExp2 > 0 ? "还差 " + lackExp2 + " 修为" : ""));
             }
+            this.renderBreakPrep(btPlan);
+
             // 催化按钮：禁用原因写明白（灵液差多少滴）
             var _liq = function (b, need) {
                 if (!b) return;

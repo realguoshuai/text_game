@@ -238,7 +238,10 @@ GAME.Goals = {
 
         // ③ 修为已满：先看气血，再劝突破
         if (this._full(p)) {
-            var ch = (typeof r.breakChance === "number") ? r.breakChance : null;
+            var btPlan = null;
+            try { btPlan = (GAME.Breakthrough && GAME.Breakthrough.plan) ? GAME.Breakthrough.plan(p) : null; } catch (e) { btPlan = null; }
+            var ch = (btPlan && btPlan.ok) ? btPlan.successChance
+                : ((typeof r.breakChance === "number") ? r.breakChance : null);
             var gate = (p.realmIndex === GAME.DATA.ZHUJI_GATE_INDEX);
             if (hpPct < 0.6) {
                 return {
@@ -250,7 +253,10 @@ GAME.Goals = {
             return {
                 kind: "go",
                 label: "尝试突破" + (ch !== null ? "（" + Math.round(ch * 100) + "%）" : ""),
-                why: "修为已满，气血 " + hp + "/" + maxHp + (gate ? "，入手筑基丹更稳" : "") + "——可以一试",
+                why: "修为已满，气血 " + hp + "/" + maxHp + (gate ? "，入手筑基丹更稳" : "") +
+                     ((btPlan && btPlan.ok && btPlan.parts.length > 0)
+                         ? "，筹备已加 +" + Math.round(btPlan.addSum * 100) + "%"
+                         : "，灵脉/护法还能再凑") + "——可以一试",
                 run: function () { GAME.Core.breakthrough(); }
             };
         }

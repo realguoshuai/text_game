@@ -789,3 +789,55 @@ button .btn-why {
 }
 .atlas-monster .q-灵品 { color: #e08a5a; }
 .atlas-signature .q-灵品 { color: #c9a14a; }
+
+/* ---------- 破境筹备（突破成功率的可见拆解） ----------
+   参考《鬼谷八荒》《觅长生》：破境前的准备是能被玩家调控的，
+   不是点一下听天由命。折叠态只占一行，展开才铺明细。
+   放在 .actions 网格之外（网格是 auto-fit 按钮格，塞 details 会被挤成半列）。 */
+.bt-prep {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.6;
+    border: 1px solid var(--panel-border);
+    border-left: 3px solid var(--gold);
+    border-radius: 4px;
+    background: rgba(212, 175, 55, 0.06);
+    padding: 0 8px;
+    flex-shrink: 0;
+}
+.bt-prep > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 6px 0;
+    color: var(--text-dim);
+    user-select: none;
+    white-space: normal;
+}
+.bt-prep > summary::-webkit-details-marker { display: none; }
+.bt-prep > summary::before { content: "\25B8  "; color: var(--gold); }
+.bt-prep[open] > summary::before { content: "\25BE  "; }
+.bt-prep > summary b { color: var(--gold); }
+.bt-prep .bt-risk { color: var(--warning); font-style: normal; }
+.bt-prep-body { padding: 0 0 8px; }
+.bt-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 3px 0;
+    border-top: 1px dashed var(--panel-border);
+}
+.bt-rk { flex-shrink: 0; min-width: 3.6em; color: var(--text-strong); }
+.bt-rn { flex: 1; min-width: 0; color: var(--text-mute); font-size: 11px; }
+.bt-rv { flex-shrink: 0; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.bt-plus { color: var(--accent); }
+.bt-prep-base { display: flex; align-items: baseline; gap: 6px; padding: 4px 0 2px; }
+.bt-prep-total {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--panel-border);
+    color: var(--text-dim);
+    font-size: 11px;
+}
+.bt-prep-act { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.bt-act-btn { font-size: 11px; padding: 4px 8px; min-height: 0; }
+.bt-act-static { font-size: 11px; color: var(--text-mute); }

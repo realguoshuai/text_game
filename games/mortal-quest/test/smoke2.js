@@ -41,7 +41,7 @@ vm.createContext(sandbox);
 // ---------- 按 index.html 顺序加载（跳过 ui.js / storage.js） ----------
 const FILES = [
   'data/realms.js', 'data/items.js', 'data/events.js', 'data/world.js', 'data/content.js',
-  'js/state.js', 'js/combat.js', 'js/core.js', 'js/market.js',
+  'js/state.js', 'js/combat.js', 'js/core.js', 'js/breakthrough.js', 'js/market.js',
   'js/sect.js', 'js/blackmarket.js', 'js/trial.js',
 ];
 for (const f of FILES) {
