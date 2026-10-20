@@ -3,13 +3,12 @@
  * test/smoke_time.js —— 年月账簿（把闭关年月变成真资源）回归测试
  *   ① 模块与配置：GAME.Time / GAME.DATA.TIME 落位
  *   ② 寿元预算：remain / remainLabel / remainShort / 告急档位
- *   ③ 灵潮：24 月一涨、涨 6 月，边界逐点核对（含跨周期回绕）
- *   ④ 分档：周天→月数→修为/心境（涨潮心境 ×2），高境月数按境界放大
- *   ⑤ 地雷：寿元撑不到 / 尸虫丸毒发 / 阴毒发作 一律拦下并给原因
- *   ⑥ 执行：seclude 加修为与心境、推进时间；被拦时不推进（不闭死）
- *   ⑦ 唯一出口：Core.meditate 走 Time.seclude，仍是"一周天 +1 修为"
- *   ⑧ 预告：preview 报坊市换货与倒计时余量
- *   ⑨ 天时入破境筹备：涨潮 +5%，退潮时 advice 提示"等灵潮"
+ *   ③ 分档：周天→月数→修为/心境，高境月数按境界放大
+ *   ④ 地雷：寿元撑不到 / 尸虫丸毒发 / 阴毒发作 一律拦下并给原因
+ *   ⑤ 执行：seclude 加修为与心境、推进时间；被拦时不推进（不闭死）
+ *   ⑥ 唯一出口：Core.meditate 走 Time.seclude，仍是"一周天 +1 修为"
+ *   ⑦ 预告：preview 报坊市换货与倒计时余量
+ *   ⑧ 破境筹备不再有天时（灵潮已删，成功率只由丹药/灵脉/护法/心境/丹道决定）
  * 运行： node test/smoke_time.js
  * ========================================================= */
 
@@ -36,7 +35,7 @@ vm.createContext(sandbox);
 const FILES = [
   'data/realms.js', 'data/realms_foundation.js', 'data/items.js', 'data/content.js',
   'data/world.js',
-  'js/state.js', 'js/core.js', 'js/time.js', 'js/breakthrough.js',
+  'js/state.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/breakthrough.js',
 ];
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BASE, f), 'utf8'), sandbox, { filename: f });
 const G = sandbox.GAME;
@@ -69,12 +68,11 @@ function at(realmIndex, months) {
 /* ================= ① 模块与配置 ================= */
 section('① 模块与配置');
 ok('GAME.Time 已挂载', !!G.Time);
-ok('方法齐备', ['remain', 'remainLabel', 'remainShort', 'remainLevel', 'tide', 'tideLabel',
+ok('方法齐备', ['remain', 'remainLabel', 'remainShort', 'remainLevel',
   'tier', 'tiers', 'monthsOf', 'expOf', 'mindOf', 'guard', 'seclude', 'preview', 'priceLabel']
   .every(k => typeof G.Time[k] === 'function'));
 const CFG = G.DATA.TIME;
-ok('灵潮：24 月一轮、第 6 月起涨 6 月', CFG.tide.cycle === 24 && CFG.tide.from === 6 && CFG.tide.len === 6);
-ok('灵潮：心境 ×2、破境 +5%', CFG.tide.mindMul === 2 && near(CFG.tide.breakAdd, 0.05));
+ok('灵潮已删除：DATA.TIME 不再有 tide 配置', CFG.tide === undefined);
 ok('心境折算：每 4 月 +1', CFG.mindPerMonths === 4);
 ok('四档闭关：1/3/6/12 周天',
   CFG.tiers.map(t => t.cycles).join(',') === '1,3,6,12' &&
@@ -104,22 +102,6 @@ ok('余 240 月 → 正常档', G.Time.remainLevel(p) === '');
 p = at(0, 0); p.ageYears = 80; p.ageBonus = 10;
 ok('延寿丹 +10 年 → 余 360 月', G.Time.remain(p).total === 360);
 
-/* ================= ③ 灵潮边界 ================= */
-section('③ 灵潮边界');
-const tideAt = (m) => { const q = at(0, m); return G.Time.tide(q); };
-ok('t=0 退潮，距涨潮 6 月', tideAt(0).on === false && tideAt(0).left === 6);
-ok('t=5 退潮，余 1 月', tideAt(5).on === false && tideAt(5).left === 1);
-ok('t=6 涨潮，余 6 月', tideAt(6).on === true && tideAt(6).left === 6);
-ok('涨潮时 mindMul=2、breakAdd=0.05', tideAt(6).mindMul === 2 && near(tideAt(6).breakAdd, 0.05));
-ok('t=11 涨潮，余 1 月（最后一月）', tideAt(11).on === true && tideAt(11).left === 1);
-ok('t=12 退潮，距下轮涨潮 18 月', tideAt(12).on === false && tideAt(12).left === 18);
-ok('t=18 退潮，距涨潮 12 月', tideAt(18).on === false && tideAt(18).left === 12);
-ok('t=24 回绕到周期起点（退潮 6 月）', tideAt(24).on === false && tideAt(24).left === 6);
-ok('t=30 → 相位 6，涨潮', tideAt(30).on === true);
-ok('退潮时 mindMul=1、breakAdd=0', tideAt(0).mindMul === 1 && tideAt(0).breakAdd === 0);
-ok('tideLabel 涨潮带余量', /灵潮涨/.test(G.Time.tideLabel(at(0, 6))) && /余 6 月/.test(G.Time.tideLabel(at(0, 6))));
-ok('tideLabel 退潮带倒计时', /灵潮退/.test(G.Time.tideLabel(at(0, 0))) && /6 月后涨/.test(G.Time.tideLabel(at(0, 0))));
-
 /* ================= ④ 分档：周天 → 月数 → 产出 ================= */
 section('④ 分档：周天 → 月数 → 产出');
 p = at(0, 0);          // 练气一层，meditateMonths = 3
@@ -130,13 +112,6 @@ ok('闭关 3 周天：9 月 / +3 / 心境 +2', tiers[1].months === 9 && tiers[1]
 ok('苦修 6 周天：18 月 / +6 / 心境 +4', tiers[2].months === 18 && tiers[2].exp === 6 && tiers[2].mind === 4);
 ok('长关 12 周天：36 月 / +12 / 心境 +9', tiers[3].months === 36 && tiers[3].exp === 12 && tiers[3].mind === 9);
 ok('priceLabel 含月数与产出', /36 月/.test(G.Time.priceLabel(tiers[3])) && /心境 \+9/.test(G.Time.priceLabel(tiers[3])));
-
-// 涨潮：心境 ×2（修为不动——"一周天 +1" 是硬不变量）
-p = at(0, 6);
-tiers = G.Time.tiers(p);
-ok('涨潮时闭关心境 ×2 → 4', tiers[1].mind === 4);
-ok('涨潮时修为不变 → 3', tiers[1].exp === 3);
-ok('涨潮时长关心境 ×2 → 18', tiers[3].mind === 18);
 
 // 高境：月数随 meditateMonths 放大（结丹 12 月/周天）
 p = at(22, 0);
@@ -214,8 +189,8 @@ ok('预告含出关时寿元', pv.some(x => /出关时寿元余/.test(x)));
 p = at(0, 0); p.shichong = { months: 12 };
 ok('有尸虫丸时预告其余量', G.Time.preview(p, 6).some(x => /尸虫丸余 6 月/.test(x)));
 
-/* ================= ⑨ 天时入破境筹备 ================= */
-section('⑨ 天时入破境筹备');
+/* ================= ⑧ 破境筹备不再有天时 ================= */
+section('⑧ 破境筹备不再有天时');
 function atBreak(months) {
   G.State.createNewPlayer();
   const q = P();
@@ -226,20 +201,13 @@ function atBreak(months) {
   q.totalMonths = months;
   return q;
 }
-let q = atBreak(0);
-let plan = G.Breakthrough.plan(q);
-ok('退潮时无「天时」股力', !plan.parts.some(x => x.id === 'tide'));
-ok('退潮时成功率 = 底子 0.58', near(plan.successChance, 0.58));
-q = atBreak(6);
-plan = G.Breakthrough.plan(q);
-ok('涨潮多一股「天时」', plan.parts.some(x => x.id === 'tide'));
-ok('涨潮 +5% → 0.63', near(plan.successChance, 0.63));
-ok('addSum 含天时 0.05', near(plan.addSum, 0.05));
-q = atBreak(0);
-const adv = G.Breakthrough.advice(q);
-ok('退潮时建议"等灵潮"', adv.some(x => x.id === 'tide' && /灵潮/.test(x.short)));
-q = atBreak(6);
-ok('涨潮时不再劝等', !G.Breakthrough.advice(q).some(x => x.id === 'tide'));
+let plan = G.Breakthrough.plan(atBreak(0));
+ok('plan.parts 里没有 tide 股', !plan.parts.some(x => x.id === 'tide'));
+ok('底子 0.58（灵脉/护法/心境全 0 时就是底子）', near(plan.successChance, 0.58));
+ok('换个年份也不改变成功率（不再看天时）', near(G.Breakthrough.plan(atBreak(6)).successChance, 0.58));
+const adv = G.Breakthrough.advice(atBreak(0));
+ok('建议里不再劝"等灵潮"', !adv.some(x => x.id === 'tide'));
+ok('GAME.Time 上已无 tide/tideLabel', typeof G.Time.tide === 'undefined' && typeof G.Time.tideLabel === 'undefined');
 
 console.log('\n==== 结果：' + pass + ' 通过 / ' + fail + ' 失败 ====');
 if (fail) { console.log('失败项：' + fails.join(' | ')); process.exit(1); }

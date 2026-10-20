@@ -849,3 +849,8 @@ button .btn-why {
 #dd-sec-preview{color:var(--muted,#8a7f6a);font-size:11px;opacity:.85;border-top:1px dashed rgba(0,0,0,.08);margin-top:4px;padding-top:4px;}
 #max-age-text.age-warn{color:#b5822a;}
 #max-age-text.age-danger{color:#c0392b;font-weight:700;}
+
+/* ===== 药圃（灵药年份）：三垄地，年月长在土里 ===== */
+.plot-row { align-items: center; }
+.plot-btn { flex-shrink: 0; font-size: 11px; padding: 3px 8px; min-height: 0; }
+#plot-hint { line-height: 1.5; }

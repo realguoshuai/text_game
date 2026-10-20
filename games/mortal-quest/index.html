@@ -96,7 +96,7 @@
                 <details class="dropdown" id="dd-meditate">
                     <summary>闭关苦修 ▾</summary>
                     <div class="dd-body">
-                        <div class="dd-note" id="dd-time-text">寿元余 —　｜　灵潮 —</div>
+                        <div class="dd-note" id="dd-time-text">寿元余 —　｜　药圃 —</div>
                         <button id="btn-sec-mid" class="small-btn dd-item tier-btn" style="display:block;width:100%;">闭关</button>
                         <button id="btn-sec-long" class="small-btn dd-item tier-btn" style="display:block;width:100%;">苦修</button>
                         <button id="btn-sec-epic" class="small-btn dd-item tier-btn" style="display:block;width:100%;">长关</button>
@@ -131,6 +131,15 @@
                     <div id="bt-prep-list" class="bt-prep-list"></div>
                     <div id="bt-prep-total" class="bt-prep-total"></div>
                     <div id="bt-prep-act" class="bt-prep-act"></div>
+                </div>
+            </details>
+
+            <!-- 药圃：时间不只是花掉的，也是长在土里的（js/plot.js） -->
+            <details id="plot-box" class="bt-prep" style="display:none;">
+                <summary><span id="plot-sum">药圃</span></summary>
+                <div class="bt-prep-body">
+                    <div id="plot-list" class="bt-prep-list"></div>
+                    <div id="plot-hint" class="bt-prep-total"></div>
                 </div>
             </details>
 
@@ -512,6 +521,7 @@
 <script src="js/combat.js"></script>
 <script src="js/core.js"></script>
 <script src="js/time.js"></script>
+<script src="js/plot.js"></script>
 <script src="js/breakthrough.js"></script>
 <script src="js/moEvent.js"></script>
 <script src="js/market.js"></script>

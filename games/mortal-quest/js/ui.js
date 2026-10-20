@@ -358,6 +358,72 @@ GAME.UI = {
         }
     },
 
+    // ---------- 药圃面板 ----------
+    // 时间不只是花掉的，也是长在土里的：三垄地，把百年灵药养到千年。
+    // ★ 年份与"还差几月"一律问 GAME.Plot，别在这里自己算。
+    renderPlot: function () {
+        var box = this.$("plot-box");
+        if (!box) return;
+        if (!GAME.Plot || !GAME.Plot.status) { box.style.display = "none"; return; }
+        var p = GAME.State.p();
+        var st = null;
+        try { st = GAME.Plot.status(p); } catch (e) { st = null; }
+        if (!st) { box.style.display = "none"; return; }
+        box.style.display = "";
+
+        var sum = this.$("plot-sum");
+        if (sum) {
+            var t = "药圃 · " + st.growing + "/" + st.plots + " 垄在长";
+            if (st.ready > 0) t += ' · <b class="bt-plus">' + st.ready + " 株可收</b>";
+            else if (st.nextLeft != null) t += " · 最近 " + GAME.Plot._fmtMonths(st.nextLeft) + "后成";
+            sum.innerHTML = t;
+        }
+
+        var list = this.$("plot-list"), self = this;
+        if (list) {
+            list.innerHTML = "";
+            st.list.forEach(function (s) {
+                var row = document.createElement("div");
+                row.className = "bt-row plot-row";
+
+                var name = document.createElement("span");
+                name.className = "bt-rk";
+                name.innerText = "第 " + (s.i + 1) + " 垄";
+
+                var desc = document.createElement("span");
+                desc.className = "bt-rn";
+
+                var btn = document.createElement("button");
+                btn.className = "small-btn plot-btn";
+
+                if (s.empty) {
+                    desc.innerText = "空地";
+                    btn.innerText = "移栽";
+                    btn.disabled = st.seed < 1;
+                    self._why(btn, st.seed < 1 ? "需【百年灵药】×1（现有 0）" : "");
+                    btn.onclick = function () { GAME.Plot.plant(s.i); };
+                } else if (s.ready) {
+                    desc.innerText = s.years + " 年 · 已满千年";
+                    btn.innerText = "收成";
+                    btn.onclick = function () { GAME.Plot.harvest(s.i); };
+                } else {
+                    desc.innerText = s.years + "/1000 年（还需 " + GAME.Plot._fmtMonths(s.left) + "）";
+                    btn.innerText = "收成";
+                    btn.disabled = true;
+                    self._why(btn, "年份不足，此时起出白糟蹋一株好药");
+                }
+                row.appendChild(name); row.appendChild(desc); row.appendChild(btn);
+                list.appendChild(row);
+            });
+        }
+
+        var hint = this.$("plot-hint");
+        if (hint) {
+            hint.innerText = "每月长 " + (Math.round(GAME.Plot.rate(p) * 10) / 10) + " 年份（灵峰加成已计入）" +
+                "　｜　百年灵药 " + st.seed + " 株";
+        }
+    },
+
     updateUI: function () {
         try {
             if (GAME.scene) GAME.scene.render();   // 重绘像素场景横幅（新增）
@@ -456,7 +522,16 @@ GAME.UI = {
                     this._why(_tb, lock ? lockWhy : (_t.ok ? "" : _t.why));
                 }
                 var _dn = this.$("dd-time-text");
-                if (_dn) _dn.innerText = "寿元余 " + GAME.Time.remainShort(p) + "　｜　" + GAME.Time.tideLabel(p);
+                if (_dn) {
+                    var _seg = ["寿元余 " + GAME.Time.remainShort(p)];
+                    if (p.marketNextRefresh != null) {
+                        var _mk = Math.max(0, p.marketNextRefresh - (p.totalMonths || 0));
+                        _seg.push(_mk > 0 ? "坊市 " + _mk + " 月后换货" : "坊市新到货");
+                    }
+                    var _ps = (GAME.Plot && GAME.Plot.status) ? GAME.Plot.status(p) : null;
+                    if (_ps) _seg.push("药圃 " + _ps.growing + " 垄在长");
+                    _dn.innerText = _seg.join("　｜　");
+                }
                 var _pv = this.$("dd-sec-preview");
                 if (_pv) {
                     var _epic = GAME.Time.tier(p, "epic");
@@ -488,6 +563,7 @@ GAME.UI = {
                 this._why(bt, lock ? lockWhy : (lackExp2 > 0 ? "还差 " + lackExp2 + " 修为" : ""));
             }
             this.renderBreakPrep(btPlan);
+            this.renderPlot();
 
             // 催化按钮：禁用原因写明白（灵液差多少滴）
             var _liq = function (b, need) {

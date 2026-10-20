@@ -261,22 +261,21 @@ GAME.Goals = {
             };
         }
 
-        // ④ 修为未满：闭关打坐（时间是真预算——顺带说清灵潮与长关怎么选）
+        // ④ 修为未满：闭关打坐（时间是真预算——顺带报"还差多少、地里还有几株药"）
         var need = (r.needExp || 0) - Math.floor(p.currentExp || 0);
-        var td = (GAME.Time && GAME.Time.tide) ? GAME.Time.tide(p) : null;
-        var tideHint = "";
-        if (td) {
-            tideHint = td.on
-                ? "；时值灵潮（余 " + td.left + " 月），闭关养心境 ×2，正宜长关"
-                : "；灵潮 " + td.left + " 月后涨，长关可留到那时";
+        var leftTxt = (GAME.Time && GAME.Time.remainLabel) ? ("；寿元余 " + GAME.Time.remainLabel(p)) : "";
+        var plotHint = "";
+        if (GAME.Plot && GAME.Plot.status) {
+            var ps = GAME.Plot.status(p);
+            if (ps && ps.ready > 0) plotHint = "；药圃有 " + ps.ready + " 株满千年可收";
+            else if (ps && ps.nextLeft != null) plotHint = "；药圃 " + ps.growing + " 株在长，最近 " + GAME.Plot._fmtMonths(ps.nextLeft) + "后可收";
         }
-        var leftTxt = (GAME.Time && GAME.Time.remainLabel) ? ("寿元余 " + GAME.Time.remainLabel(p)) : "";
         return {
             kind: "heal",
             label: "闭关打坐（" + (r.meditateMonths || 3) + " 月 · +1 修为）",
             why: "还差 " + need + " 修为可尝试突破" +
                  (typeof r.breakChance === "number" ? "（届时成功率 " + Math.round(r.breakChance * 100) + "%）" : "") +
-                 tideHint + (leftTxt ? "；" + leftTxt : ""),
+                 plotHint + leftTxt,
             run: function () { GAME.Core.meditate(); }
         };
     },

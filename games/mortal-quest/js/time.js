@@ -8,7 +8,8 @@
  *   ① 预算：寿元余 N 年 M 月（随境界/延寿丹/折寿实时变）
  *   ② 价格：每档闭关明码标价（几个月），修为与心境按"周天/月数"折算
  *   ③ 分配：静修 / 闭关 / 苦修 / 长关 四档——同一个寿元池，不同的领取方式
- *   ④ 择时：灵潮每 24 月一涨（涨 6 月）——涨潮时闭关心境 ×2、破境 +5%
+ *   ④ 产出：闭关的年月同时养着洞府药圃里的灵药年份（js/plot.js）——
+ *      时间不只是花掉的，也是长在土里的
  *   ⑤ 地雷：会把自己闭死的事（寿元不够、毒发在关内）一律先拦下并说明原因
  *
  * ★ 时间相关推演的唯一出口：不要在别处再算"还剩几年"或"潮期到没到"。
@@ -22,11 +23,6 @@ GAME.DATA = GAME.DATA || {};
 GAME.DATA.TIME = {
     // 心境按"月"折算：静坐养的是心，不是修为。每 4 月 +1 心境（长生路上的慢功夫）
     mindPerMonths: 4,
-
-    // 灵潮：每 24 月一轮，第 6~12 月为涨潮期
-    //   mindMul —— 涨潮时闭关所得心境翻倍（天地灵气充盈，入定更深）
-    //   breakAdd —— 涨潮时破境 +5%（天时之利，算进破境筹备的一股力）
-    tide: { cycle: 24, from: 6, len: 6, mindMul: 2, breakAdd: 0.05 },
 
     // 闭关分档：cycles = 周天数（一个周天 = 本境 meditateMonths 月）
     tiers: [
@@ -73,30 +69,6 @@ GAME.Time = {
         return t <= 60 ? "danger" : (t <= 120 ? "warn" : "");
     },
 
-    /* ================= ④ 择时：灵潮 ================= */
-
-    tide: function (p) {
-        p = p || GAME.State.p();
-        var c = this.cfg().tide;
-        var phase = (((p.totalMonths || 0) % c.cycle) + c.cycle) % c.cycle;
-        var on = phase >= c.from && phase < c.from + c.len;
-        var left = on
-            ? (c.from + c.len - phase)                                   // 还有几月退潮
-            : (phase < c.from ? (c.from - phase) : (c.cycle - phase + c.from));  // 还有几月涨潮
-        return {
-            on: on, phase: phase, left: left,
-            mindMul: on ? c.mindMul : 1,
-            breakAdd: on ? c.breakAdd : 0
-        };
-    },
-
-    tideLabel: function (p) {
-        var t = this.tide(p);
-        if (!t.on) return "灵潮退 · " + t.left + " 月后涨";
-        return "灵潮涨 · 余 " + t.left + " 月（心境 ×" + t.mindMul +
-            "、破境 +" + Math.round(t.breakAdd * 100) + "%）";
-    },
-
     /* ================= ② 价格：一档闭关到底花什么、换什么 ================= */
 
     monthsOf: function (p, cycles) {
@@ -110,10 +82,10 @@ GAME.Time = {
         return cycles * (1 + extra);
     },
 
-    // 心境：每 mindPerMonths 月 +1；涨潮期翻倍
-    mindOf: function (months, tideMul) {
+    // 心境：每 mindPerMonths 月 +1（静坐养的是心，与天象无关）
+    mindOf: function (months) {
         var per = this.cfg().mindPerMonths || 4;
-        return Math.floor(months / per) * (tideMul || 1);
+        return Math.floor(months / per);
     },
 
     /* ================= ⑤ 地雷：会把自己闭死的事，先拦下来 ================= */
@@ -141,14 +113,12 @@ GAME.Time = {
         for (i = 0; i < list.length; i++) if (list[i].id === id) def = list[i];
         if (!def) return null;
         var months = this.monthsOf(p, def.cycles);
-        var t = this.tide(p);
         var g = this.guard(p, months);
         return {
             id: def.id, name: def.name, note: def.note, cycles: def.cycles,
             months: months,
             exp: this.expOf(p, def.cycles),
-            mind: this.mindOf(months, t.mindMul),
-            tide: t.on, tideMul: t.mindMul,
+            mind: this.mindOf(months),
             ok: g.ok, why: g.why
         };
     },
@@ -193,7 +163,7 @@ GAME.Time = {
                 (extra ? "（藏经阁 +" + extra + "）" : "") + "。", "info");
         } else {
             GAME.UI.log("你闭关苦修 " + t.months + " 个月，出关时蒲团上落了一层灰——修为 +" + t.exp +
-                (t.mind > 0 ? "，心境 +" + t.mind + (t.tide ? "（灵潮 ×" + t.tideMul + "）" : "") : "") + "。", "info");
+                (t.mind > 0 ? "，心境 +" + t.mind : "") + "。", "info");
         }
         GAME.Core.passTime(t.months);
         return true;

@@ -155,15 +155,6 @@ GAME.Breakthrough = {
             parts.push({ id: "mind", label: "心境", add: mindAdd, note: "心境 " + (p.mind || 0) + "，灵台不动" });
             dmgMul *= Math.max(mc.dmgFloor, 1 - mindSteps * mc.dmgPer10);
         }
-
-        // —— 天时：灵气潮汐（每 24 月涨潮 6 月，破境 +5%）——
-        // 时间成为资源之后，"挑日子冲关"才是真抉择：等潮要花寿元，不等就少一分把握。
-        var tdInfo = (GAME.Time && GAME.Time.tide) ? GAME.Time.tide(p) : null;
-        var tideAdd = (tdInfo && tdInfo.on) ? (tdInfo.breakAdd || 0) : 0;
-        if (tideAdd > 0) {
-            parts.push({ id: "tide", label: "天时", add: tideAdd, note: "灵潮涨，天地灵气正盛" });
-        }
-
         // —— 丹道：《三转归元功》结丹补偿（仅结丹、非裸冲非伪丹）——
         var szAdd = 0;
         if (isJiedan && !bareJiedan && !fakeJiedan && GAME.Cultivation && GAME.Cultivation.jiedanBonus) {
@@ -180,7 +171,7 @@ GAME.Breakthrough = {
         if (GAME.Alchemy && p.jiangchen) dmgMul *= GAME.Alchemy.breakDmgMul();
 
         // —— 合计：丹药链上限 1.0；常规境界上限 98%（心境按旧规则只补到 98%）——
-        var addSum = vein.add + (guardOn ? guard.add : 0) + szAdd + tideAdd;
+        var addSum = vein.add + (guardOn ? guard.add : 0) + szAdd;
         var coreChance = Math.min(chainCap, baseChance + addSum);
         var mindTotalAdd = 0;
         if (mindSteps > 0 && coreChance < cfg.cap) {
@@ -277,18 +268,7 @@ GAME.Breakthrough = {
             });
         }
 
-        // ③ 天时：退潮时可等下一波（等潮的代价是寿元，摆出来让玩家自己权衡）
-        var td = (GAME.Time && GAME.Time.tide) ? GAME.Time.tide(GAME.State.p()) : null;
-        var tdCfg = (GAME.DATA.TIME && GAME.DATA.TIME.tide) ? GAME.DATA.TIME.tide : null;
-        if (td && !td.on && tdCfg && tdCfg.breakAdd > 0) {
-            out.push({
-                id: "tide", gain: tdCfg.breakAdd, text: "等灵潮再冲关",
-                cost: 0, currency: "", short: "灵潮 " + td.left + " 月后涨",
-                run: null,
-            });
-        }
-
-        // ④ 丹药：关隘无丹时点名后果（不是灰按钮，是"这样冲会死多少"）
+        // ③ 丹药：关隘无丹时点名后果（不是灰按钮，是"这样冲会死多少"）
         if (plan.isZhuji && !plan.zhujiPill) {
             out.push({ id: "pill", gain: 0.20, text: "备一枚筑基丹再冲", cost: 0, currency: "", short: "裸冲失败八成身陨", run: null });
         }

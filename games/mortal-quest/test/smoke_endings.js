@@ -34,7 +34,7 @@ const FILES = [
   'data/skills_foundation.js', 'data/items_foundation.js',
   'data/events.js', 'data/world.js', 'data/worldmap.js', 'data/content.js',
   'data/qixuan_events.js', 'data/demon_war_events.js', 'data/dungeon_heisha.js', 'data/wild_dungeons.js',
-  'js/state.js', 'js/combat.js', 'js/core.js', 'js/time.js', 'js/market.js', 'js/map.js',
+  'js/state.js', 'js/combat.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/market.js', 'js/map.js',
   'js/sect.js', 'js/puppet.js', 'js/insect.js', 'js/cave2.js',
   'js/cultivation.js', 'js/alchemy.js', 'js/bottle.js', 'js/bonds.js',
   'js/dungeon_heisha.js', 'js/hunt.js', 'js/teleport_portal.js', 'js/endings.js',

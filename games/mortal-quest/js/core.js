@@ -119,6 +119,9 @@ GAME.Core = {
         // 调用，而不能只看 p.garden——否则无职弟子的掠园预警永不兑现（死代码）。
         if (GAME.Garden && GAME.Garden.active && GAME.Garden.active()) GAME.Garden.tick(months);
 
+        // 药圃：洞里那几株药也在跟着长年份（逻辑在 js/plot.js）——时间既花出去，也长在土里
+        if (GAME.Plot && GAME.Plot.tick) GAME.Plot.tick(months);
+
         // 十年回顾：每满 10 年结算一次小结（js/review.js，纯展示）
         if (GAME.Review && GAME.Review.tick) GAME.Review.tick();
 
@@ -206,7 +209,7 @@ GAME.Core = {
     // ================= 洞府动作 =================
 
     // 打坐：伪灵根每次只得 1 修为——凡人流核心压迫。
-    // ★ 时间账一律交给 GAME.Time（寿元预算 / 灵潮 / 分档 / 地雷守卫都在那里），
+    // ★ 时间账一律交给 GAME.Time（寿元预算 / 分档 / 地雷守卫都在那里；药圃年份问 GAME.Plot），
     //   这里只保留"点一下 = 一个周天"的旧语义，避免出现第二套耗时与产出公式。
     meditate: function () {
         var p = GAME.State.p();
