@@ -5958,6 +5958,25 @@
     f.flash = 0.5;
     addFloater(f.x, f.y - 0.8, '二阶段·狂暴！', '#ff3b3b');
     screenShake = Math.max(screenShake, 0.6);
+    summonMinions(f);                     // 二阶段·召唤：召 2 只碎石傀儡助战
+  }
+  /** Boss 二阶段·召唤：过半时召 2 只「碎石傀儡」助战（弱怪 zombie_a 作载体）。
+   *  复用 makeFoes 同一套实例构造（snapWalkable 吸附 + 属性上浮），只改实例不碰共享 def_；
+   *  直接 push 进 foes，updateFoes 当帧即可接管其 AI。灰白光环 + 改名标识其为召唤物。 */
+  function summonMinions(boss) {
+    var key = 'zombie_a';                  // 必存在且有精灵图的弱怪，保证渲染不崩
+    var offs = [[-2, -2], [2, 2]];
+    var list = [], k, fresh, m;
+    for (k = 0; k < offs.length; k++) list.push({ t: key, x: boss.home.x + offs[k][0], y: boss.home.y + offs[k][1] });
+    fresh = makeFoes(list);
+    for (k = 0; k < fresh.length; k++) {
+      m = fresh[k];
+      m.name = '碎石傀儡';
+      m.vRing = '200,200,210'; m.vBar = '#cfcfd8';
+      m.summoned = true;
+      foes.push(m);
+    }
+    addFloater(boss.x, boss.y - 1.0, '召唤·碎石傀儡！', '#dcdce8');
   }
   function addFloater(mx, my, text, color, opts) {
     var o = opts || {};
