@@ -262,6 +262,7 @@ GAME.Map = {
         return (this.cfg().chapters || []).map(function (c) {
             return {
                 id: c.id, name: c.name, desc: c.desc, minRealm: c.minRealm,
+                art: c.art, realmRange: c.realmRange, signature: c.signature,
                 current: c.id === cur,
                 reached: p.realmIndex >= (c.minRealm || 0),
             };

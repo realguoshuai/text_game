@@ -500,6 +500,21 @@
     </div>
 </div>
 
+<!-- 坐化：一世账目 + 身后事（寿元尽时由 setDead 唤起） -->
+<div id="sit-modal" class="modal-mask" style="display:none;" data-page-node-id="sit_modal">
+    <div class="modal-box sit-box" data-page-node-id="sit_modal_box">
+        <div class="modal-head" data-page-node-id="sit_modal_head">
+            <span>坐化</span>
+            <button id="btn-sit-close" class="small-btn" data-page-node-id="sit_modal_close">✕</button>
+        </div>
+        <div id="sit-body" class="sit-body" data-page-node-id="sit_body"></div>
+        <div class="sit-actions" data-page-node-id="sit_actions">
+            <button id="btn-sit-keep" class="btn-gold" data-page-node-id="sit_keep">封存洞府 · 重入轮回</button>
+            <button id="btn-sit-end" class="small-btn" data-page-node-id="sit_end">就此了断</button>
+        </div>
+    </div>
+</div>
+
 <!-- 脚本按依赖顺序加载：数据层 -> 状态 -> 存档 -> 战斗 -> 核心 -> 坊市 -> 扩展模块 -> 界面 -->
 <script src="data/realms.js"></script>
 <script src="data/realms_foundation.js"></script>
@@ -522,6 +537,7 @@
 <script src="js/core.js"></script>
 <script src="js/time.js"></script>
 <script src="js/plot.js"></script>
+<script src="js/mortality.js"></script>
 <script src="js/breakthrough.js"></script>
 <script src="js/moEvent.js"></script>
 <script src="js/market.js"></script>

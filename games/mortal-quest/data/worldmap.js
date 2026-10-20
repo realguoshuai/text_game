@@ -33,6 +33,7 @@ GAME.DATA.MAP = {
       {
         id: "qi", name: "练气篇", minRealm: 0, realmRange: [0, 12],
         desc: "山村穷小子初涉修途，山野、市镇、岚州腹地，皆是练气修士的天地。",
+        art: "assets/ch/qi.jpg",     // 章节扉页（无图则整块不出现）
         signature: [
           { name: "青牛镇年礼", desc: "岁末镇上张灯，凡俗人情里偶藏些粗浅丹方与年节物事。" },
           { name: "幽篁采药", desc: "谷中野老识得几味山参，可换些许银钱，亦是练气修士的进项。" },

@@ -35,7 +35,7 @@ vm.createContext(sandbox);
 const FILES = [
   'data/realms.js', 'data/realms_foundation.js', 'data/items.js', 'data/skills.js',
   'data/events.js', 'data/world.js', 'data/content.js', 'data/demon_war_events.js',
-  'js/state.js', 'js/combat.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/market.js', 'js/garden.js',
+  'js/state.js', 'js/combat.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/mortality.js', 'js/market.js', 'js/garden.js',
   'js/sect.js', 'js/blackmarket.js', 'js/trial.js',
   'js/puppet.js', 'js/insect.js', 'js/cave2.js', 'js/teleport_portal.js',
 ];

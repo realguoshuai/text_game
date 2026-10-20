@@ -222,6 +222,9 @@ GAME.Goals = {
         var maxHp = p.maxHp || 1;
         var hp = Math.max(0, Math.round(p.currentHp || 0));
         var hpPct = hp / maxHp;
+        // 弥留：寿元只剩最后几年时，目标卡必须换一种说话方式——这时"再闭关"是有风险的
+        var dy = (GAME.Mortality && GAME.Mortality.dying) ? GAME.Mortality.dying(p) : { near: false, left: 0 };
+        var lastChance = dy.near ? "；寿元仅余 " + dy.left + " 年，这大概是最后一次冲关" : "";
 
         // ① 剧情 / 战斗 / 待决事件期间：先了结眼前的事（此时其它操作本就被锁）
         if (GAME.Qixuan && typeof GAME.Qixuan.active === "function" && GAME.Qixuan.active()) {
@@ -256,14 +259,16 @@ GAME.Goals = {
                 why: "修为已满，气血 " + hp + "/" + maxHp + (gate ? "，入手筑基丹更稳" : "") +
                      ((btPlan && btPlan.ok && btPlan.parts.length > 0)
                          ? "，筹备已加 +" + Math.round(btPlan.addSum * 100) + "%"
-                         : "，灵脉/护法还能再凑") + "——可以一试",
+                         : "，灵脉/护法还能再凑") + "——可以一试" + lastChance,
                 run: function () { GAME.Core.breakthrough(); }
             };
         }
 
         // ④ 修为未满：闭关打坐（时间是真预算——顺带报"还差多少、地里还有几株药"）
         var need = (r.needExp || 0) - Math.floor(p.currentExp || 0);
-        var leftTxt = (GAME.Time && GAME.Time.remainLabel) ? ("；寿元余 " + GAME.Time.remainLabel(p)) : "";
+        var leftTxt = dy.near
+            ? "；寿元仅余 " + dy.left + " 年——闭关前先算好，别把自己关死在蒲团上"
+            : ((GAME.Time && GAME.Time.remainLabel) ? ("；寿元余 " + GAME.Time.remainLabel(p)) : "");
         var plotHint = "";
         if (GAME.Plot && GAME.Plot.status) {
             var ps = GAME.Plot.status(p);

@@ -37,7 +37,7 @@ vm.createContext(sandbox);
 const FILES = [
   'data/realms.js', 'data/realms_foundation.js', 'data/items.js', 'data/skills_foundation.js',
   'data/world.js', 'data/content.js',
-  'js/state.js', 'js/combat.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/breakthrough.js',
+  'js/state.js', 'js/combat.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/mortality.js', 'js/breakthrough.js',
   'js/cave2.js', 'js/cultivation.js',
 ];
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BASE, f), 'utf8'), sandbox, { filename: f });

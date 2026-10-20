@@ -34,7 +34,7 @@ vm.createContext(sandbox);
 const FILES = [
   'data/realms.js', 'data/realms_foundation.js', 'data/items.js', 'data/content.js',
   'data/world.js',
-  'js/state.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/breakthrough.js',
+  'js/state.js', 'js/core.js', 'js/time.js', 'js/plot.js', 'js/mortality.js', 'js/breakthrough.js',
 ];
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BASE, f), 'utf8'), sandbox, { filename: f });
 const G = sandbox.GAME;

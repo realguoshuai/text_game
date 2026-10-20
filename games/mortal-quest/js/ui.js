@@ -126,7 +126,83 @@ GAME.UI = {
         var p = GAME.State.p();
         this.log("【道陨】死因：" + (p.deathReason || "未知") + "。修仙界如此残酷，唯轮回石尚存你一生记忆。", "danger");
         this.log("别慌：死亡不会写入存档。读取最近一次轮回石，即可从那一刻重来（也可直接重入轮回开新局）。", "system");
+        // 坐化：先给一页账再谈重来（其他死法没有 reckoning，走原来的横幅提示）
+        if (p.reckoning) this.renderSit();
         this.updateUI();
+    },
+
+    // ---------- 坐化：一世账目 ----------
+    // 死不是"结束"，是"这一世结束"：先让玩家看清自己活了什么，再问要不要留下洞府。
+    renderSit: function () {
+        var self = this;
+        var p = GAME.State.p();
+        var r = p && p.reckoning;
+        var box = this.$("sit-modal");
+        if (!box) return;
+        if (!r) { box.style.display = "none"; return; }
+
+        var body = this.$("sit-body");
+        if (!body) return;
+
+        var rows = [
+            ["在世", r.span + " 年（" + r.bornAge + " 岁入道 → " + r.diedAge + " 岁，大限 " + r.limit + "）"],
+            ["破境", r.breakthroughs + " 次"],
+            ["斩妖", r.kills + " 头" + (r.mercies > 0 ? "　放生 " + r.mercies + " 人" : "")],
+            ["炼丹", r.alchemy + " 炉　探幽 " + r.explores + " 处"],
+            ["遗物", "灵石 " + r.stones + "（带不走）"],
+            ["药圃", r.seeds > 0
+                ? r.seeds + " 垄在长 · 共 " + Math.floor(r.plotYears) + " 年 · " + (r.ripe > 0 ? r.ripe + " 株满千年" : "无一株满千年")
+                : "空着"],
+            ["故人", r.bonds.length > 0 ? r.bonds.length + " 位" : "无"]
+        ];
+
+        var html = "";
+        // 有些出身没有名只有别称（如"二愣子"），别拼成"无名散修 二愣子"
+        var nm = r.name || r.alias || "无名散修";
+        var al = (r.alias && r.alias !== nm) ? r.alias : "";
+        html += '<div class="sit-title">' + nm + (al ? '<span class="sit-alias">' + al + '</span>' : "") + "</div>";
+        html += '<div class="sit-span">十六岁入道　·　' + r.diedAge + " 岁坐化</div>";
+        html += '<div class="sit-realm">止步 &nbsp;' + r.realmName + "</div>";
+        html += '<div class="sit-verdict">' + r.verdict + "</div>";
+        html += '<div class="sit-ledger">';
+        rows.forEach(function (kv) {
+            html += '<div class="sit-row"><span class="sit-k">' + kv[0] + '</span><span class="sit-v">' + kv[1] + "</span></div>";
+        });
+        html += "</div>";
+        if (r.regret) html += '<div class="sit-regret">未了：' + r.regret + "</div>";
+
+        html += '<div class="sit-letter-head">留下一封遗书</div><div class="sit-letters">';
+        GAME.Mortality.LETTERS.forEach(function (L, i) {
+            var on = (p._sitLetter || "self") === L.id;
+            html += '<button class="sit-letter' + (on ? " on" : "") + '" data-letter="' + L.id + '">' + L.text + "</button>";
+        });
+        html += "</div>";
+        body.innerHTML = html;
+
+        var bts = body.querySelectorAll(".sit-letter");
+        for (var i = 0; i < bts.length; i++) {
+            bts[i].onclick = function () {
+                p._sitLetter = this.getAttribute("data-letter");
+                for (var k = 0; k < bts.length; k++) bts[k].className = "sit-letter";
+                this.className = "sit-letter on";
+            };
+        }
+
+        box.style.display = "";
+    },
+
+    closeSit: function () {
+        var box = this.$("sit-modal");
+        if (box) box.style.display = "none";
+    },
+
+    // 封存洞府：把地里还没熟的药与一句遗书留给下一世，然后重入轮回
+    sitKeep: function () {
+        var p = GAME.State.p();
+        var r = p && p.reckoning;
+        if (r && GAME.Mortality) GAME.Mortality.writeLegacy(r, p._sitLetter || "self");
+        this.closeSit();
+        this.doRestart(true);
     },
 
     // ---------- 死亡锁：除「重入轮回」「存档管理」外，所有操作按键置灰禁用 ----------
@@ -135,7 +211,7 @@ GAME.UI = {
     applyDeathLock: function () {
         var p = GAME.State.p();
         var dead = !!(p && p.isDead);
-        var ALLOW = { "btn-restart": 1, "btn-manage": 1, "btn-save-close": 1 };
+        var ALLOW = { "btn-restart": 1, "btn-manage": 1, "btn-save-close": 1, "btn-sit-keep": 1, "btn-sit-end": 1, "btn-sit-close": 1 };
         var self = this;
         // —— 非死亡态：解除上一轮死亡锁，交回业务渲染决定正常禁用 ——
         if (!dead) {
@@ -161,6 +237,8 @@ GAME.UI = {
         function lockBtn(b) {
             if (!b) return;
             if (ALLOW[b.id]) return;
+            // 坐化面板里的遗书按钮：属于"身后事"，不是今生操作，必须可点
+            if (b.classList && b.classList.contains("sit-letter")) return;
             if (b.hasAttribute && b.hasAttribute("data-slot")) return;
             b.disabled = true;
             if (b.classList) b.classList.add("dead-locked");
@@ -750,6 +828,11 @@ GAME.UI = {
         this.setPlayMode(true);                 // 含 workspace 还原为 grid，否则两栏塌陷
         this.initLogs();
         if (GAME.Qixuan) GAME.Qixuan.start();   // 苍梧门六幕开局：炼骨崖考核
+        // 前世洞府：地里那几株药接着长（只传给新局，领过即焚）
+        if (GAME.Mortality && GAME.Mortality.claim) {
+            var _leg = GAME.Mortality.claim(GAME.State.p()) || [];
+            for (var _li = 0; _li < _leg.length; _li++) this.log(_leg[_li], "system");
+        }
         this.updateUI();
     },
 
@@ -1947,7 +2030,8 @@ GAME.UI = {
             b.className = "small-btn btn-gold";
             b.innerText = "动身";
             b.disabled = !chk.ok;
-            if (!chk.ok) { b.title = chk.msg; b.setAttribute("data-why", chk.msg); }   // 原因同时落成可见小字
+            // 原因已完整写在左侧 sub（lockMsg），按钮不再重复一遍——手机上一段话出现两次很吵
+            if (!chk.ok) b.title = chk.msg;
             b.onclick = function () { GAME.Map.travel(r.id); };
             right.appendChild(b);
             row.appendChild(left); row.appendChild(right);
@@ -1978,6 +2062,14 @@ GAME.UI = {
         var byCh = GAME.Map.atlasByChapter();
         var grp = byCh[active];
         var chapMeta = (GAME.Map.chapters() || []).filter(function (c) { return c.id === active; })[0] || {};
+
+        // 章节扉页（数据里有 art 才画，缺图不占位、不裂版）
+        if (chapMeta.art) {
+            var art = document.createElement("div");
+            art.className = "atlas-chapter-art";
+            art.style.backgroundImage = "url('" + chapMeta.art + "')";
+            atlasBox.appendChild(art);
+        }
 
         // 风物引言
         var intro = document.createElement("div");
@@ -2513,8 +2605,8 @@ GAME.UI = {
         this.setPlayMode(true);
         this.updateUI();
     },
-    doRestart: function () {
-        if (!window.confirm("重入轮回将删除当前存档与今生进度，确定？")) return;
+    doRestart: function (skipConfirm) {
+        if (!skipConfirm && !window.confirm("重入轮回将删除当前存档与今生进度，确定？")) return;
         GAME.Storage.clear();
         // 清除死亡态：否则回到出身页时死亡锁仍未解除，按钮全灰、需手动刷新
         var pp = GAME.State.p();
@@ -2772,6 +2864,10 @@ GAME.UI = {
         };
         this.$("btn-manage").onclick = function () { self.doSaveManage(); };
         this.$("btn-restart").onclick = function () { self.doRestart(); };
+        var bSitKeep = this.$("btn-sit-keep"), bSitEnd = this.$("btn-sit-end"), bSitClose = this.$("btn-sit-close");
+        if (bSitKeep) bSitKeep.onclick = function () { self.sitKeep(); };
+        if (bSitEnd) bSitEnd.onclick = function () { self.closeSit(); };
+        if (bSitClose) bSitClose.onclick = function () { self.closeSit(); };
         this.$("btn-zhuji").onclick = function () { self.startPresetZhuji(); };
         this.$("btn-save-close").onclick = function () { self.closeSaveModal(); };
         this.$("btn-zhuji-preset").onclick = function () { self.startPresetZhuji(); };

@@ -190,9 +190,15 @@ GAME.Core = {
         if (p.isDead) return;
         var limit = GAME.State.maxAge();
         if (p.ageYears >= limit) {
-            p.isDead = true;
-            p.deathReason = "寿元 " + limit + " 岁大限已至";
-            GAME.UI.log("大限已至！你终究未能打破天地桎梏，寿元耗尽，坐化于洞府之中……", "danger");
+            // 寿元尽 = 坐化：一世账目与身后事交给 GAME.Mortality，不在这里拼日志。
+            // 缺模块时退回旧路径，保证"死"这件事永远不会因为模块缺失而失效。
+            if (GAME.Mortality && GAME.Mortality.die) {
+                GAME.Mortality.die("寿元 " + limit + " 岁大限已至");
+            } else {
+                p.isDead = true;
+                p.deathReason = "寿元 " + limit + " 岁大限已至";
+                GAME.UI.log("大限已至！你终究未能打破天地桎梏，寿元耗尽，坐化于洞府之中……", "danger");
+            }
         } else if (p.currentHp <= 0) {
             // 玄傀护主软着陆：致命气血耗损先由铁奴挡下
             if (this.tryRescue()) {

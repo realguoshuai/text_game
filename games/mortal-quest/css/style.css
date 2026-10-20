@@ -223,6 +223,8 @@ button:disabled {
     gap: 8px;
     border-radius: 4px;
 }
+/* 左列必须能"长"：否则窄屏下列宽塌成一条，中文被挤成竖排（每行一个字） */
+.item-row > div:first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .item-row:last-child { border-bottom: none; }
 .item-row:hover { background: rgba(255,255,255,0.03); }
 .skill-learned { background: linear-gradient(90deg, var(--accent-soft, rgba(180,83,9,0.12)), transparent 60%); border-radius: 4px; }
@@ -247,7 +249,11 @@ button:disabled {
     font-size:13px; line-height:18px; text-align:center; padding:0; cursor:pointer; border-radius:4px;
 }
 .guide-close:hover { background:rgba(255,255,255,0.06); color:var(--text); }
-.item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+/* 右列封顶：禁用原因（.btn-why）会把按钮撑长，不封顶则左列被压成 0 宽（中文竖排） */
+.item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+    max-width: 58%; flex-wrap: wrap; justify-content: flex-end; }
+.item-right button { white-space: normal; }
+.item-right .btn-why { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
 .empty-tip { color: var(--text-faint); font-size: 12px; text-align: center; padding: 8px; }
 
 /* 出身选择 */
@@ -854,3 +860,47 @@ button .btn-why {
 .plot-row { align-items: center; }
 .plot-btn { flex-shrink: 0; font-size: 11px; padding: 3px 8px; min-height: 0; }
 #plot-hint { line-height: 1.5; }
+
+/* ===== 坐化：一世账目（死亡不是结束，是这一世结束）===== */
+.sit-box { max-width: 520px; }
+.sit-body { padding: 6px 2px 2px; }
+.sit-title { font-size: 20px; font-weight: 700; letter-spacing: .06em; color: var(--gold, #b08d57); text-align: center; }
+.sit-alias { font-size: 12px; font-weight: 400; color: var(--muted, #8a7f6a); margin-left: 6px; }
+.sit-span { text-align: center; font-size: 12px; color: var(--muted, #8a7f6a); margin-top: 2px; letter-spacing: .04em; }
+.sit-realm { text-align: center; font-size: 14px; margin-top: 8px; letter-spacing: .1em; }
+.sit-verdict { margin: 10px 0 12px; padding: 10px 12px; text-align: center; line-height: 1.75; font-size: 13px;
+    border-top: 1px solid rgba(176,141,87,.28); border-bottom: 1px solid rgba(176,141,87,.28); }
+.sit-ledger { display: flex; flex-direction: column; gap: 3px; }
+.sit-row { display: flex; align-items: baseline; gap: 8px; font-size: 12px; line-height: 1.6; }
+.sit-k { flex: 0 0 44px; color: var(--muted, #8a7f6a); letter-spacing: .08em; }
+.sit-v { flex: 1 1 auto; min-width: 0; word-break: break-word; }
+.sit-regret { margin-top: 8px; font-size: 12px; line-height: 1.6; color: #b5822a; }
+.sit-letter-head { margin: 14px 0 6px; font-size: 12px; letter-spacing: .1em; color: var(--muted, #8a7f6a); }
+.sit-letters { display: flex; flex-direction: column; gap: 5px; }
+.sit-letter { text-align: left; line-height: 1.55; padding: 6px 9px; font-size: 12px; border-radius: 6px;
+    border: 1px solid rgba(140,120,90,.32); background: transparent; color: inherit; cursor: pointer; }
+.sit-letter.on { border-color: var(--gold, #b08d57); box-shadow: inset 0 0 0 1px rgba(176,141,87,.45); }
+.sit-actions { display: flex; gap: 8px; margin-top: 14px; }
+.sit-actions button { flex: 1 1 0; }
+
+/* ===== 章节扉页：一张水墨，替代被删掉的大横幅——只占一条，不抢版面 ===== */
+.atlas-chapter-art {
+    height: clamp(76px, 12vh, 108px);
+    margin: 0 0 9px;
+    border-radius: 8px;
+    background-size: cover;
+    background-position: center 40%;
+    background-repeat: no-repeat;
+    box-shadow: inset 0 0 0 1px rgba(120,102,74,.22);
+    /* 下缘压暗一点，让下面的引言文字有落点 */
+    position: relative;
+}
+.atlas-chapter-art::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+    border-radius: 0 0 8px 8px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,.10));
+    pointer-events: none;
+}
+@media (max-width: 420px) {
+    .atlas-chapter-art { height: clamp(64px, 9vh, 84px); margin-bottom: 7px; }
+}
