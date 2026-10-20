@@ -241,4 +241,65 @@ GAME.Map = {
         GAME.UI.updateUI();
         return true;
     },
+
+    // ---------- 章节地图（Increment 2：章节为皮） ----------
+    // 当前篇章：身在天星海即星海篇；其余按境界阈值回落
+    chapterOf: function (realmIndex, location) {
+        if (location === "luanxing_hai") return "star";
+        if (realmIndex >= 22) return "jiedan";
+        if (realmIndex >= 13) return "zhuji";
+        return "qi";
+    },
+
+    currentChapter: function () {
+        var p = GAME.State.p();
+        return this.chapterOf(p.realmIndex, p.location);
+    },
+
+    // 章节列表 + 当前章标记 + 是否已触及（达到该境界段即算"到过"）
+    chapters: function () {
+        var self = this, p = GAME.State.p(), cur = this.currentChapter();
+        return (this.cfg().chapters || []).map(function (c) {
+            return {
+                id: c.id, name: c.name, desc: c.desc, minRealm: c.minRealm,
+                current: c.id === cur,
+                reached: p.realmIndex >= (c.minRealm || 0),
+            };
+        });
+    },
+
+    // 节点动态归属章节：碎星海恒属星海篇；筑基陆地节点在结丹后升入结丹篇
+    nodeChapter: function (n, ri) {
+        if (n.id === "luanxing_hai") return "star";
+        if (n.chapter === "zhuji" && ri >= 22) return "jiedan";
+        return n.chapter || "qi";
+    },
+
+    // 按章节分组节点（动态归属；含解锁态 / 当前所在地 / 退役标记）
+    atlasByChapter: function () {
+        var self = this, p = GAME.State.p(), ri = p.realmIndex, cur = this.currentChapter(), out = {};
+        (this.cfg().chapters || []).forEach(function (c) { out[c.id] = { chapter: c, nodes: [] }; });
+        this.cfg().nodes.forEach(function (n) {
+            var dch = self.nodeChapter(n, ri);
+            if (!out[dch]) {
+                var meta = (self.cfg().chapters || []).filter(function (c) { return c.id === dch; })[0];
+                out[dch] = { chapter: meta || { id: dch, name: dch }, nodes: [] };
+            }
+            var u = self.nodeUnlocked(n.id);
+            out[dch].nodes.push({
+                id: n.id, name: n.name, kind: n.kind,
+                unlocked: u.ok, lockMsg: u.ok ? "" : u.msg,
+                reqRealmName: (GAME.DATA.REALMS[n.reqRealm || 0] || {}).name || "",
+                teaser: n.teaser || "", here: p.location === n.id,
+                inCurrent: (dch === cur),
+                retired: (n.id === "tainan_gu" && self.marketRetired()),
+            });
+        });
+        return out;
+    },
+
+    // 低阶坊市退役：玩家已离开练气篇（进入筑基及以上），苍南谷散修坊市再不活跃
+    marketRetired: function () {
+        return this.currentChapter() !== "qi";
+    },
 };

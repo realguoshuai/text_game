@@ -683,3 +683,24 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
     flex: 0 0 auto;
 }
+
+/* ---------- 章节地图（Increment 2：章节为皮） ---------- */
+.atlas-chapter {
+    margin: 10px 0 4px;
+    padding: 4px 8px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    color: #e8e8e8;
+    border-left: 3px solid #3f3f46;
+    background: rgba(255, 255, 255, 0.03);
+}
+.atlas-chapter-current {
+    color: #e8b84b;
+    border-left-color: #e8b84b;
+    background: rgba(232, 184, 75, 0.08);
+}
+.atlas-old {
+    padding: 2px 8px 6px 14px;
+    opacity: 0.7;
+}

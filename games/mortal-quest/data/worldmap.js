@@ -27,17 +27,25 @@ GAME.DATA.MAP = {
 
     start: "shenshou_gu",
 
+    // 章节：按修为划分的篇章，地图舆图据此分组呈现（低阶坊市随章节退役）
+    chapters: [
+      { id: "qi",      name: "练气篇",   minRealm: 0,  desc: "山村穷小子初涉修途，山野、市镇、岚州腹地，皆是练气修士的天地。" },
+      { id: "zhuji",   name: "筑基篇",   minRealm: 13, desc: "拜入宗门，谋那筑基长生。青梧谷的枫林、云京的宫阙，是筑基修士的舞台。" },
+      { id: "jiedan",  name: "结丹篇",   minRealm: 22, desc: "凝丹化婴之途。气血法力皆非昔比，凡俗手段再难伤你分毫。" },
+      { id: "star",    name: "碎星海篇", minRealm: 22, desc: "万里之外的修仙群岛，妖修与散修杂处，灵药灵矿遍地——那是结丹之后的世界。" },
+    ],
+
     // 解锁梯度：练气三层出山 → 四层赴岚州腹地 → 六层涉足散修之地 → 圆满方够资格谒见宗门
     nodes: [
         {
-            id: "shenshou_gu", name: "幽篁谷", kind: "cave", reqRealm: 0,
+            id: "shenshou_gu", name: "幽篁谷", kind: "cave", reqRealm: 0, chapter: "qi",
             desc: "苍梧门后山的旧谷。谷深处那孔石洞是你闭关多年的所在，承露瓶仍在囊中。厉长风还在山下营生，若说再见，恐需些时日。",
             actions: [
                 { id: "farewell", label: "向厉长风辞行", hint: "故人赠银做盘缠，心境 +5" },
             ],
         },
         {
-            id: "qingniu_zhen", name: "青牛镇", kind: "mortal", reqRealm: 2,
+            id: "qingniu_zhen", name: "青牛镇", kind: "mortal", reqRealm: 2, chapter: "qi",
             reqText: "出山只百里，蛊毒虫豸与剪径蟊贼却认不得你这点道行。",
             desc: "你出生长大的小镇，青石街、老槐树、父母兄妹皆在此处。凡俗烟火气最重，也最伤修道人的心境。",
             actions: [
@@ -45,7 +53,7 @@ GAME.DATA.MAP = {
             ],
         },
         {
-            id: "jiayuan_cheng", name: "景阳城", kind: "mortal", reqRealm: 3,
+            id: "jiayuan_cheng", name: "景阳城", kind: "mortal", reqRealm: 3, chapter: "qi",
             reqText: "去岚州腹地千里之遥，没练气四层的手段，只怕走不到城下。",
             desc: "岚州腹地的繁华大城，商贾辐辏，市井喧嚣。惊蛟会盘踞城中，而玄机世家的门楣正悬着白绫——玄机子死讯已传开数月了。",
             actions: [
@@ -53,19 +61,19 @@ GAME.DATA.MAP = {
             ],
         },
         {
-            id: "tainan_gu", name: "苍南山·苍南谷", kind: "immortal", reqRealm: 5,
+            id: "tainan_gu", name: "苍南山·苍南谷", kind: "immortal", reqRealm: 5, chapter: "qi",
             reqText: "散修之地不问出身只问拳头，道行不足者入谷便是任人宰割的肥羊。",
             desc: "散修云集的去处。谷外围着一层掩形幻阵，肉眼凡胎只见寻常山岭；入了谷，三教九流的修仙者在此换取灵药、法器与法术，每隔数年更有升仙大会在此开擂。",
             actions: [],
         },
         {
-            id: "huangfeng_gu", name: "青梧谷", kind: "immortal", reqRealm: 12, reqSect: "huangfenggu",
+            id: "huangfeng_gu", name: "青梧谷", kind: "immortal", reqRealm: 12, reqSect: "huangfenggu", chapter: "zhuji",
             reqText: "青梧谷护山大阵森严，练气圆满以下，连那条青石山道都走不到头。",
             desc: "云国四大宗门之一的山门所在。枫林深处殿宇连绵，门人往来皆驾灵光。此处不再是散修的江湖——有宗门、有职司，也有规矩。",
             actions: [],
         },
         {
-            id: "yuejing_cheng", name: "云京·皇城", kind: "immortal", reqRealm: 13,
+            id: "yuejing_cheng", name: "云京·皇城", kind: "immortal", reqRealm: 13, chapter: "zhuji",
             reqText: "皇城米贵，居之不易——筑基修士方有资格在云国庙堂之侧走动而不被豺狼盯上。",
             teaser: "云国帝都，气象森严。近来城中夜夜有血气冲霄，黑袍人出没坊间—— 幽冥教的手已伸进了皇宫。",
             desc: "云国帝都。宫阙连云，禁军甲胄鲜明。可只有修行者知道，这座皇城的地底，正蛰伏着一头择人而噬的血魔。",
@@ -74,7 +82,7 @@ GAME.DATA.MAP = {
             ],
         },
         {
-            id: "luanxing_hai", name: "碎星海", kind: "immortal", reqRealm: 21,
+            id: "luanxing_hai", name: "碎星海", kind: "immortal", reqRealm: 21, chapter: "star",
             reqText: "碎星海在万里重洋之外，凡俗海船去不得——须筑基九层灵力圆满、御器跨海，方可一搏。",
             teaser: "万里之外的修仙群岛，妖修与散修杂处，灵药灵矿遍地——那是结丹之后的世界。",
             desc: "？？？",

@@ -685,7 +685,7 @@ GAME.UI = {
             });
         }
 
-        /* ② 散修坊市：仅苍南谷可见（商品与出售由 renderTainan 填充同一批容器） */
+        /* ② 散修坊市：仅苍南谷可见；玩家离开练气篇（筑基及以上）后坊市退役，仅留旧忆 */
         this.show("tainan-market-block", !!GAME.Tainan.at());
 
         /* ④ 货币兑换（低阶↔中阶灵石 + 灵石→银两） */
@@ -1680,25 +1680,44 @@ GAME.UI = {
             box.appendChild(row);
         });
 
-        // 天下舆图：全部节点与解锁进度——未解锁者隐去详情，只留所需境界
+        // 天下舆图：按章节分组呈现（当前篇展开高亮，旧地折叠为"可回顾"）
         var atlasBox = this.$("map-atlas");
         atlasBox.innerHTML = "";
-        GAME.Map.atlas().forEach(function (n) {
-            var row = document.createElement("div");
-            row.className = "item-row";
-            var left = document.createElement("div");
-            if (n.unlocked) {
-                left.innerHTML = (n.here ? '<span class="gold">【此地】</span>' : "") +
-                    '<span class="q-灵品">' + n.name + '</span>' +
-                    '<div class="item-desc">' + (n.kind === "immortal" ? "修仙之地" : n.kind === "mortal" ? "凡俗城池" : "故地洞府") + '</div>';
+        var byCh = GAME.Map.atlasByChapter();
+        (GAME.Map.chapters() || []).forEach(function (c) {
+            var grp = byCh[c.id];
+            if (!grp || !grp.nodes.length) return;
+            var title = document.createElement("div");
+            title.className = "atlas-chapter" + (c.current ? " atlas-chapter-current" : "");
+            title.innerHTML = "【" + c.name + "】" +
+                (c.current ? ' <span class="gold">· 当前</span>' : (c.reached ? ' <span class="item-desc">· 旧地</span>' : ' <span class="item-desc">· 未至</span>'));
+            atlasBox.appendChild(title);
+            if (c.current) {
+                grp.nodes.forEach(function (n) {
+                    var row = document.createElement("div");
+                    row.className = "item-row";
+                    var left = document.createElement("div");
+                    if (n.unlocked) {
+                        left.innerHTML = (n.here ? '<span class="gold">【此地】</span>' : "") +
+                            '<span class="q-灵品">' + n.name + '</span>' +
+                            (n.retired ? ' <span class="warning">（坊市已散）</span>' : '') +
+                            '<div class="item-desc">' + (n.kind === "immortal" ? "修仙之地" : n.kind === "mortal" ? "凡俗城池" : "故地洞府") + '</div>';
+                    } else {
+                        left.innerHTML = '<span class="warning">🔒</span> <span class="item-desc">' + n.name +
+                            '</span><div class="item-desc">需 ' + n.reqRealmName + ' 以上' +
+                            (n.teaser ? ' — ' + n.teaser : '') + '</div>';
+                    }
+                    row.appendChild(left);
+                    row.appendChild(document.createElement("div"));
+                    atlasBox.appendChild(row);
+                });
             } else {
-                left.innerHTML = '<span class="warning">🔒</span> <span class="item-desc">' + n.name +
-                    '</span><div class="item-desc">需 ' + n.reqRealmName + ' 以上' +
-                    (n.teaser ? ' — ' + n.teaser : '') + '</div>';
+                var names = grp.nodes.map(function (n) { return n.name + (n.retired ? "（坊市已散）" : ""); }).join("、");
+                var old = document.createElement("div");
+                old.className = "item-desc atlas-old";
+                old.innerHTML = "旧地 · 可回顾：" + names;
+                atlasBox.appendChild(old);
             }
-            row.appendChild(left);
-            row.appendChild(document.createElement("div"));
-            atlasBox.appendChild(row);
         });
 
         // 狩猎副本入口：分档狩猎（按修为解锁），狩猎中显示撤退按钮
@@ -1836,6 +1855,12 @@ GAME.UI = {
         var self = this;
         var p = GAME.State.p();
         if (!GAME.Tainan.at() || p.isDead || p.combat) return;   // 可见性由 applyPanels 统一控制
+        // 低阶坊市退役：筑基及以上修士，苍南谷散修坊市再不活跃，只留旧忆
+        if (GAME.Map.marketRetired()) {
+            this.$("tainan-goods").innerHTML = '<div class="empty-tip">苍南谷散修坊市已随你道行远去——筑基以上的修士，再无人来这等低阶坊市交易，徒留旧忆。</div>';
+            this.$("tainan-sell").innerHTML = "";
+            return;
+        }
 
         var tips = [];
         if (p.sectId) tips.push("你已是【" + GAME.DATA.TAINAN.token.sectName + "】门人。");
