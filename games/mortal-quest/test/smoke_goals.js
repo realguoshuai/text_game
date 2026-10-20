@@ -139,5 +139,58 @@ const all = G.Goals.list();
 assert('list() 返回适用目标清单', Array.isArray(all) && all.length > 0);
 assert('末项目标已完成标记正确', all[all.length - 1].done === false || all[all.length - 1].id === 'endgame');
 
+// ---------- ⑥ 下一步行动（action：目标 → 现在就点哪） ----------
+section('⑥ 下一步行动 action()');
+G.State.createNewPlayer();
+let p6 = P();
+p6.realmIndex = 5;
+const r6 = G.DATA.REALMS[5];
+
+// 修为未满 → 劝闭关
+p6.currentExp = 0;
+let a = G.Goals.action(p6);
+assert('修为未满 → 建议闭关打坐', a && a.kind === 'heal' && /闭关打坐/.test(a.label));
+assert('闭关提示写明还差多少修为', a && /还差 \d+ 修为/.test(a.why));
+assert('闭关行动可执行（run 为函数）', a && typeof a.run === 'function');
+assert('闭关提示含突破成功率', a && /成功率 \d+%/.test(a.why));
+
+// 修为已满 + 气血充足 → 劝突破
+p6.currentExp = r6.needExp;
+p6.currentHp = p6.maxHp;
+a = G.Goals.action(p6);
+assert('修为已满气血足 → 建议突破', a && a.kind === 'go' && /尝试突破/.test(a.label));
+assert('突破行动可执行', a && typeof a.run === 'function');
+assert('突破提示带气血实况', a && /气血/.test(a.why));
+
+// 修为已满 + 气血不足 → 先回血（关键的"为什么现在别点突破"）
+p6.currentHp = Math.floor(p6.maxHp * 0.3);
+a = G.Goals.action(p6);
+assert('修为满但气血不足 → 先打坐回血', a && a.kind === 'heal' && /恢复气血/.test(a.label));
+assert('回血提示说明硬突破会重伤', a && /重伤/.test(a.why));
+
+// 顶境 → 无下一步可点
+p6.realmIndex = 30;
+p6.currentExp = 0;
+a = G.Goals.action(p6);
+assert('顶境 → 此界已圆满且不可点', a && a.kind === 'done' && a.run === null);
+
+// 战斗中 → 先了结眼前之事
+p6.realmIndex = 5;
+p6.currentExp = 0;
+p6.combat = { foe: {} };
+a = G.Goals.action(p6);
+assert('战斗中 → 先了结眼前之事', a && a.kind === 'story' && a.run === null);
+p6.combat = null;
+
+// 纯函数：调用不写状态
+const expBefore = p6.currentExp, hpBefore = p6.currentHp;
+G.Goals.action(p6);
+assert('action() 不修改玩家状态', p6.currentExp === expBefore && p6.currentHp === hpBefore);
+
+// 死亡 → 无行动
+p6.isDead = true;
+assert('死亡时无行动建议', G.Goals.action(p6) === null);
+p6.isDead = false;
+
 console.log('\n==== 结果: ' + pass + ' passed, ' + fail + ' failed ====');
 if (fail) { console.log('失败项：' + fails.join(' | ')); process.exit(1); }

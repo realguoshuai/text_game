@@ -93,7 +93,13 @@ GAME.Goals = {
             text: "走完苍梧门开局六幕",
             hint: function (p) {
                 var act = (p.qixuan && p.qixuan.act) || 1;
-                return "当前第 " + Math.min(act, 6) + " 幕 / 共 6 幕";
+                // act>=6 = 前五幕已了、第六幕由「突破练气四层」唤起（qixuan.onBreakthroughFour）
+                // 此时若还写「第 6 幕 / 共 6 幕」，玩家会以为有一步可点，实际无事可做 → 说清触发条件
+                if (act >= 6) {
+                    return "前五幕已了——待你突破练气四层，墨师翻脸那一幕自会找上门（当前 " +
+                        GAME.Goals._realmName(p.realmIndex) + "）";
+                }
+                return "当前第 " + act + " 幕 / 共 6 幕";
             },
             where: "苍梧门",
             goto: function () {                       // 目标横幅「前往：苍梧门」可点击 → 直接跳转开幕
@@ -195,6 +201,70 @@ GAME.Goals = {
             where: "乱星海"
         }
     ],
+
+    // ---------- 下一步：把"目标"翻译成"现在就点这里" ----------
+    // 参考《一念逍遥》《鬼谷八荒》：主界面常驻一个明确可点的下一步，
+    // 玩家不该自己从一堆按钮里猜该干什么。目标条讲"要去哪"，action 讲"现在点哪"。
+    _realm: function (p) {
+        return (GAME.DATA && GAME.DATA.REALMS && GAME.DATA.REALMS[p.realmIndex]) || {};
+    },
+    // 修为是否已满（可尝试突破）
+    _full: function (p) {
+        var r = this._realm(p);
+        if (r.needExp === null || r.needExp === undefined) return false;
+        return p.currentExp >= r.needExp;
+    },
+
+    action: function (p) {
+        if (!p || p.isDead) return null;
+        var r = this._realm(p);
+        var next = GAME.DATA.REALMS[p.realmIndex + 1];
+        var maxHp = p.maxHp || 1;
+        var hp = Math.max(0, Math.round(p.currentHp || 0));
+        var hpPct = hp / maxHp;
+
+        // ① 剧情 / 战斗 / 待决事件期间：先了结眼前的事（此时其它操作本就被锁）
+        if (GAME.Qixuan && typeof GAME.Qixuan.active === "function" && GAME.Qixuan.active()) {
+            return { kind: "story", label: "继续当前剧情", why: "剧情抉择期间其它操作锁死——先走完眼前这一幕", run: null };
+        }
+        if (p.combat || p.moEvent || p.pendingEvent || p.pendingMercy) {
+            return { kind: "story", label: "先了结眼前之事", why: "有未决的战斗或事件，处理完才可闭关", run: null };
+        }
+
+        // ② 已至当世顶境
+        if (!next) {
+            return { kind: "done", label: "此界已圆满", why: "已至顶境，往后只剩自行择道", run: null };
+        }
+
+        // ③ 修为已满：先看气血，再劝突破
+        if (this._full(p)) {
+            var ch = (typeof r.breakChance === "number") ? r.breakChance : null;
+            var gate = (p.realmIndex === GAME.DATA.ZHUJI_GATE_INDEX);
+            if (hpPct < 0.6) {
+                return {
+                    kind: "heal", label: "先打坐恢复气血",
+                    why: "修为已满，但气血仅 " + hp + "/" + maxHp + "——此时强行突破，失败会重伤",
+                    run: function () { GAME.Core.meditate(); }
+                };
+            }
+            return {
+                kind: "go",
+                label: "尝试突破" + (ch !== null ? "（" + Math.round(ch * 100) + "%）" : ""),
+                why: "修为已满，气血 " + hp + "/" + maxHp + (gate ? "，入手筑基丹更稳" : "") + "——可以一试",
+                run: function () { GAME.Core.breakthrough(); }
+            };
+        }
+
+        // ④ 修为未满：闭关打坐
+        var need = (r.needExp || 0) - Math.floor(p.currentExp || 0);
+        return {
+            kind: "heal",
+            label: "闭关打坐（" + (r.meditateMonths || 3) + " 月 +1 修为）",
+            why: "还差 " + need + " 修为可尝试突破" +
+                 (typeof r.breakChance === "number" ? "（届时成功率 " + Math.round(r.breakChance * 100) + "%）" : ""),
+            run: function () { GAME.Core.meditate(); }
+        };
+    },
 
     // ---------- 取当前目标 ----------
     // 规则：先看紧急项，再按主线顺序取第一个"适用且未完成"的项。

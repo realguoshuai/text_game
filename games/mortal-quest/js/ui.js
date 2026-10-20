@@ -189,6 +189,31 @@ GAME.UI = {
     },
 
     // ---------- 总渲染 ----------
+    // ---------- 禁用原因显性化 ----------
+    // 灰按钮只写 title，手机上没有 hover 永远看不到 → 一律落成按钮内小字
+    _why: function (btn, reason) {
+        if (!btn) return;
+        btn.setAttribute("data-why", reason || "");   // 空串即"无原因"，避免依赖 removeAttribute
+    },
+
+    // 统一把 data-why 渲染成按钮内小字（每帧比对文本，避免重复追加）
+    annotateWhy: function () {
+        if (typeof document === "undefined" || !document.querySelectorAll) return;
+        // 必须扫全部 button：只扫 button[disabled] 会让"刚变为可用"的按钮残留旧原因
+        var btns = document.querySelectorAll("button");
+        for (var i = 0; i < btns.length; i++) {
+            var b = btns[i];
+            var reason = b.disabled ? ((b.getAttribute && b.getAttribute("data-why")) || "") : "";
+            var el = b.querySelector ? b.querySelector(".btn-why") : null;
+            if (!reason) {
+                if (el && el.parentNode) { try { el.parentNode.removeChild(el); } catch (e) { } }
+                continue;
+            }
+            if (!el) { el = document.createElement("span"); el.className = "btn-why"; b.appendChild(el); }
+            if (el.innerText !== reason) el.innerText = reason;
+        }
+    },
+
     // ---------- 当前目标横幅 ----------
     renderGoal: function () {
         var box = this.$("goal-banner");
@@ -215,6 +240,36 @@ GAME.UI = {
                 }
             } else {
                 w.innerText = "";   // 死亡态：目标横幅交由 applyDeathLock 显示「道陨」，此处留空
+            }
+        }
+
+        // 下一步行动卡：把「目标」落成「现在就点这里」（参考《一念逍遥》常驻下一步）
+        var nx = this.$("goal-next");
+        if (nx) {
+            nx.innerHTML = "";
+            var a = null;
+            try { a = (GAME.Goals && GAME.Goals.action) ? GAME.Goals.action(GAME.State.p()) : null; } catch (e) { a = null; }
+            if (!a) { nx.style.display = "none"; }
+            else {
+                nx.style.display = "";
+                if (typeof a.run === "function") {
+                    var nb = document.createElement("button");
+                    nb.className = "goal-next-btn goal-next-" + (a.kind || "go");
+                    nb.innerText = a.label;
+                    nb.onclick = function () { try { a.run(); } catch (e) { console.error(e); } };
+                    nx.appendChild(nb);
+                } else {
+                    var sp = document.createElement("span");
+                    sp.className = "goal-next-static goal-next-" + (a.kind || "done");
+                    sp.innerText = a.label;
+                    nx.appendChild(sp);
+                }
+                if (a.why) {
+                    var wy = document.createElement("span");
+                    wy.className = "goal-next-why";
+                    wy.innerText = a.why;
+                    nx.appendChild(wy);
+                }
             }
         }
     },
@@ -274,7 +329,12 @@ GAME.UI = {
             var inStory = !!(GAME.Qixuan && GAME.Qixuan.active());   // 炼骨崖考核等剧情抉择期间，闭关类全部禁点
             var lock = dead || busy || waiting || inStory;
             var ids = ["btn-meditate","btn-catalyze-bainian","btn-catalyze-qiannian","btn-breakthrough","btn-explore","btn-market","btn-sect"];
-            for (var i = 0; i < ids.length; i++) this.$(ids[i]).disabled = lock;
+            var lockWhy = inStory ? "剧情进行中" : busy ? "战斗/事件未了" : waiting ? "有待决事件" : dead ? "已身陨" : "";
+            for (var i = 0; i < ids.length; i++) {
+                var lbtn = this.$(ids[i]);
+                lbtn.disabled = lock;
+                this._why(lbtn, lock ? lockWhy : "");
+            }
             // 丹炉：练气三层前灰显不可点（玄机子未传手艺）
             var alchOk = !lock && GAME.Core.canAlchemy();
             var bAlch = this.$("btn-alchemy");
@@ -285,27 +345,43 @@ GAME.UI = {
             // 杂役堂只在幽篁谷且有宗门身份时可用；血色禁地副本入口同理（旧试炼入口已撤）
             var atHome = p.location === GAME.DATA.MAP.start;
             this.$("btn-sect").disabled = lock || !atHome || !p.sectId;
+            this._why(this.$("btn-sect"), lock ? lockWhy
+                : !p.sectId ? "尚未拜入宗门"
+                : !atHome ? "须回幽篁谷（宗门驻地）" : "");
 
             // 打坐耗时随境界递增（按钮文案动态）
             var mm = realm.meditateMonths || 3;
             this.$("btn-meditate").innerText = "闭关打坐 (" + mm + "月+1修为)";
 
             var bt = this.$("btn-breakthrough");
-            if (realm.needExp === null) { bt.innerText = "此界圆满"; bt.disabled = true; }
-            else {
-                var next = GAME.DATA.REALMS[p.realmIndex + 1];
+            if (realm.needExp === null) {
+                bt.innerText = "此界圆满"; bt.disabled = true;
+                this._why(bt, "已至当世顶境");
+            } else {
                 var isZhuji = p.realmIndex === GAME.DATA.ZHUJI_GATE_INDEX;
-                bt.innerText = "尝试突破 (" + (realm.breakChance * 100).toFixed(0) + "%" + (isZhuji ? "，需筑基丹" : "") + ")";
+                var atJiedan = p.realmIndex === GAME.DATA.JIEDAN_GATE_SOURCE;
+                // 门槛境界（筑基九层/练气九层等）breakChance 为 null，不能直接乘 → 否则显示 NaN%
+                var chTxt = (typeof realm.breakChance === "number")
+                    ? (realm.breakChance * 100).toFixed(0) + "%"
+                    : (atJiedan ? "结丹之劫" : isZhuji ? "筑基之劫" : "未知");
+                bt.innerText = "尝试突破 (" + chTxt +
+                    (isZhuji ? "，需筑基丹" : atJiedan ? "，需凝丹" : "") + ")";
                 bt.disabled = lock || p.currentExp < realm.needExp;
+                var lackExp = Math.ceil(realm.needExp - p.currentExp);
+                this._why(bt, lock ? lockWhy : (lackExp > 0 ? "还差 " + lackExp + " 修为" : ""));
             }
-            this.$("btn-catalyze-bainian").disabled = lock || p.liquid < 1;
-            this.$("btn-catalyze-qiannian").disabled = lock || p.liquid < 5;
-            var bw = this.$("btn-catalyze-wood");
-            if (bw) bw.disabled = lock || p.liquid < 1;
-            var bxb = this.$("btn-catalyze-xuanbing");
-            if (bxb) bxb.disabled = lock || p.liquid < 5;
-            var bll = this.$("btn-catalyze-longlin");
-            if (bll) bll.disabled = lock || p.liquid < 10;
+            // 催化按钮：禁用原因写明白（灵液差多少滴）
+            var _liq = function (b, need) {
+                if (!b) return;
+                b.disabled = lock || p.liquid < need;
+                this._why(b, lock ? lockWhy : (p.liquid < need
+                    ? "灵液不足：需 " + need + " 滴（现有 " + (p.liquid || 0) + "）" : ""));
+            }.bind(this);
+            _liq(this.$("btn-catalyze-bainian"), 1);
+            _liq(this.$("btn-catalyze-qiannian"), 5);
+            _liq(this.$("btn-catalyze-wood"), 1);
+            _liq(this.$("btn-catalyze-xuanbing"), 5);
+            _liq(this.$("btn-catalyze-longlin"), 10);
 
             // —— 异常警示行：有异常才亮（煞气/阴毒/觊觎度/药香泄露） ——
             var aw = function (id, on) { var el = this.$(id); if (el) el.style.display = on ? "" : "none"; }.bind(this);
@@ -388,6 +464,9 @@ GAME.UI = {
             this.renderPuppet();
             this.renderAchievements();
             this.applyPanels();
+
+            // 最后统一把「为什么这个按钮是灰的」贴到按钮里（手机无 hover，title 等于不存在）
+            try { this.annotateWhy(); } catch (e) { }
         } catch (e) {
             console.error("渲染异常", e);
             try { this.log("界面渲染出现异常：" + e.message + "（游戏仍在运行，可重入轮回）", "danger"); } catch (e2) {}
@@ -1673,7 +1752,7 @@ GAME.UI = {
             b.className = "small-btn btn-gold";
             b.innerText = "动身";
             b.disabled = !chk.ok;
-            if (!chk.ok) b.title = chk.msg;
+            if (!chk.ok) { b.title = chk.msg; b.setAttribute("data-why", chk.msg); }   // 原因同时落成可见小字
             b.onclick = function () { GAME.Map.travel(r.id); };
             right.appendChild(b);
             row.appendChild(left); row.appendChild(right);
@@ -1782,7 +1861,8 @@ GAME.UI = {
             b.className = "small-btn btn-gold";
             b.innerText = "入山狩猎";
             b.disabled = !chk.ok || !!p.combat;
-            if (!chk.ok) b.title = chk.msg;
+            if (!chk.ok) { b.title = chk.msg; b.setAttribute("data-why", chk.msg); }   // 原因同时落成可见小字
+            else if (p.combat) b.setAttribute("data-why", "战斗中");
             b.onclick = function () { GAME.Hunt.enter(d.id); };
             right.appendChild(b);
             if (p.hunt && p.hunt.id === d.id && p.hunt.await && !p.combat) {

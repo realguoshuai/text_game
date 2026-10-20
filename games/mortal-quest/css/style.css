@@ -531,8 +531,9 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
 .goal-banner {
     flex-shrink: 0;                /* 布局挤压时不许横幅把出身面板顶出可视区 */
     display: flex;
+    flex-wrap: wrap;               /* 下一步行动卡在窄屏自动换行，不挤走正文 */
     align-items: baseline;
-    gap: 10px;
+    gap: 6px 10px;
     margin: 0 0 10px;
     padding: 7px 12px;
     background: var(--panel-bg);
@@ -558,6 +559,43 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
 .goal-banner.urgent .goal-main b { color: var(--warning); }
 .goal-hint { display: block; font-size: 12px; color: var(--text-mute); }
 .goal-where { flex-shrink: 0; font-size: 12px; color: var(--text-faint); }
+
+/* ---------- 下一步行动卡（目标横幅内） ----------
+   参考《一念逍遥》《鬼谷八荒》：主界面常驻一个明确可点的下一步，
+   玩家不该自己从一堆按钮里猜该干什么。 */
+.goal-next { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.goal-next-btn {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+    border: 1px solid var(--gold);
+    background: rgba(212, 175, 55, 0.14);
+    color: var(--gold);
+    white-space: nowrap;
+}
+.goal-next-btn:hover { background: rgba(212, 175, 55, 0.26); }
+.goal-next-btn.goal-next-heal {
+    border-color: var(--accent);
+    background: rgba(120, 200, 180, 0.12);
+    color: var(--accent);
+}
+.goal-next-static { flex-shrink: 0; font-size: 12px; color: var(--text-dim); }
+.goal-next-why { font-size: 11px; color: var(--text-mute); min-width: 0; }
+
+/* ---------- 禁用按钮的原因小字（手机无 hover，title 等于不存在） ---------- */
+button .btn-why {
+    display: block;
+    font-size: 10px;
+    font-weight: normal;
+    line-height: 1.25;
+    margin-top: 2px;
+    color: var(--warning);
+    opacity: 0.9;
+    white-space: normal;
+}
 .goal-where-link { color: var(--gold); cursor: pointer; border-bottom: 1px dashed currentColor; }
 .goal-where-link:hover { color: var(--gold-tx); }
 @media (max-width: 768px) {
