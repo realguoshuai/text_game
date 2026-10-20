@@ -202,6 +202,15 @@
     { cn: '元婴期', need: 1400, st: { atk: 16, def: 9,  maxhp: 210 } },
     { cn: '化神期', need: 3200, st: { atk: 24, def: 14, maxhp: 330 } }
   ];
+  /* ★ 怪物随玩家境界 scaling（#4 战斗平衡）：玩家 def 靠装备乘性堆叠（升阶×2.85 ×淬炼×1.72≈×4.9），
+   *   而怪物 atk 是固定线性值，两者没有对齐 → 中期起怪物平A 恒为 1、满配玩家对全体普通怪绝对免疫。
+   *   治本：让怪物 atk/def/hp/exp/stones 按玩家境界乘系数，成长与挑战并存。系数表与 REALMS 同序，
+   *   数值刻意略高于「玩家属性成长」——玩家不堆装备就会被打死，逼着把沉没口（淬炼/升阶）用起来。 */
+  var REALM_FOE_SCALE = [1.0, 1.45, 2.0, 2.7, 3.5];
+  function realmFoeScale() {
+    var i = Math.max(0, Math.min(player.realmIdx | 0, REALM_FOE_SCALE.length - 1));
+    return REALM_FOE_SCALE[i] || 1;
+  }
   var YAODAN_CULT = 12;              // 一枚妖丹能炼出的修为（ITEMS.yaodan.cult 与此保持一致）
   /* 秘宝的两个数值锚（v58）：同理，ITEMS 的 desc 与坊市定价都要读这里，别各写一份。
    *  · 凝元丹直接给修为 ⇒ **必须限量**（SHOP_CULT_MAX / 重境界），否则"银两→修为"盖过主线。
@@ -3369,6 +3378,42 @@
           E.pass = E.atkMul && E.defMul && E.hpMul && E.meltSame && E.poorReject && E.capped;
           gpE.textContent = JSON.stringify(E);
         }
+        if (at === 'balance') {
+          /* ?autotest=balance —— 怪物随玩家境界 scaling（#4）锁死「成长与挑战并存」：
+           *   ① 怪物 atk 随 realmFoeScale() 单调放大（炼气 sc=1.0 → 化神 sc=3.5）；
+           *   ② 缩放后化神怪 atk 足以击穿化神裸玩家 def（base=max(1,atk-def)>1），威胁恢复——
+           *      否则"中期起平A 恒为 1、满配绝对免疫"的失衡复发；
+           *   ③ Boss（golem）同样随境界缩放。
+           * 期望值由 REALM_FOE_SCALE 现算，不硬编码数字；minotaur_a 裸 atk=15、golem 裸 atk=16。 */
+          var gpb = document.getElementById('probe') || (function () {
+            var d = document.createElement('div'); d.id = 'probe'; d.style.display = 'none';
+            document.body.appendChild(d); return d;
+          })();
+          var B = { scaleMono: false, threatBack: false, bossScale: false, pass: false };
+          var _rv = rollVariant; rollVariant = function () { return 0; };   // 临时关变体，纯测 scaling 单调性
+          var loIdx = 0, hiIdx = REALMS.length - 1;
+          player.realmIdx = loIdx; player.realmName = REALMS[loIdx].cn;
+          var fLo = makeFoes([{ t: 'minotaur_a', x: 10, y: 10 }])[0];
+          player.realmIdx = hiIdx; player.realmName = REALMS[hiIdx].cn;
+          var fHi = makeFoes([{ t: 'minotaur_a', x: 10, y: 10 }])[0];
+          var wantLo = Math.round(15 * REALM_FOE_SCALE[loIdx]);
+          var wantHi = Math.round(15 * REALM_FOE_SCALE[hiIdx]);
+          B.scaleMono = !!fLo && !!fHi && fHi.atk > fLo.atk
+            && fLo.atk === wantLo && fHi.atk === wantHi;
+          recalcStats();                       // 化神裸玩家 def = 8 + REALMS[hi].st.def
+          var dmgHi = rollDamage(fHi.atk, player.def, {});
+          B.threatBack = dmgHi.base > 1 && dmgHi.dmg > 1;
+          player.realmIdx = hiIdx; player.realmName = REALMS[hiIdx].cn;
+          var gHi = makeFoes([{ t: 'golem', x: 10, y: 10 }])[0];
+          player.realmIdx = loIdx; player.realmName = REALMS[loIdx].cn;
+          var gLo = makeFoes([{ t: 'golem', x: 10, y: 10 }])[0];
+          B.bossScale = !!gLo && !!gHi && gHi.atk > gLo.atk
+            && gHi.atk === Math.round(16 * REALM_FOE_SCALE[hiIdx]);
+          player.realmIdx = 0; player.realmName = REALMS[0].cn; recalcStats();
+          rollVariant = _rv;   // 恢复变体逻辑
+          B.pass = B.scaleMono && B.threatBack && B.bossScale;
+          gpb.textContent = JSON.stringify(B);
+        }
         if (at === 'card') {
           /* ?map=<图>&autotest=card —— 装备操作卡（v55）
            * 用户原话：「装备长按熔炼能不能改成点击，有装备/使用或熔炼或者丢弃什么的」。
@@ -5920,6 +5965,15 @@
       var vHp = V ? Math.round(d.hp * V.hp) : d.hp;
       var vSt = V ? [Math.max(1, Math.round(d.stones[0] * V.exp * 0.8)),
                      Math.max(1, Math.round(d.stones[1] * V.exp * 0.8))] : d.stones;
+      /* ★ 怪物随玩家境界 scaling（#4）：让怪物 atk/def/hp/exp/stones 乘 realmFoeScale()。
+       *   玩家 def 靠装备乘性堆叠（升阶×2.85 ×淬炼×1.72≈×4.9），怪物固定线性值 → 中期起平A 恒为 1。
+       *   缩放后成长与挑战并存：玩家不堆装备就会被打死（逼着用淬炼/升阶沉没口）。参数集中可调。 */
+      var sc = realmFoeScale();
+      var bAtk = (V ? Math.round(d.atk * V.atk) : d.atk) * sc;
+      var bDef = (V ? Math.round(d.def * V.def) : d.def) * sc;
+      var bHp  = vHp * sc;
+      var bExp = (V ? Math.round(d.exp * V.exp) : d.exp) * sc;
+      var bSt  = [Math.max(1, Math.round(vSt[0] * sc)), Math.max(1, Math.round(vSt[1] * sc))];
       return {
         def_: d, key: d.key, name: d.name, el: d.el || '无',
         // 变体三字段：显示名（带前缀）、脚下光环色（'r,g,b'）、血条色
@@ -5927,9 +5981,9 @@
         vRing: vart ? ((V.ring || (vEl && vEl.ring)) || '') : '',
         vBar: vart ? ((V.bar || (vEl && vEl.bar)) || '') : '',
         x: cell.x, y: cell.y, home: cell,
-        hp: vHp, maxhp: vHp, atk: V ? Math.round(d.atk * V.atk) : d.atk,
-        def: V ? Math.round(d.def * V.def) : d.def,
-        exp: V ? Math.round(d.exp * V.exp) : d.exp, stones: vSt,
+        hp: Math.round(bHp), maxhp: Math.round(bHp), atk: Math.round(bAtk),
+        def: Math.round(bDef),
+        exp: Math.round(bExp), stones: bSt,
         face: 'down', flash: 0, atkAnim: 0, deadT: 0, atkCd: 0, alive: true, respawn: 0,
         // ★5 Boss/精英读条机制状态
         isBoss: isBoss5, isElite: isElite5,

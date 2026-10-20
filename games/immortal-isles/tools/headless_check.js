@@ -489,6 +489,16 @@ results.push(run('装备 淬炼属性放大与熔炼价隔离', 'autotest=enhanc
     && E.pass === true;
 }, { budget: 20000 }));
 
+// 8.4a2) 战斗数值平衡（#4）：怪物随玩家境界 scaling —— 锁死「成长与挑战并存」。
+//        为什么必须单独立一条：scaling 系数若被改坏（或 future 有人把 REALM_FOE_SCALE 拍平），
+//        表现只是"后期又变碾压"，肉眼极难发现；这条断言把"化神怪 atk 必须能击穿化神裸玩家 def"
+//        钉死，回归即红。期望值由 game.js 现算（REALM_FOE_SCALE），不硬编码数字。
+results.push(run('战斗 怪物随境界 scaling', 'autotest=balance', ({ probe }) => {
+  if (!probe) return false;
+  const B = probe;
+  return B.scaleMono === true && B.threatBack === true && B.bossScale === true && B.pass === true;
+}, { budget: 20000 }));
+
 // 8.4b) 装备操作卡（v55）：点格子弹卡片替代长按熔炼。
 //       为什么必须单独立一条：这套交互"看起来对"和"真的对"差得远 ——
 //       卡片可能打开在错误的位置、按钮可能在但点了没反应、取消可能有副作用、
