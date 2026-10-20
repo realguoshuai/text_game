@@ -376,9 +376,6 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
     #save-row { flex-wrap: wrap; width: 100%; }
     #save-row .small-btn { flex: 1 1 auto; min-height: 38px; }
 
-    /* 场景横幅缩小，给内容让空间 */
-    #scene-canvas { height: 110px; }
-
     /* 工作区单列，左右自然堆叠，整页滚动 */
     #workspace {
         grid-template-columns: 1fr;
@@ -671,18 +668,6 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
     margin-top: 14px;
     border-top: 1px dashed var(--panel-border);
     padding-top: 10px;
-}
-
-/* ---------- 仙侠水墨场景横幅（js/scene.js 渲染） ---------- */
-#scene-canvas {
-    display: block;
-    width: 100%;
-    /* 随视口高度收缩：矮屏给内容让空间，高屏保留横幅感（原固定 190px 挤占左栏面板） */
-    height: clamp(116px, 17vh, 172px);
-    background: #080c18;
-    border-bottom: 2px solid var(--panel-border);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
-    flex: 0 0 auto;
 }
 
 /* 矮窗口紧凑化：把省下的纵向空间尽量让给 #panel-area（关键面板/舆图） */
