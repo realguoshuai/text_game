@@ -302,4 +302,46 @@ GAME.Map = {
     marketRetired: function () {
         return this.currentChapter() !== "qi";
     },
+
+    // ---------- 章节独立地图页（Increment 3） ----------
+    _activeChapter: null,   // 当前选中的篇章标签（null = 跟随 currentChapter）
+
+    // 当前展示的篇章：未手动选时跟随当前篇
+    activeChapter: function () {
+        if (this._activeChapter) return this._activeChapter;
+        return this.currentChapter();
+    },
+
+    // 切换篇章标签（由 UI 标签点击调用）
+    setActiveChapter: function (id) {
+        this._activeChapter = id;
+    },
+
+    // 章节境界区间（用于筛选本篇妖物 / 机缘）
+    chapterRealmRange: function (id) {
+        var c = (this.cfg().chapters || []).filter(function (x) { return x.id === id; })[0];
+        return (c && c.realmRange) ? c.realmRange : [0, 99];
+    },
+
+    // 本篇妖物：从路遇池按章节境界区间取并集（去重），并解析 MONSTERS 名字/描述
+    monstersOf: function (id) {
+        var range = this.chapterRealmRange(id);
+        var pool = (GAME.DATA.MAP_ENCOUNTERS && GAME.DATA.MAP_ENCOUNTERS.pool) || [];
+        var seen = {}, out = [];
+        pool.forEach(function (e) {
+            if (e.maxRealm < range[0] || e.minRealm > range[1]) return;   // 与本章区间无交集
+            if (seen[e.monster]) return;
+            seen[e.monster] = true;
+            var def = null;
+            (GAME.DATA.MONSTERS || []).forEach(function (m) { if (m.id === e.monster) def = m; });
+            out.push({ id: e.monster, name: def ? def.name : e.monster, desc: def ? (def.desc || "") : "" });
+        });
+        return out;
+    },
+
+    // 本篇机缘：章节专属风物/事件描述
+    signaturesOf: function (id) {
+        var c = (this.cfg().chapters || []).filter(function (x) { return x.id === id; })[0];
+        return (c && c.signature) ? c.signature : [];
+    },
 };

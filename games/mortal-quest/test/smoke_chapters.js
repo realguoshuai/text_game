@@ -127,6 +127,49 @@ ok('筑基期 marketRetired=true（即便身处苍南谷，坊市已散）', G.M
 setP(25, 'luanxing_hai');
 ok('结丹期 marketRetired=true', G.Map.marketRetired() === true);
 
+/* ================= ⑦ chapterRealmRange ================= */
+section('⑦ chapterRealmRange 章节境界区间');
+const rr = function (id) { return G.Map.chapterRealmRange(id); };
+ok('qi 区间 = [0,12]', rr('qi')[0] === 0 && rr('qi')[1] === 12);
+ok('zhuji 区间 = [13,21]', rr('zhuji')[0] === 13 && rr('zhuji')[1] === 21);
+ok('jiedan 区间 = [22,30]', rr('jiedan')[0] === 22 && rr('jiedan')[1] === 30);
+ok('star 区间 = [22,30]', rr('star')[0] === 22 && rr('star')[1] === 30);
+
+/* ================= ⑧ monstersOf 本篇妖物 ================= */
+section('⑧ monstersOf 本篇妖物（按境界区间筛选 + 名字解析）');
+function ids(arr) { return arr.map(function (m) { return m.id; }); }
+const mQi = G.Map.monstersOf('qi');
+ok('练气篇 3 种妖物（风行狼/散修/毒蛇）', mQi.length === 3);
+ok('练气篇 含 wild_fenglang', ids(mQi).indexOf('wild_fenglang') >= 0);
+ok('练气篇 名字已解析（非原始 id）', mQi.every(function (m) { return !!m.name && m.name !== m.id; }));
+const mZhuji = G.Map.monstersOf('zhuji');
+ok('筑基篇 4 种妖物', mZhuji.length === 4);
+ok('筑基篇 含 wild_moxiu', ids(mZhuji).indexOf('wild_moxiu') >= 0);
+const mJiedan = G.Map.monstersOf('jiedan');
+ok('结丹篇 4 种妖物（散修/妖修/蛟/魔修巡察）', mJiedan.length === 4);
+ok('结丹篇 含 wild_jiaolong', ids(mJiedan).indexOf('wild_jiaolong') >= 0);
+const mStar = G.Map.monstersOf('star');
+ok('碎星海篇 4 种妖物（与结丹同境界带）', mStar.length === 4);
+ok('碎星海篇 名字已解析', mStar.every(function (m) { return !!m.name && m.name !== m.id; }));
+
+/* ================= ⑨ signaturesOf 本篇机缘 ================= */
+section('⑨ signaturesOf 本篇机缘');
+['qi', 'zhuji', 'jiedan', 'star'].forEach(function (cid) {
+    var sig = G.Map.signaturesOf(cid);
+    ok(cid + ' 章含 ≥2 条机缘', sig.length >= 2);
+    ok(cid + ' 章机缘名字非空', sig.every(function (s) { return !!s.name; }));
+});
+
+/* ================= ⑩ activeChapter / setActiveChapter ================= */
+section('⑩ activeChapter / setActiveChapter 章节标签切换');
+setP(5, 'tainan_gu');
+ok('默认 activeChapter = currentChapter(qi)', G.Map.activeChapter() === 'qi');
+G.Map.setActiveChapter('star');
+ok('setActiveChapter 后 activeChapter=star（可预览未至篇章）', G.Map.activeChapter() === 'star');
+ok('setActiveChapter 不改动 currentChapter', G.Map.currentChapter() === 'qi');
+G.Map.setActiveChapter('qi');
+ok('切回 qi 后 activeChapter=qi', G.Map.activeChapter() === 'qi');
+
 /* ================= 汇总 ================= */
 console.log('\n' + '─'.repeat(46));
 console.log(`  结果：${pass} 通过 / ${fail} 失败`);

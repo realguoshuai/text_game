@@ -1680,45 +1680,91 @@ GAME.UI = {
             box.appendChild(row);
         });
 
-        // 天下舆图：按章节分组呈现（当前篇展开高亮，旧地折叠为"可回顾"）
+        // 天下舆图：章节为独立地图页（标签切换 + 主题视觉 + 本篇妖物/机缘）
+        var tabsBox = this.$("map-chapter-tabs");
+        if (tabsBox) {
+            tabsBox.innerHTML = "";
+            var chaps = GAME.Map.chapters();
+            var activeCh = GAME.Map.activeChapter();
+            chaps.forEach(function (c) {
+                var tb = document.createElement("button");
+                tb.className = "chapter-tab" + (c.id === activeCh ? " active" : "") + (c.current ? " is-current" : "");
+                tb.innerHTML = c.name +
+                    (c.current ? ' <span class="gold">· 当前</span>'
+                        : (c.reached ? ' <span class="item-desc">· 旧地</span>' : ' <span class="item-desc">· 未至</span>'));
+                tb.onclick = function () { GAME.Map.setActiveChapter(c.id); GAME.UI.updateUI(); };
+                tabsBox.appendChild(tb);
+            });
+        }
+
         var atlasBox = this.$("map-atlas");
+        atlasBox.className = "map-atlas-body theme-" + GAME.Map.activeChapter();
         atlasBox.innerHTML = "";
+        var active = GAME.Map.activeChapter();
         var byCh = GAME.Map.atlasByChapter();
-        (GAME.Map.chapters() || []).forEach(function (c) {
-            var grp = byCh[c.id];
-            if (!grp || !grp.nodes.length) return;
-            var title = document.createElement("div");
-            title.className = "atlas-chapter" + (c.current ? " atlas-chapter-current" : "");
-            title.innerHTML = "【" + c.name + "】" +
-                (c.current ? ' <span class="gold">· 当前</span>' : (c.reached ? ' <span class="item-desc">· 旧地</span>' : ' <span class="item-desc">· 未至</span>'));
-            atlasBox.appendChild(title);
-            if (c.current) {
-                grp.nodes.forEach(function (n) {
-                    var row = document.createElement("div");
-                    row.className = "item-row";
-                    var left = document.createElement("div");
-                    if (n.unlocked) {
-                        left.innerHTML = (n.here ? '<span class="gold">【此地】</span>' : "") +
-                            '<span class="q-灵品">' + n.name + '</span>' +
-                            (n.retired ? ' <span class="warning">（坊市已散）</span>' : '') +
-                            '<div class="item-desc">' + (n.kind === "immortal" ? "修仙之地" : n.kind === "mortal" ? "凡俗城池" : "故地洞府") + '</div>';
-                    } else {
-                        left.innerHTML = '<span class="warning">🔒</span> <span class="item-desc">' + n.name +
-                            '</span><div class="item-desc">需 ' + n.reqRealmName + ' 以上' +
-                            (n.teaser ? ' — ' + n.teaser : '') + '</div>';
-                    }
-                    row.appendChild(left);
-                    row.appendChild(document.createElement("div"));
-                    atlasBox.appendChild(row);
-                });
-            } else {
-                var names = grp.nodes.map(function (n) { return n.name + (n.retired ? "（坊市已散）" : ""); }).join("、");
-                var old = document.createElement("div");
-                old.className = "item-desc atlas-old";
-                old.innerHTML = "旧地 · 可回顾：" + names;
-                atlasBox.appendChild(old);
-            }
-        });
+        var grp = byCh[active];
+        var chapMeta = (GAME.Map.chapters() || []).filter(function (c) { return c.id === active; })[0] || {};
+
+        // 风物引言
+        var intro = document.createElement("div");
+        intro.className = "atlas-chapter-intro";
+        intro.innerHTML = '<span class="atlas-chapter-title">【' + (chapMeta.name || active) + '】</span> ' + (chapMeta.desc || "");
+        atlasBox.appendChild(intro);
+
+        // 本篇舆地
+        if (grp && grp.nodes.length) {
+            var sp1 = document.createElement("div");
+            sp1.className = "atlas-subtitle"; sp1.innerText = "◆ 本篇舆地";
+            atlasBox.appendChild(sp1);
+            grp.nodes.forEach(function (n) {
+                var row = document.createElement("div");
+                row.className = "item-row";
+                var left = document.createElement("div");
+                if (n.unlocked) {
+                    left.innerHTML = (n.here ? '<span class="gold">【此地】</span>' : "") +
+                        '<span class="q-灵品">' + n.name + '</span>' +
+                        (n.retired ? ' <span class="warning">（坊市已散）</span>' : '') +
+                        '<div class="item-desc">' + (n.kind === "immortal" ? "修仙之地" : n.kind === "mortal" ? "凡俗城池" : "故地洞府") + '</div>';
+                } else {
+                    left.innerHTML = '<span class="warning">🔒</span> <span class="item-desc">' + n.name +
+                        '</span><div class="item-desc">需 ' + n.reqRealmName + ' 以上' +
+                        (n.teaser ? ' — ' + n.teaser : '') + '</div>';
+                }
+                row.appendChild(left);
+                row.appendChild(document.createElement("div"));
+                atlasBox.appendChild(row);
+            });
+        }
+
+        // 本篇妖物
+        var mons = GAME.Map.monstersOf(active) || [];
+        if (mons.length) {
+            var sp2 = document.createElement("div");
+            sp2.className = "atlas-subtitle"; sp2.innerText = "◆ 本篇妖物";
+            atlasBox.appendChild(sp2);
+            mons.forEach(function (m) {
+                var row = document.createElement("div");
+                row.className = "item-row atlas-monster";
+                row.innerHTML = '<span class="q-灵品">' + m.name + '</span>' +
+                    (m.desc ? '<div class="item-desc">' + m.desc + '</div>' : '');
+                atlasBox.appendChild(row);
+            });
+        }
+
+        // 本篇机缘
+        var sigs = GAME.Map.signaturesOf(active) || [];
+        if (sigs.length) {
+            var sp3 = document.createElement("div");
+            sp3.className = "atlas-subtitle"; sp3.innerText = "◆ 本篇机缘";
+            atlasBox.appendChild(sp3);
+            sigs.forEach(function (s) {
+                var row = document.createElement("div");
+                row.className = "item-row atlas-signature";
+                row.innerHTML = '<span class="q-灵品">' + s.name + '</span>' +
+                    (s.desc ? '<div class="item-desc">' + s.desc + '</div>' : '');
+                atlasBox.appendChild(row);
+            });
+        }
 
         // 狩猎副本入口：分档狩猎（按修为解锁），狩猎中显示撤退按钮
         var huntBox = this.$("map-hunts");

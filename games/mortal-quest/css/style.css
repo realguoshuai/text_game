@@ -704,3 +704,54 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
     padding: 2px 8px 6px 14px;
     opacity: 0.7;
 }
+
+/* ===== 章节独立地图页（Increment 3） ===== */
+.chapter-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 10px;
+}
+.chapter-tab {
+    flex: 1 1 auto;
+    min-width: 70px;
+    padding: 6px 8px;
+    border: 1px solid var(--panel-border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-dim);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+}
+.chapter-tab:hover { border-color: var(--accent); color: var(--text); }
+.chapter-tab.active {
+    background: var(--accent);
+    color: #0b0e16;
+    border-color: var(--accent);
+    font-weight: 600;
+}
+.chapter-tab.is-current::after { content: " ◉"; }
+
+.map-atlas-body {
+    padding: 8px 10px;
+    border-left: 3px solid var(--panel-border);
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 8px;
+}
+.map-atlas-body.theme-qi     { border-left-color: #6fae5a; background: linear-gradient(90deg, rgba(111, 174, 90, 0.08), transparent); }
+.map-atlas-body.theme-zhuji  { border-left-color: #5a9fd6; background: linear-gradient(90deg, rgba(90, 159, 214, 0.08), transparent); }
+.map-atlas-body.theme-jiedan { border-left-color: #b07ad6; background: linear-gradient(90deg, rgba(176, 122, 214, 0.10), transparent); }
+.map-atlas-body.theme-star   { border-left-color: #3fb6b0; background: linear-gradient(90deg, rgba(63, 182, 176, 0.10), transparent); }
+
+.atlas-chapter-intro { margin-bottom: 8px; line-height: 1.5; color: var(--text); }
+.atlas-chapter-title { font-weight: 700; font-size: 15px; }
+.atlas-subtitle {
+    margin: 10px 0 4px;
+    color: var(--accent);
+    font-size: 13px;
+    border-bottom: 1px dashed var(--panel-border);
+    padding-bottom: 3px;
+}
+.atlas-monster .q-灵品 { color: #e08a5a; }
+.atlas-signature .q-灵品 { color: #c9a14a; }
