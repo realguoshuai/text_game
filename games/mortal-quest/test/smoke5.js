@@ -32,7 +32,7 @@ vm.createContext(sandbox);
 
 // 加载顺序同 index.html（insect.js 定义 jinshi，炼丹配方交叉引用需要它）
 ["data/realms.js", "data/items.js", "data/skills.js", "data/events.js", "data/world.js", "data/worldmap.js", "data/content.js",
- "js/state.js", "js/storage.js", "js/combat.js", "js/core.js", 'js/breakthrough.js', "js/moEvent.js", "js/market.js",
+ "js/state.js", "js/storage.js", "js/combat.js", "js/core.js", 'js/time.js', 'js/breakthrough.js', "js/moEvent.js", "js/market.js",
  "js/map.js", "js/jiayuan.js", "js/mansion.js", "js/tainan.js", "js/sect.js", "js/blackmarket.js", "js/trial.js", "js/insect.js"
 ].forEach(function (f) {
     vm.runInContext(fs.readFileSync(path.join(BASE, f), "utf8"), sandbox, { filename: f });

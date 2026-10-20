@@ -378,9 +378,16 @@ GAME.UI = {
 
             this.$("realm-text").innerText = realm.name;
             this.$("exp-text").innerText = realm.needExp === null ? "此界圆满" : (p.currentExp + " / " + realm.needExp);
-            this.$("age-text").innerText = p.ageYears + "岁";
-            this.$("max-age-text").innerText = GAME.State.maxAge() + "岁" +
-                (p.ageBonus > 0 ? "(+" + p.ageBonus + ")" : "");
+            // 寿元账簿：光有"24岁/100岁"不算资源，得让人一眼看见"还剩多少"
+            this.$("age-text").innerText = p.ageYears + "岁" + (p.ageMonths ? p.ageMonths + "月" : "");
+            var _ti = (GAME.Time && GAME.Time.remain) ? GAME.Time.remain(p) : null;
+            var _ma = this.$("max-age-text");
+            if (_ma) {
+                _ma.innerText = GAME.State.maxAge() + "岁" +
+                    (p.ageBonus > 0 ? "(+" + p.ageBonus + ")" : "") +
+                    (_ti ? " · 余" + (_ti.years > 0 ? _ti.years + "年" : _ti.months + "月") : "");
+                _ma.className = (GAME.Time && GAME.Time.remainLevel) ? ("age-" + (GAME.Time.remainLevel(p) || "ok")) : "";
+            }
             this.$("hp-text").innerText = Math.max(0, p.currentHp) + " / " + p.maxHp;
             this.$("stone-text").innerText = p.spiritStones;
             this.$("liquid-text").innerText = p.liquid;
@@ -435,7 +442,27 @@ GAME.UI = {
 
             // 打坐耗时随境界递增（按钮文案动态）
             var mm = realm.meditateMonths || 3;
-            this.$("btn-meditate").innerText = "闭关打坐 (" + mm + "月+1修为)";
+            this.$("btn-meditate").innerText = "闭关打坐 (" + mm + "月 · +1修为)";
+
+            // 闭关分档：同一个寿元池，玩家自己决定一次花几个月、换多少修为与心境
+            if (GAME.Time && GAME.Time.tiers) {
+                var _tiers = GAME.Time.tiers(p);
+                for (var _ti2 = 1; _ti2 < _tiers.length; _ti2++) {
+                    var _t = _tiers[_ti2];
+                    var _tb = this.$("btn-sec-" + _t.id);
+                    if (!_tb) continue;
+                    _tb.innerText = _t.name + " " + _t.cycles + " 周天（" + GAME.Time.priceLabel(_t) + "）";
+                    _tb.disabled = lock || !_t.ok;
+                    this._why(_tb, lock ? lockWhy : (_t.ok ? "" : _t.why));
+                }
+                var _dn = this.$("dd-time-text");
+                if (_dn) _dn.innerText = "寿元余 " + GAME.Time.remainShort(p) + "　｜　" + GAME.Time.tideLabel(p);
+                var _pv = this.$("dd-sec-preview");
+                if (_pv) {
+                    var _epic = GAME.Time.tier(p, "epic");
+                    _pv.innerText = _epic ? ("长关 12 周天 → " + GAME.Time.preview(p, _epic.months).join(" · ")) : "";
+                }
+            }
 
             var bt = this.$("btn-breakthrough");
             // 破境推演：按钮与筹备面板共用同一份 plan，杜绝"显示一套、掷骰另一套"
@@ -2736,7 +2763,12 @@ GAME.UI = {
     bindBatch: function () {
         var bind = function (id, fn) { var el = document.getElementById(id); if (el) el.onclick = fn; };
         if (!GAME.Core || !GAME.Core.meditateTimes) return;
-        bind("btn-meditate-5", function () { GAME.Core.meditateTimes(5); });
+        if (GAME.Time && GAME.Time.seclude) {
+        bind("btn-sec-mid", function () { GAME.Time.seclude("mid"); });
+        bind("btn-sec-long", function () { GAME.Time.seclude("long"); });
+        bind("btn-sec-epic", function () { GAME.Time.seclude("epic"); });
+    }
+    bind("btn-meditate-5", function () { GAME.Core.meditateTimes(5); });
         bind("btn-meditate-10", function () { GAME.Core.meditateTimes(10); });
         bind("btn-meditate-full", function () { GAME.Core.meditateTimes("full"); });
     },

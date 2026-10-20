@@ -206,17 +206,16 @@ GAME.Core = {
     // ================= 洞府动作 =================
 
     // 打坐：伪灵根每次只得 1 修为——凡人流核心压迫。
-    // 耗时随境界递增（练气低层 3 月、高层 6 月、筑基 8 月），低境不空耗寿元。
+    // ★ 时间账一律交给 GAME.Time（寿元预算 / 灵潮 / 分档 / 地雷守卫都在那里），
+    //   这里只保留"点一下 = 一个周天"的旧语义，避免出现第二套耗时与产出公式。
     meditate: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
-        var months = GAME.DATA.REALMS[p.realmIndex].meditateMonths || 3;
-        var extra = (GAME.Home && GAME.Home.meditateExp) ? GAME.Home.meditateExp() : 0;
-        var gain = 1 + extra;
-        p.currentExp += gain;
-        GAME.UI.log("你闭门吐纳 " + months + " 个月，杂灵根吸纳的灵气微乎其微，修为 +" + gain +
-            (extra ? "（藏经阁 +" + extra + "）" : "") + "。", "info");
-        this.passTime(months);
+        if (!GAME.Time || !GAME.Time.seclude) {
+            GAME.UI.log("时序紊乱，无法入定。", "danger");
+            return;
+        }
+        GAME.Time.seclude("short");
     },
 
     // 批量打坐：连修 n 次（n<=0 或 "full" 表示一直修到本境圆满）

@@ -841,3 +841,11 @@ button .btn-why {
 .bt-prep-act { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .bt-act-btn { font-size: 11px; padding: 4px 8px; min-height: 0; }
 .bt-act-static { font-size: 11px; color: var(--text-mute); }
+
+/* ===== 年月账簿（时间作为资源）：闭关分档 + 寿元告急着色 ===== */
+.dd-note{font-size:11px;line-height:1.5;color:var(--muted,#8a7f6a);padding:2px 4px 4px;letter-spacing:.02em;}
+.dd-note + .dd-item{margin-top:2px;}
+.tier-btn{border-left:3px solid var(--accent,#b08d57);text-align:left;}
+#dd-sec-preview{color:var(--muted,#8a7f6a);font-size:11px;opacity:.85;border-top:1px dashed rgba(0,0,0,.08);margin-top:4px;padding-top:4px;}
+#max-age-text.age-warn{color:#b5822a;}
+#max-age-text.age-danger{color:#c0392b;font-weight:700;}

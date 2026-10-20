@@ -33,7 +33,7 @@ vm.createContext(sandbox);
 
 // 加载顺序与 index.html 一致
 ['data/realms.js', 'data/items.js', 'data/skills.js', 'data/events.js', 'data/world.js',
- 'data/content.js', 'js/state.js', 'js/storage.js', 'js/combat.js', 'js/core.js', 'js/breakthrough.js',
+ 'data/content.js', 'js/state.js', 'js/storage.js', 'js/combat.js', 'js/core.js', 'js/time.js', 'js/breakthrough.js',
  'js/moEvent.js', 'js/market.js', 'js/sect.js', 'js/blackmarket.js', 'js/trial.js']
     .forEach(function (f) {
         vm.runInContext(fs.readFileSync(path.join(BASE, f), 'utf8'), sandbox, { filename: f });
