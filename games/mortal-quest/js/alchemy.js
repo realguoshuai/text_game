@@ -51,8 +51,9 @@ GAME.Alchemy = {
         // 境界门槛（展金丹 1~3 层 / 元灵丹 4~6 层）
         if (item.realmBand) {
             if (p.realmIndex < item.realmBand[0] || p.realmIndex > item.realmBand[1]) {
-                GAME.UI.log("【" + item.name + "】于你当前境界无益——此丹专为筑基第 " +
-                    (item.realmBand[0] - 12) + "~" + (item.realmBand[1] - 12) + " 层所设。", "system");
+                var _lo = (GAME.DATA.REALMS[item.realmBand[0]] || {}).name || "特定境界";
+                var _hi = (GAME.DATA.REALMS[item.realmBand[1]] || {}).name || "特定境界";
+                GAME.UI.log("【" + item.name + "】于你当前境界无益——此丹专为「" + _lo + "～" + _hi + "」所设。", "system");
                 GAME.UI.updateUI();
                 return 0;
             }

@@ -123,10 +123,10 @@ assert('副本提示含已破血仆数', !!g && /2\/4/.test(g.hint));
 P().heisha.bossDone = true;
 g = G.Goals.current();
 assert('副本通关 → 冲击结丹', g && g.id === 'jiedan');
-P().realmIndex = 21;
+P().realmIndex = 15;
 g = G.Goals.current();
-assert('筑基九层 → 冲击结丹（未圆满，目标仍为 jiedan）', g && g.id === 'jiedan');
-P().realmIndex = 30;
+assert('筑基后期 → 冲击结丹（未圆满，目标仍为 jiedan）', g && g.id === 'jiedan');
+P().realmIndex = 18;
 g = G.Goals.current();
 assert('结丹圆满 → 结局收束', g && g.id === 'endgame');
 
@@ -169,7 +169,7 @@ assert('修为满但气血不足 → 先打坐回血', a && a.kind === 'heal' &&
 assert('回血提示说明硬突破会重伤', a && /重伤/.test(a.why));
 
 // 顶境 → 无下一步可点
-p6.realmIndex = 30;
+p6.realmIndex = 18;
 p6.currentExp = 0;
 a = G.Goals.action(p6);
 assert('顶境 → 此界已圆满且不可点', a && a.kind === 'done' && a.run === null);

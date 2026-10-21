@@ -62,7 +62,7 @@ console.log('==== 一、舆图：未达标节点先亮相（验收①） ====');
   const yj = atlas.find(n => n.id === "yuejing_cheng");
   const sea = atlas.find(n => n.id === "luanxing_hai");
   assert('云京在舆图上可见（未解锁也展示）', !!yj && yj.unlocked === false);
-  assert('云京展示所需境界（筑基一层）', yj.reqRealmName === '筑基一层');
+  assert('云京展示所需境界（筑基初期）', yj.reqRealmName === '筑基初期');
   assert('云京带预告词（幽冥教）', yj.teaser.indexOf('幽冥教') >= 0);
   assert('碎星海在舆图上可见（远期预告）', !!sea && sea.unlocked === false && sea.teaser.indexOf('结丹') >= 0);
 
@@ -108,7 +108,7 @@ console.log('==== 三、狩猎副本：境界门槛 / 连战 / 软着陆（验�
 {
   // 门槛
   const p = reset(3);
-  assert('魔修弃营（筑基三层门槛）对练气四层关闭', G.Hunt.canEnter("hunt_shashen").ok === false);
+  assert('魔修弃营（筑基期门槛）对练气四层关闭', G.Hunt.canEnter("hunt_shashen").ok === false);
   assert('黑石矿洞（练气五层门槛）对练气四层关闭', G.Hunt.canEnter("hunt_heishikuang").ok === false);
   p.realmIndex = 4;
   assert('练气五层可入黑石矿洞', G.Hunt.canEnter("hunt_heishikuang").ok === true);

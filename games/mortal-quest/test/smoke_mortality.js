@@ -131,7 +131,7 @@ function verdictOf(mut) {
 }
 const vQi = verdictOf({ realmIndex: 3, karma: 0, mind: 0, kills: 0, seeds: 0 });
 const vJi = verdictOf({ realmIndex: 14, karma: 0, mind: 0, kills: 0 });
-const vJie = verdictOf({ realmIndex: 24, karma: 0, mind: 0, kills: 0 });
+const vJie = verdictOf({ realmIndex: 16, karma: 0, mind: 0, kills: 0 });
 const vMo = verdictOf({ realmIndex: 3, karma: -60, mind: 0, kills: 2 });
 const vSeed = verdictOf({ realmIndex: 3, karma: 0, mind: 0, kills: 2, plots: [{ y: 100 }, null, null] });
 ok('练气坐化：判词说"凡"', vQi.indexOf('凡') >= 0);

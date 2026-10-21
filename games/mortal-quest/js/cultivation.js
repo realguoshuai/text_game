@@ -190,7 +190,7 @@ GAME.Cultivation = {
         }
         var before = this.statMul();
         p.threeTurnCount = (p.threeTurnCount || 0) + 1;
-        p.realmIndex = this.cfgSZ().rollbackIndex;   // 跌回筑基一层
+        p.realmIndex = this.cfgSZ().rollbackIndex;   // 跌回筑基初期
         p.currentExp = 0;                            // 清空当前阶位修为
         var after = this.statMul();
         // 气血 / 法力上限按新倍率重算（神识上限由 foundationMaxSpirit 动态读取 threeTurnCount）
@@ -206,7 +206,7 @@ GAME.Cultivation = {
             p.maxHp = Math.round(p.maxHp / before * after);
             p.maxMp = Math.round(p.maxMp / before * after);
         }
-        GAME.UI.log("【散功逆转·第" + p.threeTurnCount + "转】真元自丹田倒卷而回——周身修为层层剥落，跌回筑基一层！", "danger");
+        GAME.UI.log("【散功逆转·第" + p.threeTurnCount + "转】真元自丹田倒卷而回——周身修为层层剥落，跌回筑基初期！", "danger");
         GAME.UI.log("然而真元更为凝练：气血、法力、神识上限永久 +" +
             Math.round(this.cfgSZ().statGain * 100) + "%（现累计 +" + Math.round((after - 1) * 100) + "%）。" +
             "日后结丹，每转另得 +" + Math.round(this.cfgSZ().jiedanBonusPerTurn * 100) + "% 破境之机。", "success");

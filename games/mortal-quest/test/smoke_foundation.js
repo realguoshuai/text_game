@@ -124,14 +124,14 @@ console.log('==== 二、洞府护山大阵 · 反制潜入魔修（强制验收�
 console.log('==== 三、境界绝对压制：增伤翻倍 + 分层免伤（强制验收③） ====');
 {
   assert('大境界映射：练气=0 / 筑基=1',
-    G.DATA.majorRealm(5) === 0 && G.DATA.majorRealm(13) === 1 && G.DATA.majorRealm(21) === 1);
+    G.DATA.majorRealm(5) === 0 && G.DATA.majorRealm(13) === 1 && G.DATA.majorRealm(15) === 1);
   // 高打低：每差一大境 ×(1+gap*1.5)
   assert('筑基打练气增伤 ×2.5（差一大境）', G.Combat.realmDamageMul(1, 0) === 2.5);
   assert('差两大境 ×4.0', G.Combat.realmDamageMul(2, 0) === 4);
   assert('同境无增伤', G.Combat.realmDamageMul(1, 1) === 1);
   // 分层免伤：defSuppress 0.60~0.85 → 受低境攻击 ×(0.4~0.15)
   assert('筑基一层受练气攻击削减 60%（×0.4）', G.Combat.realmDefSuppress(13) === 0.4);
-  assert('筑基九层受练气攻击削减 85%（×0.15）', G.Combat.realmDefSuppress(21) === 0.15);
+  assert('筑基后期受练气攻击削减 85%（×0.15）', G.Combat.realmDefSuppress(15) === 0.15);
   assert('练气无压制（×1）', G.Combat.realmDefSuppress(5) === 1);
 
   // 集成：筑基玩家 攻 练气怪 —— 增伤生效
@@ -162,7 +162,7 @@ console.log('==== 三、境界绝对压制：增伤翻倍 + 分层免伤（强�
 // ============ 强制验收 ④：材料不全拒开通关 / 集齐三物结算天道 ============
 console.log('==== 四、终局：修复古传送阵 · 破空而去（强制验收④） ====');
 {
-  const p = reset(21);   // 筑基九层圆满
+  const p = reset(15);   // 筑基后期圆满
   G.DemonWar.checkPhase();
   assert('九层圆满进入【破空而去】阶段', p.warPhase === 4);
   assert('终局三物未集齐（缺 3 件）', G.TeleportPortal.missingItems().length === 3);
@@ -177,7 +177,7 @@ console.log('==== 四、终局：修复古传送阵 · 破空而去（强制验�
   const td = G.TeleportPortal.escape();
   assert('激活传送·通关结算', p.ending === 'victory' && td > 0);
   assert('天道评分 = 筑基层数×5 + 突破×2 + 成就 + 击杀',
-    p.tiandao === (21 - 12) * 5 + (p.stats.breakthroughs || 0) * 2 + p.achievements.length + (p.stats.kills || 0));
+    p.tiandao === (15 - 12) * 5 + (p.stats.breakthroughs || 0) * 2 + p.achievements.length + (p.stats.kills || 0));
   assert('通关战报入档', logs.some(function (l) { return l.indexOf('通关大捷') >= 0; }));
   assert('重复结算幂等', G.TeleportPortal.win() === p.tiandao);
 }
@@ -283,22 +283,22 @@ console.log('==== 七、洞府 2.0 + 前线战备 + 燕家堡夺宝（覆盖） 
   assert('租赁上品灵峰（-600）', p.peak === 'high' && p.spiritStones === s0 + 60 - 600);
   assert('地火丹房二阶丹方三条齐备', G.DATA.ALCHEMY.recipes2.length === 3);
 
-  // 前线战备（筑基中期 16~18）
-  const mid = reset(16);
+  // 前线战备（筑基中期）
+  const mid = reset(14);
   const res = G.DemonWar.frontlineDefend();
   assert('前线战备结算宗门功勋', res && res.contrib > 0);
   assert('前线战备缴获中阶灵石', res && G.State.countItem('mid_stone') >= 2);
 
-  // 燕家堡两分支（筑基后期 19~20）
-  const late = reset(19);
+  // 燕家堡两分支（筑基后期）
+  const late = reset(15);
   G.State.addItem('puppet_gongjian', 1);
   const pb = G.DemonWar.yanjiaFortune('puppet');
   assert('燕家堡·自爆傀儡断后突围存活', pb && pb.survived === true);
-  const late2 = reset(19);
+  const late2 = reset(15);
   setRand(0.1);   // 硬破成功（<0.5）
   const br = G.DemonWar.yanjiaFortune('break');
   assert('燕家堡·硬破血祭大阵成功并缴获', br && br.survived === true && br.loot === 'xiufu_zhenpan');
-  const late3 = reset(19);
+  const late3 = reset(15);
   setRand(0.9);   // 硬破失败
   const br2 = G.DemonWar.yanjiaFortune('break');
   assert('燕家堡·硬破失败则重伤脱身', br2 && br2.survived === false && br2.dmg > 0);

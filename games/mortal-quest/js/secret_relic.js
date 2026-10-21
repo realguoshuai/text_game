@@ -1,7 +1,7 @@
 /* =========================================================
  * js/secret_relic.js —— 古修遗迹·探宝（筑基期专属 roguelike 副本）
  *
- * 进入：筑基一层以上、非战斗、无待决事件。休整 4 月。
+ * 进入：筑基以上、非战斗、无待决事件。休整 4 月。
  * 机制：固定 12 步探索，每步加权随机——采灵物 / 撬宝箱 / 触机关 / 战残魂。
  * 结算：走完 12 步自出口脱离保住战利品；残魂战由 combat.js 路由至 afterCombat。
  * 设计仿 js/trial.js 的 step 机制，但专属筑基、可反复刷（不标记永久通关）。
@@ -24,7 +24,7 @@ GAME.Relic = {
         var p = GAME.State.p();
         var cfg = this.cfg();
         if (p.realmIndex < cfg.enterRealm) {
-            GAME.UI.log("需筑基一层以上方可探古修遗迹。", "system");
+            GAME.UI.log("需筑基以上方可探古修遗迹。", "system");
             GAME.UI.updateUI();
             return;
         }

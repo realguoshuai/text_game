@@ -93,7 +93,7 @@ GAME.Bonds = {
     canNangongwan: function () {
         var p = GAME.State.p();
         if (this.bonds().nangongwan) return { ok: false, msg: "凌清沅这一段因果，已然了结。" };
-        if (p.realmIndex < 16) return { ok: false, msg: "须筑基中期（四层以上）方会遇上此事。" };
+        if (p.realmIndex < 14) return { ok: false, msg: "须筑基中期以上方会遇上此事。" };
         return { ok: true };
     },
     // choice: "guard"（暗中护法 → 战伏击魔修）/ "leave"（视而不见）
@@ -131,7 +131,7 @@ GAME.Bonds = {
     canDongxuaner: function () {
         var p = GAME.State.p();
         if (this.bonds().dongxuaner) return { ok: false, msg: "柳蔓儿这一段，已然有了了断。" };
-        if (p.realmIndex < 16) return { ok: false, msg: "须筑基中期方有此事。" };
+        if (p.realmIndex < 14) return { ok: false, msg: "须筑基中期方有此事。" };
         return { ok: true };
     },
     // choice: "plot"（虚与委蛇索要筑基丹药）/ "refuse"（冷淡回绝坚守道心）

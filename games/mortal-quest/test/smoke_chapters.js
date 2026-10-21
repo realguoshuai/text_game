@@ -56,7 +56,7 @@ const byId = {};
 CH.forEach(function (c) { byId[c.id] = c; });
 ok('含 qi/zhuji/jiedan/star 四章', !!byId.qi && !!byId.zhuji && !!byId.jiedan && !!byId.star);
 ok('章节名称正确', byId.qi.name === '练气篇' && byId.zhuji.name === '筑基篇' && byId.jiedan.name === '结丹篇' && byId.star.name === '碎星海篇');
-ok('碎星海章 minRealm=22（结丹后才触及）', byId.star.minRealm === 22);
+ok('碎星海章 minRealm=16（结丹初期后触及）', byId.star.minRealm === 16);
 // 节点 chapter 字段已落位
 const nta = G.DATA.MAP.nodes.filter(function (n) { return n.id === 'tainan_gu'; })[0];
 const nhf = G.DATA.MAP.nodes.filter(function (n) { return n.id === 'huangfeng_gu'; })[0];
@@ -131,9 +131,9 @@ ok('结丹期 marketRetired=true', G.Map.marketRetired() === true);
 section('⑦ chapterRealmRange 章节境界区间');
 const rr = function (id) { return G.Map.chapterRealmRange(id); };
 ok('qi 区间 = [0,12]', rr('qi')[0] === 0 && rr('qi')[1] === 12);
-ok('zhuji 区间 = [13,21]', rr('zhuji')[0] === 13 && rr('zhuji')[1] === 21);
-ok('jiedan 区间 = [22,30]', rr('jiedan')[0] === 22 && rr('jiedan')[1] === 30);
-ok('star 区间 = [22,30]', rr('star')[0] === 22 && rr('star')[1] === 30);
+ok('zhuji 区间 = [13,15]', rr('zhuji')[0] === 13 && rr('zhuji')[1] === 15);
+ok('jiedan 区间 = [16,18]', rr('jiedan')[0] === 16 && rr('jiedan')[1] === 18);
+ok('star 区间 = [16,18]', rr('star')[0] === 16 && rr('star')[1] === 18);
 
 /* ================= ⑧ monstersOf 本篇妖物 ================= */
 section('⑧ monstersOf 本篇妖物（按境界区间筛选 + 名字解析）');

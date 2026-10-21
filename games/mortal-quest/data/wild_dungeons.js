@@ -66,7 +66,7 @@ GAME.DATA.MONSTERS.push(
         loot: [{ id: "beast_soul", chance: 0.7, qty: [1, 2] }, { id: "tianhuo_crystal", chance: 0.3, qty: [1, 1] }],
         desc: "三阶妖兽，鬃毛间火星迸溅，一声长嚎百狼来投——筑基修士亦需结伴而猎。",
     },
-    /* —— 结丹期野外（下标 22~30）：majorRealm:2，与结丹玩家同境，方有真正较量 —— */
+    /* —— 结丹期野外（下标 16~18）：majorRealm:2，与结丹玩家同境，方有真正较量 —— */
     {
         id: "wild_sanxiu_jie", name: "渡劫散修", human: true, tier: 4, majorRealm: 2,
         hp: 2200, atk: 105, def: 60, speed: 16, spirit: 100, exp: 650,
@@ -106,14 +106,14 @@ GAME.DATA.MAP_ENCOUNTERS = {
         { minRealm: 2, maxRealm: 8,  monster: "wild_fenglang" },
         { minRealm: 3, maxRealm: 10, monster: "wild_sanxiu"  },
         { minRealm: 4, maxRealm: 12, monster: "wild_dushe"   },
-        { minRealm: 13, maxRealm: 17, monster: "wild_qingbao" },
-        { minRealm: 13, maxRealm: 17, monster: "wild_wugong"  },
-        { minRealm: 14, maxRealm: 18, monster: "wild_moxiu"   },
-        { minRealm: 18, maxRealm: 21, monster: "wild_huolang" },
-        { minRealm: 22, maxRealm: 24, monster: "wild_sanxiu_jie" },
-        { minRealm: 22, maxRealm: 26, monster: "wild_yaoxiu" },
-        { minRealm: 25, maxRealm: 28, monster: "wild_jiaolong" },
-        { minRealm: 27, maxRealm: 30, monster: "wild_moxiu_jie" },
+        { minRealm: 13, maxRealm: 15, monster: "wild_qingbao" },
+        { minRealm: 13, maxRealm: 15, monster: "wild_wugong"  },
+        { minRealm: 14, maxRealm: 15, monster: "wild_moxiu"   },
+        { minRealm: 13, maxRealm: 15, monster: "wild_huolang" },
+        { minRealm: 16, maxRealm: 17, monster: "wild_sanxiu_jie" },
+        { minRealm: 16, maxRealm: 18, monster: "wild_yaoxiu" },
+        { minRealm: 17, maxRealm: 18, monster: "wild_jiaolong" },
+        { minRealm: 18, maxRealm: 18, monster: "wild_moxiu_jie" },
     ],
 };
 
@@ -143,7 +143,7 @@ GAME.DATA.HUNTS = {
             },
         },
         {
-            id: "hunt_shashen", name: "魔修弃营", reqRealm: 15,
+            id: "hunt_shashen", name: "魔修弃营", reqRealm: 14,
             teaser: "魔道六宗入境后遗弃的一处联络营垒——守备虽撤，留下的凶徒与禁制仍在。",
             waves: ["wild_moxiu", "moyan_disciple", "wild_huolang"],
             reward: {
@@ -154,7 +154,7 @@ GAME.DATA.HUNTS = {
             },
         },
         {
-            id: "hunt_luanxing", name: "乱星海·妖修巢", reqRealm: 22,
+            id: "hunt_luanxing", name: "乱星海·妖修巢", reqRealm: 16,
             teaser: "碎星海深处妖修盘踞的浮岛群。此处妖物已开灵智、结丹有望，是结丹修士真正的磨刀石。",
             waves: ["wild_yaoxiu", "wild_sanxiu_jie", "wild_jiaolong"],
             reward: {

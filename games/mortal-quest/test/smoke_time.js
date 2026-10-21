@@ -114,7 +114,7 @@ ok('长关 12 周天：36 月 / +12 / 心境 +9', tiers[3].months === 36 && tier
 ok('priceLabel 含月数与产出', /36 月/.test(G.Time.priceLabel(tiers[3])) && /心境 \+9/.test(G.Time.priceLabel(tiers[3])));
 
 // 高境：月数随 meditateMonths 放大（结丹 12 月/周天）
-p = at(22, 0);
+p = at(16, 0);
 tiers = G.Time.tiers(p);
 ok('结丹：静修 12 月', tiers[0].months === 12);
 ok('结丹：长关 144 月（12 年）', tiers[3].months === 144);

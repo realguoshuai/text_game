@@ -42,9 +42,9 @@ GAME.DATA.QINGYUAN = {
 GAME.DATA.SANZHUAN = {
     id: "sanzhuan_chongyuan",
     name: "三转归元功",
-    // 触发条件：筑基后期（七~九层 ⇒ REALMS 下标 19~21）且心境 ≥ 80
-    reqLayerMin: 19,
-    reqLayerMax: 21,
+    // 触发条件：筑基后期（REALMS 下标 15）且心境 ≥ 80
+    reqLayerMin: 15,
+    reqLayerMax: 15,
     reqMind: 80,
     maxTurns: 3,               // 上限三转
     statGain: 0.20,            // 每转：气血/法力/神识上限永久 +20%

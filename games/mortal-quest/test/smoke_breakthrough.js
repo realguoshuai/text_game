@@ -87,9 +87,9 @@ ok('护法：+4%、抽血 40%、气血门槛 50%、温养 30 灵石',
 section('② 关隘识别');
 atRealm(0); ok('练气一层 → normal', G.Breakthrough.gate(P()) === 'normal');
 atRealm(12); ok('练气十三层 → zhuji', G.Breakthrough.gate(P()) === 'zhuji');
-atRealm(20); ok('筑基八层 → normal', G.Breakthrough.gate(P()) === 'normal');
-atRealm(21); ok('筑基九层 → jiedan', G.Breakthrough.gate(P()) === 'jiedan');
-atRealm(22); ok('结丹一层 → normal', G.Breakthrough.gate(P()) === 'normal');
+atRealm(14); ok('筑基中期 → normal', G.Breakthrough.gate(P()) === 'normal');
+atRealm(15); ok('筑基后期 → jiedan', G.Breakthrough.gate(P()) === 'jiedan');
+atRealm(16); ok('结丹初期 → normal', G.Breakthrough.gate(P()) === 'normal');
 
 /* ================= ③ 常规境界底子 ================= */
 section('③ 常规境界底子');
@@ -101,9 +101,9 @@ ok('无任何加成时成功率 = 0.58', near(plan.successChance, 0.58));
 ok('无加成时 parts 为空', plan.parts.length === 0);
 ok('无加成时反噬倍率 1.0', plan.dmgMul === 1);
 ok('无加成时反噬伤害 = failDamage(40)', plan.failDmg === 40);
-atRealm(30);
+atRealm(18);
 plan = G.Breakthrough.plan(P());
-ok('结丹九层（顶境）plan.ok=false', plan.ok === false && plan.reason === 'top');
+ok('结丹后期（顶境）plan.ok=false', plan.ok === false && plan.reason === 'top');
 
 /* ================= ④ 灵脉 ================= */
 section('④ 灵脉（灵石租金的回报）');
@@ -180,16 +180,16 @@ ok('心境 100 常规叠加（0.58+0.20=0.78）', near(G.Breakthrough.plan(P()).
 
 /* ================= ⑦ 丹药链 ================= */
 section('⑦ 丹药链（连服叠加）');
-p = atRealm(21);
+p = atRealm(15);
 G.State.addItem('pill_jiedan', 1);
 plan = G.Breakthrough.plan(p);
 ok('凝丹 → 35%', near(plan.baseChance, 0.35) && plan.isJiedan === true);
 ok('凝丹免死：deathMul=0', plan.deathMul === 0 && near(plan.deathP, 0));
-p = atRealm(21); G.State.addItem('pill_jiedan', 1); p.jiedanStreak = 1;
+p = atRealm(15); G.State.addItem('pill_jiedan', 1); p.jiedanStreak = 1;
 ok('凝丹连服 1 次 → 55%', near(G.Breakthrough.plan(P()).baseChance, 0.55));
-p = atRealm(21); G.State.addItem('pill_jiedan_zhengpin', 1);
+p = atRealm(15); G.State.addItem('pill_jiedan_zhengpin', 1);
 ok('正品凝丹 → 55%', near(G.Breakthrough.plan(P()).baseChance, 0.55));
-p = atRealm(21);
+p = atRealm(15);
 plan = G.Breakthrough.plan(p);
 ok('无丹裸冲 → 3%', near(plan.baseChance, 0.03) && plan.bareJiedan === true);
 
@@ -202,22 +202,22 @@ ok('伪筑基丹 → 15%', near(plan.baseChance, 0.15));
 
 /* ================= ⑧ 丹道 / 反噬估算 ================= */
 section('⑧ 丹道补偿与反噬估算');
-p = atRealm(21); G.State.addItem('pill_jiedan_zhengpin', 1); p.threeTurnCount = 1;
+p = atRealm(15); G.State.addItem('pill_jiedan_zhengpin', 1); p.threeTurnCount = 1;
 plan = G.Breakthrough.plan(p);
 ok('三转归元功 1 转 → 55%+25%=80%', near(plan.successChance, 0.8));
 ok('parts 含 sanzhuan', plan.parts.some(x => x.id === 'sanzhuan'));
-p = atRealm(21); p.threeTurnCount = 2;
+p = atRealm(15); p.threeTurnCount = 2;
 plan = G.Breakthrough.plan(p);
 ok('裸冲不享丹道补偿（仍 3%）', near(plan.successChance, 0.03) && !plan.parts.some(x => x.id === 'sanzhuan'));
 
-p = atRealm(21);
+p = atRealm(15);
 plan = G.Breakthrough.plan(p);
 ok('裸冲身陨率 = 97%×95% ≈ 92.15%', near(plan.deathP, 0.97 * 0.95, 1e-9));
 ok('裸冲反噬 = JIEDAN.bare.dmg(220)', plan.failDmg === 220);
-p = atRealm(21); G.State.addItem('pill_jiedan', 1); p.jiangchen = true;
+p = atRealm(15); G.State.addItem('pill_jiedan', 1); p.jiangchen = true;
 plan = G.Breakthrough.plan(p);
 ok('降尘丹 → 反噬倍率 ×0.2（0.3×0.2=0.06）', near(plan.dmgMul, 0.06));
-ok('降尘丹 → 反噬伤害 400×0.06=24（筑基九层 failDamage 400）', plan.failDmg === 24);
+ok('降尘丹 → 反噬伤害 400×0.06=24（筑基后期 failDamage 400）', plan.failDmg === 24);
 
 p = atRealm(5);
 plan = G.Breakthrough.plan(p);
@@ -239,7 +239,7 @@ G.Core.breakthrough();
 ok('随机数 0.641 > 0.64 → 突破失败', P().realmIndex === 5);
 
 // 门槛续破：_btCtx 与 plan 必须同值
-p = atRealm(21); G.State.addItem('pill_jiedan_zhengpin', 1); p.peak = 'high';
+p = atRealm(15); G.State.addItem('pill_jiedan_zhengpin', 1); p.peak = 'high';
 p.companion = { id: 'quhun', name: '铁奴·玄傀', hp: 200, maxHp: 200, atk: 24 };
 p.btGuard = true;
 plan = G.Breakthrough.plan(p);
@@ -280,10 +280,10 @@ p.companion = { id: 'quhun', name: '铁奴·玄傀', hp: 200, maxHp: 200, atk: 2
 ok('玄傀可用但未请 → 提示「请玄傀护法」', G.Breakthrough.advice(p).some(a => a.id === 'guard-on'));
 p.btGuard = true;
 ok('已请护法 → 不再提示开启', !G.Breakthrough.advice(p).some(a => a.id === 'guard-on'));
-p = atRealm(21);
+p = atRealm(15);
 ok('结丹无丹 → 点名「裸冲九成五身陨」',
   G.Breakthrough.advice(p).some(a => a.id === 'pill' && a.short.indexOf('九成五') >= 0));
-p = atRealm(21); G.State.addItem('pill_jiedan', 1);
+p = atRealm(15); G.State.addItem('pill_jiedan', 1);
 ok('结丹持凝丹 → 不再催备丹', !G.Breakthrough.advice(p).some(a => a.id === 'pill'));
 
 /* ================= 汇总 ================= */

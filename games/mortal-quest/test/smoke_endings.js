@@ -2,7 +2,7 @@
 /* =========================================================
  * test/smoke_endings.js —— 筑基期后多结局系统无头测试
  *   ① 终局前默认全锁定（除条件后解锁）
- *   ② 结丹之路：需李玄尘亲传 + 筑基九层以上
+ *   ② 结丹之路：需李玄尘亲传 + 筑基后期以上
  *   ③ 红尘双修：需凌清沅·暗中护法完成
  *   ④ 孤峰悟道：回绝柳蔓儿 + 斩断温巧兮 + 未结凌清沅
  *   ⑤ 魔焰噬心：阴魂精魄 ≥ 3
@@ -62,7 +62,7 @@ function idOf(name) {
 
 console.log('【1】结局定义与锁定基线');
 {
-  const p = reset(16);
+  const p = reset(15);
   assert('结局清单共 5 条', G.Endings.list().length === 5);
   ['victory', 'jiedan', 'shuangxiu', 'duxiu', 'moxiu'].forEach(function (id) {
     assert('结局存在: ' + id, !!G.Endings.byId(id));
@@ -73,15 +73,15 @@ console.log('【1】结局定义与锁定基线');
   assert('破空而去未修阵锁定', G.Endings.canChoose('victory').ok === false);
 }
 
-console.log('【2】结丹之路：李玄尘亲传 + 筑基九层');
+console.log('【2】结丹之路：李玄尘亲传 + 筑基后期');
 {
-  const p = reset(16);   // 筑基三层，不足
+  const p = reset(14);   // 筑基中期，不足
   p.masterId = 'lihuayuan'; G.Bonds.bonds().lihuayuan = { done: true };
-  assert('亲传但修为不足（<筑基九层）仍锁定', G.Endings.canChoose('jiedan').ok === false);
-  p.realmIndex = 19;     // 筑基七层，仍未到结丹门槛
-  assert('亲传 + 筑基七层仍锁定（须筑基九层）', G.Endings.canChoose('jiedan').ok === false);
-  p.realmIndex = 21;     // 筑基九层（结丹门槛）
-  assert('亲传 + 筑基九层解锁', G.Endings.canChoose('jiedan').ok === true);
+  assert('亲传但修为不足（<筑基后期）仍锁定', G.Endings.canChoose('jiedan').ok === false);
+  p.realmIndex = 14;     // 筑基中期，仍未到结丹门槛
+  assert('亲传 + 筑基中期仍锁定（须筑基后期）', G.Endings.canChoose('jiedan').ok === false);
+  p.realmIndex = 15;     // 筑基后期（结丹门槛）
+  assert('亲传 + 筑基后期解锁', G.Endings.canChoose('jiedan').ok === true);
   assert('择结丹结局成功', G.Endings.choose('jiedan') === true);
   assert('ending 落定为 jiedan', p.ending === 'jiedan');
   assert('天道点数为正', (p.tiandao || 0) > 0);
@@ -91,7 +91,7 @@ console.log('【2】结丹之路：李玄尘亲传 + 筑基九层');
 
 console.log('【3】红尘双修：凌清沅·暗中护法');
 {
-  const p = reset(16);
+  const p = reset(15);
   G.Bonds.bonds().nangongwan = { done: true, choice: 'leave' };
   assert('视而不见不解锁双修', G.Endings.canChoose('shuangxiu').ok === false);
   G.Bonds.bonds().nangongwan = { done: true, choice: 'guard' };
@@ -101,7 +101,7 @@ console.log('【3】红尘双修：凌清沅·暗中护法');
 
 console.log('【4】孤峰悟道：斩情丝 + 回绝 + 未结凌清沅');
 {
-  const p = reset(16);
+  const p = reset(15);
   G.Bonds.bonds().dongxuaner = { done: true, choice: 'plot' };
   G.Bonds.bonds().chenqiaoqian = { done: true };
   assert('虚与委蛇不解锁孤修', G.Endings.canChoose('duxiu').ok === false);
@@ -114,7 +114,7 @@ console.log('【4】孤峰悟道：斩情丝 + 回绝 + 未结凌清沅');
 
 console.log('【5】魔焰噬心：阴魂精魄 ≥ 3');
 {
-  const p = reset(16);
+  const p = reset(15);
   G.State.addItem('yin_hun_soul', 2);
   assert('两枚精魄不解锁', G.Endings.canChoose('moxiu').ok === false);
   G.State.addItem('yin_hun_soul', 1);
@@ -124,7 +124,7 @@ console.log('【5】魔焰噬心：阴魂精魄 ≥ 3');
 
 console.log('【6】破空而去：修阵后经原通关链收束');
 {
-  const p = reset(16);
+  const p = reset(15);
   p.teleportRepaired = true;
   assert('修阵后解锁破空而去', G.Endings.canChoose('victory').ok === true);
   assert('择破空而去成功', G.Endings.choose('victory') === true && p.ending === 'victory');

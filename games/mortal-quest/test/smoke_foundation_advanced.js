@@ -103,7 +103,7 @@ console.log('==== 一、青冥剑诀：无视 30% 护甲 + 护体剑盾（验收
 // ============ 验收 ②：《三转归元功》散功逆转 ============
 console.log('==== 二、三转归元功：散功逆转（验收②） ====');
 {
-  const p = reset(19);   // 筑基后期七层
+  const p = reset(15);   // 筑基后期
   assert('未习三转功不可散功', G.Cultivation.canSanGong().ok === false);
   G.Cultivation.learnSZ();
   assert('习得三转归元功', G.Cultivation.hasSZ() === true);
@@ -126,14 +126,14 @@ console.log('==== 二、三转归元功：散功逆转（验收②） ====');
   assert('结丹突破补偿：每转 +25%', G.Cultivation.jiedanBonus() === 0.25);
 
   // 二转、三转
-  p.realmIndex = 20; p.mind = 90;
+  p.realmIndex = 15; p.mind = 90;
   G.Cultivation.sanGong();
-  p.realmIndex = 21; p.mind = 90;
+  p.realmIndex = 15; p.mind = 90;
   G.Cultivation.sanGong();
   assert('三转计数累加至 3', p.threeTurnCount === 3);
   assert('属性上限倍率 = 1.6（三转累计 +60%）', G.Cultivation.statMul() === 1.6);
   assert('结丹补偿封顶 +75%', G.Cultivation.jiedanBonus() === 0.75);
-  p.realmIndex = 19; p.mind = 90;
+  p.realmIndex = 15; p.mind = 90;
   assert('三转已满不可再散', G.Cultivation.canSanGong().ok === false && G.Cultivation.sanGong() === false);
 }
 

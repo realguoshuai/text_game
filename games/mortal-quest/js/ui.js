@@ -2920,7 +2920,7 @@ GAME.UI = {
         this.closeSaveModal();
         document.getElementById("log-box").innerHTML = "";
         var pp = GAME.State.p();
-        this.log("【官方筑基期存档】你以筑基一层之身睁眼——神识已修至《大衍决》四层圆满，气血 " + pp.maxHp +
+        this.log("【官方筑基期存档】你以筑基初期之身睁眼——神识已修至《大衍决》四层圆满，气血 " + pp.maxHp +
             "、法力 " + pp.maxMp + "、灵石 " + pp.spiritStones + "。十年苦修尽数跳过，且去领略机关傀儡、噬金虫群与魔道终局。", "success");
         this.updateUI();
     },

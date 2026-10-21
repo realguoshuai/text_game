@@ -41,7 +41,7 @@ GAME.DATA.MAP = {
         ],
       },
       {
-        id: "zhuji", name: "筑基篇", minRealm: 13, realmRange: [13, 21],
+        id: "zhuji", name: "筑基篇", minRealm: 13, realmRange: [13, 15],
         desc: "拜入宗门，谋那筑基长生。青梧谷的枫林、云京的宫阙，是筑基修士的舞台。",
         signature: [
           { name: "宗门讲经", desc: "青梧谷朔望开坛，筑基弟子可听讲道，裨益神识与心境。" },
@@ -50,7 +50,7 @@ GAME.DATA.MAP = {
         ],
       },
       {
-        id: "jiedan", name: "结丹篇", minRealm: 22, realmRange: [22, 30],
+        id: "jiedan", name: "结丹篇", minRealm: 16, realmRange: [16, 18],
         desc: "凝丹化婴之途。气血法力皆非昔比，凡俗手段再难伤你分毫。",
         signature: [
           { name: "灵脉洞天", desc: "结丹修士可入宗门灵脉修行，吐纳之间法力暴涨，进境一日千里。" },
@@ -59,7 +59,7 @@ GAME.DATA.MAP = {
         ],
       },
       {
-        id: "star", name: "碎星海篇", minRealm: 22, realmRange: [22, 30],
+        id: "star", name: "碎星海篇", minRealm: 16, realmRange: [16, 18],
         desc: "万里之外的修仙群岛，妖修与散修杂处，灵药灵矿遍地——那是结丹之后的世界。",
         signature: [
           { name: "浮岛妖修巢", desc: "乱星海深处妖修盘踞的浮岛群，是结丹修士真正的磨刀石。" },
@@ -116,8 +116,8 @@ GAME.DATA.MAP = {
             ],
         },
         {
-            id: "luanxing_hai", name: "碎星海", kind: "immortal", reqRealm: 21, chapter: "star",
-            reqText: "碎星海在万里重洋之外，凡俗海船去不得——须筑基九层灵力圆满、御器跨海，方可一搏。",
+            id: "luanxing_hai", name: "碎星海", kind: "immortal", reqRealm: 16, chapter: "star",
+            reqText: "碎星海在万里重洋之外，凡俗海船去不得——须筑基后期灵力圆满、御器跨海，方可一搏。",
             teaser: "万里之外的修仙群岛，妖修与散修杂处，灵药灵矿遍地——那是结丹之后的世界。",
             desc: "？？？",
             actions: [],

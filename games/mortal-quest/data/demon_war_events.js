@@ -36,10 +36,10 @@ GAME.DATA.MONSTERS.push(
 /* —— 四阶段主线定义 —— */
 GAME.DATA.DEMON_WAR = {
     phases: [
-        { id: 1, name: "魔道前夜", realmMin: 13, realmMax: 15, text: "魔道六宗陈兵云国边境，风声鹤唳。你独辟灵峰、研习《大衍决》，为大战积蓄底蕴。" },
-        { id: 2, name: "前线御敌", realmMin: 16, realmMax: 18, text: "魔道六宗全面入侵！宗门调令如雪片——你驻守前线灵石矿，与鬼灵门刺杀队血战。" },
-        { id: 3, name: "燕家堡惊变", realmMin: 19, realmMax: 20, text: "燕家堡夺宝大会暗藏鬼灵门血祭大阵！识破阴谋后，你借流烟步与傀儡断后杀出血路——七大派败局已定。" },
-        { id: 4, name: "破空而去", realmMin: 21, realmMax: 21, text: "宗门弃你而去。荒山枯井深处，一座上古修士洞府静静沉眠——古传送阵，是你唯一的生路。" },
+        { id: 1, name: "魔道前夜", realmMin: 13, realmMax: 13, text: "魔道六宗陈兵云国边境，风声鹤唳。你独辟灵峰、研习《大衍决》，为大战积蓄底蕴。" },
+        { id: 2, name: "前线御敌", realmMin: 14, realmMax: 14, text: "魔道六宗全面入侵！宗门调令如雪片——你驻守前线灵石矿，与鬼灵门刺杀队血战。" },
+        { id: 3, name: "燕家堡惊变", realmMin: 15, realmMax: 15, text: "燕家堡夺宝大会暗藏鬼灵门血祭大阵！识破阴谋后，你借流烟步与傀儡断后杀出血路——七大派败局已定。" },
+        { id: 4, name: "破空而去", realmMin: 15, realmMax: 15, text: "宗门弃你而去。荒山枯井深处，一座上古修士洞府静静沉眠——古传送阵，是你唯一的生路。" },
     ],
 };
 
@@ -58,7 +58,6 @@ GAME.DemonWar = {
                 if (ph.id === 4) {
                     GAME.UI.log("通往碎星海的生路只剩一条：集齐【紫纹宝竹】【中阶灵石】【修复阵盘】，修复荒山枯井中的古传送阵！", "warning");
                 }
-                break;
             }
         }
     },
@@ -73,8 +72,8 @@ GAME.DemonWar = {
     frontlineDefend: function () {
         var p = GAME.State.p();
         if (p.isDead) return null;
-        if (p.realmIndex < 16 || p.realmIndex > 18) {
-            GAME.UI.log("前线战事唯有筑基中期（四~六层）方得调令，此时尚无征召。", "system");
+        if (p.realmIndex !== 14) {
+            GAME.UI.log("前线战事唯有筑基中期方得调令，此时尚无征召。", "system");
             return null;
         }
         var contrib = 30 + GAME.Combat.rand(0, 20);   // 宗门功勋
@@ -93,8 +92,8 @@ GAME.DemonWar = {
     yanjiaFortune: function (branch) {
         var p = GAME.State.p();
         if (p.isDead) return null;
-        if (p.realmIndex < 19) {
-            GAME.UI.log("燕家堡夺宝大会尚在筑基后期（七~八层）方现端倪。", "system");
+        if (p.realmIndex < 15) {
+            GAME.UI.log("燕家堡夺宝大会尚在筑基后期方现端倪。", "system");
             return null;
         }
         if (branch === "puppet") {

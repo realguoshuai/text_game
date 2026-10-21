@@ -152,10 +152,10 @@ ok("未解锁条目均带所需境界", G.Map.atlas().filter(function (n) { retu
     .every(function (n) { return (n.reqRealmName || "").length > 0 && n.lockMsg.indexOf("需") >= 0; }));
 ok("当前所在地在舆图中标出", G.Map.atlas().some(function (n) { return n.here && n.id === "shenshou_gu"; }));
 p.realmIndex = 13;
-ok("筑基一层解锁至月京城，乱星海仍锁（需筑基九层）", G.Map.atlas().filter(function (n) { return !n.unlocked; })
+ok("筑基初期解锁至月京城，碎星海仍锁（需结丹初期）", G.Map.atlas().filter(function (n) { return !n.unlocked; })
     .map(function (n) { return n.id; }).join(",") === "luanxing_hai");
-p.realmIndex = 21;   // 筑基九层
-ok("筑基九层后舆图全部解锁", G.Map.atlas().every(function (n) { return n.unlocked; }));
+p.realmIndex = 16;   // 结丹初期
+ok("结丹初期后舆图全部解锁", G.Map.atlas().every(function (n) { return n.unlocked; }));
 
 /* ================= ② 景阳城玄机世家主线 ================= */
 console.log("\n【2】景阳城·玄机世家主线（解毒副本）");

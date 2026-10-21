@@ -40,11 +40,11 @@ GAME.Endings = {
             },
             {
                 id: "jiedan", name: "结丹之路 · 黄枫真传",
-                cond: "拜入李玄尘门下且修为至筑基七层以上——得师护道，闭关冲击结丹。",
+                cond: "拜入李玄尘门下且修为至筑基后期以上——得师护道，闭关冲击结丹。",
                 text: "李玄尘亲手封了你的洞府：「三年之内，灵药我给你备齐。」丹房地火日夜不熄——结丹，就在此一搏。",
                 bonus: 20, needPortal: false,
-                unlocked: function () { return master && p.realmIndex >= 21; },
-                msg: (!master) ? "须先拜入李玄尘门下。" : (p.realmIndex < 21 ? "须修为至筑基九层以上。" : ""),
+                unlocked: function () { return master && p.realmIndex >= 15; },
+                msg: (!master) ? "须先拜入李玄尘门下。" : (p.realmIndex < 15 ? "须修为至筑基后期以上。" : ""),
             },
             {
                 id: "shuangxiu", name: "红尘之约 · 双修证道",

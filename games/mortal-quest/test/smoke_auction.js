@@ -8,7 +8,7 @@
  *    未到结丹期显示锁定提示、拍品区为空、竞拍函数直接拒拍（修为不到不能点击）。
  *
  * 注：结丹(index22+) 已在 realms.js / realms_foundation.js 落地（applyJiedan 写入
- * REALMS[22..30] 的 hp/mp/defSuppress）。测试以 p.realmIndex=22 直接模拟结丹，
+ * REALMS[16..18] 的 hp/mp/defSuppress）。测试以 p.realmIndex=16 直接模拟结丹，
  * 桩掉 updateUI/autoSave 隔离 UI 副作用，专注验证拍卖会逻辑本身。
  *
  * 运行： node test/smoke_auction.js
@@ -106,9 +106,9 @@ U.started = true;
 section('解锁判定 helper');
 ok('isZhuji(练气12)=false', G.DATA.isZhuji({ realmIndex: 12 }) === false);
 ok('isZhuji(筑基13)=true', G.DATA.isZhuji({ realmIndex: 13 }) === true);
-ok('isJiedan(筑基21)=false', G.DATA.isJiedan({ realmIndex: 21 }) === false);
-ok('isJiedan(结丹22)=true', G.DATA.isJiedan({ realmIndex: 22 }) === true);
-ok('JIEDAN_GATE_INDEX=22', G.DATA.JIEDAN_GATE_INDEX === 22);
+ok('isJiedan(筑基15)=false', G.DATA.isJiedan({ realmIndex: 15 }) === false);
+ok('isJiedan(结丹16)=true', G.DATA.isJiedan({ realmIndex: 16 }) === true);
+ok('JIEDAN_GATE_INDEX=16', G.DATA.JIEDAN_GATE_INDEX === 16);
 
 /* ================= ① 黑市筑基门槛 ================= */
 section('① 黑市筑基门槛：练气期锁闭，筑基期开放');
@@ -150,10 +150,10 @@ G.Auction.bid(0);
 G.Auction.buyout(0);
 ok('练气期：竞拍函数拒拍（灵石不变）', a1.spiritStones === stonesBefore);
 
-// 结丹玩家：桩掉 updateUI/autoSave 隔离 UI 副作用，验证拍卖逻辑（REALMS[22] 现已真实落地）
+// 结丹玩家：桩掉 updateUI/autoSave 隔离 UI 副作用，验证拍卖逻辑（REALMS[16] 现已真实落地）
 const a2 = G.State.createNewPlayer('wanderer');
-a2.realmIndex = 22;
-ok('结丹一层 REALMS[22] 气血上限已由 foundation 写入(>0)', G.DATA.REALMS[22] && G.DATA.REALMS[22].hp > 0);
+a2.realmIndex = 16;
+ok('结丹初期 REALMS[16] 气血上限已由 foundation 写入(>0)', G.DATA.REALMS[16] && G.DATA.REALMS[16].hp > 0);
 ok('结丹丹药 pill_jiedan 已定义', !!G.DATA.ITEMS.pill_jiedan);
 ok('拍卖缺失拍品已补齐（jinshi / chong_egg）', !!G.DATA.ITEMS.jinshi && !!G.DATA.ITEMS.chong_egg);
 const realUpdate = G.UI.updateUI, realSave = G.UI.autoSave;

@@ -97,7 +97,7 @@ GAME.Mortality = {
     // 判词：不是评价，是墓碑上那句话
     verdict: function (r) {
         if (r.karma <= -30) return "你走过的地方，草木都记得你。";
-        if (r.realmIndex >= 22) return "金丹已成。天地却没再给你更多年月——到这一步，已不是勤勉能解决的事。";
+        if (r.realmIndex >= 16) return "金丹已成。天地却没再给你更多年月——到这一步，已不是勤勉能解决的事。";
         if (r.realmIndex >= 13) return "你筑基了。这一界绝大多数人，一辈子都卡在你随手迈过的那道坎上。";
         if (r.mind >= 60) return "你没走多远，但走得干净。心静的人，寿元总差一点。";
         if (r.kills >= 40) return "你杀过太多东西，也躲过太多回。最后没有谁杀你——是年月。";
@@ -107,7 +107,7 @@ GAME.Mortality = {
 
     // 未了之事：给玩家看"差一点什么"，而不是一句"你死了"
     regret: function (r, p) {
-        if (r.realmIndex >= 30) return "";
+        if (r.realmIndex >= 18) return "";
         var next = GAME.DATA.REALMS[r.realmIndex + 1];
         if (!next) return "";
         var need = (next.needExp || 0) - Math.floor(p.currentExp || 0);

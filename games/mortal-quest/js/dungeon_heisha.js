@@ -22,7 +22,7 @@ GAME.Heisha = {
         return p.heisha;
     },
 
-    // ---------- 准入：筑基一层以上 ----------
+    // ---------- 准入：筑基以上 ----------
     canEnter: function () {
         var p = GAME.State.p();
         return !p.isDead && !p.combat && p.realmIndex >= 13;

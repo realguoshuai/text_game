@@ -35,48 +35,34 @@ GAME.DATA.REALMS = [
     { name:"练气十一层",needExp:670, breakChance:0.22, failDamage:85, failExpLoss:0.30, deathChance:0.05, maxAge:100, atk:30, def:17, speed:11, spirit:15, meditateMonths:6 },
     { name:"练气十二层",needExp:790, breakChance:0.18, failDamage:95, failExpLoss:0.35, deathChance:0.06, maxAge:100, atk:33, def:19, speed:11, spirit:16, meditateMonths:6 },
     { name:"练气十三层",needExp:920, breakChance:0.15, failDamage:105,failExpLoss:0.35, deathChance:0.07, maxAge:100, atk:35, def:20, speed:12, spirit:17, meditateMonths:6 },
-    /* —— 筑基期拆为九层（index 13~21）：练气十三层(index12)→筑基一层仍走 ZHUJI 筑基丹链 ——
-     * 筑基一层~九层为常规修为突破；寿元统一 200 岁；神识随层暴涨（呼应《大衍决》神识暴涨）。
-     * 阶段划分（供魔道入侵终局判定）：前期 1~3 / 中期 4~6 / 后期 7~8 / 九层圆满。 */
-    { name:"筑基一层",  needExp:1100, breakChance:0.60, failDamage:110, failExpLoss:0.30, deathChance:0.02, maxAge:200, atk:40, def:25, speed:14, spirit:25, meditateMonths:8 },
-    { name:"筑基二层",  needExp:1300, breakChance:0.55, failDamage:120, failExpLoss:0.30, deathChance:0.03, maxAge:200, atk:46, def:29, speed:15, spirit:27, meditateMonths:8 },
-    { name:"筑基三层",  needExp:1500, breakChance:0.50, failDamage:130, failExpLoss:0.30, deathChance:0.03, maxAge:200, atk:52, def:33, speed:15, spirit:29, meditateMonths:8 },
-    { name:"筑基四层",  needExp:1750, breakChance:0.45, failDamage:145, failExpLoss:0.35, deathChance:0.04, maxAge:200, atk:58, def:37, speed:16, spirit:31, meditateMonths:9 },
-    { name:"筑基五层",  needExp:2000, breakChance:0.40, failDamage:160, failExpLoss:0.35, deathChance:0.04, maxAge:200, atk:64, def:41, speed:16, spirit:33, meditateMonths:9 },
-    { name:"筑基六层",  needExp:2300, breakChance:0.35, failDamage:175, failExpLoss:0.35, deathChance:0.05, maxAge:200, atk:70, def:45, speed:17, spirit:35, meditateMonths:9 },
-    { name:"筑基七层",  needExp:2600, breakChance:0.30, failDamage:190, failExpLoss:0.40, deathChance:0.05, maxAge:200, atk:76, def:49, speed:17, spirit:37, meditateMonths:10 },
-    { name:"筑基八层",  needExp:2950, breakChance:0.26, failDamage:210, failExpLoss:0.40, deathChance:0.06, maxAge:200, atk:82, def:53, speed:18, spirit:39, meditateMonths:10 },
-    { name:"筑基九层",  needExp:3300, breakChance:null, failDamage:400, failExpLoss:0.20, deathChance:0, maxAge:200, atk:88, def:57, speed:18, spirit:41, meditateMonths:10 },
+    /* —— 筑基期（index 13~15）：初期 / 中期 / 后期 三块（仅练气分 1~13 层）——
+     * 练气十三层(index12)→筑基初期仍走 ZHUJI 筑基丹链；筑基三层为常规修为突破，寿元统一 200 岁。 */
+    { name:"筑基初期",  needExp:3900, breakChance:0.60, failDamage:110, failExpLoss:0.30, deathChance:0.02, maxAge:200, atk:40,  def:25,  speed:14, spirit:25,  meditateMonths:8 },
+    { name:"筑基中期",  needExp:6050, breakChance:0.45, failDamage:145, failExpLoss:0.35, deathChance:0.04, maxAge:200, atk:58,  def:37,  speed:16, spirit:31,  meditateMonths:9 },
+    { name:"筑基后期",  needExp:null, breakChance:null, failDamage:400, failExpLoss:0.20, deathChance:0,    maxAge:200, atk:76,  def:49,  speed:17, spirit:37,  meditateMonths:10 },
 
-    /* —— 结丹期（index 22~30）：筑基九层(index21) 经「结丹天堑」凝丹而成。
-     * 寿元跃至 500 岁（呼应凡人流：结丹方脱凡胎）；斗法面板随层暴涨。
-     * 筑基九层→结丹一层走 GAME.DATA.JIEDAN 专用数值（见下方 JIEDAN 表）；
-     * 结丹内部各层为常规修为突破，沿用 realm.breakChance 等字段。 */
-    { name:"结丹一层",  needExp:3300, breakChance:0.30, failDamage:260, failExpLoss:0.35, deathChance:0.06, maxAge:500, atk:120, def:80,  speed:22, spirit:60,  meditateMonths:12 },
-    { name:"结丹二层",  needExp:3800, breakChance:0.26, failDamage:300, failExpLoss:0.38, deathChance:0.07, maxAge:500, atk:135, def:92,  speed:24, spirit:68,  meditateMonths:12 },
-    { name:"结丹三层",  needExp:4400, breakChance:0.22, failDamage:350, failExpLoss:0.40, deathChance:0.08, maxAge:500, atk:150, def:105, speed:26, spirit:76,  meditateMonths:12 },
-    { name:"结丹四层",  needExp:5100, breakChance:0.18, failDamage:410, failExpLoss:0.42, deathChance:0.09, maxAge:500, atk:170, def:120, speed:28, spirit:85,  meditateMonths:12 },
-    { name:"结丹五层",  needExp:5900, breakChance:0.15, failDamage:480, failExpLoss:0.45, deathChance:0.10, maxAge:500, atk:190, def:135, speed:30, spirit:95,  meditateMonths:12 },
-    { name:"结丹六层",  needExp:6800, breakChance:0.12, failDamage:560, failExpLoss:0.48, deathChance:0.11, maxAge:500, atk:210, def:150, speed:32, spirit:105, meditateMonths:12 },
-    { name:"结丹七层",  needExp:7900, breakChance:0.10, failDamage:650, failExpLoss:0.50, deathChance:0.12, maxAge:500, atk:235, def:170, speed:34, spirit:115, meditateMonths:12 },
-    { name:"结丹八层",  needExp:9100, breakChance:0.08, failDamage:760, failExpLoss:0.52, deathChance:0.13, maxAge:500, atk:260, def:190, speed:36, spirit:130, meditateMonths:12 },
-    { name:"结丹九层",  needExp:null, breakChance:null, failDamage:null, failExpLoss:0,    deathChance:0,    maxAge:500, atk:290, def:215, speed:38, spirit:145, meditateMonths:12 },
+    /* —— 结丹期（index 16~18）：初期 / 中期 / 后期 三块；筑基后期(index15) 经「结丹天堑」凝丹而成。
+     * 寿元跃至 500 岁（呼应凡人流：结丹方脱凡胎）；斗法面板随块暴涨。
+     * 筑基后期→结丹初期走 GAME.DATA.JIEDAN 专用数值（见下方 JIEDAN 表）；
+     * 结丹内部各块为常规修为突破，沿用 realm.breakChance 等字段。 */
+    { name:"结丹初期",  needExp:11500, breakChance:0.30, failDamage:260, failExpLoss:0.35, deathChance:0.06, maxAge:500, atk:120, def:80,  speed:22, spirit:60,  meditateMonths:12 },
+    { name:"结丹中期",  needExp:17800, breakChance:0.18, failDamage:410, failExpLoss:0.42, deathChance:0.09, maxAge:500, atk:170, def:120, speed:28, spirit:85,  meditateMonths:12 },
+    { name:"结丹后期",  needExp:null,  breakChance:null, failDamage:null, failExpLoss:0,    deathChance:0,    maxAge:500, atk:290, def:215, speed:38, spirit:145, meditateMonths:12 },
 ];
 
-/* 筑基丹链触发边界：练气十三层(index12)→筑基一层(index13) 走 GAME.DATA.ZHUJI 专用数值。
+/* 筑基丹链触发边界：练气十三层(index12)→筑基初期(index13) 走 GAME.DATA.ZHUJI 专用数值。
  * core.breakthrough 据此判定 isZhuji，故拆层后不依赖 realm 名。 */
 GAME.DATA.ZHUJI_GATE_INDEX = 12;
 
-/* 结丹门槛：筑基九层(index21)之后即结丹一层(index22)。当前 REALMS 仅到筑基九层，
- * 结丹境界尚未实现；此常量与 isJiedan 仅为后续功能（如拍卖会）提供统一解锁判定，
- * 待 REALMS 扩展至结丹后自动生效（届时 index22+ 自然落入新境界）。 */
-GAME.DATA.JIEDAN_GATE_INDEX = 22;
+/* 结丹门槛：筑基后期(index15)之后即结丹初期(index16)。
+ * isJiedan / 拍卖会 / 碎星海 等均统一以 JIEDAN_GATE_INDEX 判定。 */
+GAME.DATA.JIEDAN_GATE_INDEX = 16;
 GAME.DATA.isJiedan = function (p) { return !!p && p.realmIndex >= GAME.DATA.JIEDAN_GATE_INDEX; };
 GAME.DATA.isZhuji  = function (p) { return !!p && p.realmIndex > GAME.DATA.ZHUJI_GATE_INDEX; };
 
 /* 大境界（major realm）：0=练气，1=筑基。供战斗「境界绝对压制」计算双方阶层差。
- * 仅含练气/筑基两阶；未来接入结丹时扩展为按 index 区间映射。 */
-GAME.DATA.majorRealm = function (idx) { return idx >= 22 ? 2 : (idx >= 13 ? 1 : 0); };
+ * 练气=0、筑基=1、结丹=2；后续大境界沿用 初期/中期/后期 三块递增。 */
+GAME.DATA.majorRealm = function (idx) { return idx >= 16 ? 2 : (idx >= 13 ? 1 : 0); };
 
 /* —— 筑基冲关数值表（练气十三层 → 筑基专用，由 core.breakthrough 读取）——
  * 伪灵根裸冲：2% 成功，失败 80% 触发【经脉俱断】道消身陨——凡人流的天堑。
@@ -94,12 +80,12 @@ GAME.DATA.ZHUJI = {
     fake:     { chance:0.15, deathChance:0.40, dmgMul:1.3 }, // 伪丹：15%，失败 40% 身陨
 };
 
-/* 结丹天堑（筑基九层 index21 → 结丹一层 index22）专用数值，由 core.breakthrough 读取。
+/* 结丹天堑（筑基后期 index15 → 结丹初期 index16）专用数值，由 core.breakthrough 读取。
  * 无丹硬冲：3% 成、失败九成五身陨（原著结丹之难，百中无一）；
  * 凝丹（结丹丹）：35% 起，连服每多一枚累积 +20%、历史失败保底每档 +15%，服丹免死；
  * 正品凝丹：55% 起同链；伪凝丹：20% 且失败三成身陨。
  * 《三转归元功》结丹补偿另计（每转 +25%，上限 +75%）。 */
-GAME.DATA.JIEDAN_GATE_SOURCE = 21;   // 筑基九层为结丹突破源（与 ZHUJI_GATE_INDEX=12 对应练气十三层同理）
+GAME.DATA.JIEDAN_GATE_SOURCE = 15;   // 筑基后期为结丹突破源（与 ZHUJI_GATE_INDEX=12 对应练气十三层同理）
 GAME.DATA.JIEDAN = {
     bare:     { chance:0.03, deathChance:0.95, dmg:220 },   // 无丹硬冲：3% 成，失败九成五经脉俱断
     pill:     { chance:0.35, perPill:0.20, perExtra:0.15, cap:1.0, dmgMul:0.3, deathMul:0 },  // 凝丹：服丹免死

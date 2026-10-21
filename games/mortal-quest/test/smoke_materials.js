@@ -227,6 +227,7 @@ console.log('==== 五、宗门与坊市黑市渠道（覆盖） ====');
   q.spiritStones = 500;
   const idx = goods.indexOf(ore);
   G.Market.buy(idx);
+  G.Market._lastBuyTs = 0;   // 模拟两次独立点击（间隔 >600ms 防手抖去重），验证无限量货源
   G.Market.buy(idx);
   assert('连买 2 块玄铁不断货', cnt('iron_ore') === 2 &&
     q.marketGoods.filter(function (g) { return g.id === 'iron_ore'; }).length === 1);

@@ -34,7 +34,7 @@ GAME.Breakthrough = {
 
     cfg: function () { return GAME.DATA.BREAK_PREP; },
 
-    // ---------- 当前关隘：normal / zhuji（练气十三层→筑基）/ jiedan（筑基九层→结丹）----------
+    // ---------- 当前关隘：normal / zhuji（练气十三层→筑基）/ jiedan（筑基后期→结丹初期）----------
     gate: function (p) {
         p = p || GAME.State.p();
         if (p.realmIndex === GAME.DATA.ZHUJI_GATE_INDEX) return "zhuji";

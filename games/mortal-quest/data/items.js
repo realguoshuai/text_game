@@ -28,9 +28,9 @@ GAME.DATA.ITEMS = {
     pill_huanglong:{ id:"pill_huanglong", name:"黄龙丹", quality:"灵品", type:"pill", price:80,  desc:"药力浑厚，修为 +25。",   use:{ exp:25 } },
     pill_jinsui:   { id:"pill_jinsui",    name:"金髓丸", quality:"上品", type:"pill", price:220, desc:"易筋洗髓，修为 +80。",   use:{ exp:80 } },
     pill_zhuji:    { id:"pill_zhuji",     name:"筑基丹", quality:"极品", type:"pill", price:800, desc:"冲关筑基之凭。突破筑基时自动消耗一枚。", use:{ zhuji:true } },
-    pill_jiedan:   { id:"pill_jiedan",    name:"凝丹",   quality:"极品", type:"pill", price:1500, realmBand:[21,30], desc:"凝丹之凭。突破结丹时自动消耗一枚（筑基九层圆满方可冲击）。", use:{ jiedan:true } },
-    pill_jiedan_zhengpin: { id:"pill_jiedan_zhengpin", name:"正品凝丹", quality:"极品", type:"pill", price:2200, realmBand:[21,30], desc:"三味天材所炼，药效醇厚。冲击结丹成功率更高、反噬更轻。", use:{ jiedan:true } },
-    fake_jiedan:   { id:"fake_jiedan",    name:"伪凝丹", quality:"上品", type:"pill", price:400,  realmBand:[21,30], desc:"药力虚浮的赝品，冲击结丹成功率低，且失败仍有身陨之危。", use:{ jiedan:true } },
+    pill_jiedan:   { id:"pill_jiedan",    name:"凝丹",   quality:"极品", type:"pill", price:1500, realmBand:[15,18], desc:"凝丹之凭。突破结丹时自动消耗一枚（筑基后期圆满方可冲击）。", use:{ jiedan:true } },
+    pill_jiedan_zhengpin: { id:"pill_jiedan_zhengpin", name:"正品凝丹", quality:"极品", type:"pill", price:2200, realmBand:[15,18], desc:"三味天材所炼，药效醇厚。冲击结丹成功率更高、反噬更轻。", use:{ jiedan:true } },
+    fake_jiedan:   { id:"fake_jiedan",    name:"伪凝丹", quality:"上品", type:"pill", price:400,  realmBand:[15,18], desc:"药力虚浮的赝品，冲击结丹成功率低，且失败仍有身陨之危。", use:{ jiedan:true } },
     pill_yanshou:  { id:"pill_yanshou",   name:"延寿丹", quality:"极品", type:"pill", price:600, desc:"夺天地造化以续命，寿元大限 +10 年。练气期唯一续命之法。", use:{ ageBonus:10 } },
 
     // —— 符箓（仅战斗中使用） ——

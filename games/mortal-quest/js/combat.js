@@ -120,7 +120,7 @@ GAME.Combat = {
         return 1;                            // 同境/低打高：增伤只看攻方高境，免伤另由 realmDefSuppress 处理
     },
     // 高境界守方受低境界攻击时的强制免伤系数：dmg *= realmDefSuppress(defenderRealmIdx)
-    // 筑基一层 defSuppress=0.60（受练气攻击 ×0.4）；九层圆满 0.85（×0.15）；练气无压制=1
+    // 筑基初期 defSuppress=0.60（受练气攻击 ×0.4）；后期圆满 0.85（×0.15）；练气无压制=1
     realmDefSuppress: function (defenderRealmIdx) {
         var r = GAME.DATA.REALMS[defenderRealmIdx];
         if (!r || r.defSuppress == null) return 1;

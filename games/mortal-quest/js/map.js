@@ -246,7 +246,7 @@ GAME.Map = {
     // 当前篇章：身在天星海即星海篇；其余按境界阈值回落
     chapterOf: function (realmIndex, location) {
         if (location === "luanxing_hai") return "star";
-        if (realmIndex >= 22) return "jiedan";
+        if (realmIndex >= 16) return "jiedan";
         if (realmIndex >= 13) return "zhuji";
         return "qi";
     },

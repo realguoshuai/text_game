@@ -130,7 +130,7 @@ GAME.State = {
     },
 
     // ---------- 官方预设：筑基期体验存档 ----------
-    // 以 createNewPlayer 为基底，直接落位于「筑基一层」，并补齐神识/资源/体验道具，
+    // 以 createNewPlayer 为基底，直接落位于「筑基初期」，并补齐神识/资源/体验道具，
     // 让玩家无需百年苦修即可体验筑基期专属玩法（机关傀儡、噬金虫、洞府2.0、魔道终局）。
     // 注意：必须在 GAME.DATA.REALMS / FOUNDATION 加载后调用，hp/mp 取自梯度表。
     createZhujiPreset: function () {
@@ -139,10 +139,10 @@ GAME.State = {
             return this.createNewPlayer("hunter");
         }
         var p = this.createNewPlayer("hunter");   // 沈牧出身作基底（四系杂灵根·凡人流）
-        var R = GAME.DATA.REALMS[13];             // 筑基一层
+        var R = GAME.DATA.REALMS[13];             // 筑基初期
         p.originId = "hunter";
         p.name = "沈牧";
-        p.realmIndex = 13;                        // 筑基一层
+        p.realmIndex = 13;                        // 筑基初期
         p.currentExp = 0;
         p.maxHp = (R.hp != null) ? R.hp : 350;    // 350
         p.currentHp = p.maxHp;
