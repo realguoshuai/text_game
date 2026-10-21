@@ -395,7 +395,7 @@ GAME.UI = {
         box.className = "goal-banner" + (g.urgent ? " urgent" : "");
         var tag = this.$("goal-tag");
         if (tag) tag.innerText = g.urgent ? "当务之急" : "当前目标";
-        var t = this.$("goal-text"); if (t) t.innerText = g.text || "—";
+        var t = this.$("goal-text"); if (t) t.innerText = g.text || "暂无特定目标，可四处游历或闭关破境";
         var h = this.$("goal-hint"); if (h) h.innerText = g.hint || "";
         var w = this.$("goal-where");
         if (w) {
