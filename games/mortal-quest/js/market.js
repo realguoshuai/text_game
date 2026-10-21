@@ -98,6 +98,9 @@ GAME.Market = {
         if (!p.atMarket || p.isDead) return;
         var g = p.marketGoods[index];
         if (!g || g.qty <= 0) return;
+        // 同物防重：600ms 内重复点同一商品，视作手抖连点，直接吞掉，杜绝重复扣款
+        var _now = Date.now();
+        if (this._lastBuyId === g.id && this._lastBuyTs && (_now - this._lastBuyTs) < 600) return;
         if (g.req && p.realmIndex < g.req) {
             GAME.UI.log("掌柜摆摆手：「这等好货，不卖给练气" + (g.req + 1) + "层以下的散修。」——修为不足，人家怕你兜不住。", "system");
             GAME.UI.updateUI();
@@ -116,6 +119,9 @@ GAME.Market = {
             if (g.qty <= 0) p.marketGoods.splice(index, 1);
         }
         GAME.State.addItem(g.id, 1);
+        this._lastBuyId = g.id;
+        this._lastBuyTs = Date.now();
+        this._flash = { id: g.id, ts: Date.now() };   // 给市集行一个短暂"已购"脉冲，避免玩家以为点空而连点
         GAME.UI.log("你购入【" + GAME.DATA.ITEMS[g.id].name + "】，花费 " + price + " 灵石。", "info");
         GAME.Core.checkAchievements();
         GAME.UI.autoSave();

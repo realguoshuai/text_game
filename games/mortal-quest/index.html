@@ -42,12 +42,6 @@
 
     <!-- ===== 命盘：一行讲完「我是谁、还剩多少」 ===== -->
     <div class="panel" id="main-panel">
-        <!-- 重伤未愈：核心危机状态，独立成条、不挤在副状态栏；点击直达打坐疗伤 -->
-        <div class="injury-alert" id="injury-alert" style="display:none;">
-            <span class="ia-mark">伤</span>
-            <span class="ia-text">重伤未愈 · 气血 <b id="hurt-text2">1</b> · 宜打坐调息</span>
-            <span class="ia-go">点击打坐疗伤 ›</span>
-        </div>
         <div class="id-row">
             <span class="id-cell"><em>道号</em><b class="highlight">沈小牧</b></span>
             <span class="id-cell"><em>出身</em><b id="origin-text" class="highlight">-</b></span>
@@ -468,6 +462,13 @@
         <span class="goal-where" id="goal-where"></span>
         <span class="goal-next" id="goal-next"></span>
     </div>
+
+        <!-- 重伤未愈：核心危机状态，挂在当前目标卡下方；点击直达打坐疗伤 -->
+        <div class="injury-alert" id="injury-alert" style="display:none;">
+            <span class="ia-mark">伤</span>
+            <span class="ia-text">重伤未愈 · 气血 <b id="hurt-text2">1</b> · 宜打坐调息</span>
+            <span class="ia-go">点击打坐疗伤 ›</span>
+        </div>
 
             <!-- 洞府操作：常驻可见 -->
             <div class="actions" id="cave-actions" data-page-node-id="WVzQskURDI6MUseBEVxhqv">

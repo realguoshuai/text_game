@@ -2307,6 +2307,12 @@ details.dropdown .dd-body .btn-why { color: var(--warning); }
 .log-story   { color: #D8C08C; border-left: 2px solid rgba(212,167,106,.5); padding: 2px 0 7px 8px; }
 .log-loot    { color: #E4BE84; }
 .log-moment  { background: rgba(212,167,106,.1); border: 1px solid rgba(212,167,106,.3); color: #E9D6AE; padding: 4px 8px; }
+.log-moment  { background: rgba(212,167,106,.1); border: 1px solid rgba(212,167,106,.3); color: #E9D6AE; padding: 4px 8px; }
+/* 购买即时反馈：短暂绿脉冲 + "已购"标记，避免玩家以为点空而重复下单 */
+.item-row.bought-flash { animation: boughtPulse .9s ease; }
+@keyframes boughtPulse { 0% { background: rgba(79,205,196,.20); } 100% { background: transparent; } }
+.btn-done-ok { background: #2F6B45; color: #EAFBF0; border-color: #2F6B45; }
+.btn-done-ok:hover { background: #27613C; }
 
 /* ---------- 4. 当前目标：从"占三成高度的便签"压成一行通栏状态条 ---------- */
 .goal-banner {
@@ -2449,7 +2455,7 @@ body.theme-light .id-cell em { color: #8C7355; }
 body.theme-light .id-cell b { color: #2B2723; }
 body.theme-light .id-cell b.highlight { color: #2E6B57; }
 body.theme-light .id-cell b.gold { color: #8C5E24; }
-body.theme-light .id-gauge .id-bar { background: #E7DCC8; border-color: #C9B79A; }
+body.theme-light .id-gauge .id-bar { background: #D8CDBE; border-color: #C9B79A; }
 body.theme-light .id-bar i { background: linear-gradient(90deg, #3F7D68, #7FB79C); }
 body.theme-light .id-bar.hp i { background: linear-gradient(90deg, #8C2B1E, #C0573C); }
 body.theme-light .alert-tag {
@@ -2626,7 +2632,10 @@ body.theme-light #log-title {
 }
 body.theme-light #log-box { color: #332E28; }
 body.theme-light .log-entry { border-bottom-color: rgba(140,110,70,.20); }
-body.theme-light .log-time { color: #8C5E24; opacity: 1; }
+body.theme-light .log-time { color: #6B4423; opacity: 1; }
+/* 进度条底轨：浅底上原来的近白透明轨几乎隐形，加深为可辨的赭色 */
+body.theme-light .exp-track { background: #D8CDBE; border-color: #C9B79A; }
+
 body.theme-light .log-system  { color: #8C7355; }
 body.theme-light .log-danger  { color: #A2351F; }
 body.theme-light .log-success { color: #2F6B45; }
@@ -3138,7 +3147,7 @@ body.theme-light .btm-stats { color: #2F6B45; }
 /* ---------- 重伤危机状态：从拥挤的副状态行提出来，独立成条 + 呼吸光 + 可点打坐 ---------- */
 .injury-alert {
     display: flex; align-items: center; gap: 10px;
-    margin: 0 0 9px; padding: 8px 12px;
+    margin: 8px 0 12px; padding: 8px 12px;
     background: rgba(140, 30, 30, .22);
     border: 1px solid #a83232;
     border-radius: 4px;

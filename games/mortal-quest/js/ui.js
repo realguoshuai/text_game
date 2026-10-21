@@ -204,7 +204,10 @@ GAME.UI = {
             box.appendChild(entry);
             // 裁剪：正常流下最旧的一条在头部
             while (box.childElementCount > this.MAX_LOG) box.removeChild(box.firstChild);
-            if (atBottom && typeof box.scrollHeight === "number") box.scrollTop = box.scrollHeight;
+            // 吸底放在下一帧：批量追加日志时本帧布局可能未稳，直接设可能被旧高度截断
+            if (atBottom && typeof box.scrollHeight === "number") {
+                requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
+            }
             // 斗法页另存一份战报（只读旁路，不改任何战斗状态）
             if (GAME.BattleUI) GAME.BattleUI.feed(message, type);
         } catch (e) { console.error("log异常", e); }
@@ -1162,8 +1165,10 @@ GAME.UI = {
                 var item = GAME.DATA.ITEMS[g.id];
                 var price = GAME.Market.buyPrice(g.price);
                 var locked = g.req && p.realmIndex < g.req;
+                var flash = GAME.Market._flash;
+                var isFlash = flash && flash.id === g.id && (Date.now() - flash.ts) < 900;
                 var row = document.createElement("div");
-                row.className = "item-row";
+                row.className = "item-row" + (isFlash ? " bought-flash" : "");
                 var left = document.createElement("div");
                 left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + g.qty +
                     '<div class="item-desc">' + item.desc +
@@ -1175,8 +1180,9 @@ GAME.UI = {
                 priceEl.innerText = price + "灵石";
                 var b = document.createElement("button");
                 b.className = "small-btn btn-gold";
-                b.innerText = "购买";
-                b.disabled = p.spiritStones < price || !!locked;
+                b.innerText = isFlash ? "已购 ✓" : "购买";
+                b.disabled = (p.spiritStones < price || !!locked) || isFlash;
+                if (isFlash) { b.classList.remove("btn-gold"); b.classList.add("btn-done-ok"); }
                 b.onclick = function () { GAME.Market.buy(i); };
                 right.appendChild(priceEl);
                 right.appendChild(b);
