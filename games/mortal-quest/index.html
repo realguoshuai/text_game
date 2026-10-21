@@ -75,6 +75,7 @@
             <span class="alert-tag" id="alert-wrap-阴毒" style="display:none;">阴毒：<span id="yindu-text">无</span></span>
             <span class="alert-tag" id="alert-wrap-risk" style="display:none;">觊觎：<span id="risk-text">0</span>/100</span>
             <span class="alert-tag" id="alert-wrap-leak" style="display:none;">药香泄露：<span id="leak-text">0</span></span>
+            <span class="alert-tag alert-hurt" id="alert-wrap-hurt" style="display:none;">重伤 · 气血 <span id="hurt-text">1</span>，宜打坐调息</span>
         </div>
     </div>
 
@@ -238,7 +239,24 @@
                     <h3 style="margin-top:14px;">地火丹房</h3>
                     <div class="combat-actions">
                         <button id="btn-home-alchemy" class="small-btn">开炉炼丹（地火丹房）</button>
-                    </div>
+                                        <!-- 破境筹备 / 药圃：从中间栏收进洞府页，中栏只留高频即操作，不再堆折叠数据 -->
+                    <details id="bt-prep" class="bt-prep" style="display:none;">
+                        <summary><span id="bt-prep-sum">破境筹备</span></summary>
+                        <div class="bt-prep-body">
+                            <div id="bt-prep-base" class="bt-prep-base"></div>
+                            <div id="bt-prep-list" class="bt-prep-list"></div>
+                            <div id="bt-prep-total" class="bt-prep-total"></div>
+                            <div id="bt-prep-act" class="bt-prep-act"></div>
+                        </div>
+                    </details>
+                    <details id="plot-box" class="bt-prep" style="display:none;">
+                        <summary><span id="plot-sum">药圃</span></summary>
+                        <div class="bt-prep-body">
+                            <div id="plot-list" class="bt-prep-list"></div>
+                            <div id="plot-hint" class="bt-prep-total"></div>
+                        </div>
+                    </details>
+                </div>
                 </div>
 
                 <div class="panel" id="codex-panel">
@@ -479,25 +497,6 @@
                 <button id="btn-sect" class="act-tile" data-page-node-id="estJjkB8CNUqoOaXYE4qO5">门派<em id="sect-sub">尚未入门</em></button>
             </div>
 
-            <!-- 破境筹备：把成功率拆成可凑的几股力（灵脉/护法/心境/丹道），折叠常态只占一行 -->
-            <details id="bt-prep" class="bt-prep" style="display:none;">
-                <summary><span id="bt-prep-sum">破境筹备</span></summary>
-                <div class="bt-prep-body">
-                    <div id="bt-prep-base" class="bt-prep-base"></div>
-                    <div id="bt-prep-list" class="bt-prep-list"></div>
-                    <div id="bt-prep-total" class="bt-prep-total"></div>
-                    <div id="bt-prep-act" class="bt-prep-act"></div>
-                </div>
-            </details>
-
-            <!-- 药圃：时间不只是花掉的，也是长在土里的（js/plot.js） -->
-            <details id="plot-box" class="bt-prep" style="display:none;">
-                <summary><span id="plot-sum">药圃</span></summary>
-                <div class="bt-prep-body">
-                    <div id="plot-list" class="bt-prep-list"></div>
-                    <div id="plot-hint" class="bt-prep-total"></div>
-                </div>
-            </details>
         </div>
 
         <!-- 右栏：见闻录 -->
@@ -598,6 +597,7 @@
 <script src="js/auction.js"></script>
 <script src="js/art.js"></script>
 <script src="js/battle_ui.js"></script>
+<script src="js/battle_result.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

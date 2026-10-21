@@ -10,6 +10,7 @@ GAME.Combat = {
 
     // ---------- 开战：把妖兽配置深拷进战斗状态，避免污染数据表 ----------
     start: function (monsterId) {
+        this._rec = null;   // 上一场的结算明细绝不带进这一场
         var def = null;
         GAME.DATA.MONSTERS.forEach(function (m) { if (m.id === monsterId) def = m; });
         if (!def) return;
@@ -661,11 +662,14 @@ GAME.Combat = {
         ratio = ratio || 1;
         for (var i = 0; i < loot.length; i++) {
             var l = loot[i];
+            var idef = GAME.DATA.ITEMS[l.id];
+            if (!idef) continue;   // 掉落表引用了不存在的物品：跳过，别让一场胜仗崩在最后一步
             if (Math.random() < l.chance * ratio) {
                 var qty = this.rand(l.qty[0], l.qty[1]);
                 if (qty > 0) {
                     GAME.State.addItem(l.id, qty);
-                    GAME.UI.log("意外之喜！获得【" + GAME.DATA.ITEMS[l.id].name + "】×" + qty + "。", "loot");
+                    this._note(l.id, qty);
+                    GAME.UI.log("意外之喜！获得【" + idef.name + "】×" + qty + "。", "loot");
                 }
             }
         }
@@ -688,9 +692,11 @@ GAME.Combat = {
             var spLimit = GAME.State.spLimit ? GAME.State.spLimit() : 0;
             if (spLimit >= 25) {
                 GAME.State.addItem("beast_soul", 1);
+                this._note("beast_soul", 1);
                 GAME.UI.log("你神识如网铺开，趁妖魂未散一举拘入掌中——【搜神拘魂】得【妖兽精魄】×1。", "loot");
             } else if (Math.random() < 0.40 * ratio) {
                 GAME.State.addItem("beast_soul", 1);
+                this._note("beast_soul", 1);
                 GAME.UI.log("妖兽眉心一点魂光未散，被你以灵力裹住收起——获得【妖兽精魄】×1。", "loot");
             } else {
                 GAME.UI.log("妖魂逸散于风中，你神识不足，未能拘住分毫。", "system");
@@ -699,10 +705,12 @@ GAME.Combat = {
 
         if (def.foundation && def.moSect === "moyan" && Math.random() < 0.35 * ratio) {
             GAME.State.addItem("tianhuo_crystal", 1);
+            this._note("tianhuo_crystal", 1);
             GAME.UI.log("你剖开魔焰门修士丹田，取出一枚灼热结晶——获得【天火晶】×1。", "loot");
         }
         if (def.foundation && def.moSect === "guiling" && Math.random() < 0.30 * ratio) {
             GAME.State.addItem("yin_hun_soul", 1);
+            this._note("yin_hun_soul", 1);
             GAME.UI.log("鬼灵门修士丹田阴魂凝而不散，被你以符封住——获得【阴魂精魄】×1。", "loot");
         }
     },
@@ -762,11 +770,14 @@ GAME.Combat = {
             this.end();
             return;
         }
+        // 走到这里的才是"野外撞上的那一只"：把明细记下来，交给结算弹窗
+        this._rec = { win: true, foe: this.shortName(def.name), exp: def.exp, stones: stones, items: [] };
         p.spiritStones += stones;
         GAME.UI.log("你从尸身上搜出 " + stones + " 枚灵石。", "loot");
         this.grantLoot(def.loot, 1, def);
         p.stats.kills += 1;
         this.end();
+        this._settle();
     },
 
     // ---------- 战败：折寿 / 被抢 / 概率身陨 ----------
@@ -834,15 +845,45 @@ GAME.Combat = {
         var lostAge = this.rand(def.loseAge[0], def.loseAge[1]);
         p.ageYears += lostAge;   // 伤及根基，直接折寿
         p.currentHp = Math.max(1, Math.ceil(p.maxHp * 0.1)); // 重伤垂死，勉强爬回
+        // 重伤未愈：气血只要有一丝回升（过时间即 +10/月）就算养回来了，标记自解
+        p.wounded = { hp: p.currentHp };
+        this._rec = { win: false, foe: this.shortName(def.name), lostStones: lostStones,
+                      lostAge: lostAge, hp: p.currentHp, maxHp: p.maxHp };
         GAME.UI.log("你力竭倒地！【" + def.name + "】搜刮了你 " + lostStones + " 枚灵石，冷笑而去。", "danger");
         GAME.UI.log("此战伤了根基，折损寿元 " + lostAge + " 年！你拖着残躯爬回住处。", "danger");
         this.end();
         GAME.Core.checkDeath();
 
-        if (!p.isDead && routed) {
-            if (ctx.type === "jiayuan") GAME.Jiayuan.afterCombat(false, ctx);
-            else GAME.Tainan.afterCombat(false, ctx);
+        if (!p.isDead) {
+            if (routed) {
+                if (ctx.type === "jiayuan") GAME.Jiayuan.afterCombat(false, ctx);
+                else GAME.Tainan.afterCombat(false, ctx);
+            } else {
+                this._settle();
+            }
         }
+    },
+
+    // 把这一场的明细交给结算弹窗（数字早已落账，这里只是"摊开"）
+    _settle: function () {
+        var rec = this._rec;
+        this._rec = null;
+        if (rec && GAME.BattleResult) GAME.BattleResult.show(rec);
+    },
+
+    // 掉落收集器：只有真正 addItem 成功的才进结算篮子，没 roll 中的不会凭空出现
+    _note: function (id, qty) {
+        if (!this._rec || !this._rec.items) return;
+        var arr = this._rec.items;
+        for (var i = 0; i < arr.length; i++) {
+            if (arr[i].id === id) { arr[i].qty += qty; return; }
+        }
+        arr.push({ id: id, qty: qty });
+    },
+
+    // 「铁齿狼 · 一阶妖兽」→「铁齿狼」：结算面板标题行塞不下后半截
+    shortName: function (nm) {
+        return String(nm == null ? "" : nm).split(/[·・]/)[0].trim();
     },
 
     end: function () {

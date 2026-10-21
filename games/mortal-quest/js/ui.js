@@ -784,6 +784,16 @@ GAME.UI = {
             var leakV = gsAlert ? (gsAlert.leak || 0) : 0;
             aw("alert-wrap-leak", leakV > 0);
             if (leakV > 0) this.$("leak-text").innerText = leakV;
+            // 重伤未愈：战败后气血停在残血值。**没有额外的清除入口**——
+            // 过时间自然回血（core.js 每月 +10），只要涨过战败那一刻的值就自解。
+            // 这样"打坐疗伤"是字面意义的解法，而不是靠某个按钮把标记抹掉。
+            if (p.wounded && p.currentHp > (p.wounded.hp || 0)) delete p.wounded;
+            var hurtOn = !!(p.wounded && !p.isDead);
+            aw("alert-wrap-hurt", hurtOn);
+            if (hurtOn) {
+                var ht = this.$("hurt-text");
+                if (ht) ht.innerText = p.currentHp;
+            }
             var ddl = this.$("dd-liquid-text");
             if (ddl) ddl.innerText = p.liquid;
 
@@ -2865,12 +2875,14 @@ GAME.UI = {
             modal = document.createElement("div");
             modal.id = "breakthrough-modal";
             modal.className = "modal";
-            modal.innerHTML = '<div class="modal-content" style="max-width:440px;text-align:center;border:2px solid #ffd700;box-shadow:0 0 25px rgba(255,215,0,0.5);background:linear-gradient(180deg,#121b2d 0%,#20162b 100%);">' +
-                '<div style="color:#ffd700;font-size:14px;letter-spacing:4px;margin-bottom:6px;">✦ 九 霄 雷 劫 · 功 成 证 道 ✦</div>' +
-                '<h2 id="bt-modal-title" style="color:#fff056;font-size:24px;margin:8px 0;text-shadow:0 0 12px rgba(255,215,0,0.8);">境界突破</h2>' +
-                '<div id="bt-modal-desc" style="color:#ffd384;font-size:14px;margin:12px 0;line-height:1.6;"></div>' +
-                '<div id="bt-modal-stats" style="color:#70a1ff;font-size:13px;font-weight:bold;margin:12px 0;"></div>' +
-                '<button id="btn-bt-ok" class="btn-gold" style="margin-top:14px;width:100%;padding:10px 0;font-size:15px;letter-spacing:3px;">收 纳 灵 气 · 稳 固 根 基</button>' +
+            // 样式走 .btm-* 类（css「渡劫诏书」块）：深色是夜空金匾，浅色是宣纸洒金——
+            // 不再用内联样式，否则 body.theme-light 够不着它（用户 2026-10-21 报的就是这个）
+            modal.innerHTML = '<div class="modal-content btm-box">' +
+                '<div class="btm-kicker">✦ 九 霄 雷 劫 · 功 成 证 道 ✦</div>' +
+                '<h2 id="bt-modal-title" class="btm-title">境界突破</h2>' +
+                '<div id="bt-modal-desc" class="btm-desc"></div>' +
+                '<div id="bt-modal-stats" class="btm-stats"></div>' +
+                '<button id="btn-bt-ok" class="btn-gold btm-act">收 纳 灵 气 · 稳 固 根 基</button>' +
                 '</div>';
             document.body.appendChild(modal);
         }

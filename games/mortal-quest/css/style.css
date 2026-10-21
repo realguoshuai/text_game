@@ -226,10 +226,13 @@ h3 { margin: 0 0 8px 0; color: var(--text-dim); font-size: 14px; border-left: 3p
 /* 二级页签：只露当前组的 3~4 个，长名不再被压成一字竖排 */
 #tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;            /* 二级标签只占单行：超出就横向滚，绝不折返挤占纵向空间 */
     gap: 5px;
     flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;        /* 隐藏滚动条，保持精致 */
 }
+#tabs::-webkit-scrollbar { display: none; height: 0; }
 #tabs button {
     flex: 0 0 auto;
     padding: 3px 12px;
@@ -1695,7 +1698,7 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
 .modal-box .btn-gold:hover:not(:disabled) { background: #9c7430; color: #fdf6e6; }
 
 /* ---------- 窄屏 ---------- */
-@media (max-width: 1180px) and (min-width: 901px) {
+@media (max-width: 1200px) and (min-width: 901px) {
     #workspace { grid-template-columns: minmax(0, 1fr) 300px; }
     #right-col { grid-column: 1 / -1; max-height: 220px; }
 }
@@ -2767,3 +2770,382 @@ body.theme-light details.dropdown .dd-body .btn-why { color: #A2351F; }
 body.theme-light * { scrollbar-color: #C4B296 transparent; }
 body.theme-light ::-webkit-scrollbar-thumb { background: #C4B296; }
 body.theme-light ::-webkit-scrollbar-thumb:hover { background: #8C7355; }
+
+/* =========================================================
+ * 斗法结算弹窗（js/battle_result.js）
+ *
+ * 一层"仪式"，不是一页界面，所以与斗法页同规矩：固定暗底，不跟浅色主题翻白。
+ * 两套配色靠容器变量切：胜利=鎏金竹青（--rg-strong 暖金），战败=赤墨（暖红）。
+ * 卷轴 = 中间纸面（.rg-paper）+ 两侧立轴（.rg-pole），匾额/朱印从纸面上沿探出。
+ * ========================================================= */
+body.result-on { overflow: hidden; }
+
+.result-page {
+    position: fixed; inset: 0; z-index: 72;
+    display: none;
+    flex-direction: column; align-items: center; justify-content: flex-start;
+    padding: 64px 14px 30px;
+    overflow-y: auto;
+    background:
+        radial-gradient(64% 54% at 50% 38%, rgba(10, 14, 12, .70), rgba(3, 5, 4, .93) 78%),
+        rgba(3, 5, 4, .90);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.result-page.on { display: flex; }
+.result-page.on .rg-scroll { animation: rgIn .32s cubic-bezier(.2, .8, .3, 1) both; }
+.result-page.on .rg-act    { animation: rgIn .32s .06s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes rgIn { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* ---------- 两套配色 ---------- */
+.result-page.is-win {
+    --rg-p1: #17261F; --rg-p2: #0C1712;
+    --rg-line: #8C7334; --rg-edge: #C9A24E;
+    --rg-tx: #E6DCC2; --rg-dim: #9BAF9F;
+    --rg-strong: #F0D48A;
+    --rg-pole1: #0B100D; --rg-pole2: #3C4E43;
+}
+.result-page.is-lose {
+    --rg-p1: #2B1714; --rg-p2: #170C0A;
+    --rg-line: #7A2E20; --rg-edge: #A4462F;
+    --rg-tx: #E4D2C8; --rg-dim: #B08D80;
+    --rg-strong: #E8785C;
+    --rg-pole1: #180B09; --rg-pole2: #4A241C;
+}
+
+/* ---------- 卷轴 ---------- */
+.rg-scroll {
+    position: relative;
+    width: min(720px, 92vw);
+    margin-top: auto;
+    flex: 0 0 auto;
+}
+.rg-pole {
+    position: absolute; top: -7px; bottom: -7px; width: 22px; z-index: 3;
+    border-radius: 11px;
+    background: linear-gradient(90deg, var(--rg-pole1), var(--rg-pole2) 44%, var(--rg-pole2) 56%, var(--rg-pole1));
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .62), inset 0 0 0 1px rgba(201, 162, 78, .22);
+}
+.rg-l { left: -11px; }
+.rg-r { right: -11px; }
+
+.rg-paper {
+    position: relative; z-index: 1;
+    padding: clamp(20px, 4vw, 32px) clamp(16px, 3.4vw, 36px) clamp(16px, 3vw, 24px);
+    background: linear-gradient(180deg, var(--rg-p1), var(--rg-p2));
+    border: 1px solid var(--rg-line);
+    border-radius: 3px;
+    color: var(--rg-tx);
+    text-align: center;
+    box-shadow:
+        0 26px 64px rgba(0, 0, 0, .66),
+        inset 0 0 0 1px rgba(255, 255, 255, .045),
+        inset 0 0 70px rgba(0, 0, 0, .52);
+}
+/* 内层描边：古籍的双框，一层就够，两层会显廉价 */
+.rg-paper::before {
+    content: ""; position: absolute; inset: 7px; z-index: 0;
+    border: 1px solid var(--rg-line); opacity: .5; border-radius: 2px;
+    pointer-events: none;
+}
+.rg-paper > * { position: relative; z-index: 1; }
+/* 战败：血渍。用三层不规则径向渐变模拟，别做成对称的"设计感血斑" */
+.result-page.is-lose .rg-paper::after {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background:
+        radial-gradient(34% 24% at 9% 6%, rgba(150, 26, 18, .30), transparent 72%),
+        radial-gradient(26% 17% at 84% 4%, rgba(124, 20, 14, .26), transparent 74%),
+        radial-gradient(30% 22% at 94% 96%, rgba(150, 26, 18, .26), transparent 72%),
+        radial-gradient(22% 14% at 30% 99%, rgba(110, 18, 12, .22), transparent 74%);
+}
+
+/* ---------- 匾额 / 朱印 ---------- */
+.rg-seal {
+    margin: -40px auto 16px;
+    width: min(430px, 90%);
+    padding: 10px 14px 8px;
+    font-size: clamp(21px, 4.2vw, 33px);
+    line-height: 1.18;
+    letter-spacing: .34em; text-indent: .34em;
+    color: #F4E0A6;
+    background: linear-gradient(180deg, #1D3229 0%, #0E1C17 100%);
+    border: 1px solid var(--rg-edge);
+    border-radius: 2px;
+    text-shadow: 0 0 20px rgba(240, 212, 138, .42), 0 1px 0 rgba(0, 0, 0, .8);
+    box-shadow:
+        0 0 0 3px rgba(201, 162, 78, .13),
+        0 0 0 4px rgba(201, 162, 78, .30),
+        0 12px 28px rgba(0, 0, 0, .62),
+        inset 0 0 26px rgba(201, 162, 78, .15);
+}
+.result-page.is-lose .rg-seal {
+    width: 92px; height: 92px;
+    margin: -62px auto 14px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0;
+    font-size: clamp(21px, 3.6vw, 26px); line-height: 1.04;
+    letter-spacing: .1em; text-indent: 0;
+    color: #FBEEE2;
+    background: radial-gradient(62% 62% at 50% 34%, #A82B1B, #78190F 72%, #57110A);
+    border: 2px solid #C2543A;
+    border-radius: 4px;
+    transform: rotate(-3deg);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .66);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .72), inset 0 0 20px rgba(0, 0, 0, .42);
+}
+.result-page.is-lose .rg-seal span { display: block; }
+
+/* ---------- 正文 ---------- */
+.rg-lead {
+    margin: 0 0 14px;
+    font-size: clamp(14px, 2.5vw, 17px);
+    line-height: 1.75;
+    color: var(--rg-tx);
+    letter-spacing: .02em;
+}
+.rg-lead b { color: var(--rg-strong); font-weight: 600; letter-spacing: .1em; }
+
+.rg-gains { display: flex; flex-direction: column; align-items: center; gap: 5px; margin: 0 0 16px; }
+.rg-gain { display: flex; align-items: baseline; gap: 10px; }
+.rg-gain em {
+    font-style: normal; font-size: 12px; color: var(--rg-dim);
+    letter-spacing: .2em;
+}
+.rg-gain b {
+    font-size: clamp(17px, 3vw, 23px);
+    color: var(--rg-strong);
+    letter-spacing: .04em;
+    text-shadow: 0 0 18px rgba(240, 212, 138, .42);
+}
+
+/* ---------- 战利品横幅 ---------- */
+.rg-loot { max-width: 580px; margin: 0 auto; }
+.rg-loot-hd, .rg-lost-hd {
+    font-size: 12px; letter-spacing: .5em; text-indent: .5em;
+    color: #C9A24E;
+    margin-bottom: 9px;
+}
+.result-page.is-win .rg-loot {
+    padding: 10px 10px 12px;
+    background: linear-gradient(180deg, #211809 0%, #150E06 100%);
+    border: 1px solid #A9843F;
+    border-radius: 3px;
+    box-shadow: inset 0 0 34px rgba(0, 0, 0, .62), 0 6px 18px rgba(0, 0, 0, .42);
+}
+.rg-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.rg-slot {
+    width: clamp(66px, 12.5vw, 84px);
+    flex: 0 0 auto;
+    padding: 6px 4px 5px;
+    background: rgba(0, 0, 0, .30);
+    border: 1px solid var(--q, #6B6151);
+    border-radius: 3px;
+    text-align: center;
+}
+.rg-slot.q-fan   { --q: #6B6151; }
+.rg-slot.q-ling  { --q: #3F7A5E; }
+.rg-slot.q-shang { --q: #4F6F9A; }
+.rg-slot.q-ji    { --q: #B08D57; }
+.rg-ico {
+    display: block; width: 46px; height: 46px; margin: 0 auto 5px;
+    border-radius: 2px; overflow: hidden;
+    background: #0A0E0B;
+    border: 1px solid var(--q, #6B6151);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, .7);
+}
+.rg-ico img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.rg-slot b {
+    display: block; font-size: 11px; font-weight: 500; color: #EADFC6;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rg-slot em { font-style: normal; font-size: 11px; color: #C9A24E; }
+/* 空槽是虚线的：一眼看出"这里本来就没东西"，不是被吞了 */
+.rg-slot.is-empty {
+    border: 1px dashed rgba(201, 162, 78, .22);
+    background: transparent;
+    min-height: 92px;
+    box-shadow: none;
+}
+.rg-empty {
+    padding: 16px 8px;
+    font-size: 13px; color: var(--rg-dim); line-height: 1.7;
+}
+
+.rg-sum {
+    margin: 12px 0 0;
+    font-size: 12px; line-height: 1.7;
+    color: var(--rg-dim);
+    letter-spacing: .03em;
+}
+
+/* ---------- 战失统计卡 ---------- */
+.rg-lost {
+    max-width: 420px; margin: 0 auto;
+    padding: 14px 18px 16px;
+    background: linear-gradient(180deg, #F2E7D3 0%, #E2D3BA 100%);
+    border: 1px solid #C8AE86;
+    border-radius: 3px;
+    color: #2B1A14;
+    text-align: left;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .44);
+}
+.rg-lost .rg-lost-hd { color: #7C2A1B; margin-bottom: 11px; text-align: center; }
+.rg-lost p {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin: 0 0 7px; padding-bottom: 5px;
+    border-bottom: 1px dashed rgba(120, 80, 50, .28);
+}
+.rg-lost em { font-style: normal; font-size: 13px; color: #6B5647; letter-spacing: .06em; }
+.rg-lost b { font-size: 15px; color: #2B1A14; }
+.rg-lost b.bad { color: #A3341F; }
+.rg-hp {
+    height: 8px; margin-top: 11px;
+    background: #D8C6AB;
+    border: 1px solid #B99F79; border-radius: 5px; overflow: hidden;
+}
+.rg-hp i { display: block; height: 100%; background: linear-gradient(90deg, #7C1F12, #C4442C); }
+
+/* ---------- 按钮 ---------- */
+.rg-act {
+    margin-top: 20px; margin-bottom: auto;
+    flex: 0 0 auto;
+    min-width: min(340px, 86vw);
+    max-width: 92vw;
+    padding: 13px 26px;
+    font-family: inherit;
+    font-size: clamp(14px, 2.6vw, 16px);
+    letter-spacing: .16em; text-indent: .16em;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: transform .12s ease, box-shadow .18s ease, background .18s ease;
+}
+.result-page.is-win .rg-act {
+    color: #F6E4AE;
+    background: linear-gradient(180deg, #3B2E15 0%, #231A0B 100%);
+    border: 1px solid #C9A24E;
+    box-shadow: 0 0 0 3px rgba(201, 162, 78, .12), 0 10px 24px rgba(0, 0, 0, .62), inset 0 0 20px rgba(201, 162, 78, .14);
+    text-shadow: 0 0 14px rgba(240, 212, 138, .45);
+}
+.result-page.is-win .rg-act:hover {
+    background: linear-gradient(180deg, #4E3C1A 0%, #2E2210 100%);
+    border-color: #E8C877;
+    box-shadow: 0 0 0 3px rgba(201, 162, 78, .22), 0 12px 28px rgba(0, 0, 0, .64), inset 0 0 26px rgba(201, 162, 78, .22);
+}
+.result-page.is-lose .rg-act {
+    color: #F0DCCB;
+    background: linear-gradient(180deg, #3E211A 0%, #26120D 100%);
+    border: 1px solid #A4462F;
+    box-shadow: 0 0 0 3px rgba(164, 70, 47, .12), 0 10px 24px rgba(0, 0, 0, .62), inset 0 0 20px rgba(164, 70, 47, .16);
+}
+.result-page.is-lose .rg-act:hover {
+    background: linear-gradient(180deg, #51291F 0%, #311711 100%);
+    border-color: #C2543A;
+}
+.rg-act:active { transform: translateY(1px); }
+
+/* ---------- 窄屏 ---------- */
+@media (max-width: 560px) {
+    .result-page { padding: 52px 10px 24px; }
+    .rg-pole { width: 14px; border-radius: 7px; }
+    .rg-l { left: -7px; } .rg-r { right: -7px; }
+    .rg-paper { padding: 18px 12px 16px; }
+    .rg-seal { margin-top: -34px; letter-spacing: .24em; text-indent: .24em; }
+    .result-page.is-lose .rg-seal { width: 76px; height: 76px; margin-top: -50px; font-size: 20px; }
+    .rg-slot { width: 64px; }
+    .rg-ico { width: 40px; height: 40px; }
+    .rg-lost { padding: 12px 14px 14px; }
+    .rg-act { min-width: 88vw; padding: 12px 16px; letter-spacing: .1em; text-indent: .1em; }
+}
+
+/* ---------- 重伤状态标签（战败后挂在命盘上，过时间回血即消失） ---------- */
+.alert-tag.alert-hurt {
+    background: rgba(163, 52, 31, .14);
+    border-color: rgba(163, 52, 31, .5);
+    color: #C4442C;
+}
+body.theme-light .alert-tag.alert-hurt {
+    background: rgba(163, 52, 31, .10);
+    color: #A3341F;
+}
+
+/* =========================================================
+ * 渡劫破境 · 天道诏书弹窗（js/ui.js showBreakthroughModal）
+ *
+ * 之前整块是内联样式（#121b2d 夜空底、#ffd700 金字），主题切换够不着它——
+ * 浅色模式下命盘和纸面都翻了宣纸，就这一张诏书还悬着半夜的蓝。
+ * 现在样式全走类：深色 = 夜空金匾（原样），浅色 = 宣纸洒金。
+ * ========================================================= */
+.modal .btm-box {
+    max-width: 440px;
+    text-align: center;
+    color: #F3E3B0;
+    background: linear-gradient(180deg, #121b2d 0%, #20162b 100%);
+    border: 2px solid #ffd700;
+    border-radius: 4px;
+    box-shadow: 0 0 25px rgba(255, 215, 0, .5);
+    padding: 22px 24px 20px;
+}
+.btm-kicker {
+    color: #ffd700;
+    font-size: 14px;
+    letter-spacing: 4px;
+    margin-bottom: 6px;
+}
+.btm-title {
+    color: #fff056;
+    font-size: 24px;
+    margin: 8px 0;
+    text-shadow: 0 0 12px rgba(255, 215, 0, .8);
+}
+.btm-desc {
+    color: #ffd384;
+    font-size: 14px;
+    margin: 12px 0;
+    line-height: 1.6;
+}
+.btm-stats {
+    color: #70a1ff;
+    font-size: 13px;
+    font-weight: bold;
+    margin: 12px 0;
+}
+.btm-act {
+    margin-top: 14px;
+    width: 100%;
+    padding: 10px 0;
+    font-size: 15px;
+    letter-spacing: 3px;
+}
+
+/* ---------- 浅色：宣纸洒金 ---------- */
+body.theme-light .modal .btm-box {
+    color: #4A3A22;
+    background:
+        radial-gradient(70% 50% at 50% 0%, rgba(176, 141, 87, .16), transparent 64%),
+        linear-gradient(180deg, #FBF5E6 0%, #F1E8D3 100%);
+    border-color: #B08D57;
+    box-shadow: 0 0 0 3px rgba(176, 141, 87, .14), 0 16px 40px rgba(90, 70, 50, .30), inset 0 0 30px rgba(176, 141, 87, .10);
+}
+body.theme-light .btm-kicker { color: #8C5E24; }
+body.theme-light .btm-title {
+    color: #6D4A16;
+    text-shadow: none;
+}
+body.theme-light .btm-desc { color: #5C4B3A; }
+/* 属性结算那行：原来的电光蓝在宣纸上发飘，换成竹青 */
+body.theme-light .btm-stats { color: #2F6B45; }
+
+/* ---------- 弹窗统一描金规范（save-modal / sit-modal / 突破诏书 共用 .modal-box） ---------- */
+/* 之前各弹窗已是木框纸面，这里把边框提到 #8d734a 并加描金外阴影，与主界面描金标题一致；
+ * 标题栏换成竹青渐变 + 金字的「官印」感，弱化原本的焦糖棕。 */
+.modal-box {
+    border: 2px solid #8d734a;
+    box-shadow: 0 0 0 3px #14170f, 0 0 0 4px rgba(176, 141, 87, .3),
+                0 10px 30px rgba(0, 0, 0, .8), 0 0 15px rgba(212, 167, 106, .15);
+}
+.modal-head {
+    background: linear-gradient(90deg, #1d2b29 0%, #151e1d 100%);
+    border-bottom: 1px solid rgba(141, 115, 74, .4);
+    color: #d4a76a;
+    font-weight: bold;
+    letter-spacing: 4px;
+}
