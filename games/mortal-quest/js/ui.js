@@ -422,18 +422,12 @@ GAME.UI = {
             if (!a) { nx.style.display = "none"; }
             else {
                 nx.style.display = "";
-                if (typeof a.run === "function") {
-                    var nb = document.createElement("button");
-                    nb.className = "goal-next-btn goal-next-" + (a.kind || "go");
-                    nb.innerText = a.label;
-                    nb.onclick = function () { try { a.run(); } catch (e) { console.error(e); } };
-                    nx.appendChild(nb);
-                } else {
-                    var sp = document.createElement("span");
-                    sp.className = "goal-next-static goal-next-" + (a.kind || "done");
-                    sp.innerText = a.label;
-                    nx.appendChild(sp);
-                }
+                // 第七轮审查：目标横幅纯化为信息条，不再内嵌可点按钮（与下方动作网格重复）。
+                // 下一步只作文字提示，执行入口统一收口到动作网格。
+                var sp = document.createElement("span");
+                sp.className = "goal-next-static goal-next-" + (a.kind || "go");
+                sp.innerText = a.label;
+                nx.appendChild(sp);
                 if (a.why) {
                     var wy = document.createElement("span");
                     wy.className = "goal-next-why";

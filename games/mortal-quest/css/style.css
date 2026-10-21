@@ -3195,3 +3195,82 @@ body.theme-light .injury-alert:hover { background: rgba(163, 52, 31, .2); }
     font-weight: bold;
     letter-spacing: 4px;
 }
+
+/* ================= 第七轮审查：中栏行动网格统一 2 列等高 + 目标横幅紧凑化 ================= */
+.actions { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.actions > .act-hero-btn, .actions > details#dd-meditate,
+.actions > .act-tile, .actions > details#dd-catalyze { grid-column: span 1; }
+.actions > button, .actions > details, .actions > details > summary { min-height: 70px; }
+.actions > details > summary { height: 100%; }
+.actions > button, .actions > details > summary {
+    padding: 0 10px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px;
+}
+.actions > .act-hero-btn { font-size: 16px; letter-spacing: 3px; min-height: 70px; padding: 0 10px; }
+.actions > .act-hero-btn em { font-size: 11.5px; letter-spacing: 1px; }
+/* 目标横幅：纯信息条，紧凑化。flex 改块级流：标签/标题/去向/下一步自然成 2~3 行 */
+.goal-banner { display: block; padding: 6px 12px; line-height: 1.45; }
+.goal-banner .goal-tag { display: inline-block; margin-right: 7px; vertical-align: 1px; }
+.goal-banner .goal-main { display: inline; }
+.goal-banner #goal-text { display: inline; }
+.goal-banner .goal-hint { display: inline; margin-left: 5px; }
+.goal-banner .goal-where { display: inline; margin-right: 6px; }
+.goal-banner #goal-next { display: block; margin-top: 2px; padding-top: 2px; border-top: 1px dashed rgba(140,110,70,.22); line-height: 1.4; }
+.goal-banner .goal-next-static { display: inline; }
+.goal-banner .goal-next-why { display: inline; margin-left: 6px; }
+body.theme-light .goal-banner { padding: 6px 12px; }
+body.theme-light .goal-banner #goal-next { border-top-color: rgba(140,110,70,.22); }
+@media (max-width: 900px) {
+    .actions { grid-template-columns: 1fr; }
+}
+
+/* ---- 浅色模式：羊皮纸卡 + 古籍描边（用户规范色值） ---- */
+body.theme-light .goal-banner {
+    background: #FAF6ED;
+    border: 1px solid #C8B9A6;
+    border-left: 4px solid #8C5E24;
+    border-radius: 6px;
+    padding: 8px 14px;
+}
+body.theme-light .goal-tag {
+    background: #E8DEC8; color: #7A4E1B; border: none;
+    font-size: 11px; padding: 1px 6px; border-radius: 3px; font-weight: 600;
+}
+body.theme-light .goal-main b { color: #2B2520; }
+body.theme-light .goal-hint,
+body.theme-light .goal-next-static,
+body.theme-light .goal-next-why { color: #6E5C49; }
+body.theme-light .actions > button,
+body.theme-light .actions > details > summary {
+    background: linear-gradient(180deg, #FAF6EE 0%, #EFE7DA 100%);
+    border: 1px solid #C4B59E;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(60, 45, 30, .05);
+}
+body.theme-light .actions > button:hover:not(:disabled),
+body.theme-light .actions > details > summary:hover {
+    border-color: #8C5E24;
+    background: linear-gradient(180deg, #FFFFFF 0%, #F5ECE0 100%);
+}
+body.theme-light .actions > button { color: #2B2520; }
+body.theme-light .actions em { color: #6B5945; opacity: 1; }
+body.theme-light .actions > button:disabled,
+body.theme-light .actions > details > summary.is-locked {
+    background: #E8E2D5;
+    border-color: #D2C8B8;
+    color: #9E9384;
+    box-shadow: none;
+}
+body.theme-light .actions > button:disabled em,
+body.theme-light .actions > details > summary.is-locked em { color: #9E9384; }
+body.theme-light .actions > .act-hero-btn {
+    background: linear-gradient(180deg, #FAF6EE 0%, #EFE7DA 100%);
+    border-color: #C4B59E;
+}
+body.theme-light .actions > button.act-seal {
+    border: 1px solid #B8766B;
+    color: #8A3428;
+    background: linear-gradient(180deg, #FAF6EE 0%, #F0E2D6 100%);
+    box-shadow: inset 0 0 0 1px rgba(163,52,31,.10), 0 1px 3px rgba(60,45,30,.05);
+}
+body.theme-light .actions > button.act-seal em { color: #8A3428; }
