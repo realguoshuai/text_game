@@ -155,6 +155,25 @@ GAME.UI = {
             gBtns[gi].className = "nav-g" + (on ? " nav-on" : "") + (urgent ? " nav-locked" : "");
             gBtns[gi].disabled = !!urgent;
         }
+
+        this.dedupeHeadings(visible);
+    },
+
+    // 页签已经写明「市集」，纸上再顶一个大字「市集」只占垂直空间（三级标题叠三级导航）。
+    // 只收完全同名的那一个：'门派 · 杂役堂' 与 '天下舆图（渐进解锁）' 这类带信息的标题保留。
+    dedupeHeadings: function (panelId) {
+        try {
+            var panel = panelId ? document.getElementById(panelId) : null;
+            if (!panel) return;
+            var btn = this.$("tab-" + (this.TAB_BTN[this.tab] || this.tab));
+            var tabName = btn ? String(btn.innerText || "").trim() : "";
+            var heads = panel.querySelectorAll("h3");
+            for (var i = 0; i < heads.length; i++) {
+                var dupe = !!tabName && String(heads[i].innerText || "").trim() === tabName;
+                if (dupe) heads[i].classList.add("h-dupe");
+                else heads[i].classList.remove("h-dupe");
+            }
+        } catch (e) { /* 标题收不掉不影响玩法 */ }
     },
 
     // ---------- 日志 ----------
@@ -166,10 +185,28 @@ GAME.UI = {
             var p = GAME.State.p();
             var entry = document.createElement("div");
             entry.className = "log-entry log-" + type;
-            entry.innerText = "[" + p.ageYears + "岁" + p.ageMonths + "月] " + message;
-            box.insertBefore(entry, box.firstChild);
-            // 裁剪：日志框为 column-reverse，最旧的一条是 lastChild
-            while (box.childElementCount > this.MAX_LOG) box.removeChild(box.lastChild);
+            // 时间戳单独一层：与正文同色时，一屏读下来像糊在一起
+            var stamp = document.createElement("span");
+            stamp.className = "log-time";
+            stamp.innerText = "[" + p.ageYears + "岁" + p.ageMonths + "月]";
+            var body = document.createElement("span");
+            body.className = "log-msg";
+            body.innerText = " " + message;
+            entry.appendChild(stamp);
+            entry.appendChild(body);
+            // 新条目接在末尾。原来是 column-reverse + insertBefore(firstChild)：
+            // 好处是 CSS 原生吸底，坏处是条目不满一屏时整块贴到底，标题底下一大片空。
+            // 改成正常流，吸底交给下面两行——但只在玩家本来就在底部时才抢滚动位置。
+            var atBottom = true;
+            if (typeof box.scrollHeight === "number" && typeof box.clientHeight === "number") {
+                atBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 48;
+            }
+            box.appendChild(entry);
+            // 裁剪：正常流下最旧的一条在头部
+            while (box.childElementCount > this.MAX_LOG) box.removeChild(box.firstChild);
+            if (atBottom && typeof box.scrollHeight === "number") box.scrollTop = box.scrollHeight;
+            // 斗法页另存一份战报（只读旁路，不改任何战斗状态）
+            if (GAME.BattleUI) GAME.BattleUI.feed(message, type);
         } catch (e) { console.error("log异常", e); }
     },
 
@@ -822,6 +859,9 @@ GAME.UI = {
 
             // 最后统一把「为什么这个按钮是灰的」贴到按钮里（手机无 hover，title 等于不存在）
             try { this.annotateWhy(); } catch (e) { }
+            // 物品图标同样统一收口：二十多处 item-row 各补一遍必漏
+            try { this.decorateIcons(); } catch (e) { }
+            try { if (GAME.BattleUI) GAME.BattleUI.render(); } catch (e) { }
         } catch (e) {
             console.error("渲染异常", e);
             try { this.log("界面渲染出现异常：" + e.message + "（游戏仍在运行，可重入轮回）", "danger"); } catch (e2) {}
@@ -916,6 +956,39 @@ GAME.UI = {
             for (var _li = 0; _li < _leg.length; _li++) this.log(_leg[_li], "system");
         }
         this.updateUI();
+    },
+
+    // ---------- 物品图标：给所有 item-row 补一张图 ----------
+    // 行内第一个 span.q-* 就是物品名，拿它反查 id，再按品阶描边。
+    // 只在渲染末尾扫一遍，就不必去改二十多处渲染代码。
+    decorateIcons: function () {
+        if (!GAME.Art || !GAME.DATA.ITEMS) return;
+        if (!this._nameToId) {
+            this._nameToId = {};
+            for (var k in GAME.DATA.ITEMS) {
+                var it0 = GAME.DATA.ITEMS[k];
+                if (it0 && it0.name) this._nameToId[it0.name] = k;
+            }
+        }
+        var rows = document.querySelectorAll(".item-row:not(.ico-done)");
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            row.classList.add("ico-done");
+            var q = row.querySelector("span[class^='q-']");
+            if (!q) continue;
+            var id = this._nameToId[(q.textContent || "").trim()];
+            if (!id) continue;
+            var item = GAME.DATA.ITEMS[id];
+            if (!item) continue;
+            var ico = document.createElement("span");
+            ico.className = "item-ico " + GAME.Art.qualityClass(item.quality);
+            var img = document.createElement("img");
+            img.src = GAME.Art.itemSrc(id, item);
+            img.alt = "";
+            img.loading = "lazy";
+            ico.appendChild(img);
+            row.insertBefore(ico, row.firstChild);
+        }
     },
 
     // ---------- 背包 ----------
@@ -3037,6 +3110,7 @@ GAME.UI = {
 /* ================= 入口 ================= */
 (function () {
     try {
+        if (GAME.BattleUI) GAME.BattleUI.init();   // 斗法页先搭好空壳，开战时只填内容
         GAME.UI.bindEvents();
         GAME.UI.bindBatch();            // 批量闭关（连修 5/10/至圆满）
         GAME.UI.initTheme();            // 先还原配色偏好，避免首屏闪烁

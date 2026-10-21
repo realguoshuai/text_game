@@ -125,7 +125,14 @@ function click(b, tag) {
 }
 function lastLog() {
     const box = els['log-box'];
-    return (box && box.children[0]) ? box.children[0].innerText : '';
+    if (!box || !box.children.length) return '';
+    // 见闻录已改成「旧在前、新在后」（正常文档流 + 吸底），最新一条在末尾；
+    // 每条又拆成 <span.log-time> + <span.log-msg> 两段，文本要从子节点拼。
+    const last = box.children[box.children.length - 1];
+    if (last.children && last.children.length) {
+        return last.children.map(c => c._text || '').join(' ');
+    }
+    return last.innerText || last._text || '';
 }
 function month() { const p = G.State.p(); return p.clock.year * 12 + p.clock.month; }
 function clearLogs() { if (els['log-box']) els['log-box'].innerHTML = ''; }

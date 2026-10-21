@@ -357,7 +357,8 @@ button:disabled {
     border-radius: 4px;
 }
 /* 左列必须能"长"：否则窄屏下列宽塌成一条，中文被挤成竖排（每行一个字） */
-.item-row > div:first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* 物品图标插在行首，用 first-of-type 而非 first-child，否则左列规则会落到图标上 */
+.item-row > div:first-of-type { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .item-row:last-child { border-bottom: none; }
 .item-row:hover { background: rgba(255,255,255,0.03); }
 .skill-learned { background: linear-gradient(90deg, var(--accent-soft, rgba(180,83,9,0.12)), transparent 60%); border-radius: 4px; }
@@ -1805,6 +1806,282 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
 .cover-note b { color: #d9c08a; }
 .origin-desc { color: #c1d0c4; }
 
+/* =========================================================
+ * 物品图标（assets/items 抽自效果图，144px）
+ * 图标按「品阶」描边，凡品灰、灵品青、上品蓝、极品金
+ * ========================================================= */
+.item-ico {
+    flex: 0 0 auto;
+    width: 46px; height: 46px;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid #6b5636;
+    background: #10161a;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .55), 0 1px 3px rgba(0, 0, 0, .35);
+    line-height: 0;
+}
+.item-ico img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.item-ico.iq-fan   { border-color: #5c6470; }
+.item-ico.iq-ling  { border-color: #3f7a5e; box-shadow: inset 0 0 8px rgba(64, 180, 130, .22), 0 1px 3px rgba(0, 0, 0, .35); }
+.item-ico.iq-shang { border-color: #4f6f9a; box-shadow: inset 0 0 9px rgba(90, 140, 220, .26), 0 1px 3px rgba(0, 0, 0, .35); }
+.item-ico.iq-ji    { border-color: #b08d57; box-shadow: inset 0 0 10px rgba(220, 175, 90, .34), 0 0 7px rgba(200, 160, 80, .22); }
+#panel-area .item-ico { box-shadow: inset 0 0 0 1px rgba(90, 70, 40, .45), 0 1px 3px rgba(60, 40, 20, .25); }
+#panel-area .item-ico.iq-ji { box-shadow: inset 0 0 10px rgba(190, 150, 70, .3), 0 0 7px rgba(190, 150, 70, .28); }
+
+/* =========================================================
+ * 斗法页（battle_ui.js 动态建 DOM）
+ * 一屏之内四段：双方 → 战局实况 → 手段 → 主命令
+ * ========================================================= */
+.battle-page {
+    position: fixed; inset: 0; z-index: 60;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 16px;
+    background:
+        radial-gradient(120% 90% at 50% 0%, rgba(10, 18, 16, .90), rgba(3, 6, 6, .97));
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+}
+body.battle-on .battle-page { display: flex; }
+body.battle-folded .battle-page { display: none; }
+
+.bp-frame {
+    position: relative;
+    width: min(1000px, 100%);
+    height: min(88vh, 780px);
+    max-height: min(94vh, 900px);
+    display: flex; flex-direction: column;
+    padding: 26px 20px 14px;
+    border-radius: 6px;
+    background:
+        radial-gradient(130% 100% at 50% -12%, rgba(62, 78, 69, .55), rgba(14, 22, 20, .94) 62%),
+        linear-gradient(180deg, #1b2522, #0d1413);
+    border: 1px solid #6b5636;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .65), 0 20px 54px rgba(0, 0, 0, .62),
+                inset 0 0 70px rgba(0, 0, 0, .55);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.bp-frame::before,
+.bp-frame::after {
+    content: "";
+    position: absolute; top: 0; bottom: 0; width: 5px; pointer-events: none;
+    background: linear-gradient(180deg, #6b5636, #33291a 40%, #6b5636);
+    opacity: .55;
+}
+.bp-frame::before { left: 0; }
+.bp-frame::after { right: 0; }
+
+.bp-plaque {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    padding: 2px 30px 4px;
+    font-family: var(--font-serif, "Songti SC", serif);
+    font-size: 20px; letter-spacing: 4px;
+    color: #f2dcaa;
+    background: linear-gradient(180deg, #332c1d, #17130e);
+    border: 1px solid #8a6a33; border-top: none;
+    border-radius: 0 0 8px 8px;
+    text-shadow: 0 0 10px rgba(224, 176, 92, .55);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, .65);
+    white-space: nowrap;
+}
+.bp-fold {
+    position: absolute; top: 8px; right: 12px;
+    width: 24px; height: 24px; line-height: 1;
+    font-size: 12px; color: #b9a887;
+    background: rgba(20, 26, 24, .9);
+    border: 1px solid #6b5636; border-radius: 3px;
+    cursor: pointer;
+}
+.bp-fold:hover { color: #f0d9a0; border-color: #b08d57; }
+
+/* ---------- 双方 ---------- */
+.bp-stage { display: flex; align-items: flex-start; gap: 12px; flex: 0 0 auto; }
+.bp-side { display: flex; gap: 10px; flex: 1 1 0; min-width: 0; align-items: center; }
+.bp-side.bp-right { flex-direction: row-reverse; text-align: right; }
+.bp-ava {
+    flex: 0 0 auto; width: 78px; height: 78px;
+    border-radius: 50%; overflow: hidden;
+    border: 2px solid #8a6a33;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, .55), 0 0 16px rgba(200, 160, 90, .28);
+    background: #0c1210;
+}
+.bp-ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bp-meta { flex: 1 1 auto; min-width: 0; }
+.bp-nm { display: flex; flex-direction: column; gap: 2px; margin-bottom: 7px; min-width: 0; }
+.bp-nm b {
+    font-family: var(--font-serif, serif); font-size: 17px; letter-spacing: 1px;
+    color: #f2e3c4; text-shadow: 0 1px 2px rgba(0, 0, 0, .8);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+.bp-nm em { font-style: normal; font-size: 11px; color: #9bb0a2; letter-spacing: .5px; }
+
+.bp-bar {
+    position: relative; height: 13px; margin-bottom: 5px;
+    border-radius: 2px; overflow: hidden;
+    background: linear-gradient(180deg, #1a0f0e, #2a1614);
+    border: 1px solid rgba(120, 90, 55, .55);
+}
+.bp-bar i {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 0; transition: width .28s ease;
+}
+.bp-hp i { background: linear-gradient(180deg, #d9482f, #8e1f14); }
+.bp-gd i { background: linear-gradient(180deg, #4aa3c9, #1d5a78); }
+.bp-bar span {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; letter-spacing: .5px; color: #f4ece0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .95);
+    pointer-events: none;
+}
+.bp-gd.is-dim { opacity: .42; }
+.bp-line {
+    font-size: 11.5px; color: #93a89b; letter-spacing: .3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bp-center {
+    flex: 0 0 auto; align-self: center;
+    width: 38px; text-align: center;
+    font-family: var(--font-serif, serif); font-size: 26px;
+    color: rgba(210, 168, 96, .5);
+    text-shadow: 0 0 14px rgba(210, 168, 96, .35);
+}
+
+/* ---------- 战局实况：宣纸 ---------- */
+.bp-scroll {
+    flex: 1 1 auto; min-height: 96px;
+    display: flex; flex-direction: column;
+    margin: 12px 0 10px; padding: 8px 16px 10px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #f0e5ca, #e3d5b2 70%, #dccdA6);
+    border: 1px solid #8a6a33;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34), inset 0 0 44px rgba(140, 110, 60, .32);
+}
+.bp-scroll-hd {
+    flex: 0 0 auto; text-align: center;
+    font-family: var(--font-serif, serif); font-size: 12.5px; letter-spacing: 4px;
+    color: #7c5a2e;
+    border-bottom: 1px solid rgba(140, 110, 70, .38);
+    padding-bottom: 4px; margin-bottom: 6px;
+}
+.bp-log { flex: 1 1 auto; overflow-y: auto; padding-right: 4px; }
+.bp-ln {
+    font-family: var(--font-serif, "Songti SC", serif);
+    font-size: 13.5px; line-height: 1.8; color: #342a1d;
+    margin-bottom: 2px;
+}
+.bp-ln.bp-danger  { color: #a2351f; }
+.bp-ln.bp-warning { color: #9a5b1a; }
+.bp-ln.bp-loot    { color: #7a5416; }
+.bp-ln.bp-success { color: #2f6b45; }
+.bp-ln.bp-system  { color: #6b5b42; font-size: 12.5px; }
+.bp-rnd {
+    font-size: 11.5px; letter-spacing: 3px; color: #8a3b22;
+    margin: 6px 0 3px; padding-bottom: 2px;
+    border-bottom: 1px dashed rgba(140, 110, 70, .45);
+}
+
+/* ---------- 符箓 / 术法抽屉 ---------- */
+.bp-drawer {
+    display: none; flex: 0 0 auto;
+    margin-bottom: 8px; padding: 8px 12px 10px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #ece0c4, #ddceac);
+    border: 1px solid #8a6a33;
+    box-shadow: inset 0 0 30px rgba(140, 110, 60, .3);
+    max-height: 168px; overflow-y: auto;
+}
+.bp-drawer-hd { font-family: var(--font-serif, serif); font-size: 12px; letter-spacing: 2px; color: #7c5a2e; margin-bottom: 6px; }
+.bp-drawer-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.bp-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px; text-align: left;
+    background: rgba(255, 250, 238, .72);
+    border: 1px solid #b08d57; border-radius: 3px;
+    color: #3a2f1e; cursor: pointer;
+}
+.bp-item img { width: 30px; height: 30px; border-radius: 2px; flex: 0 0 auto; object-fit: cover; border: 1px solid #a08a63; }
+.bp-item { min-width: 0; }
+.bp-item > b, .bp-item > em { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bp-item b { font-family: var(--font-serif, serif); font-size: 13px; font-weight: normal; display: block; }
+.bp-item em { font-style: normal; font-size: 10.5px; color: #7b6a4f; display: block; }
+.bp-item:hover:not(:disabled) { background: #fff6e2; border-color: #8a3b22; }
+.bp-item.off, .bp-item:disabled { opacity: .45; cursor: not-allowed; }
+.bp-empty { grid-column: 1 / -1; font-size: 12px; color: #7b6a4f; padding: 4px 2px; }
+
+/* ---------- 主命令 / 旁门手段 ---------- */
+.bp-cmds { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.bp-cmd {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 8px 6px 7px;
+    font-family: var(--font-serif, serif);
+    color: #f0e2c2;
+    background: linear-gradient(180deg, #2c2520, #16120f);
+    border: 1px solid #7a5f34; border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 220, 160, .14), 0 2px 7px rgba(0, 0, 0, .55);
+    cursor: pointer;
+}
+.bp-cmd b { font-size: 16px; letter-spacing: 3px; text-indent: 3px; font-weight: normal; }
+.bp-cmd em { font-style: normal; font-size: 10.5px; color: #a3947a; letter-spacing: .3px; }
+.bp-cmd:hover:not(:disabled) { border-color: #c9a25e; color: #fff3d6; }
+.bp-cmd:disabled { opacity: .36; cursor: not-allowed; }
+.bp-cmd.on { border-color: #c9a25e; box-shadow: inset 0 0 18px rgba(220, 170, 80, .32); }
+.bp-cmd::after {
+    content: ""; position: absolute; inset: 2px; border-radius: 2px;
+    border: 1px solid rgba(200, 160, 90, .16); pointer-events: none;
+}
+.bp-extras { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.bp-chip {
+    font-size: 11.5px; padding: 4px 9px; cursor: pointer;
+    color: #cfc2a6; background: rgba(28, 34, 31, .92);
+    border: 1px solid #5d5033; border-radius: 3px;
+}
+.bp-chip:hover:not(:disabled) { border-color: #c9a25e; color: #f5e6c6; }
+.bp-chip:disabled { opacity: .42; color: #7d7563; cursor: not-allowed; }
+
+/* 收起后的召回条 */
+.bp-back {
+    display: none;
+    position: fixed; right: 18px; bottom: 18px; z-index: 61;
+    padding: 8px 16px;
+    font-family: var(--font-serif, serif); font-size: 13px; letter-spacing: 1px;
+    color: #f2dcaa; background: linear-gradient(180deg, #332c1d, #17130e);
+    border: 1px solid #8a6a33; border-radius: 18px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
+    cursor: pointer;
+}
+body.battle-folded .bp-back { display: block; }
+
+/* ---------- 窄屏 ---------- */
+@media (max-width: 760px) {
+    .battle-page { padding: 6px; }
+    .bp-frame { padding: 22px 12px 10px; height: auto; max-height: 98vh; border-radius: 4px; }
+    .bp-plaque { font-size: 16px; letter-spacing: 3px; padding: 2px 20px 3px; }
+    .bp-ava { width: 54px; height: 54px; }
+    .bp-nm b { font-size: 14px; }
+    .bp-nm em { font-size: 10px; }
+    .bp-bar { height: 11px; }
+    .bp-bar span { font-size: 9px; }
+    .bp-line { font-size: 10px; }
+    .bp-center { width: 22px; font-size: 18px; }
+    .bp-ln { font-size: 12.5px; line-height: 1.72; }
+    .bp-cmds { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+    .bp-cmd { padding: 7px 4px 6px; }
+    .bp-cmd b { font-size: 15px; }
+    .bp-cmd em { font-size: 9.5px; }
+    .bp-extras { gap: 5px; }
+    .bp-chip { font-size: 10.5px; padding: 3px 7px; }
+    .bp-scroll { max-height: 38vh; min-height: 84px; }
+    .bp-drawer { max-height: 26vh; }
+    .battle-page { align-items: flex-start; padding-top: 8px; }
+    .bp-drawer-list { grid-template-columns: 1fr 1fr; }
+    .bp-item b { font-size: 12px; }
+    .bp-item img { width: 24px; height: 24px; }
+}
+
 /* ---------- 浅色：把墨底换成日光下的宣纸 ---------- */
 body.theme-light {
     background-image:
@@ -1821,3 +2098,286 @@ body.theme-light #topbar h2 { filter: none; background-image: linear-gradient(18
 body.theme-light #brand-sub { color: #7d8878; }
 body.theme-light .bt-prep { background: linear-gradient(180deg, #eceae0, #e2e0d4); }
 body.theme-light .actions > button, body.theme-light .actions > details > summary { background: linear-gradient(180deg, #f3f1e6, #ddd9c8); color: #3a3325; border-color: #b7b19c; }
+
+/* =========================================================
+ * 第五轮：暗色沉浸 —— 把左右两栏的浅米黄压成暗调羊皮纸
+ *
+ * 上一轮换皮留下的最大问题不是"不好看"，是**明度打架**：
+ * 左栏面板与右栏见闻录是 #e9dcc0 的浅米黄，中栏是暗石牌，
+ * 整屏被割成「黑-黄-黑-黄」四条，眼睛没有落点，纸也不像纸。
+ * 这一轮统一到暗色：纸还是纸（纸纹、木框、暗金边都在），
+ * 只是从"灯下的宣纸"变成"烛火里的旧纸"。
+ *
+ * 做法仍与上一轮相同：**只在容器上重定义变量**，
+ * 子元素继续用 var(--text) 就整片翻暗，不必逐条改颜色。
+ * ========================================================= */
+
+/* ---------- 1. 纸面容器：暗调羊皮纸 + 象牙白字 ---------- */
+#panel-area,
+#right-col,
+.modal-box,
+.paper,
+details.dropdown .dd-body,
+.goal-banner {
+    --text:         #DCD6CD;
+    --text-strong:  #F4ECDC;
+    --text-dim:     #B4AB9B;
+    --text-mute:    #8E8676;
+    --text-faint:   #6E685C;
+    --accent:       #D08A62;
+    --gold:         #D4A76A;
+    --gold-tx:      #E4BE84;
+    --gold-bd:      #8D734A;
+    --warning:      #E38F73;
+    --danger-bd:    #8C3A28;
+    --danger-tx:    #ED9D83;
+    --success:      #7FBF97;
+    --panel-bg:     #222624;
+    --panel-border: #3A423B;
+    --btn-bg:        #233431;
+    --btn-border:    #8D734A;
+    --btn-text:      #D8C8A9;
+    --event-bd:     #A0763A;
+    --ach-bg:       #262C29;
+    --log-bg:       transparent;
+    color: var(--text);
+}
+
+/* 左栏纸面：暗青石面。
+ * ⚠ 这里**不能再叠 var(--grain)**：那是一张 feTurbulence 噪点图，
+ *   在浅米黄（#e9dcc0）上是纸纤维，压到 #1f2422 上就成了一片雪花——
+ *   整块面板发灰发脏、字也发毛，正是"水墨感"被毁掉的直接原因。
+ *   改用 1px 细密横纹（帘纹纸），够静，不抢字。 */
+#panel-area {
+    background-color: #1f2422;
+    background-image:
+        radial-gradient(62% 40% at 12% 0%, rgba(212,167,106,.065), transparent 62%),
+        radial-gradient(52% 42% at 92% 100%, rgba(96,150,126,.045), transparent 62%),
+        repeating-linear-gradient(0deg, rgba(214,204,182,.018) 0 1px, transparent 1px 4px);
+    border: 1px solid #454032;
+    box-shadow: inset 0 0 34px rgba(0,0,0,.42), inset 0 0 0 1px rgba(212,167,106,.10);
+}
+
+/* 右栏见闻录：比纸面再深半档，像一卷压在案上的旧竹纸。
+ * 原来那条 26px 一格的横线在暗底上会显成"格子布"，一并换成 4px 帘纹。 */
+#right-col {
+    background-color: #1b201e;
+    background-image:
+        radial-gradient(70% 30% at 50% 0%, rgba(212,167,106,.06), transparent 62%),
+        repeating-linear-gradient(0deg, rgba(214,204,182,.016) 0 1px, transparent 1px 4px);
+    border-color: #3F463C;
+    box-shadow: inset 0 0 30px rgba(0,0,0,.5), inset 0 0 0 1px rgba(212,167,106,.08), 0 8px 22px rgba(0,0,0,.45);
+}
+#right-col::before,
+#right-col::after { background: linear-gradient(180deg, rgba(126,158,136,.34), rgba(90,120,85,.12)); }
+
+/* ---------- 2. 纸面内的硬编码墨色，逐条翻成暗底浅字 ---------- */
+#panel-area h3 { color: #E7C98E; border-bottom-color: rgba(212,167,106,.3); }
+#panel-area h3::after { background: linear-gradient(90deg, transparent, rgba(212,167,106,.75), transparent); }
+#panel-area h4.mkt-sec { color: #DCC497; border-bottom-color: rgba(212,167,106,.24); }
+#panel-area .item-desc { color: var(--text-dim); }
+#panel-area .item-row { border-bottom-color: rgba(212,167,106,.14); }
+#panel-area .highlight { color: var(--accent); }
+#panel-area .gold { color: var(--gold); }
+#panel-area .warning { color: var(--warning); }
+#panel-area .empty-tip { color: #8A8274; }
+#panel-area .guide-box {
+    background: rgba(212,167,106,.07);
+    border: 1px solid rgba(212,167,106,.24);
+    border-left: 3px solid var(--gold);
+}
+#panel-area .guide-title { color: var(--gold-tx); }
+#panel-area .ach { border-color: rgba(212,167,106,.26); color: var(--text-mute); }
+#panel-area .ach-on { color: var(--gold-tx); background: rgba(212,167,106,.14); border-color: var(--gold); }
+#panel-area .ach-off { color: var(--text-faint); background: rgba(120,140,128,.08); }
+
+/* 品阶四色：暗底上原本的深青/深紫全糊了，统一提亮一档 */
+#panel-area .q-凡品 { color: #9A9284; }
+#panel-area .q-灵品 { color: #6FB6C8; }
+#panel-area .q-上品 { color: #B98AD0; }
+#panel-area .q-极品 { color: #E08060; }
+
+/* 纸面上的按钮：从"玉石白牌"翻成"暗玉牌"，与中栏石牌同一个语族 */
+#panel-area button,
+details.dropdown .dd-body button {
+    background: linear-gradient(180deg, #2B3A36, #1E2A27);
+    border: 1px solid var(--btn-border);
+    color: var(--btn-text);
+    box-shadow: inset 0 1px 0 rgba(226,198,140,.14);
+}
+#panel-area button:hover:not(:disabled),
+details.dropdown .dd-body button:hover:not(:disabled) {
+    background: linear-gradient(180deg, #35473F, #243230);
+    border-color: #C0A16A;
+    color: #F4EAD4;
+}
+#panel-area button:disabled {
+    background: #1A2320;
+    color: #6E7A72;
+    border-color: #2F3A35;
+    box-shadow: none;
+}
+#panel-area .btn-danger { border-color: #8C3A28; color: #ED9D83; }
+#panel-area .btn-danger:hover:not(:disabled) { background: #8C3A28; color: #FDF3E6; border-color: #A8462F; }
+#panel-area .btn-gold { border-color: var(--gold-bd); color: var(--gold-tx); }
+#panel-area .btn-gold:hover:not(:disabled) { background: rgba(141,115,74,.34); color: #F6ECD2; }
+#panel-area button .btn-why { color: var(--warning); }
+
+/* 章节地图：纸面上的"浅底卡"也要压暗，否则一整块发白 */
+#panel-area .atlas-chapter { background: rgba(212,167,106,.06); border-color: rgba(212,167,106,.22); color: var(--text); }
+#panel-area .atlas-chapter-current { background: rgba(212,167,106,.13); border-color: var(--gold); }
+#panel-area .chapter-tab { background: rgba(212,167,106,.06); border-color: rgba(212,167,106,.24); color: var(--text-dim); }
+#panel-area .chapter-tab.on { background: rgba(212,167,106,.18); border-color: var(--gold); color: #F4EAD4; }
+#panel-area .map-atlas-body { background: rgba(0,0,0,.16); }
+#panel-area .atlas-subtitle { color: var(--accent); }
+#panel-area .atlas-chapter-intro { color: var(--text-dim); }
+#panel-area .atlas-chapter-title { color: var(--gold-tx); }
+/* 章节扉页是水墨白底图，在暗屏上会亮成一块斑：压一档亮度，底部再收一道暗角融进纸面 */
+#panel-area .atlas-chapter-art { filter: brightness(.85) saturate(.86); border: 1px solid rgba(212,167,106,.16); }
+#panel-area .atlas-chapter-art::after { background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(10,14,13,.46)); }
+
+/* 弹窗（存档 / 坐化）：整体也压暗，别在暗屏上开一盏白灯 */
+.modal-box {
+    background-color: #1f2422;
+    background-image: radial-gradient(60% 40% at 50% 0%, rgba(212,167,106,.06), transparent 62%);
+    border: 1px solid #454032;
+    box-shadow: inset 0 0 30px rgba(0,0,0,.45), 0 14px 40px rgba(0,0,0,.7);
+}
+.modal-box h3, .modal-box h2 { color: #E7C98E; }
+.slot-name { color: var(--text-strong); }
+.slot-tag { background: rgba(212,167,106,.14); color: var(--gold-tx); border-color: rgba(212,167,106,.3); }
+.slot-time { color: var(--text-mute); }
+.preset-title { color: var(--gold-tx); }
+.preset-desc { color: var(--text-mute); }
+.modal-box .btn-gold { border-color: var(--gold-bd); color: var(--gold-tx); }
+.modal-box button {
+    background: linear-gradient(180deg, #2B3A36, #1E2A27);
+    border: 1px solid var(--btn-border);
+    color: var(--btn-text);
+}
+.modal-box button:hover:not(:disabled) { background: linear-gradient(180deg, #35473F, #243230); border-color: #C0A16A; }
+.modal-box button:disabled { background: #1A2320; color: #6E7A72; border-color: #2F3A35; }
+
+/* 下拉浮层（闭关档位 / 丹药）：同样暗玉牌，别在暗屏上弹一张白纸 */
+details.dropdown .dd-body {
+    background: linear-gradient(180deg, #232A27, #1A211F);
+    background-image: none;
+    border: 1px solid #4A4436;
+    box-shadow: inset 0 0 24px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.66);
+}
+details.dropdown .dd-body button:disabled { background: #1A2320; color: #6E7A72; border-color: #2F3A35; }
+details.dropdown .dd-body .dd-note,
+details.dropdown .dd-body #dd-sec-preview { color: var(--text-mute); }
+details.dropdown .dd-body .tier-btn { border-left: 3px solid var(--gold); }
+details.dropdown .dd-body .btn-why { color: var(--warning); }
+
+/* ---------- 3. 见闻录：不再贴底、不再挤成一片 ---------- */
+#log-title {
+    color: #A99A7C;
+    border-bottom-color: rgba(212,167,106,.24);
+    letter-spacing: 8px;
+    text-indent: 8px;
+}
+#log-box {
+    /* 原来是 display:flex + column-reverse：条目不满时整块贴底，
+       标题底下留一大片空洞，读起来像从半截开始。
+       改成正常文档流，新条目接在末尾，由 JS 负责吸底。 */
+    display: block;
+    padding: 2px 4px 6px;
+    color: #CFC7BA;
+    font-size: 12.5px;
+    line-height: 1.75;
+}
+.log-entry {
+    display: block;
+    height: auto;
+    min-height: 0;
+    margin: 0 0 9px;
+    padding: 0 0 7px;
+    border-bottom: 1px dashed rgba(212,167,106,.15);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+}
+.log-entry:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+/* 时间戳单独一层色：原先 [18岁1月] 与正文同色，一屏读下来像糊在一起 */
+.log-time {
+    color: #C39A5E;
+    font-size: 11px;
+    letter-spacing: .2px;
+    margin-right: 2px;
+    font-family: var(--font-mono, inherit);
+    opacity: .95;
+}
+.log-system  { color: #8E8676; }
+.log-danger  { color: #E38F73; }
+.log-success { color: #7FBF97; }
+.log-info    { color: #CFC7BA; }
+.log-story   { color: #D8C08C; border-left: 2px solid rgba(212,167,106,.5); padding: 2px 0 7px 8px; }
+.log-loot    { color: #E4BE84; }
+.log-moment  { background: rgba(212,167,106,.1); border: 1px solid rgba(212,167,106,.3); color: #E9D6AE; padding: 4px 8px; }
+
+/* ---------- 4. 当前目标：从"占三成高度的便签"压成一行通栏状态条 ---------- */
+.goal-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 7px 10px 8px;
+    background-color: #1e2523;
+    background-image: radial-gradient(60% 60% at 18% 0%, rgba(212,167,106,.06), transparent 62%);
+    border: 1px solid #474033;
+    border-left: 3px solid var(--seal);
+    border-radius: 2px;
+    box-shadow: inset 0 0 22px rgba(0,0,0,.34), 0 3px 10px rgba(0,0,0,.4);
+}
+.goal-tag {
+    flex: 0 0 auto; align-self: flex-start; margin: 1px 0 0;
+    background: rgba(163,52,31,.16); color: #E39274; border-color: rgba(163,52,31,.5);
+    white-space: nowrap;
+}
+/* 目标标题与进度提示挤在一行：
+ * 给块级就会各占一行（多 16px），给行内又会在「共」和「6 幕」之间硬折（更难读）。
+ * 用 nowrap + 省略号：放不下时截的是进度提示的尾巴，不是标题。 */
+.goal-main { flex: 1 1 130px; min-width: 0; display: flex; align-items: baseline; gap: 7px; }
+.goal-main b {
+    /* 不收缩：标题是这张卡唯一必须读完的信息，
+       放不下时该截的是旁边那句进度提示（"当前第 1 幕 / 共 6 幕"）。 */
+    flex: 0 0 auto; max-width: 100%; display: block;
+    color: var(--text-strong); font-size: 13.5px; line-height: 1.45;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.goal-hint {
+    flex: 0 1 auto; min-width: 0; display: block; margin: 0;
+    font-size: 11px; color: #AEA492;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.goal-where { display: none; }
+/* 下一步：按钮与原因同一行，原因超长才折行（原来各占一行，白占 40px） */
+.goal-next {
+    flex: 1 1 100%;
+    margin: 0;
+    padding-top: 5px;
+    border-top: 1px dashed rgba(212,167,106,.16);
+    gap: 3px 6px;
+}
+.goal-next-btn { background: rgba(212,167,106,.14); border: 1px solid var(--gold-bd); color: var(--gold-tx); }
+.goal-next-btn:hover { background: rgba(212,167,106,.26); }
+.goal-next-btn.goal-next-heal { border-color: #4E7A5F; color: #8FC4A2; background: rgba(79,122,95,.16); }
+.goal-next-static { color: var(--text-mute); }
+.goal-next-why { color: #A79D8C; font-size: 10.5px; line-height: 1.5; }
+.goal-where-link { color: var(--gold-tx); }
+
+/* ---------- 5. 滚动条：细、透明轨道、暗金滑块 ---------- */
+* { scrollbar-width: thin; scrollbar-color: #3A4A42 transparent; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: #33473F;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: #8D734A; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ---------- 6. 重复的面板大标题（与页签名相同）收掉 ---------- */
+#panel-area h3.h-dupe { display: none; }
