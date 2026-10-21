@@ -1671,7 +1671,7 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
 .cover-note b { color: #d9c08a; }
 
 /* ---------- 模态：木框纸面 ---------- */
-.modal-mask { background: rgba(4,7,6,.78); backdrop-filter: blur(2px); }
+.modal-mask { background: rgba(4,7,6,.78); backdrop-filter: blur(4px); }
 .modal-box {
     background-color: #e9dcc0;
     background-image: radial-gradient(60% 40% at 14% 4%, rgba(160,130,80,.16), transparent 62%), var(--grain);
@@ -3134,11 +3134,48 @@ body.theme-light .btm-desc { color: #5C4B3A; }
 /* 属性结算那行：原来的电光蓝在宣纸上发飘，换成竹青 */
 body.theme-light .btm-stats { color: #2F6B45; }
 
+
+/* ---------- 重伤危机状态：从拥挤的副状态行提出来，独立成条 + 呼吸光 + 可点打坐 ---------- */
+.injury-alert {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 9px; padding: 8px 12px;
+    background: rgba(140, 30, 30, .22);
+    border: 1px solid #a83232;
+    border-radius: 4px;
+    color: #ff8a85;
+    font-size: 13px; letter-spacing: .04em;
+    cursor: pointer;
+    animation: pulse-glow 2s infinite ease-in-out;
+}
+.injury-alert:hover { background: rgba(140, 30, 30, .34); }
+.injury-alert .ia-mark {
+    flex: 0 0 auto; width: 22px; height: 22px; line-height: 20px; text-align: center;
+    border: 1px solid #c0392b; border-radius: 50%;
+    color: #ffb3ae; font-size: 13px; font-family: var(--font-kai);
+}
+.injury-alert .ia-text { flex: 1 1 auto; }
+.injury-alert .ia-text b { color: #ffd0cc; font-size: 15px; }
+.injury-alert .ia-go { flex: 0 0 auto; color: #ffb3ae; font-size: 12px; letter-spacing: .06em; }
+@keyframes pulse-glow {
+    0%, 100% { border-color: #a83232; box-shadow: 0 0 4px rgba(168, 50, 50, .22); }
+    50%      { border-color: #ff4d4f; box-shadow: 0 0 11px rgba(255, 77, 79, .45); }
+}
+/* 浅色下：暗红微光同样成立，只是底色走更淡的宣纸红 */
+body.theme-light .injury-alert {
+    background: rgba(163, 52, 31, .12);
+    border-color: #a2351f; color: #a2351f;
+}
+body.theme-light .injury-alert .ia-mark { border-color: #a2351f; color: #a2351f; }
+body.theme-light .injury-alert .ia-text b { color: #8c2b1e; }
+body.theme-light .injury-alert .ia-go { color: #a2351f; }
+body.theme-light .injury-alert:hover { background: rgba(163, 52, 31, .2); }
 /* ---------- 弹窗统一描金规范（save-modal / sit-modal / 突破诏书 共用 .modal-box） ---------- */
 /* 之前各弹窗已是木框纸面，这里把边框提到 #8d734a 并加描金外阴影，与主界面描金标题一致；
  * 标题栏换成竹青渐变 + 金字的「官印」感，弱化原本的焦糖棕。 */
 .modal-box {
     border: 2px solid #8d734a;
+    border-top: 3px solid #b8924f;          /* 竹简上下卷轴封边 */
+    border-bottom: 3px solid #b8924f;
     box-shadow: 0 0 0 3px #14170f, 0 0 0 4px rgba(176, 141, 87, .3),
                 0 10px 30px rgba(0, 0, 0, .8), 0 0 15px rgba(212, 167, 106, .15);
 }

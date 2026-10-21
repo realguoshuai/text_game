@@ -789,10 +789,17 @@ GAME.UI = {
             // 这样"打坐疗伤"是字面意义的解法，而不是靠某个按钮把标记抹掉。
             if (p.wounded && p.currentHp > (p.wounded.hp || 0)) delete p.wounded;
             var hurtOn = !!(p.wounded && !p.isDead);
-            aw("alert-wrap-hurt", hurtOn);
+            aw("injury-alert", hurtOn);
+            var iaEl = this.$("injury-alert");
+            if (iaEl) {
+                iaEl.onclick = hurtOn ? function () {
+                    GAME.UI.switchTab("home");
+                    if (GAME.Core && GAME.Core.meditate) GAME.Core.meditate();
+                } : null;
+            }
             if (hurtOn) {
-                var ht = this.$("hurt-text");
-                if (ht) ht.innerText = p.currentHp;
+                var ht2 = this.$("hurt-text2");
+                if (ht2) ht2.innerText = p.currentHp;
             }
             var ddl = this.$("dd-liquid-text");
             if (ddl) ddl.innerText = p.liquid;
