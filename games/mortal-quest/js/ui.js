@@ -501,6 +501,9 @@ GAME.UI = {
         if (!st) { box.style.display = "none"; return; }
         box.style.display = "";
 
+        var head = this.$("plot-head-text");
+        if (head) head.innerText = st.growing + " / " + st.plots + " 垄在长" + (st.ready > 0 ? " · " + st.ready + " 株可收" : "");
+
         var sum = this.$("plot-sum");
         if (sum) {
             var t = "药圃 · " + st.growing + "/" + st.plots + " 垄在长";
@@ -592,6 +595,11 @@ GAME.UI = {
                 _ma.className = (GAME.Time && GAME.Time.remainLevel) ? ("age-" + (GAME.Time.remainLevel(p) || "ok")) : "";
             }
             this.$("hp-text").innerText = Math.max(0, p.currentHp) + " / " + p.maxHp;
+            var _hf = this.$("hp-fill");
+            if (_hf) {
+                var _hp = p.maxHp > 0 ? Math.max(0, Math.min(100, p.currentHp / p.maxHp * 100)) : 0;
+                _hf.style.width = _hp.toFixed(1) + "%";
+            }
             this.$("stone-text").innerText = p.spiritStones;
             this.$("liquid-text").innerText = p.liquid;
             this.$("stat-text").innerText = "攻" + s.atk + " 防" + s.def + " 速" + s.speed + " 识" + s.spirit;
@@ -633,7 +641,9 @@ GAME.UI = {
             var alchOk = !lock && GAME.Core.canAlchemy();
             var bAlch = this.$("btn-alchemy");
             bAlch.disabled = !alchOk;
-            bAlch.innerText = alchOk ? "开炉炼丹" : (GAME.Core.canAlchemy() ? "开炉炼丹" : "开炉炼丹 (需练气三层)");
+            var _asub = this.$("alchemy-sub");
+            if (_asub) _asub.innerText = alchOk ? "丹方 · 取材 · 文火"
+                : (GAME.Core.canAlchemy() ? (lock ? lockWhy : "丹火未熄") : "需练气三层");
             var tAlch = this.$("tab-alchemy");
             if (tAlch) tAlch.disabled = !GAME.Core.canAlchemy();
             // 杂役堂只在幽篁谷且有宗门身份时可用；血色禁地副本入口同理（旧试炼入口已撤）
@@ -643,9 +653,14 @@ GAME.UI = {
                 : !p.sectId ? "尚未拜入宗门"
                 : !atHome ? "须回幽篁谷（宗门驻地）" : "");
 
+            var _ssub = this.$("sect-sub");
+            if (_ssub) _ssub.innerText = p.sectId ? "杂役堂 · 贡献 " + p.sectContrib : "";
+
             // 打坐耗时随境界递增（按钮文案动态）
             var mm = realm.meditateMonths || 3;
-            this.$("btn-meditate").innerText = "闭关打坐 (" + mm + "月 · +1修为)";
+            var _msub = this.$("meditate-sub");
+            if (_msub) _msub.innerText = mm + " 月 · +1 修为";
+            else this.$("btn-meditate").innerText = "闭关打坐 (" + mm + "月 · +1修为)";
 
             // 闭关分档：同一个寿元池，玩家自己决定一次花几个月、换多少修为与心境
             if (GAME.Time && GAME.Time.tiers) {
@@ -680,21 +695,27 @@ GAME.UI = {
             // 破境推演：按钮与筹备面板共用同一份 plan，杜绝"显示一套、掷骰另一套"
             var btPlan = null;
             try { btPlan = (GAME.Breakthrough && GAME.Breakthrough.plan) ? GAME.Breakthrough.plan(p) : null; } catch (e) { btPlan = null; }
+            var _btsub2 = this.$("bt-sub");
             if (realm.needExp === null) {
-                bt.innerText = "此界圆满"; bt.disabled = true;
+                if (_btsub2) _btsub2.innerText = "已至当世顶境";
+                else bt.innerText = "此界圆满";
+                bt.disabled = true;
                 this._why(bt, "已至当世顶境");
             } else if (btPlan && btPlan.ok) {
                 // 按钮直接报「筹备后的真实成功率」——骰子做重的回报必须立刻看见
-                bt.innerText = "尝试突破 (" + Math.round(btPlan.successChance * 100) + "%)" +
-                    (btPlan.isZhuji ? (btPlan.zhujiPill ? "，服筑基丹" : "，无丹裸冲")
-                        : btPlan.isJiedan ? (btPlan.jiedanPill ? "，服凝丹" : "，无丹裸冲") : "");
+                var _btTxt = Math.round(btPlan.successChance * 100) + "%" +
+                    (btPlan.isZhuji ? (btPlan.zhujiPill ? " · 服筑基丹" : " · 无丹裸冲")
+                        : btPlan.isJiedan ? (btPlan.jiedanPill ? " · 服凝丹" : " · 无丹裸冲") : "");
+                if (_btsub2) _btsub2.innerText = _btTxt;
+                else bt.innerText = "尝试突破（" + _btTxt + "）";
                 bt.disabled = lock || p.currentExp < realm.needExp;
                 var lackExp = Math.ceil(realm.needExp - p.currentExp);
                 this._why(bt, lock ? lockWhy : (lackExp > 0 ? "还差 " + lackExp + " 修为" : ""));
             } else {
                 // 兜底：破境模块未载入时退回旧文案，别让整条渲染链断在这里
-                bt.innerText = "尝试突破 (" +
-                    ((typeof realm.breakChance === "number") ? (realm.breakChance * 100).toFixed(0) + "%" : "未知") + ")";
+                var _btTxt2 = ((typeof realm.breakChance === "number") ? (realm.breakChance * 100).toFixed(0) + "%" : "未知");
+                if (_btsub2) _btsub2.innerText = _btTxt2;
+                else bt.innerText = "尝试突破 (" + _btTxt2 + ")";
                 bt.disabled = lock || p.currentExp < realm.needExp;
                 var lackExp2 = Math.ceil(realm.needExp - p.currentExp);
                 this._why(bt, lock ? lockWhy : (lackExp2 > 0 ? "还差 " + lackExp2 + " 修为" : ""));
@@ -752,7 +773,9 @@ GAME.UI = {
             badge("badge-bag", buildable > 0, buildable);
             badge("badge-fzone", !!(GAME.FZone && GAME.FZone.canEnter && GAME.FZone.canEnter()), 0);
             badge("badge-companion", GAME.State.countItem("chong_egg") > 0, 0);
-            this.$("btn-market").innerText = p.atMarket ? "坊市中" : "前往坊市 (耗时1月)";
+            var _mksub = this.$("market-sub");
+            if (_mksub) _mksub.innerText = p.atMarket ? "已在坊市中" : "耗时 1 月";
+            else this.$("btn-market").innerText = p.atMarket ? "坊市中" : "前往坊市 (耗时1月)";
             this.$("btn-save").disabled = dead;
 
             // 进入坊市时自动切到市集页签（仅在状态跃迁那一次触发）

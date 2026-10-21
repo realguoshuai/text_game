@@ -10,14 +10,17 @@
 
 <div id="game-container" data-page-node-id="vWuVgJAHCmppfsedO4oFd3">
 
-    <!-- ===== 顶栏：标题 + 存档操作 ===== -->
-    <div id="topbar" data-page-node-id="kKy70nIPSoXZGUZGfAkVde">
-        <h2 data-page-node-id="iSG1WXcoh9IgdzYCmptwgt">凡人问道录</h2>
-        <div id="save-row" data-page-node-id="Vg3t5d4saG1odga9Fa7ZC2">
-            <button id="btn-theme" class="small-btn" data-page-node-id="xDxvJ8vsfwJMtYMj1GWTGp">浅色</button>
-            <button id="btn-save" class="small-btn" data-page-node-id="TKldJsBtfT2PIYlwJD92LV">存档</button>
-            <button id="btn-manage" class="small-btn" data-page-node-id="jWUEknvPpOc9lp8q4wmLxK">存档管理</button>
-            <button id="btn-restart" class="small-btn btn-danger" data-page-node-id="vora45MHzWWkBakGz8Ndrl">重入轮回</button>
+    <!-- ===== 顶栏：书名 + 存档操作 ===== -->
+    <div id="topbar">
+        <div id="brand">
+            <h2>凡人问道录</h2>
+            <span id="brand-sub">踏碎凌霄 · 逆天成道</span>
+        </div>
+        <div id="save-row">
+            <button id="btn-theme" class="small-btn">深色</button>
+            <button id="btn-save" class="small-btn">存档</button>
+            <button id="btn-manage" class="small-btn">存档管理</button>
+            <button id="btn-restart" class="small-btn btn-danger">重入轮回</button>
         </div>
     </div>
 
@@ -37,116 +40,54 @@
         <div class="cover-note">修仙界不讲情面，但也不必怕：随时可存档，<b>死亡不会写入存档</b>——读回最近一次轮回石即可重来。</div>
     </div>
 
-    <!-- ===== 角色状态 ===== -->
-    <div class="panel" id="main-panel" data-page-node-id="Sgd4asjAPlZuw3vrWFjiPn">
-        <div class="stats-grid" data-page-node-id="TwZsqWAN4sRRRxSYSkXDe3">
-        	<div data-page-node-id="HP3sNFSdKAr3WxYVfec3mZ">道号：<span class="highlight" data-page-node-id="gNXg5gOIp854GvGtF2TpyR">沈小牧</span></div>
-        	<div data-page-node-id="1Mn2wscTDZCJbCdq3OKPAe">出身：<span id="origin-text" class="highlight" data-page-node-id="TWTTNZZx2gG2C3IAb2D62P">-</span></div>
-        	<div data-page-node-id="GABYWdrlik8aeTGPHrLlyA">境界：<span id="realm-text" class="highlight" data-page-node-id="6wj3O33SyaYlmt774lUnBc">练气一层</span></div>
-        	<div data-page-node-id="g7qrya9bdT5bJtgCRYXOyC">气血：<span id="hp-text" data-page-node-id="JQXTbLmiFrnPJQYBwbRQQ9">100 / 100</span></div>
-        	<div data-page-node-id="VHDPsnz7KsDGNPCbf4A170">灵石：<span id="stone-text" class="gold" data-page-node-id="7V8K8f7KKdtEKHiE7wWAtt">0</span></div>
-        	<div data-page-node-id="8xOlD1GDN4Fd5sg1CF2nFi">绿液：<span id="liquid-text" class="highlight" data-page-node-id="MU9l8dneEBYdgYKnsVKQvP">0</span> 滴</div>
-        	<div data-page-node-id="jT7LVvFhIq9nHBGZkRmFdY">所在：<span id="location-text" class="highlight" data-page-node-id="29khdKCsHP9nCXDrEmQcE9">幽篁谷</span></div>
-        	<div data-page-node-id="BNO3i0ePYIhDZCUXVATF5Y">银两：<span id="silver-text" data-page-node-id="ho1T7krnzF4ITh4Lkyv6T4">0</span> 两</div>
-        	<div style="grid-column:1/-1;" id="status-alerts">
-        		<span class="alert-tag" id="alert-wrap-煞气" style="display:none;"><div data-page-node-id="W04p8fDgasX1F2f1gmoUmN">煞气：<span id="sha-text" data-page-node-id="l9xODSsGWTAVKt58pFBaYb">0</span></div></span>
-        		<span class="alert-tag" id="alert-wrap-阴毒" style="display:none;"><div data-page-node-id="kAErd22dSBm5gAfESdqQTH">阴毒：<span id="yindu-text" data-page-node-id="YiMkTW0vXOQVeU76GRidia">无</span></div></span>
-        		<span class="alert-tag" id="alert-wrap-risk" style="display:none;">觊觎：<span id="risk-text">0</span>/100</span>
-        		<span class="alert-tag" id="alert-wrap-leak" style="display:none;">药香泄露：<span id="leak-text">0</span></span>
-        	</div>
-        		<details class="stats-more" style="grid-column:1/-1;">
-        			<summary>更多属性</summary>
-        			<div data-page-node-id="OeCIbsfK8IIfpSbxPJO4tY">
-        				<div data-page-node-id="rrk3etvmFfPUtinUxTLR9s"><em>资质</em><b>伪灵根</b></div>
-        				<div data-page-node-id="3MMV74EyFhPXlbEgrHhxy6"><em>善恶</em><b id="karma-text">0</b></div>
-        				<div data-page-node-id="tnJbcnqCs9kLDnRuHYWmat"><em>寿元</em><b><span id="age-text">16岁</span> / <span id="max-age-text">100岁</span></b></div>
-        				<div data-page-node-id="gk70asWOYLyCVvzSIycHjP"><em>面板</em><b id="stat-text">攻5 防2 速6 识5</b></div>
-        				<div data-page-node-id="zDkfWZ9DtR1C7RabyjRXP6"><em>法器</em><b id="artifact-text">无</b></div>
-        				<div data-page-node-id="2EsZldE5HXqDtaqdLHxQzy"><em>贡献</em><b id="contrib-text">0</b></div>
-        				<div data-page-node-id="gCNIeRw0pIkAlDKqd4H0AE"><em>敛气</em><b><span id="conceal-text">0</span> 阶</b></div>
-        				<div data-page-node-id="cjCfMPh0Jjq4TIdRE1ows1"><em>青木功</em><b><span id="changchun-text">0</span> 层</b></div>
-        				<div data-page-node-id="aeBKIxFozDem1ZZqf9tChp"><em>玄傀</em><b id="companion-text">无</b></div>
-        				<div data-page-node-id="NNpx9tNsATqagymtXgtnkL"><em>心境</em><b id="mind-text">0</b></div>
-        				<div data-page-node-id="lwOqVTk6n66Bpo9n2tzHsU"><em>门派</em><b id="sect-text">散修</b></div>
-        				<div data-page-node-id="alGs6tEjPTKwDD1oBFvPkb"><em>因果</em><b id="causal-text">无</b></div>
-        			</div>
-        		</details>
+    <!-- ===== 命盘：一行讲完「我是谁、还剩多少」 ===== -->
+    <div class="panel" id="main-panel">
+        <div class="id-row">
+            <span class="id-cell"><em>道号</em><b class="highlight">沈小牧</b></span>
+            <span class="id-cell"><em>出身</em><b id="origin-text" class="highlight">-</b></span>
+            <span class="id-cell"><em>境界</em><b id="realm-text" class="highlight">练气一层</b></span>
+            <span class="id-cell id-gauge"><em>修为</em><b id="exp-text">0 / 20</b><span class="id-bar"><i id="exp-fill"></i></span></span>
+            <span class="id-cell id-gauge"><em>气血</em><b id="hp-text">100 / 100</b><span class="id-bar hp"><i id="hp-fill"></i></span></span>
+            <span class="id-cell"><em>灵石</em><b id="stone-text" class="gold">0</b></span>
+            <span class="id-cell"><em>银两</em><b id="silver-text">0</b></span>
+            <span class="id-cell"><em>绿液</em><b id="liquid-text" class="highlight">0</b></span>
+            <span class="id-cell"><em>所在</em><b id="location-text" class="highlight">幽篁谷</b></span>
+            <details class="stats-more" id="stats-more">
+                <summary>更多属性</summary>
+                <div class="stats-more-grid">
+                    <div><em>资质</em><b>伪灵根</b></div>
+                    <div><em>善恶</em><b id="karma-text">0</b></div>
+                    <div><em>寿元</em><b><span id="age-text">16岁</span> / <span id="max-age-text">100岁</span></b></div>
+                    <div><em>面板</em><b id="stat-text">攻5 防2 速6 识5</b></div>
+                    <div><em>法器</em><b id="artifact-text">无</b></div>
+                    <div><em>贡献</em><b id="contrib-text">0</b></div>
+                    <div><em>敛气</em><b><span id="conceal-text">0</span> 阶</b></div>
+                    <div><em>青木功</em><b><span id="changchun-text">0</span> 层</b></div>
+                    <div><em>玄傀</em><b id="companion-text">无</b></div>
+                    <div><em>心境</em><b id="mind-text">0</b></div>
+                    <div><em>门派</em><b id="sect-text">散修</b></div>
+                    <div><em>因果</em><b id="causal-text">无</b></div>
+                </div>
+            </details>
         </div>
-        <!-- 修为进度：主循环的进度条，值一行空间 -->
-        <div class="exp-bar">
-            <span class="exp-k">修为</span>
-            <span class="exp-track"><i id="exp-fill"></i></span>
-            <span class="exp-v" id="exp-text">0 / 20</span>
+        <div class="id-alerts" id="status-alerts">
+            <span class="alert-tag" id="alert-wrap-煞气" style="display:none;">煞气：<span id="sha-text">0</span></span>
+            <span class="alert-tag" id="alert-wrap-阴毒" style="display:none;">阴毒：<span id="yindu-text">无</span></span>
+            <span class="alert-tag" id="alert-wrap-risk" style="display:none;">觊觎：<span id="risk-text">0</span>/100</span>
+            <span class="alert-tag" id="alert-wrap-leak" style="display:none;">药香泄露：<span id="leak-text">0</span></span>
         </div>
-    </div>
-
-    <!-- ===== 当前目标：随进度自动切换的里程碑 ===== -->
-    <div id="goal-banner" class="goal-banner">
-        <span class="goal-tag" id="goal-tag">当前目标</span>
-        <span class="goal-main">
-            <b id="goal-text">—</b>
-            <span class="goal-hint" id="goal-hint"></span>
-        </span>
-        <span class="goal-where" id="goal-where"></span>
-        <span class="goal-next" id="goal-next"></span>
     </div>
 
     <!-- ===== 工作区：左=操作+面板，右=日志；两栏各自内部滚动 ===== -->
     <div id="workspace" data-page-node-id="miDdDGGRuA0M4UnwChNkf4">
 
         <div id="left-col" data-page-node-id="Hw2irYum2Lt7PMHm1NUjzG">
-            <!-- 洞府操作：常驻可见 -->
-            <div class="actions" id="cave-actions" data-page-node-id="WVzQskURDI6MUseBEVxhqv">
-                <button id="btn-meditate" data-page-node-id="C8BlRj3V4Dsr299iTeBxY8">闭关打坐 (半年+1修为)</button>
-                <details class="dropdown" id="dd-meditate">
-                    <summary>闭关苦修 ▾</summary>
-                    <div class="dd-body">
-                        <div class="dd-note" id="dd-time-text">寿元余 —　｜　药圃 —</div>
-                        <button id="btn-sec-mid" class="small-btn dd-item tier-btn" style="display:block;width:100%;">闭关</button>
-                        <button id="btn-sec-long" class="small-btn dd-item tier-btn" style="display:block;width:100%;">苦修</button>
-                        <button id="btn-sec-epic" class="small-btn dd-item tier-btn" style="display:block;width:100%;">长关</button>
-                        <div class="dd-note" id="dd-sec-preview">—</div>
-                        <button id="btn-meditate-5" class="small-btn dd-item" style="display:block;width:100%;">连修 5 次</button>
-                        <button id="btn-meditate-10" class="small-btn dd-item" style="display:block;width:100%;">连修 10 次</button>
-                        <button id="btn-meditate-full" class="small-btn dd-item" style="display:block;width:100%;">直修至本境圆满</button>
-                    </div>
-                </details>
-                                <details class="dropdown" id="dd-catalyze">
-                    <summary>灵液催熟 ▾（绿液 <span id="dd-liquid-text">0</span> 滴）</summary>
-                    <div class="dd-body">
-						<button id="btn-catalyze-bainian" class="small-btn dd-item" style="display:block;width:100%;">催熟百年灵药 (1滴)</button>
-                											<button id="btn-catalyze-qiannian" class="small-btn dd-item" style="display:block;width:100%;">催熟千年灵药 (5滴)</button>
-                											<button id="btn-catalyze-wood" class="small-btn dd-item" style="display:block;width:100%;">催熟灵木幼苗 (1滴 得灵木×3)</button>
-                											<button id="btn-catalyze-xuanbing" class="small-btn dd-item" style="display:block;width:100%;">催熟五百年玄冰花 (5滴)</button>
-                											<button id="btn-catalyze-longlin" class="small-btn dd-item" style="display:block;width:100%;">催熟千年龙鳞果 (10滴)</button>
-                    </div>
-                </details>
-                <button id="btn-alchemy" data-page-node-id="gblIVqM1sB7jc2HqejS797">开炉炼丹</button>
-                <button id="btn-breakthrough" data-page-node-id="XBfz8ISTTIoqE6B4VQ14Ex">尝试突破境界</button>
-                <button id="btn-explore" class="btn-danger" data-page-node-id="6f8qRzfD2Q3GaHXVOqb2at">外出历练 (1~3月)</button>
-                <button id="btn-market" class="btn-gold" data-page-node-id="SWlaGwCVrQTnA5yRgLp9JA">前往坊市 (耗时2月)</button>
-                <button id="btn-sect" data-page-node-id="estJjkB8CNUqoOaXYE4qO5">门派</button>
+            <!-- 药圃：土里长着的，才是最实在的寿元 -->
+            <div id="plot-head">
+                <b>药圃</b>
+                <span id="plot-head-text">0 / 3 垄在长</span>
+                <span class="ph-line"></span>
             </div>
-
-            <!-- 破境筹备：把成功率拆成可凑的几股力（灵脉/护法/心境/丹道），折叠常态只占一行 -->
-            <details id="bt-prep" class="bt-prep" style="display:none;">
-                <summary><span id="bt-prep-sum">破境筹备</span></summary>
-                <div class="bt-prep-body">
-                    <div id="bt-prep-base" class="bt-prep-base"></div>
-                    <div id="bt-prep-list" class="bt-prep-list"></div>
-                    <div id="bt-prep-total" class="bt-prep-total"></div>
-                    <div id="bt-prep-act" class="bt-prep-act"></div>
-                </div>
-            </details>
-
-            <!-- 药圃：时间不只是花掉的，也是长在土里的（js/plot.js） -->
-            <details id="plot-box" class="bt-prep" style="display:none;">
-                <summary><span id="plot-sum">药圃</span></summary>
-                <div class="bt-prep-body">
-                    <div id="plot-list" class="bt-prep-list"></div>
-                    <div id="plot-hint" class="bt-prep-total"></div>
-                </div>
-            </details>
 
             <!-- 功能导航：先选「想做什么」（一级分组），再看「在哪做」（二级页签） -->
             <nav id="nav" data-page-node-id="rDgBXtHxbobSWbr1ZhCxl1">
@@ -490,6 +431,73 @@
                     <div id="puppet-block"></div>
                 </div>
             </div>
+        </div>
+
+        <!-- 中栏：当前目标 + 这一世能做的事 -->
+        <div id="mid-col">
+            <!-- ===== 当前目标：随进度自动切换的里程碑 ===== -->
+    <div id="goal-banner" class="goal-banner">
+        <span class="goal-tag" id="goal-tag">当前目标</span>
+        <span class="goal-main">
+            <b id="goal-text">—</b>
+            <span class="goal-hint" id="goal-hint"></span>
+        </span>
+        <span class="goal-where" id="goal-where"></span>
+        <span class="goal-next" id="goal-next"></span>
+    </div>
+
+            <!-- 洞府操作：常驻可见 -->
+            <div class="actions" id="cave-actions" data-page-node-id="WVzQskURDI6MUseBEVxhqv">
+                <button id="btn-meditate" class="act-hero-btn" data-page-node-id="C8BlRj3V4Dsr299iTeBxY8">闭关打坐<em id="meditate-sub">半年 · +1 修为</em></button>
+                <details class="dropdown" id="dd-meditate">
+                    <summary class="act-hero-btn">闭关苦修<em>静修 · 闭关 · 长关</em></summary>
+                    <div class="dd-body">
+                        <div class="dd-note" id="dd-time-text">寿元余 —　｜　药圃 —</div>
+                        <button id="btn-sec-mid" class="small-btn dd-item tier-btn" style="display:block;width:100%;">闭关</button>
+                        <button id="btn-sec-long" class="small-btn dd-item tier-btn" style="display:block;width:100%;">苦修</button>
+                        <button id="btn-sec-epic" class="small-btn dd-item tier-btn" style="display:block;width:100%;">长关</button>
+                        <div class="dd-note" id="dd-sec-preview">—</div>
+                        <button id="btn-meditate-5" class="small-btn dd-item" style="display:block;width:100%;">连修 5 次</button>
+                        <button id="btn-meditate-10" class="small-btn dd-item" style="display:block;width:100%;">连修 10 次</button>
+                        <button id="btn-meditate-full" class="small-btn dd-item" style="display:block;width:100%;">直修至本境圆满</button>
+                    </div>
+                </details>
+                                <details class="dropdown" id="dd-catalyze">
+                    <summary class="act-tile">灵液催熟<em>绿液 <span id="dd-liquid-text">0</span> 滴</em></summary>
+                    <div class="dd-body">
+						<button id="btn-catalyze-bainian" class="small-btn dd-item" style="display:block;width:100%;">催熟百年灵药 (1滴)</button>
+                											<button id="btn-catalyze-qiannian" class="small-btn dd-item" style="display:block;width:100%;">催熟千年灵药 (5滴)</button>
+                											<button id="btn-catalyze-wood" class="small-btn dd-item" style="display:block;width:100%;">催熟灵木幼苗 (1滴 得灵木×3)</button>
+                											<button id="btn-catalyze-xuanbing" class="small-btn dd-item" style="display:block;width:100%;">催熟五百年玄冰花 (5滴)</button>
+                											<button id="btn-catalyze-longlin" class="small-btn dd-item" style="display:block;width:100%;">催熟千年龙鳞果 (10滴)</button>
+                    </div>
+                </details>
+                <button id="btn-alchemy" class="act-tile" data-page-node-id="gblIVqM1sB7jc2HqejS797">开炉炼丹<em id="alchemy-sub">需练气三层</em></button>
+                <button id="btn-breakthrough" class="act-tile" data-page-node-id="XBfz8ISTTIoqE6B4VQ14Ex">尝试突破<em id="bt-sub">—</em></button>
+                <button id="btn-explore" class="btn-danger act-tile act-seal" data-page-node-id="6f8qRzfD2Q3GaHXVOqb2at">外出历练<em>1~3 月</em></button>
+                <button id="btn-market" class="btn-gold act-tile" data-page-node-id="SWlaGwCVrQTnA5yRgLp9JA">前往坊市<em id="market-sub">耗时 1 月</em></button>
+                <button id="btn-sect" class="act-tile" data-page-node-id="estJjkB8CNUqoOaXYE4qO5">门派<em id="sect-sub">尚未入门</em></button>
+            </div>
+
+            <!-- 破境筹备：把成功率拆成可凑的几股力（灵脉/护法/心境/丹道），折叠常态只占一行 -->
+            <details id="bt-prep" class="bt-prep" style="display:none;">
+                <summary><span id="bt-prep-sum">破境筹备</span></summary>
+                <div class="bt-prep-body">
+                    <div id="bt-prep-base" class="bt-prep-base"></div>
+                    <div id="bt-prep-list" class="bt-prep-list"></div>
+                    <div id="bt-prep-total" class="bt-prep-total"></div>
+                    <div id="bt-prep-act" class="bt-prep-act"></div>
+                </div>
+            </details>
+
+            <!-- 药圃：时间不只是花掉的，也是长在土里的（js/plot.js） -->
+            <details id="plot-box" class="bt-prep" style="display:none;">
+                <summary><span id="plot-sum">药圃</span></summary>
+                <div class="bt-prep-body">
+                    <div id="plot-list" class="bt-prep-list"></div>
+                    <div id="plot-hint" class="bt-prep-total"></div>
+                </div>
+            </details>
         </div>
 
         <!-- 右栏：见闻录 -->
