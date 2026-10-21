@@ -156,19 +156,152 @@ h3 { margin: 0 0 8px 0; color: var(--text-dim); font-size: 14px; border-left: 3p
 /* 洞府操作：常驻，自动换行铺满宽度 */
 .actions {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
     gap: 8px;
     flex-shrink: 0;
 }
+/* 按钮文案带月数（闭关打坐 (8月 · +1修为)），158px 时会在「为）」处断行 */
+.actions > button, .actions > details > summary {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12.5px;
+}
 
-/* ---------- 面板切换 ---------- */
-#tabs { display: flex; gap: 6px; flex-shrink: 0; }
-#tabs button { flex: 1; }
+/* ---------- 功能导航：一级分组（想做什么）→ 二级胶囊（在哪做） ---------- */
+#nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+#nav-groups {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+.nav-g {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 5px 10px 6px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(0,0,0,0.14));
+    border: 1px solid var(--panel-border);
+    border-radius: 7px;
+    color: var(--text-mute);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .16s, color .16s, background .16s;
+}
+.nav-g b {
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: inherit;
+    line-height: 1.25;
+}
+.nav-g em {
+    font-style: normal;
+    font-size: 10px;
+    letter-spacing: 0;
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    line-height: 1.3;
+}
+.nav-g:hover:not(:disabled) { border-color: var(--text-mute); color: var(--text-dim); }
+.nav-g.nav-on {
+    color: var(--gold);
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(251,191,36,0.12), rgba(251,191,36,0.02));
+    box-shadow: inset 0 -2px 0 var(--gold);
+}
+.nav-g.nav-on em { color: var(--gold); opacity: .55; }
+.nav-g.nav-locked { opacity: .45; cursor: not-allowed; }
+
+/* 二级页签：只露当前组的 3~4 个，长名不再被压成一字竖排 */
+#tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    flex-shrink: 0;
+}
+#tabs button {
+    flex: 0 0 auto;
+    padding: 3px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 999px;
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text-mute);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color .16s, color .16s, background .16s;
+}
+#tabs button:hover:not(:disabled) { border-color: var(--text-mute); color: var(--text-dim); }
 #tabs button.tab-on {
-    background-color: var(--btn-bg);
-    border-color: var(--text-dim);
+    background-color: rgba(251,191,36,0.13);
+    border-color: var(--gold);
     color: var(--gold);
     font-weight: bold;
+}
+/* 未解锁：虚线边 + 压暗，一眼区分"还不能去"和"点坏了" */
+#tabs button.tab-lock {
+    opacity: .42;
+    border-style: dashed;
+    cursor: not-allowed;
+}
+
+/* 修为进度条：数字要心算，条不用；独立一行，免得跟格子抢宽度被挤成竖排 */
+.exp-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+}
+.exp-bar .exp-k { flex: 0 0 auto; color: var(--text-mute); letter-spacing: 3px; }
+.exp-bar .exp-v { flex: 0 0 auto; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.exp-track {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 42px;
+    height: 6px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.exp-track i {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    transition: width .35s ease;
+}
+.exp-track i.full { background: linear-gradient(90deg, var(--gold), #fff6cc); }
+
+@media (max-width: 900px) {
+    #nav {
+        position: sticky;
+        top: -1px;
+        z-index: 6;
+        background: var(--container-bg);
+        padding: 6px 0 5px;
+        margin: 0 -2px;
+    }
+}
+@media (max-width: 520px) {
+    .nav-g { justify-content: center; padding: 6px 4px 7px; }
+    .nav-g b { font-size: 13px; letter-spacing: 1px; }
+    .nav-g em { display: none; }
+    #tabs { gap: 4px; }
+    #tabs button { padding: 4px 11px; font-size: 11.5px; }
 }
 #panel-area {
     flex: 1;
@@ -334,7 +467,14 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
     display: flex;
     flex-direction: column;
 }
-#log-title { flex-shrink: 0; padding-bottom: 4px; color: var(--text-mute); }
+#log-title {
+    flex-shrink: 0;
+    padding-bottom: 6px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--panel-border);
+    color: var(--text-dim);
+    letter-spacing: 4px;
+}
 #log-box {
     flex: 1;
     min-height: 0;

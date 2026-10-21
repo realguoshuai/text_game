@@ -43,7 +43,6 @@
         	<div data-page-node-id="HP3sNFSdKAr3WxYVfec3mZ">道号：<span class="highlight" data-page-node-id="gNXg5gOIp854GvGtF2TpyR">沈小牧</span></div>
         	<div data-page-node-id="1Mn2wscTDZCJbCdq3OKPAe">出身：<span id="origin-text" class="highlight" data-page-node-id="TWTTNZZx2gG2C3IAb2D62P">-</span></div>
         	<div data-page-node-id="GABYWdrlik8aeTGPHrLlyA">境界：<span id="realm-text" class="highlight" data-page-node-id="6wj3O33SyaYlmt774lUnBc">练气一层</span></div>
-        	<div data-page-node-id="bqBvTq5eZqv8uIh1OyjGss">修为：<span id="exp-text" data-page-node-id="8CHn1z1k4wtgkbzNJaDzow">0 / 20</span></div>
         	<div data-page-node-id="g7qrya9bdT5bJtgCRYXOyC">气血：<span id="hp-text" data-page-node-id="JQXTbLmiFrnPJQYBwbRQQ9">100 / 100</span></div>
         	<div data-page-node-id="VHDPsnz7KsDGNPCbf4A170">灵石：<span id="stone-text" class="gold" data-page-node-id="7V8K8f7KKdtEKHiE7wWAtt">0</span></div>
         	<div data-page-node-id="8xOlD1GDN4Fd5sg1CF2nFi">绿液：<span id="liquid-text" class="highlight" data-page-node-id="MU9l8dneEBYdgYKnsVKQvP">0</span> 滴</div>
@@ -72,6 +71,12 @@
         				<div data-page-node-id="alGs6tEjPTKwDD1oBFvPkb"><em>因果</em><b id="causal-text">无</b></div>
         			</div>
         		</details>
+        </div>
+        <!-- 修为进度：主循环的进度条，值一行空间 -->
+        <div class="exp-bar">
+            <span class="exp-k">修为</span>
+            <span class="exp-track"><i id="exp-fill"></i></span>
+            <span class="exp-v" id="exp-text">0 / 20</span>
         </div>
     </div>
 
@@ -143,17 +148,29 @@
                 </div>
             </details>
 
-            <!-- 面板切换：同一时刻只显示一个 -->
-            <div id="tabs" data-page-node-id="rDgBXtHxbobSWbr1ZhCxl1">
-                <button id="tab-map" class="small-btn" data-page-node-id="16t10QAr4zdgwWYb1ubho7">大地图</button>
-                <button id="tab-home" class="small-btn">洞府</button>
-                <button id="tab-bag" class="small-btn" data-page-node-id="uG1WwCtG5JN5JYS8dfWHqy">储物袋<span id="badge-bag" class="tab-badge" style="display:none;"></span></button>
-                <button id="tab-market" class="small-btn" data-page-node-id="xB76RNxneibNOW0kX6GD9t">市集</button>
-                <button id="tab-fzone" class="small-btn" data-page-node-id="OMeD5O2tfIYEQGQoV06SmL">副本/试炼<span id="badge-fzone" class="tab-badge" style="display:none;"></span></button>
-                <button id="tab-secret" class="small-btn">秘境</button>
-                <button id="tab-companion" class="small-btn" data-page-node-id="0dHGsHB9VCW7a4zBZbFMTX">灵宠/傀儡<span id="badge-companion" class="tab-badge" style="display:none;"></span></button>
-                <button id="tab-codex" class="small-btn">图志/道碑</button>
-            </div>
+            <!-- 功能导航：先选「想做什么」（一级分组），再看「在哪做」（二级页签） -->
+            <nav id="nav" data-page-node-id="rDgBXtHxbobSWbr1ZhCxl1">
+                <div id="nav-groups">
+                    <button class="nav-g" data-nav-group="cultivate"><b>修行</b><em>闭关 · 破境 · 丹炉</em></button>
+                    <button class="nav-g" data-nav-group="travel"><b>游历</b><em>舆图 · 市集 · 秘境</em></button>
+                    <button class="nav-g" data-nav-group="self"><b>身家</b><em>行囊 · 灵宠 · 图志</em></button>
+                    <button class="nav-g" data-nav-group="sect"><b>宗门</b><em>门派 · 贡献</em></button>
+                </div>
+                <!-- 二级页签：同一时刻只显示当前组的那几个（11 个平铺会在手机上挤成一字竖排） -->
+                <div id="tabs">
+                    <button id="tab-home" class="small-btn" data-nav-group="cultivate">洞府</button>
+                    <button id="tab-alchemy" class="small-btn" data-nav-group="cultivate">丹炉</button>
+                    <button id="tab-skill" class="small-btn" data-nav-group="cultivate">功法</button>
+                    <button id="tab-map" class="small-btn" data-nav-group="travel">大地图</button>
+                    <button id="tab-market" class="small-btn" data-nav-group="travel">市集</button>
+                    <button id="tab-secret" class="small-btn" data-nav-group="travel">秘境</button>
+                    <button id="tab-fzone" class="small-btn" data-nav-group="travel">副本/试炼<span id="badge-fzone" class="tab-badge" style="display:none;"></span></button>
+                    <button id="tab-bag" class="small-btn" data-nav-group="self">储物袋<span id="badge-bag" class="tab-badge" style="display:none;"></span></button>
+                    <button id="tab-companion" class="small-btn" data-nav-group="self">灵宠/傀儡<span id="badge-companion" class="tab-badge" style="display:none;"></span></button>
+                    <button id="tab-codex" class="small-btn" data-nav-group="self">图志/道碑</button>
+                    <button id="tab-sect" class="small-btn" data-nav-group="sect">门派</button>
+                </div>
+            </nav>
 
             <div id="panel-area" data-page-node-id="0Zg1uwes6QAbF6ly85IZ44">
                 <!-- 岚州大地图：节点流转 + 地点专属行动 -->

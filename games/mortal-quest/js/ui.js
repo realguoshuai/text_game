@@ -48,6 +48,35 @@ GAME.UI = {
         skill: "skill-panel", dungeon: "dungeon-panel", secret: "secret-panel"
     },
 
+    // ---------- 功能归类：一级分组（想做什么）→ 二级页签（在哪做） ----------
+    // 动因：11 个页签平铺时，玩家要先读懂每个系统才知道点哪个；手机上更糟——
+    // 8 个长名按钮（副本/试炼、灵宠/傀儡、图志/道碑）会被挤成一字竖排。
+    // 归到 4 组后，一级只回答「我现在想干什么」，每组底下只露 3~4 个页签。
+    NAV_GROUPS: [
+        { id: "cultivate", tabs: ["home", "alchemy", "skill"] },
+        { id: "travel",    tabs: ["map", "market", "secret", "dungeon"] },
+        { id: "self",      tabs: ["bag", "companion", "codex"] },
+        { id: "sect",      tabs: ["sect"] }
+    ],
+    // 页签键 ≠ 按钮 id 的别名：副本页的按钮叫 tab-fzone（历史命名）
+    TAB_BTN: { dungeon: "fzone" },
+
+    groupOf: function (tab) {
+        for (var i = 0; i < this.NAV_GROUPS.length; i++) {
+            if (this.NAV_GROUPS[i].tabs.indexOf(tab) >= 0) return this.NAV_GROUPS[i].id;
+        }
+        return "travel";
+    },
+
+    // 切到某一组：优先回到该组上次停留的页签，而不是永远跳第一项
+    switchGroup: function (gid) {
+        var g = null, i;
+        for (i = 0; i < this.NAV_GROUPS.length; i++) if (this.NAV_GROUPS[i].id === gid) g = this.NAV_GROUPS[i];
+        if (!g || !g.tabs.length) return;
+        var last = this._tabByGroup && this._tabByGroup[gid];
+        this.switchTab(g.tabs.indexOf(last) >= 0 ? last : g.tabs[0]);
+    },
+
     switchTab: function (name) {
         if (!this.TAB_MAP[name]) return;
         var p = GAME.State.p();
@@ -61,6 +90,8 @@ GAME.UI = {
             return;
         }
         this.tab = name;
+        if (!this._tabByGroup) this._tabByGroup = {};
+        this._tabByGroup[this.groupOf(name)] = name;
         this.updateUI();
     },
 
@@ -96,12 +127,33 @@ GAME.UI = {
             .forEach(function (id) { self.show(id, id === visible); });
 
         // 页签按钮：仅紧急面板期间禁用切换（市集常驻可开，不再按 atMarket 禁用）
+        // ★ 按钮 id 走 TAB_BTN 别名——副本页的按钮叫 tab-fzone，直接拼 "tab-"+t 会拿不到高亮
         for (var t in this.TAB_MAP) {
-            var btn = this.$("tab-" + t);
+            var btn = this.$("tab-" + (this.TAB_BTN[t] || t));
             if (btn) {
-                btn.className = "small-btn" + (this.tab === t ? " tab-on" : "");
-                btn.disabled = !!urgent;
+                // 丹炉：练气三层前 switchTab 会直接拒绝（等于"点了没反应"）。
+                // 改成显式锁定——看得见"有个丹炉还没开"，比入口凭空消失更有引导性。
+                var locked = (t === "alchemy" && GAME.Core && !GAME.Core.canAlchemy());
+                btn.className = "small-btn" + (this.tab === t ? " tab-on" : "") + (locked ? " tab-lock" : "");
+                btn.disabled = !!urgent || locked;
+                btn.title = locked ? "练气三层后，玄机子才肯教你开炉" : "";
             }
+        }
+
+        // 一级分组高亮 + 二级条只露当前组：11 个平铺会挤成一字竖排（移动端实测）
+        var curGroup = this.groupOf(this.tab);
+        if (!this._tabByGroup) this._tabByGroup = {};
+        this._tabByGroup[curGroup] = this.tab;
+        var tabBtns = document.querySelectorAll("#tabs button");
+        for (var bi = 0; bi < tabBtns.length; bi++) {
+            var bg = tabBtns[bi].getAttribute("data-nav-group");
+            tabBtns[bi].style.display = (!bg || bg === curGroup) ? "" : "none";
+        }
+        var gBtns = document.querySelectorAll("#nav-groups .nav-g");
+        for (var gi = 0; gi < gBtns.length; gi++) {
+            var on = gBtns[gi].getAttribute("data-nav-group") === curGroup;
+            gBtns[gi].className = "nav-g" + (on ? " nav-on" : "") + (urgent ? " nav-locked" : "");
+            gBtns[gi].disabled = !!urgent;
         }
     },
 
@@ -522,6 +574,13 @@ GAME.UI = {
 
             this.$("realm-text").innerText = realm.name;
             this.$("exp-text").innerText = realm.needExp === null ? "此界圆满" : (p.currentExp + " / " + realm.needExp);
+            // 进度条：数字要自己心算"还差多少"，条不用
+            var _ef = this.$("exp-fill");
+            if (_ef) {
+                var _ep = (!realm.needExp) ? 100 : Math.max(0, Math.min(100, p.currentExp / realm.needExp * 100));
+                _ef.style.width = _ep.toFixed(1) + "%";
+                _ef.className = _ep >= 100 ? "full" : "";
+            }
             // 寿元账簿：光有"24岁/100岁"不算资源，得让人一眼看见"还剩多少"
             this.$("age-text").innerText = p.ageYears + "岁" + (p.ageMonths ? p.ageMonths + "月" : "");
             var _ti = (GAME.Time && GAME.Time.remain) ? GAME.Time.remain(p) : null;
@@ -2807,6 +2866,12 @@ GAME.UI = {
         this.$("btn-mo-retry").onclick = function () { GAME.MoEvent.swallow(0); };
 
         // 面板页签切换按钮（7 个主页签）
+        var gBtns0 = document.querySelectorAll("#nav-groups .nav-g");
+        for (var gi0 = 0; gi0 < gBtns0.length; gi0++) {
+            (function (gb) {
+                gb.onclick = function () { self.switchGroup(gb.getAttribute("data-nav-group")); };
+            })(gBtns0[gi0]);
+        }
         this.$("tab-map").onclick = function () { self.switchTab("map"); };
         this.$("tab-bag").onclick = function () { self.switchTab("bag"); };
         this.$("tab-market").onclick = function () { self.switchTab("market"); };

@@ -186,11 +186,31 @@ console.log('==== 四、终局：修复古传送阵 · 破空而去（强制验�
 console.log('==== 五、页签压缩 11→7：无死链（覆盖） ====');
 {
   const html = fs.readFileSync(path.join(BASE, 'index.html'), 'utf8');
-  assert('顶部页签恰为 8 个（7 个基础 + 后加的「秘境」）', (html.match(/id="tab-/g) || []).length === 8);
-  assert('丹炉顶级按钮已移除', html.indexOf('id="tab-alchemy"') < 0);
-  assert('门派顶级按钮已移除', html.indexOf('id="tab-sect"') < 0);
-  assert('黑市顶级按钮已移除', html.indexOf('id="tab-black"') < 0);
-  assert('技能顶级按钮已移除', html.indexOf('id="tab-skill"') < 0);
+  // 旧约定是「顶部页签恰为 8 个 + 丹炉/门派/技能必须移除」——那是平铺时代的规则：
+  // 页签总数就等于拥挤程度，11 个长名按钮在 390px 上会被挤成一字竖排。
+  // 2026-10-21 改为「一级分组 → 二级页签」后，总数不再是拥挤的度量，改为守三条：
+  //   ① 同屏只露一个组的页签，且每组 ≤4（挤不出第 5 个）
+  //   ② 黑市确实并入了市集
+  //   ③ 丹炉/技能/门派有入口，但丹炉未解锁时必须是显式锁定态（当年移除它们的真原因是"点了没反应"）
+  const navBlock = (function () {
+    const i = html.indexOf('id="nav"');
+    const j = html.indexOf('id="panel-area"');
+    return html.slice(i, j > i ? j : html.length);
+  })();
+  const tabsBlock = navBlock.slice(navBlock.indexOf('id="tabs"'), navBlock.indexOf('</nav>'));
+  const cnt = {};
+  const reG = /<button[^>]*id="tab-[^"]+"[^>]*data-nav-group="([a-z]+)"/g;
+  let mg;
+  while ((mg = reG.exec(tabsBlock))) cnt[mg[1]] = (cnt[mg[1]] || 0) + 1;
+  const tooMany = Object.keys(cnt).filter(function (k) { return cnt[k] > 4; });
+  assert('页签共 11 个且全部按组收纳（平铺时代 8 个）',
+    (tabsBlock.match(/id="tab-[a-z]/g) || []).length === 11);
+  assert('每组页签 ≤4：同屏挤不出第 5 个（' + JSON.stringify(cnt) + '）', tooMany.length === 0);
+  assert('黑市顶级按钮已移除（已并入市集）', html.indexOf('id="tab-black"') < 0);
+  assert('丹炉/技能/门派三个入口存在（归修行/修行/宗门）',
+    html.indexOf('id="tab-alchemy"') >= 0 && html.indexOf('id="tab-skill"') >= 0 && html.indexOf('id="tab-sect"') >= 0);
+  assert('丹炉未解锁时显式锁定（不再「点了没反应」）',
+    fs.readFileSync(path.join(BASE, 'js', 'ui.js'), 'utf8').indexOf('t === "alchemy" && GAME.Core && !GAME.Core.canAlchemy()') >= 0);
   assert('丹炉子入口在洞府', html.indexOf('id="btn-home-alchemy"') >= 0);
   assert('大地图保留市集快捷入口（原黑市子入口升级为市集）', html.indexOf('id="btn-map-shop"') >= 0 && html.indexOf('id="btn-map-black"') < 0);
   assert('地下黑市已并入市集页签：旧货摊 + 销赃 + 材料门路齐备', html.indexOf('id="junk-goods"') >= 0 && html.indexOf('id="black-sell"') >= 0 && html.indexOf('id="black-rotation"') >= 0);
