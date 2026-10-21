@@ -2082,22 +2082,10 @@ body.battle-folded .bp-back { display: block; }
     .bp-item img { width: 24px; height: 24px; }
 }
 
-/* ---------- 浅色：把墨底换成日光下的宣纸 ---------- */
-body.theme-light {
-    background-image:
-        radial-gradient(90% 55% at 50% -6%, rgba(190,205,190,.5), transparent 62%),
-        linear-gradient(180deg, #dfe3d8 0%, #d6dbd0 45%, #cfd5ca 100%);
-}
-body.theme-light::before { opacity: .07; }
-body.theme-light::after { opacity: .07; }
-body.theme-light #main-panel { background: linear-gradient(180deg, #f4f1e6, #eae6d8); }
-body.theme-light .id-cell em { color: #6e7a6a; }
-body.theme-light .id-cell b { color: #2f2a20; }
-body.theme-light .id-cell b.highlight { color: #2b6b53; }
-body.theme-light #topbar h2 { filter: none; background-image: linear-gradient(180deg, #8a6b32, #5b4520); }
-body.theme-light #brand-sub { color: #7d8878; }
-body.theme-light .bt-prep { background: linear-gradient(180deg, #eceae0, #e2e0d4); }
-body.theme-light .actions > button, body.theme-light .actions > details > summary { background: linear-gradient(180deg, #f3f1e6, #ddd9c8); color: #3a3325; border-color: #b7b19c; }
+/* ---------- 浅色：见文件末尾「第六轮：浅色模式重做」---------- */
+/* 原来这里只换了 body 底色与几处小字，而「第五轮：暗色沉浸」写在它后面、且不带
+   主题前缀，于是浅色模式下左栏面板与右栏见闻录仍是暗纸 —— 全屏裂成黑白黑。
+   浅色规则已整体挪到文件末尾，承接暗色块之后，才能压得住。 */
 
 /* =========================================================
  * 第五轮：暗色沉浸 —— 把左右两栏的浅米黄压成暗调羊皮纸
@@ -2381,3 +2369,401 @@ details.dropdown .dd-body .btn-why { color: var(--warning); }
 
 /* ---------- 6. 重复的面板大标题（与页签名相同）收掉 ---------- */
 #panel-area h3.h-dupe { display: none; }
+
+/* =========================================================
+ * 第六轮：浅色模式重做（素绢宣纸 · 竹简）
+ *
+ * 上一轮的病根不在配色，在**作用域**：「第五轮：暗色沉浸」那一段不带任何主题前缀，
+ * 无条件把 #panel-area / #right-col / .goal-banner 压成 #1f2422，
+ * 而浅色规则写在它前面。于是浅色模式只换来一块米白的中间栏，
+ * 左右两栏照旧是黑的 —— 黑-白-黑，三块拼图没有一块属于同一本书。
+ *
+ * 这一轮把浅色当完整配色重做，而不是"补丁"：
+ *   全局底   #F2ECE1 浅杏宣纸（暖；原来是灰绿 #dfe3d8，发灰的源头之一）
+ *   面板底   #FAF7F0 素绢，1px #C4B296 淡赭描边
+ *   正文     #2B2723 浓墨；次级 #6E5A44 熟褐；更弱 #8C7355 暗金褐
+ *   动作牌   #EAE1D0 → #DED3BE 象牙竹牌（原来那条纯白浮雕把浅灰绿小字吃掉了）
+ *
+ * 全部规则带 body.theme-light 前缀：特异度与源顺序都压过暗色块，
+ * 一个 !important 都不用（用了会锁死以后所有覆盖）。
+ * ========================================================= */
+
+body.theme-light {
+    --paper-l:  #FAF7F0;
+    --paper-m:  #F2ECE1;
+    --paper-d:  #E8DFCF;
+    --ink-tx:   #2B2723;
+    --ink-2:    #6E5A44;
+    --ink-3:    #8C7355;
+    --line-2:   #C4B296;
+    background-color: #F2ECE1;
+    background-image:
+        radial-gradient(88% 52% at 50% -8%, rgba(255,252,246,.92), transparent 60%),
+        radial-gradient(70% 46% at 3% 102%, rgba(226,210,182,.46), transparent 62%),
+        radial-gradient(64% 44% at 98% 102%, rgba(220,204,176,.40), transparent 62%),
+        linear-gradient(180deg, #F4EFE4 0%, #F2ECE1 46%, #ECE5D7 100%);
+    color: var(--ink-tx);
+}
+/* 纸纹与竹影：浅底上噪点就是纸纤维，可以留；竹影是浅色描边，压到几乎看不见才不会脏 */
+body.theme-light::before { opacity: .05; }
+body.theme-light::after  { opacity: .055; }
+
+/* ---------- 1. 顶栏 ---------- */
+body.theme-light #topbar { border-bottom-color: rgba(140,110,70,.26); }
+body.theme-light #topbar::after { background: linear-gradient(90deg, transparent, rgba(140,94,36,.42), transparent); }
+body.theme-light #topbar h2 {
+    background-image: linear-gradient(180deg, #8a6b32 0%, #6b4f22 46%, #3f2e14 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: none;
+}
+body.theme-light #brand-sub { color: #8C7355; }
+body.theme-light #save-row .small-btn {
+    background: linear-gradient(180deg, #F2EADA, #E4D9C2);
+    border: 1px solid #C0AC8A;
+    color: #5B4329;
+}
+body.theme-light #save-row .small-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #FAF4E6, #EBE0C9);
+    border-color: #8C5E24; color: #3A2A16;
+}
+body.theme-light #save-row .btn-danger {
+    background: linear-gradient(180deg, #F7E9E1, #EEDAD0);
+    border-color: #C08573; color: #8C2B1E;
+}
+body.theme-light #save-row .btn-danger:hover:not(:disabled) {
+    background: linear-gradient(180deg, #FBEFE8, #F2DDD2);
+    border-color: #A3341F; color: #7D2417;
+}
+
+/* ---------- 2. 命盘：给一块能"托住"信息的卡片，别和页面底混成一片 ---------- */
+body.theme-light #main-panel {
+    background: linear-gradient(180deg, rgba(252,249,242,.96), rgba(244,238,227,.96));
+    border: 1px solid var(--line-2);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 2px 8px rgba(90,70,50,.09);
+}
+body.theme-light .id-cell { border-right-color: rgba(140,110,70,.20); }
+body.theme-light .id-cell em { color: #8C7355; }
+body.theme-light .id-cell b { color: #2B2723; }
+body.theme-light .id-cell b.highlight { color: #2E6B57; }
+body.theme-light .id-cell b.gold { color: #8C5E24; }
+body.theme-light .id-gauge .id-bar { background: #E7DCC8; border-color: #C9B79A; }
+body.theme-light .id-bar i { background: linear-gradient(90deg, #3F7D68, #7FB79C); }
+body.theme-light .id-bar.hp i { background: linear-gradient(90deg, #8C2B1E, #C0573C); }
+body.theme-light .alert-tag {
+    background: rgba(163,52,31,.09); border-color: rgba(163,52,31,.34); color: #8C2B1E;
+}
+body.theme-light .id-row .stats-more summary { color: #6E5A44; }
+body.theme-light .id-row .stats-more summary:hover { color: #8C5E24; background: rgba(176,141,87,.14); }
+
+/* ---------- 3. 左栏：木框换成浅竹框，页签换成竹牌 ---------- */
+body.theme-light #left-col {
+    border: 1px solid #B99A63;
+    background-image:
+        repeating-linear-gradient(90deg, rgba(150,120,70,.055) 0 1px, transparent 1px 7px),
+        linear-gradient(180deg, #EFE6D2, #E2D5B9);
+    box-shadow: 0 0 0 3px #F7F2E7, 0 0 0 4px rgba(185,154,99,.46), 0 8px 20px rgba(120,95,60,.14);
+}
+body.theme-light #plot-head { color: #8C7355; }
+body.theme-light #plot-head b { color: #8C5E24; }
+body.theme-light #plot-head .ph-line { background: linear-gradient(90deg, rgba(150,120,70,.5), transparent); }
+
+body.theme-light .nav-g {
+    background: linear-gradient(180deg, #E9DFC8, #D9CBA9);
+    border: 1px solid #BCA57E;
+    color: #6B4F2C;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.62), inset 0 -6px 10px rgba(140,110,70,.14);
+}
+body.theme-light .nav-g b { color: #5B4329; }
+body.theme-light .nav-g em { color: #8C7355; }
+body.theme-light .nav-g:hover:not(:disabled) {
+    border-color: #8C5E24; color: #3A2A16;
+    background: linear-gradient(180deg, #F3EAD6, #E2D5B8);
+}
+/* 选中：翻成墨木牌。浅底上再用"更亮的米"做选中，等于没选。 */
+body.theme-light .nav-g.nav-on {
+    background: linear-gradient(180deg, #6B5332, #46331B);
+    border-color: #8C6B3A;
+    color: #FBF0D2;
+    box-shadow: inset 0 0 0 1px rgba(255,240,210,.28), 0 2px 8px rgba(90,70,50,.26);
+}
+body.theme-light .nav-g.nav-on b, body.theme-light .nav-g.nav-on em { color: #FBF0D2; }
+
+body.theme-light #tabs button {
+    background: linear-gradient(180deg, #F2E9D5, #E5DAC1);
+    border: 1px solid var(--line-2);
+    color: #6B4F2C;
+}
+body.theme-light #tabs button:hover:not(:disabled) { border-color: #8C5E24; color: #3A2A16; }
+body.theme-light #tabs button.tab-on {
+    background: linear-gradient(180deg, #5E4728, #42301A);
+    border-color: #8C6B3A;
+    color: #FBF0D2;
+    box-shadow: inset 0 0 0 1px rgba(255,240,210,.24), 0 0 8px rgba(140,110,60,.16);
+}
+body.theme-light #tabs button.tab-lock {
+    opacity: .82; border-style: dashed; border-color: #CBBD9F; color: #8C7355;
+}
+
+/* ---------- 4. 纸面/见闻录/弹窗：统一素绢底，先按容器重定义变量 ---------- */
+body.theme-light #panel-area,
+body.theme-light #right-col,
+body.theme-light .modal-box,
+body.theme-light .paper,
+body.theme-light details.dropdown .dd-body,
+body.theme-light .goal-banner {
+    --text:         #2B2723;
+    --text-strong:  #231F1B;
+    --text-dim:     #6E5A44;
+    --text-mute:    #8C7355;
+    --text-faint:   #A08D75;
+    --muted:        #8C7355;
+    --accent:       #8A3B22;
+    --gold:         #8C5E24;
+    --gold-tx:      #6D4A16;
+    --gold-bd:      #9C7430;
+    --warning:      #A2351F;
+    --danger-bd:    #A2351F;
+    --danger-tx:    #8C2B1E;
+    --success:      #2F6B45;
+    --panel-bg:     #FAF7F0;
+    --panel-border: #C4B296;
+    --btn-bg:       #EDE4D3;
+    --btn-border:   #B8A68F;
+    --btn-text:     #42301B;
+    --event-bd:     #A2351F;
+    --ach-bg:       #EEE5D3;
+    --log-bg:       transparent;
+    color: var(--text);
+}
+body.theme-light #panel-area {
+    background-color: #FAF7F0;
+    background-image:
+        radial-gradient(60% 40% at 12% 4%, rgba(176,141,87,.10), transparent 62%),
+        radial-gradient(52% 42% at 92% 96%, rgba(150,120,70,.08), transparent 62%),
+        var(--grain);
+    border: 1px solid var(--line-2);
+    box-shadow: inset 0 0 30px rgba(150,120,70,.09), inset 0 0 0 1px rgba(255,255,255,.62), 0 2px 8px rgba(120,95,60,.08);
+}
+body.theme-light #right-col {
+    background-color: #F7F2E8;
+    background-image:
+        radial-gradient(70% 30% at 50% 0%, rgba(176,141,87,.09), transparent 62%),
+        repeating-linear-gradient(180deg, rgba(150,130,95,.07) 0 1px, transparent 1px 28px),
+        var(--grain);
+    border-color: var(--line-2);
+    box-shadow: inset 0 0 26px rgba(150,120,70,.08), inset 0 0 0 1px rgba(255,255,255,.55), 0 6px 18px rgba(120,95,60,.10);
+}
+body.theme-light #right-col::before,
+body.theme-light #right-col::after {
+    background: linear-gradient(180deg, rgba(120,150,110,.42), rgba(90,120,85,.16));
+}
+
+/* ---------- 5. 纸面里的硬编码色，逐条翻回墨色 ---------- */
+body.theme-light #panel-area h3 { color: #4B3520; border-bottom-color: rgba(120,90,50,.30); }
+body.theme-light #panel-area h3::after { background: linear-gradient(90deg, transparent, #B08D57, transparent); }
+body.theme-light #panel-area h4.mkt-sec { color: #5B4329; border-bottom-color: rgba(140,110,70,.32); }
+body.theme-light #panel-area .item-desc { color: var(--text-dim); }
+body.theme-light #panel-area .item-row { border-bottom-color: rgba(140,110,70,.26); }
+body.theme-light #panel-area .highlight { color: #8A3B22; }
+body.theme-light #panel-area .gold { color: #8C5E24; }
+body.theme-light #panel-area .warning { color: #A2351F; }
+body.theme-light #panel-area .empty-tip { color: #A08D75; }
+body.theme-light #panel-area .guide-box {
+    background: rgba(255,250,238,.72);
+    border: 1px solid #D3C0A0; border-left: 3px solid #B08D57;
+}
+body.theme-light #panel-area .guide-title { color: #8C5E24; }
+body.theme-light #panel-area .ach { border-color: #D3C0A0; color: #6E5A44; }
+body.theme-light #panel-area .ach-on { color: #6D4A16; background: rgba(176,141,87,.18); border-color: #B08D57; }
+body.theme-light #panel-area .ach-off { color: #A08D75; background: rgba(180,160,120,.12); }
+body.theme-light #panel-area .q-凡品 { color: #6E5A44; }
+body.theme-light #panel-area .q-灵品 { color: #23606B; }
+body.theme-light #panel-area .q-上品 { color: #6B3A7A; }
+body.theme-light #panel-area .q-极品 { color: #A2351F; }
+
+body.theme-light #panel-area button,
+body.theme-light details.dropdown .dd-body button {
+    background: linear-gradient(180deg, #F4EDDD, #E5DAC2);
+    border: 1px solid var(--btn-border);
+    color: #42301B;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+body.theme-light #panel-area button:hover:not(:disabled),
+body.theme-light details.dropdown .dd-body button:hover:not(:disabled) {
+    background: linear-gradient(180deg, #FCF6E8, #EBE0C8);
+    border-color: #8C5E24; color: #33240F;
+}
+body.theme-light #panel-area button:disabled,
+body.theme-light details.dropdown .dd-body button:disabled {
+    background: #E3DBD0; color: #999083; border-color: #D2C8B8; box-shadow: none;
+}
+body.theme-light #panel-area .btn-danger { border-color: #B0533C; color: #8C2B1E; }
+body.theme-light #panel-area .btn-danger:hover:not(:disabled) { background: #A2351F; color: #FDF3E6; border-color: #8C2B1E; }
+body.theme-light #panel-area .btn-gold { border-color: #9C7430; color: #6D4A16; }
+body.theme-light #panel-area .btn-gold:hover:not(:disabled) { background: rgba(156,116,48,.16); color: #5A3A0F; }
+body.theme-light #panel-area button .btn-why { color: #A2351F; }
+
+/* 章节地图：浅底卡 */
+body.theme-light #panel-area .atlas-chapter { background: rgba(255,250,238,.62); border-color: #D3C0A0; color: #2B2723; }
+body.theme-light #panel-area .atlas-chapter-current { background: rgba(255,252,244,.92); border-color: #B08D57; }
+body.theme-light #panel-area .chapter-tab { background: rgba(255,250,238,.62); border-color: #D3C0A0; color: #6D4A16; }
+body.theme-light #panel-area .chapter-tab.on { background: #E8DAB6; border-color: #B08D57; color: #3A2D1E; }
+body.theme-light #panel-area .map-atlas-body { background: rgba(255,250,238,.5); }
+body.theme-light #panel-area .atlas-subtitle { color: #8A3B22; }
+body.theme-light #panel-area .atlas-chapter-intro { color: #6E5A44; }
+body.theme-light #panel-area .atlas-chapter-title { color: #6D4A16; }
+/* 扉页是水墨白底：暗屏要压暗，浅屏就不该再压，只把底边融进纸色 */
+body.theme-light #panel-area .atlas-chapter-art { filter: none; border-color: #D3C0A0; }
+body.theme-light #panel-area .atlas-chapter-art::after { background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(250,247,240,.34)); }
+
+/* ---------- 6. 见闻录：焦墨正文 + 暗金褐时间戳 ---------- */
+body.theme-light #log-title {
+    color: #6E5A44;
+    border-bottom-color: rgba(140,110,70,.30);
+}
+body.theme-light #log-box { color: #332E28; }
+body.theme-light .log-entry { border-bottom-color: rgba(140,110,70,.20); }
+body.theme-light .log-time { color: #8C5E24; opacity: 1; }
+body.theme-light .log-system  { color: #8C7355; }
+body.theme-light .log-danger  { color: #A2351F; }
+body.theme-light .log-success { color: #2F6B45; }
+body.theme-light .log-info    { color: #332E28; }
+body.theme-light .log-story   { color: #6B4423; border-left-color: rgba(163,52,31,.42); }
+body.theme-light .log-loot    { color: #7A5416; }
+body.theme-light .log-moment  { background: rgba(163,52,31,.06); border-color: rgba(163,52,31,.26); color: #6B3A20; }
+
+/* ---------- 7. 当前目标 ---------- */
+body.theme-light .goal-banner {
+    background-color: #F6EFE2;
+    background-image:
+        radial-gradient(60% 60% at 18% 0%, rgba(176,141,87,.12), transparent 62%),
+        var(--grain);
+    border: 1px solid #D5C7B5;
+    border-left: 3px solid var(--seal);
+    box-shadow: inset 0 0 20px rgba(150,120,70,.07), 0 2px 8px rgba(120,95,60,.10);
+}
+body.theme-light .goal-banner.urgent {
+    background-image: linear-gradient(rgba(163,52,31,.07), rgba(163,52,31,.07)), var(--grain);
+}
+body.theme-light .goal-main b { color: #231F1B; }
+body.theme-light .goal-hint { color: #8C7355; }
+body.theme-light .goal-tag { background: rgba(163,52,31,.10); color: #A3341F; border-color: rgba(163,52,31,.42); }
+body.theme-light .goal-next { border-top-color: rgba(140,110,70,.24); }
+body.theme-light .goal-next-btn { background: rgba(176,141,87,.16); border-color: #9C7430; color: #6D4A16; }
+body.theme-light .goal-next-btn:hover { background: rgba(176,141,87,.30); }
+body.theme-light .goal-next-why { color: #8C7355; }
+body.theme-light .goal-where-link { color: #8C5E24; }
+
+/* ---------- 8. 动作牌：象牙竹牌。这是浅色模式最关键的一处 ---------- */
+/* 原来紧跟换皮写了一条"纯白浮雕"，白底 + #a4bdad 浅灰绿小字，
+ * 对比度只有 2.4:1 —— 「3月 · +1修为」「绿液 4 滴」基本看不清。 */
+body.theme-light .actions > button,
+body.theme-light .actions > details > summary {
+    background: linear-gradient(180deg, #EAE1D0 0%, #DED3BE 100%);
+    border: 1px solid var(--btn-border);
+    color: #2B2723;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.78), inset 0 -8px 14px rgba(140,110,70,.10), 0 2px 5px rgba(90,70,50,.10);
+}
+body.theme-light .actions > button:hover:not(:disabled),
+body.theme-light .actions > details > summary:hover {
+    border-color: #8C5E24;
+    color: #1F1A15;
+    background: linear-gradient(180deg, #F6EEE0 0%, #E8DCC6 100%);
+}
+/* 副标题（耗时 / 修为 / 绿液）：从 #a4bdad 提到 #5C4B3A，对比度 7.2:1 */
+body.theme-light .actions em { color: #5C4B3A; opacity: 1; }
+body.theme-light .actions > .act-hero-btn {
+    background: linear-gradient(180deg, #F0E6D2 0%, #DFD2B8 100%);
+    border-color: #A98F68;
+}
+body.theme-light .actions > button:disabled,
+body.theme-light .actions > details > summary.is-locked {
+    filter: none;
+    background: #E3DBD0;
+    border-color: #CFC5B4;
+    color: #999083;
+    box-shadow: none;
+}
+body.theme-light .actions > button:disabled em,
+body.theme-light .actions > details > summary.is-locked em { color: #999083; }
+/* 外出历练：朱砂双线保留（这格最可能送你上路，浅色下也别磨平它） */
+body.theme-light .actions > button.act-seal {
+    border: 2px solid #A3341F;
+    background: linear-gradient(180deg, #F8EEE4 0%, #EBD9CB 100%);
+    color: #7D2B17;
+    box-shadow: inset 0 0 0 2px rgba(163,52,31,.13), 0 2px 6px rgba(120,60,40,.12);
+}
+body.theme-light .actions > button.act-seal:hover:not(:disabled) {
+    background: linear-gradient(180deg, #FCF3EA, #F0E0D2);
+    border-color: #8C2B1E; color: #6B2312;
+}
+body.theme-light .actions > button.act-seal em { color: #A0523A; }
+body.theme-light .actions .btn-why { color: #A2351F; }
+body.theme-light .actions > details[open] > summary { border-color: #8C5E24; color: #1F1A15; }
+
+/* ---------- 9. 破境筹备 / 药圃折页 ---------- */
+body.theme-light .bt-prep {
+    --text: #2B2723; --text-strong: #231F1B; --text-dim: #6E5A44; --text-mute: #8C7355;
+    --panel-border: #D3C0A0; --gold: #8C5E24; --accent: #8A3B22; --warning: #A2351F;
+    background: linear-gradient(180deg, #FBF6EC, #F2EADB);
+    border: 1px solid #D3C0A0;
+    border-left: 3px solid #B08D57;
+    color: var(--text);
+}
+body.theme-light .bt-prep > summary { color: #6D4A16; }
+body.theme-light .bt-prep > summary b { color: #8C5E24; }
+body.theme-light .bt-row { border-top-color: rgba(140,110,70,.20); }
+body.theme-light .bt-prep-total { border-top-color: rgba(140,110,70,.24); color: #6E5A44; }
+body.theme-light .bt-prep .dd-note,
+body.theme-light .bt-prep #plot-hint { color: #8C7355; }
+body.theme-light .bt-prep button {
+    background: linear-gradient(180deg, #F5EDDD, #E7DCC5);
+    border-color: #C0AC8A; color: #42301B; box-shadow: none;
+}
+body.theme-light .bt-prep button:hover:not(:disabled) { border-color: #8C5E24; color: #33240F; }
+body.theme-light .bt-prep button:disabled { background: #E3DBD0; color: #999083; border-color: #D2C8B8; }
+
+/* 遮罩：深色模式那层 rgba(4,7,6,.78) 盖在宣纸上等于把屏幕按黑，
+ * 浅色下改成暖褐半透明，弹窗浮起来但不把整本书熄灯。 */
+body.theme-light .modal-mask { background: rgba(58,44,28,.44); }
+/* ---------- 10. 弹窗 / 下拉浮层 ---------- */
+body.theme-light .modal-box {
+    background-color: #FAF7F0;
+    background-image: radial-gradient(60% 40% at 50% 0%, rgba(176,141,87,.12), transparent 62%), var(--grain);
+    border: 1px solid var(--line-2);
+    box-shadow: inset 0 0 26px rgba(150,120,70,.09), 0 14px 40px rgba(90,70,50,.26);
+}
+body.theme-light .modal-box h2,
+body.theme-light .modal-box h3 { color: #4B3520; }
+body.theme-light .slot-row { background: rgba(255,250,238,.6); border-color: #D3C0A0; }
+body.theme-light .slot-name { color: #231F1B; }
+body.theme-light .slot-tag { background: rgba(176,141,87,.18); color: #6D4A16; border-color: #C0AC8A; }
+body.theme-light .slot-time { color: #8C7355; }
+body.theme-light .preset-title { color: #6D4A16; }
+body.theme-light .preset-desc { color: #6E5A44; }
+body.theme-light .modal-box button {
+    background: linear-gradient(180deg, #F4EDDD, #E5DAC2);
+    border: 1px solid var(--btn-border); color: #42301B;
+}
+body.theme-light .modal-box button:hover:not(:disabled) {
+    background: linear-gradient(180deg, #FCF6E8, #EBE0C8); border-color: #8C5E24;
+}
+body.theme-light .modal-box button:disabled { background: #E3DBD0; color: #999083; border-color: #D2C8B8; }
+body.theme-light .modal-box .btn-gold { border-color: #9C7430; color: #6D4A16; }
+body.theme-light .modal-box .btn-gold:hover:not(:disabled) { background: rgba(156,116,48,.16); color: #5A3A0F; }
+
+body.theme-light details.dropdown .dd-body {
+    background: #F7F0E0;
+    background-image: radial-gradient(60% 40% at 10% 4%, rgba(176,141,87,.14), transparent 62%), var(--grain);
+    border: 1px solid var(--line-2);
+    box-shadow: inset 0 0 22px rgba(150,120,70,.09), 0 14px 34px rgba(90,70,50,.24);
+}
+body.theme-light details.dropdown .dd-body .dd-note,
+body.theme-light details.dropdown .dd-body #dd-sec-preview { color: #8C7355; }
+body.theme-light details.dropdown .dd-body .tier-btn { border-left: 3px solid #B08D57; }
+body.theme-light details.dropdown .dd-body .btn-why { color: #A2351F; }
+
+/* ---------- 11. 滚动条：淡赭滑块，别在宣纸上留一条黑缝 ---------- */
+body.theme-light * { scrollbar-color: #C4B296 transparent; }
+body.theme-light ::-webkit-scrollbar-thumb { background: #C4B296; }
+body.theme-light ::-webkit-scrollbar-thumb:hover { background: #8C7355; }
