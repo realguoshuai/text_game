@@ -336,6 +336,114 @@ GAME.DATA.EVENTS = [
             { chance:1.0, type:"nothing", text:"空手而归。" },
         ]
     },
+
+    /* —— 元婴篇 · 双重战线事件（云国陆地 / 碎星海两条线；元婴后按所在战线触发） —— */
+    {
+        id:"df_bianhai", front:"land", minRealm:19, weight:8,
+        text:"云国北境妖兽潮起，边军旬日间连失三寨。坊市口新贴的征召榜被风吹得猎猎作响——正道七派合募元婴修士御敌，赏格厚得惊人。",
+        choices:[
+            {
+                text:"揭榜赴边，正面斩妖立功",
+                outcomes:[
+                    { chance:1.0, type:"combat", monster:"wild_yaowang_qinwei" },
+                ]
+            },
+            {
+                text:"不赴前线，转而献策帮边军重筑护城大阵",
+                outcomes:[
+                    { chance:1.0, type:"repute", fid:"xingque", amount:7, text:"你花了旬日为边军重筑阵纹。主将亲自送至渡口，连声道谢——星阙那边，记下了这份人情。（星阙声望 +7）" },
+                ]
+            },
+            {
+                text:"两国交兵，修士何苦掺和——继续赶路",
+                outcomes:[
+                    { chance:1.0, type:"nothing", text:"你绕过征召榜，循自己的路去了。" },
+                ]
+            },
+        ]
+    },
+    {
+        id:"df_zongmen_song", front:"land", minRealm:19, weight:7,
+        text:"云国西陵某大派内讧：掌门一脉与长老团反目，几近见血。有使者暗中寻到你，奉上一只沉甸甸的储物袋——想请你出面，做一场「讲理」的裁决。",
+        choices:[
+            {
+                text:"收下酬金，替掌门一脉压服长老团",
+                outcomes:[
+                    { chance:1.0, type:"stones", text:"你只出了三招，长老团便默然退位。储物袋入手沉甸甸。", amount:[2000,3600] },
+                ]
+            },
+            {
+                text:"分文不取，秉公调停两脉",
+                outcomes:[
+                    { chance:1.0, type:"repute", fid:"xingque", amount:9, text:"你据理而断，两脉各退一步。西陵修界传开你的名号——行事公允，不党不伐。（星阙声望 +9）" },
+                ]
+            },
+            {
+                text:"门内私斗最是难缠——托言不便，抽身而退",
+                outcomes:[
+                    { chance:1.0, type:"nothing", text:"你拱了拱手，转身没入人潮。身后那场内讧，与你无关。" },
+                ]
+            },
+        ]
+    },
+    {
+        id:"df_xingque_zhao", front:"sea", minRealm:19, weight:8,
+        text:"碎星海风高浪急。星阙内海的征召使在浮岛茶棚里寻到你，言明乱星盟近日频频异动，愿以重酬请元婴修士助守内海阵眼三月。",
+        choices:[
+            {
+                text:"应征助守内海阵眼",
+                outcomes:[
+                    { chance:1.0, type:"repute", fid:"xingque", amount:8, text:"三月守阵，风浪未及阵眼便被你拦下。征召使郑重一揖：星阙记你一号。（星阙声望 +8）" },
+                ]
+            },
+            {
+                text:"守阵是苦差，顺手「借」些阵中军资倒手卖出",
+                outcomes:[
+                    { chance:0.7, type:"loot", text:"你趁换防摸走几箱囤积的军资，转手卖给黑市，获利颇丰。", table:[
+                        { id:"tianhuo_crystal", chance:1.0, qty:[2,3] },
+                    ]},
+                    { chance:0.3, type:"damage", text:"你刚要收手，阵中禁制骤亮——被守阵长老的神识扫了个正着，一场恶斗后带伤遁走！", hp:[80,180], age:[0,1] },
+                ]
+            },
+            {
+                text:"海上的风浪，不沾为妙",
+                outcomes:[
+                    { chance:1.0, type:"nothing", text:"你摇了摇头，继续看你的海。" },
+                ]
+            },
+        ]
+    },
+    {
+        id:"df_luanxing_xi", front:"sea", minRealm:19, weight:8,
+        text:"附近浮岛冒出一处乱星盟黑市，专售「来路不明」的赃物。为首的认出你元婴修为，咧嘴一笑，问你肯不肯入伙，干一票劫杀星阙商队的大买卖。",
+        choices:[
+            {
+                text:"入伙，黑吃黑干这一票",
+                outcomes:[
+                    { chance:0.75, type:"loot", text:"商队护卫不过如此。你们瓜分了满船货殖，你分得最厚一份。", table:[
+                        { id:"tianhuo_crystal", chance:0.8, qty:[2,4] },
+                        { id:"herb_qiannian",   chance:0.6, qty:[1,2] },
+                        { id:"artifact_tayun",  chance:0.3, qty:[1,1] },
+                    ]},
+                    { chance:0.25, type:"combat", text:"商队里竟藏着一尊元婴供奉，反将你们围杀——只能动手！", monster:"wild_sanxiu_yuan" },
+                ]
+            },
+            {
+                text:"婉拒入伙，只随口买两件便宜货",
+                outcomes:[
+                    { chance:1.0, type:"loot", text:"你在黑市角落挑了件不起眼的旧物，付了市价七成的银子。", table:[
+                        { id:"herb_bainian", chance:1.0, qty:[1,3] },
+                    ]},
+                ]
+            },
+            {
+                text:"乱星盟魔修，人人得诛——拔剑除魔",
+                outcomes:[
+                    { chance:1.0, type:"combat", text:"你拔剑直取那为首魔修，黑市顿时炸锅！", monster:"wild_sanxiu_yuan" },
+                ]
+            },
+        ]
+    },
 ];
 
 /* —— 心魔劫事件（不入 EVENTS 随机池，仅由突破流程触发，见 js/core.js） —— */

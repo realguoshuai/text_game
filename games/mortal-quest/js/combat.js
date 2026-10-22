@@ -224,6 +224,11 @@ GAME.Combat = {
             : "你斗法一击，对【" + p.combat.name + "】造成 " + dmg + " 点伤害。",
             r.crit ? "success" : "info");
 
+        // 本命灵虫协同：伴生灵虫每回合自动噬咬（区别于噬金虫群道具的手动虫云）
+        if (p.spiritInsect && GAME.Insect && GAME.Insect.spiritBite) GAME.Insect.spiritBite(p.combat);
+        // 封魂玉·契封元神：被封印的元神每回合协战（平砍，圆熟于灵气）
+        if (p.sealedSouls && p.sealedSouls.length && GAME.Seize && GAME.Seize.soulAssist) GAME.Seize.soulAssist(p.combat);
+
         // 云京皇宫：幽冥教主双阶段状态机（血量跌破 30% 触发血祭狂暴）
         if (GAME.Heisha && p.combat.heishaBoss) GAME.Heisha.onBossDamaged();
         if (p.combat.hp <= 0) return this.victory();

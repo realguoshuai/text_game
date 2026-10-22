@@ -17,6 +17,10 @@
     var GAME = window.GAME = window.GAME || {};
     GAME.DATA = GAME.DATA || {};
 
+    /* —— 封魂玉（夺舍线反向契封容器，元婴后启用） —— */
+    GAME.DATA.ITEMS = GAME.DATA.ITEMS || {};
+    GAME.DATA.ITEMS.feng_hun_yu = { name: "封魂玉", type: "material", quality: "极品", price: 2500, desc: "一口温润的青玉，内里似有雾气流转。夺舍来袭时若持此玉，可将那缕入侵元神反契封其中、收为己用——被封印的元神此后在斗法中供你驱策。封魂玉可自元婴副本【归墟古渊】与妖王尸身拾得。" };
+
     GAME.DATA.SEIZE = {
         checkMonths: 6,          // 每满 6 个月判定一次
         baseChance: 0.08,        // 基础概率（一年两掷，结丹后年均约一成六）
@@ -45,6 +49,14 @@
             failCombatP: 0.30,   // 败：三成概率心魔凝形，直接开打
             fameGain: 6,         // 败：乱星盟声望 +6（魔道手段，同道中人所重）
         },
+        seal: {                  // 封魂玉契封（元婴，反夺舍之反向利用）
+            minRealm: 19,        // 元婴方可契封
+            successP: 0.6,       // 契封成功率
+            spiritPer: 2,        // 成：神识上限永久 +2
+            mindOn: 5,           // 成：心境 +5
+            mindOff: -3,         // 败：心境 -3（兜底不为负）
+            soulPer: 12,         // 每道契封元神每回合协战伤害
+        },
     };
 
     /* 夺舍来袭事件（不入 EVENTS 随机池，仅由 Seize.tick 触发）。
@@ -68,6 +80,11 @@
                     text: "反手卷入识海，反夺其元神",
                     tip: "五成胜算。胜：两个周天的修为 + 神识上限 +3；败：重伤三成五气血、侵染加深，三成可能直接开打",
                     outcomes: [{ type: "seize", mode: "counter", chance: 1 }],
+                },
+                {
+                    text: "取出【封魂玉】，将这缕元神契封为己用",
+                    tip: "元婴且持封魂玉。六成契封成功：神识上限永久 +2、心境 +5、侵染退一重，此后元神在斗法中供你驱策；失败则玉碎魂遁",
+                    outcomes: [{ type: "seize", mode: "seal", chance: 1 }],
                 },
             ],
         },
@@ -130,6 +147,7 @@
                     if (!GAME.Seize.canArray(p)) return false;
                     return (p.spiritStones || 0) >= GAME.Seize.arrayCost();
                 }
+                if (mode === "seal") return GAME.Seize.canSeal(p);   // 契封：元婴 + 持封魂玉
                 return true;   // 反夺：无门槛，永远可赌
             });
             return { id: ev.id, text: ev.text, choices: choices };
@@ -171,6 +189,25 @@
         resolve: function (o) {
             var p = GAME.State.p();
             var cfg = GAME.DATA.SEIZE, mode = o.mode;
+
+            if (mode === "seal") {
+                var s = cfg.seal;
+                if (GAME.State.countItem("feng_hun_yu") < 1) { GAME.UI.log("你手中并无封魂玉，无从契封。", "system"); return "done"; }
+                GAME.State.removeItem("feng_hun_yu", 1);
+                if (Math.random() < s.successP) {
+                    p.sealedSouls = p.sealedSouls || [];
+                    p.sealedSouls.push({ kind: "xinmo", tier: 1 });
+                    p.spiritBonus = (p.spiritBonus || 0) + s.spiritPer;
+                    p.mind = (p.mind || 0) + s.mindOn;
+                    this.addLevel(p, -1);
+                    GAME.UI.log("封魂玉青光暴涨，将那缕元神生生卷入玉中，玉面浮出一张模糊人脸，旋即隐去——【契封成功】！这道元神此后供你驱策（神识上限永久 +" + s.spiritPer + "，心境 +" + s.mindOn + "，侵染退去一重）。", "success");
+                } else {
+                    p.mind = Math.max(0, (p.mind || 0) + s.mindOff);
+                    GAME.UI.log("封魂玉刚罩住那缕元神，玉面便裂开一道细纹——它趁隙遁走，只余一地玉屑！（契封失败，玉碎，心境 " + s.mindOff + "）", "danger");
+                }
+                if (GAME.Chronicle) GAME.Chronicle.narrate("seize_sealed", p);
+                return "done";
+            }
 
             if (mode === "bell") {
                 if (Math.random() < this.immuneChance(p)) {
@@ -220,6 +257,30 @@
                 return "combat";
             }
             return "done";
+        },
+
+        /* ---------- 契封可用性：元婴 + 持封魂玉 ---------- */
+        canSeal: function (p) {
+            p = p || GAME.State.p();
+            if ((p.realmIndex || 0) < GAME.DATA.SEIZE.seal.minRealm) return false;
+            return GAME.State.countItem("feng_hun_yu") >= 1;
+        },
+        // 契封元神数
+        soulCount: function (p) {
+            p = p || GAME.State.p();
+            return (p.sealedSouls || []).length;
+        },
+        /* ---------- 战斗协战：契封元神每回合平砍（combat.attack 调用） ---------- */
+        soulAssist: function (combat) {
+            if (!combat) return 0;
+            var p = GAME.State.p();
+            var n = (p.sealedSouls || []).length;
+            if (!n) return 0;
+            var per = GAME.DATA.SEIZE.seal.soulPer;
+            var dmg = per * n;
+            combat.hp -= dmg;
+            GAME.UI.log("你识海中 " + n + " 道契封元神齐出，阴风席卷【" + combat.name + "】，再添 " + dmg + " 点创伤！", "info");
+            return dmg;
         },
     };
 })();

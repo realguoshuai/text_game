@@ -32,6 +32,44 @@ var GAME = window.GAME = window.GAME || {};
     }
 })();
 
+/* —— 收徒立派 · 弟子养成配置（元婴 + 已立派后解锁） —— */
+GAME.DATA.DISCIPLES = {
+    gateRealm: 19,           // 元婴方可收徒
+    needSect: true,          // 须已开宗立派（p.lingShan.founded）
+    cap: 3,                  // 门下同时在册弟子上限
+    recruitStones: 800,      // 收徒礼（安家 + 传功资）
+    talents: [               // 根骨档位（收徒时加权掷定）
+        { name: "寻常", rate: 1.0, weight: 50 },
+        { name: "上佳", rate: 1.4, weight: 32 },
+        { name: "天纵", rate: 2.0, weight: 15 },
+        { name: "绝世", rate: 3.0, weight: 3 },
+    ],
+    growthPerMonth: 6,       // 基础月成长
+    stages: [                // 弟子境界（按累计成长划分）
+        { name: "炼气", need: 0 },
+        { name: "筑基", need: 120 },
+        { name: "结丹", need: 400 },
+        { name: "元婴", need: 900 },
+    ],
+    trainExpCost: 30,        // 传功：每授一次耗自身修为
+    trainStones: 200,        // 传功：耗灵石
+    trainGrowth: 40,         // 传功：一次 +40 成长
+    dispatchMonths: 6,       // 历练耗时（月）
+    dispatchRisk: 0.25,      // 历练受伤概率
+    tributeGrowth: 400,      // 成长达结丹 → 开始每月供奉反哺
+    tributeStones: 150,      // 供奉弟子月奉灵石
+    graduateNeed: 900,       // 成长达元婴 → 可出师
+    graduateStones: 3000,    // 出师谢师礼
+    graduateFame: 30,        // 出师为门派挣得名声
+};
+
+/* 弟子姓名池（架空，去原著化——不用任何原作人名） */
+GAME.DATA.DISCIPLE_NAMES = [
+    "林砚", "沈辞", "苏舫", "顾遥", "叶知秋", "程羽",
+    "白砚", "谢无衣", "江临", "温折之", "阮青", "段云舟",
+    "闻人戟", "卫照", "祝小满", "宋雨眠",
+];
+
 GAME.Bonds = {
 
     bonds: function () {
@@ -180,5 +218,134 @@ GAME.Bonds = {
         GAME.UI.log("心境 +20（现 " + p.mind + "）；尘缘斩断，日后心魔劫与你无缘。", "success");
         GAME.UI.updateUI();
         return true;
+    },
+
+    /* ================= ⑤ 收徒立派 · 弟子养成（元婴 + 已立派） ================= */
+    _dcfg: function () { return GAME.DATA.DISCIPLES; },
+    disciples: function () {
+        var p = GAME.State.p();
+        if (!p.disciples) p.disciples = [];
+        return p.disciples;
+    },
+    // 能否收徒
+    canRecruit: function () {
+        var p = GAME.State.p(), c = this._dcfg();
+        if ((p.realmIndex || 0) < c.gateRealm) return { ok: false, msg: "非元婴修为，尚无开山收徒的底气。" };
+        if (c.needSect && !(p.lingShan && p.lingShan.founded)) return { ok: false, msg: "尚未开宗立派（须先在碎星海立地磁灵山），无处安顿弟子。" };
+        if (this.disciples().length >= c.cap) return { ok: false, msg: "门下在册弟子已满（" + c.cap + " 席），先安排老弟子出师罢。" };
+        if ((p.spiritStones || 0) < c.recruitStones) return { ok: false, msg: "收徒需备安家礼 " + c.recruitStones + " 灵石（现 " + (p.spiritStones || 0) + "）。" };
+        return { ok: true };
+    },
+    // 按 weight 掷根骨
+    _rollTalent: function () {
+        var c = this._dcfg(), total = 0, i;
+        for (i = 0; i < c.talents.length; i++) total += c.talents[i].weight;
+        var roll = Math.random() * total;
+        for (i = 0; i < c.talents.length; i++) { if (roll < c.talents[i].weight) return i; roll -= c.talents[i].weight; }
+        return 0;
+    },
+    _pickName: function (taken) {
+        var pool = GAME.DATA.DISCIPLE_NAMES.filter(function (n) { return taken.indexOf(n) < 0; });
+        if (!pool.length) pool = GAME.DATA.DISCIPLE_NAMES;
+        return pool[Math.floor(Math.random() * pool.length)];
+    },
+    // 收徒：耗灵石，掷根骨，收一名弟子
+    recruit: function () {
+        var p = GAME.State.p(), c = this._dcfg();
+        if (p.isDead || p.combat) return false;
+        var chk = this.canRecruit();
+        if (!chk.ok) { GAME.UI.log(chk.msg, "system"); GAME.UI.updateUI(); return false; }
+        p.spiritStones -= c.recruitStones;
+        var d = this.disciples();
+        var t = this._rollTalent();
+        var talent = c.talents[t];
+        var name = this._pickName(d.map(function (x) { return x.name; }));
+        d.push({ name: name, talent: t, growth: 0, months: 0, tributing: false });
+        GAME.UI.log("你花 " + c.recruitStones + " 灵石设下简易收徒礼，山门外跪着个眼神清亮的少年——你收他为开山首徒，赐名随你姓。根骨：【" + talent.name + "】。", "success");
+        GAME.UI.log("【收徒】弟子" + name + "入门。弟子按月成长（受你境界加成），可传功点拨、派下山历练；成长至结丹便开始供奉反哺，至元婴则可出师。", "info");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+        return true;
+    },
+    // 弟子当前境界名
+    stageOf: function (growth) {
+        var c = this._dcfg(), idx = 0, i;
+        for (i = 0; i < c.stages.length; i++) if (growth >= c.stages[i].need) idx = i;
+        return { idx: idx, name: c.stages[idx].name };
+    },
+    // 传功：耗自身修为 + 灵石，为指定弟子 +成长
+    train: function (idx) {
+        var p = GAME.State.p(), c = this._dcfg();
+        var d = this.disciples()[idx];
+        if (!d) { GAME.UI.log("并无此弟子。", "system"); return false; }
+        if ((p.currentExp || 0) < c.trainExpCost) { GAME.UI.log("自身修为不足 " + c.trainExpCost + "，无从传功。", "system"); return false; }
+        if ((p.spiritStones || 0) < c.trainStones) { GAME.UI.log("传功需耗灵石 " + c.trainStones + "（现 " + (p.spiritStones || 0) + "）。", "system"); return false; }
+        p.currentExp -= c.trainExpCost;
+        p.spiritStones -= c.trainStones;
+        d.growth += c.trainGrowth;
+        GAME.UI.log("你将" + d.name + "唤至前，耗时旬月为其梳理气机、讲解道途——弟子茅塞顿开（成长 +" + c.trainGrowth + "）。", "success");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+        return true;
+    },
+    // 历练：派弟子下山（耗时 dispatchMonths），得资源，小概率受伤
+    dispatch: function (idx) {
+        var p = GAME.State.p(), c = this._dcfg();
+        var d = this.disciples()[idx];
+        if (!d) { GAME.UI.log("并无此弟子。", "system"); return false; }
+        if (p.isDead || p.combat || p.pendingEvent) return false;
+        GAME.UI.log("你遣" + d.name + "下山历练，临行嘱咐再三……往返约 " + c.dispatchMonths + " 个月。", "system");
+        GAME.Core.passTime(c.dispatchMonths);   // 时间唯一出口（弟子亦随之成长）
+        if (p.isDead) return false;
+        if (Math.random() < c.dispatchRisk) {
+            var loss = Math.round(d.growth * 0.15);
+            d.growth = Math.max(0, d.growth - loss);
+            GAME.UI.log(d.name + "在外遇袭，负伤而归（成长 -" + loss + "）——所幸人无事，你赐药为其调理。", "warning");
+        } else {
+            var stones = GAME.Core.rand(300, 900);
+            p.spiritStones += stones;
+            if (p.lingShan) p.lingShan.fame += 2;
+            GAME.UI.log(d.name + "历练归来，风尘仆仆却眼神更坚，献上沿途所得的灵石 +" + stones + "（门派名声 +2）。", "success");
+        }
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+        return true;
+    },
+    // 出师：成长达标的弟子辞师，得谢师礼与门派名声
+    graduate: function (idx) {
+        var p = GAME.State.p(), c = this._dcfg();
+        var d = this.disciples()[idx];
+        if (!d) { GAME.UI.log("并无此弟子。", "system"); return false; }
+        if (d.growth < c.graduateNeed) { GAME.UI.log(d.name + " 尚需打磨（成长 " + Math.floor(d.growth) + "/" + c.graduateNeed + "），未够出师之格。", "system"); GAME.UI.updateUI(); return false; }
+        p.spiritStones += c.graduateStones;
+        if (p.lingShan) p.lingShan.fame += c.graduateFame;
+        this.disciples().splice(idx, 1);
+        GAME.UI.log("【出师】" + d.name + " 修至元婴，向你三叩首后仗剑远去——临别奉上谢师礼 " + c.graduateStones + " 灵石，为师门挣得名声 " + c.graduateFame + "。", "success");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+        return true;
+    },
+    // 时间推进出口：弟子按月成长；结丹后开始供奉反哺
+    discipleTick: function (months) {
+        var p = GAME.State.p(), c = this._dcfg();
+        if (!months || p.isDead) return;
+        var d = this.disciples();
+        if (!d.length) return;
+        var masterBonus = 1 + Math.max(0, (p.realmIndex || 0) - 18) * 0.1;   // 师者境界越高，弟子长得越快
+        var tribute = 0;
+        for (var i = 0; i < d.length; i++) {
+            var t = c.talents[d[i].talent] || c.talents[0];
+            d[i].growth += c.growthPerMonth * t.rate * masterBonus * months;
+            d[i].months += months;
+            if (d[i].growth >= c.tributeGrowth) {
+                tribute += c.tributeStones * months;
+                if (!d[i].tributing) {
+                    d[i].tributing = true;
+                    GAME.UI.log("弟子" + d[i].name + "修至" + this.stageOf(d[i].growth).name + "，开始每月向山门供奉反哺。", "info");
+                }
+            }
+        }
+        if (tribute > 0) p.spiritStones += tribute;   // 供奉静默入账，避免逐 tick 刷屏
+        return tribute;
     },
 };

@@ -56,3 +56,9 @@ games/immortal-isles/_cc0/
 _archive/
 assets_library/
 node_modules/
+
+# mortal-quest 一次性脚手架/检修脚本（检修、正则调试、批量重构用，绝不入库）
+games/mortal-quest/dbg_regex.py
+games/mortal-quest/refactor_realms_all.py
+games/mortal-quest/refactor_realms_data.py
+games/mortal-quest/_*.py

@@ -175,7 +175,7 @@ GAME.DATA.MONSTERS.push(
         hp: 26000, atk: 640, def: 430, speed: 58, spirit: 320, exp: 5000,
         stones: [1500, 3000], killChance: 0, loseAge: [0, 0], loseStonePct: [0.15, 0.3],
         affix: "berserk",
-        loot: [{ id: "artifact_zimu_complete", chance: 0.5, qty: [1, 1] }, { id: "tianhuo_crystal", chance: 0.6, qty: [2, 3] }, { id: "yinhun_zhong", chance: 0.2, qty: [1, 1] }],
+        loot: [{ id: "artifact_zimu_complete", chance: 0.5, qty: [1, 1] }, { id: "tianhuo_crystal", chance: 0.6, qty: [2, 3] }, { id: "yinhun_zhong", chance: 0.2, qty: [1, 1] }, { id: "feng_hun_yu", chance: 0.2, qty: [1, 1] }],
         desc: "乱星海妖族共主，赤羽蔽日。气血过三成便妖化狂暴，攻伐陡翻倍——硬撼者多殒于这一瞬。",
     },
     {
@@ -270,7 +270,7 @@ GAME.DATA.HUNTS = {
             waves: ["luanxing_vanguard", "xingque_vanguard", "yaowang_chixiao"],
             reward: {
                 equip: ["artifact_zimu_complete", "artifact_zhetian"],
-                materials: [{ id: "tianhuo_crystal", qty: 2 }, { id: "yinhun_zhong", qty: 1 }],
+                materials: [{ id: "tianhuo_crystal", qty: 2 }, { id: "yinhun_zhong", qty: 1 }, { id: "lingchong_egg", qty: 1 }],
                 stones: [1500, 3000],
                 text: "妖王潮都崩塌。你在王座残骸中翻出妖王珍藏的极品法器，与一函以妖血写就的功法残页。",
             },
@@ -281,7 +281,7 @@ GAME.DATA.HUNTS = {
             waves: ["wild_guixu_shou", "guixu_guard", "guixu_guard", "guixu_zhiyan"],
             reward: {
                 equip: ["artifact_zimu_complete", "artifact_zhetian", "artifact_tayun"],
-                materials: [{ id: "tianhuo_crystal", qty: 3 }, { id: "beast_soul", qty: 3 }, { id: "yinhun_zhong", qty: 2 }],
+                materials: [{ id: "tianhuo_crystal", qty: 3 }, { id: "beast_soul", qty: 3 }, { id: "yinhun_zhong", qty: 2 }, { id: "lingchong_egg", qty: 1 }, { id: "feng_hun_yu", qty: 1 }],
                 stones: [2000, 4000],
                 text: "归墟之眼阖目。渊底秘窟洞开，极品法器与稀世材料散落其中，尽归你手。",
             },

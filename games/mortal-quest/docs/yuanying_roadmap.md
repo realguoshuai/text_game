@@ -55,7 +55,7 @@
 | 3.2 | 元婴霸道对手 | 6 个 tier5-6 / majorRealm3 怪：赤霄妖王(berserk)、归墟之眼(thickShell+poison)、归墟守仆、元婴散修(seizeSoul)、妖王亲卫、归墟守兽(thickShell) | `data/wild_dungeons.js` | 低 | ✅ 已落地 |
 | 3.3 | 路遇对手补全 | `MAP_ENCOUNTERS` 补 19-21（元婴赶路有像样对手，此前空白） | `data/wild_dungeons.js` | 低 | ✅ 已落地 |
 | 3.4 | 奇遇双轨 | ① 元神出游 `ROAM_SITES` +3（古战场/灵脉秘境/星海秘境，含授艺/凶险）② 路途奇遇 `MAP_WONDERS`（元婴赶路概率触发，轻量直接给古宝/修为/材料，不致死） | `js/yuanying.js` + `js/map.js` | 低 | ✅ 已落地 |
-| 3.5 | 本命灵虫契约 | 灵虫契约伴生、战斗中协同、虫王进阶线 | `js/insect.js` + `combat.js` | 中 | 待做 |
+| 3.5 | 本命灵虫契约 | 灵虫契约伴生、战斗中协同、虫王进阶线 | `js/insect.js` + `combat.js` | 中 | ✅ 已落地 |
 
 > 产出→消耗闭环：副本/奇遇产出（极品法器 / 修为 / 天火晶石 / 阴魂钟 / 妖兽精魄）→ 分别被装备系统、突破、炼丹炼器、立派护法消耗，无死库存。
 
@@ -63,9 +63,9 @@
 
 | # | 更新项 | 内容与玩法 | 挂点 | 风险 |
 |---|---|---|---|---|
-| 4.1 | 收徒立派 | 元婴后收徒：弟子按年岁成长、历练、传功；宗门贡献反哺 | `js/bonds.js` 扩展 | 高 |
-| 4.2 | 封魂玉 | 敌对元神可契封为助力（夺舍线反向利用） | `js/seize.js` + `bonds.js` | 中 |
-| 4.3 | 双重战线事件 | 云国+碎星海两条线并行的随机事件池 | `Chronicle` + `events.js` | 低 |
+| 4.1 | 收徒立派 | 元婴后收徒：弟子按年岁成长、历练、传功；宗门贡献反哺 | `js/bonds.js` 扩展 | 高 | ✅ 已落地 |
+| 4.2 | 封魂玉 | 敌对元神可契封为助力（夺舍线反向利用） | `js/seize.js` + `bonds.js` | 中 | ✅ 已落地 |
+| 4.3 | 双重战线事件 | 云国+碎星海两条线并行的随机事件池 | `Chronicle` + `events.js` | 低 | ✅ 已落地 |
 
 ### 阶段五 · 远期终局
 
@@ -137,3 +137,34 @@
 - **第一大地雷是体内阴毒**：夺舍对决（练气四层触发）通关后 24 个月倒计时，到期无暖阳宝玉即道消身陨——实测流程里用 `takePill("nuan_yang_bao_yu")` 走等价解毒路径。
 - 驱动循环按优先级：夺舍三阶段 → 战斗结算 → 事件抉择（心魔劫恒选"观想本我"、铺路恒选"借灵药"、道途选体修覆盖 hpMul 链）→ 战后处置 → 解毒 → 刷怪/闭关 → 突破；`Math.random` 钉 0.001（验链路不通验平衡）。
 - 产出：`test/smoke_fullrun.js` **14/0**、`docs/guide_yuanying.md`（玩家向攻略，所有数字来自实测与线上表）；全仓 32 套 smoke 全绿、新文件 CRLF。
+
+---
+
+## 3.8 实施记录 · 3.5 本命灵虫契约（2026-10-22）
+
+| # | 更新项 | 新增/改动文件 | smoke |
+|---|---|---|---|
+| 3.5 | 本命灵虫契约 | `js/insect.js` `js/combat.js` `js/state.js` `js/ui.js` `data/wild_dungeons.js` | `smoke_spirit_insect` 34/0 |
+
+**落地要点**：
+1. 新增**绑定性伴生兽** `p.spiritInsect`（区别于既有「噬金虫群」= 道具手动虫云·破盾）：元婴（`SPIRIT_INSECT.gate=19`）持「本命灵虫卵」可 `Insect.contract()` 精血立契。
+2. **三阶成长**：幼虫→成虫（金石矿料×5）→虫王（天火晶×2＋灵石 2000），`Insect.advance()` 逐阶校验、不足拒、极巅拒。
+3. **战斗协同**：`combat.attack` 玩家伤害后注入 `Insect.spiritBite`，按当前攻势 ×阶比（0.15/0.30/0.50）每回合自动噬咬；**虫王附带撕甲**（削敌 def，与噬金虫群破盾定位区分）。
+4. **产出闭环**：灵虫卵来自两个元婴副本（妖王潮都/归墟古渊通关 materials），进阶耗材（金石/天火晶）均既有产出，无死库存。
+5. UI 在灵宠/傀儡面板 `#puppet-block` 追加「本命灵虫（元婴伴生）」区块（立契/进阶按钮，副标题/禁用态按资源动态）。
+
+## 4.4 实施记录 · 阶段四（2026-10-22）
+
+| # | 更新项 | 新增/改动文件 | smoke |
+|---|---|---|---|
+| 4.1 | 收徒立派 | `js/bonds.js` `js/core.js` `js/state.js` `js/ui.js` | `smoke_disciples` 32/0 |
+| 4.2 | 封魂玉 | `js/seize.js` `js/combat.js` `js/chronicle.js` `js/state.js` `js/ui.js` `data/wild_dungeons.js` | `smoke_fenghun` 27/0 |
+| 4.3 | 双重战线事件 | `js/core.js` `data/events.js` | `smoke_dual_front` 28/0 |
+
+**4.1 收徒立派**：门禁 = 元婴 + 已立派（`p.lingShan.founded`，接住 2.3）；`p.disciples` 数组，`Bonds.recruit/train/dispatch/graduate`；弟子有根骨四档（寻常/上佳/天纵/绝世）、按月成长（`Bonds.discipleTick` 挂 `Core.passTime`，受师者境界加成）、修至结丹起每月供奉灵石反哺、修至元婴可出师（谢师礼 3000 + 门派名声 30）。姓名池 16 个架空名（去原著化铁律，smoke 反查无人名泄漏）。
+
+**4.2 封魂玉**：夺舍线反向。新增「封魂玉」容器；元婴 + 持玉时，`seize_attempt` 事件多出「契封」选项（`eventFor` 按 `canSeal` 动态裁剪）。契封成功 → 元神入 `p.sealedSouls`（神识上限永久 +2、心境 +5、侵染退一重），失败 → 玉碎。被契封元神每回合协战（`Seize.soulAssist`，`combat.attack` 注入，每道 12 点平砍）。产出：归墟古渊通关 + 赤霄妖王掉落。
+
+**4.3 双重战线事件**：`explore()` 抽取加**境界门禁**（`minRealm`）+ **战线偏好**（元婴后按 `Cave2.atStarSea()` 只收当前战线事件）；EVENTS 追加 4 条元婴双线事件（陆线：边关告急/宗门讼案；海线：星阙征召/乱星袭扰），新增 `repute` outcome 类型挂 `Faction.repute` 作声望奖励。
+
+**全量**：全仓 **37 套 smoke 全绿**、`node --check` 全绿。均未提交，等「提交推送」。

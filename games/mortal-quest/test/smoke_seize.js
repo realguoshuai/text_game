@@ -70,7 +70,7 @@ ok('每 6 个月一掷、基础 8%', cfg.checkMonths === 6 && cfg.baseChance ===
 ok('侵染上限三重、每重反噬 +15%', cfg.maxLevel === 3 && cfg.levelDmgPer === 0.15);
 const ev = G.DATA.SEIZE_EVENTS.seize_attempt;
 ok('seize_attempt 事件存在且有文案', !!ev && !!ev.text);
-ok('三个选项（镇魔 / 借阵 / 反夺）', ev.choices.length === 3);
+ok('四个选项（镇魔 / 借阵 / 反夺 / 契封）', ev.choices.length === 4 && ev.choices[0].outcomes[0].mode === 'bell' && ev.choices[1].outcomes[0].mode === 'array' && ev.choices[2].outcomes[0].mode === 'counter' && ev.choices[3].outcomes[0].mode === 'seal');
 ok('三选项各带 tip', ev.choices.every(function (c) { return !!c.tip; }));
 ok('三选项 outcomes 均为 seize', ev.choices.every(function (c) {
   return c.outcomes.length === 1 && c.outcomes[0].type === 'seize' && c.outcomes[0].chance === 1;

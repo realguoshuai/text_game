@@ -191,6 +191,9 @@ GAME.State = {
         p.qixuan = { act: 7, step: 0 };
         p.tainan = null;
         p.companion = null;
+    p.spiritInsect = null;
+    p.sealedSouls = [];
+    p.disciples = [];
         p.stats = p.stats || { kills:0, mercies:0, breakthroughs:0, explores:0, pillsTaken:0, alchemy:0, maxRealm:13, oddjobs:0, trialsEntered:0, fzones:0 };
         p.stats.maxRealm = 13;
         return p;

@@ -1646,6 +1646,57 @@ GAME.UI = {
             '<button id="btn-shichong-ascend" class="' + (canAsc ? "small-btn btn-gold" : "small-btn") + '" style="margin:3px 4px 0 0;"' + (canAsc ? "" : " disabled") + '>③ 天火王化·进阶虫王</button>' +
             '<span class="item-desc">成虫×1＋天火晶' + ascNeed + '＋灵石' + ascStones + '（现 ' + cnt("tianhuo_crystal") + ' 晶／' + (p.spiritStones || 0) + ' 灵石）</span>' +
             '<div class="item-desc">斗法时放出虫云，无视护体灵光、持续融毁敌方法宝护罩（虫王效果倍增）。奇虫卵可自黑市、秘境游历、古修遗迹寻得。</div></div>';
+        // 本命灵虫契约（元婴伴生兽，3.5）
+        var SI = GAME.DATA.SPIRIT_INSECT || {};
+        var sigate = SI.gate || 19;
+        var si = p.spiritInsect, siTier = si ? (si.tier || 1) : 0;
+        var canSiContract = !si && (p.realmIndex || 0) >= sigate && cnt("lingchong_egg") >= 1;
+        html += '<div style="padding:6px 0;"><div><span class="gold">本命灵虫（元婴伴生）</span><span class="item-desc">\u3000' +
+            (si ? ('已契约 \u00b7 【' + GAME.Insect.tierName(siTier) + '】｜每回合自动噬咬' + (siTier >= 3 ? '（附撕甲）' : ''))
+                : ((p.realmIndex || 0) >= sigate ? '未契约' : '元婴后解锁')) + '</span></div>';
+        if (!si) {
+            html += '<button id="btn-si-contract" class="' + (canSiContract ? "small-btn btn-gold" : "small-btn") + '" style="margin:3px 4px 0 0;"' + (canSiContract ? "" : " disabled") + '>精血立契\u00b7孵化本命灵虫</button>' +
+                '<span class="item-desc">需本命灵虫卵×1（现 ' + cnt("lingchong_egg") + '）｜卵自元婴副本【妖王潮都】【归墟古渊】通关拾得</span>';
+        } else {
+            var advCost = GAME.Insect.advanceCost(siTier);
+            if (advCost) {
+                var parts = [];
+                if (advCost.jinshi) parts.push('金石矿料×' + advCost.jinshi);
+                if (advCost.tianhuo_crystal) parts.push('天火晶×' + advCost.tianhuo_crystal);
+                if (advCost.stones) parts.push('灵石' + advCost.stones);
+                var canAdv = (!advCost.jinshi || cnt("jinshi") >= advCost.jinshi) && (!advCost.tianhuo_crystal || cnt("tianhuo_crystal") >= advCost.tianhuo_crystal) && (!advCost.stones || (p.spiritStones || 0) >= advCost.stones);
+                html += '<button id="btn-si-advance" class="' + (canAdv ? "small-btn btn-gold" : "small-btn") + '" style="margin:3px 4px 0 0;"' + (canAdv ? "" : " disabled") + '>进阶\u00b7' + GAME.Insect.tierName(siTier + 1) + '</button>' +
+                    '<span class="item-desc">' + parts.join('＋') + '（晶 ' + cnt("tianhuo_crystal") + '／矿 ' + cnt("jinshi") + '／灵石 ' + (p.spiritStones || 0) + '）</span>';
+            } else {
+                html += '<span class="item-desc">已至虫王极巅，斗法每回合自动噬咬并撕甲。</span>';
+            }
+        }
+        html += '<div class="item-desc">斗法时灵虫每回合自动噬咬（按你当前攻势加成），虫王更附撕甲。与「噬金虫群」是两回事——那是手动放出的破盾群蜂。</div></div>';
+        // 契封元神（封魂玉，元婴）
+        var ssN = (p.sealedSouls || []).length;
+        if (ssN > 0) {
+            html += '<div style="padding:6px 0;"><div><span class="gold">契封元神（封魂玉）</span><span class="item-desc">\u3000已契封 ' + ssN + ' 道｜每回合协战 +' + (GAME.DATA.SEIZE.seal.soulPer * ssN) + '</span></div>' +
+                '<div class="item-desc">夺舍来袭时若持【封魂玉】，可将入侵元神反契封为己用（神识上限永久 +' + GAME.DATA.SEIZE.seal.spiritPer + '）。被封印的元神在斗法中每回合助你。</div></div>';
+        }
+        // 门下弟子（元婴 + 已立派）
+        var DC = GAME.DATA.DISCIPLES || {};
+        var dl = (p.disciples || []);
+        var dcR = GAME.Bonds.canRecruit();
+        html += '<div style="padding:6px 0;"><div><span class="gold">门下弟子（收徒立派）</span><span class="item-desc">\u3000在册 ' + dl.length + '/' + (DC.cap || 3) + '</span></div>' +
+            '<button id="btn-disciple-recruit" class="' + (dcR.ok ? "small-btn btn-gold" : "small-btn") + '" style="margin:3px 4px 0 0;"' + (dcR.ok ? "" : " disabled") + '>开山收徒</button>' +
+            '<span class="item-desc">' + (dcR.ok ? ('耗 ' + DC.recruitStones + ' 灵石，掷根骨收一名弟子') : dcR.msg) + '</span>';
+        dl.forEach(function (dd, di) {
+            var st = GAME.Bonds.stageOf(dd.growth);
+            var talent = (DC.talents && DC.talents[dd.talent]) ? DC.talents[dd.talent].name : "?";
+            var canGrad = dd.growth >= (DC.graduateNeed || 900);
+            html += '<div style="margin:4px 0;">' +
+                '<span class="item-desc">弟子·' + dd.name + '｜根骨【' + talent + '】｜' + st.name + '｜成长 ' + Math.floor(dd.growth) + (dd.tributing ? '｜供奉中' : '') + '</span><br>' +
+                '<button id="btn-disciple-train-' + di + '" class="small-btn">传功</button>' +
+                '<button id="btn-disciple-dispatch-' + di + '" class="small-btn" style="margin-left:3px;">历练</button>' +
+                (canGrad ? '<button id="btn-disciple-graduate-' + di + '" class="small-btn btn-gold" style="margin-left:3px;">出师</button>' : '') +
+                '</div>';
+        });
+        html += '<div class="item-desc">弟子按月成长（受你境界加成），可传功点拨／派下山历练；修至结丹起每月供奉灵石，修至元婴可出师（谢师礼 + 门派名声）。</div></div>';
         this.$("puppet-block").innerHTML = html;
 
         var bDayan = self.$("btn-puppet-dayan");
@@ -1682,6 +1733,20 @@ GAME.UI = {
         if (bEvo) bEvo.onclick = function () { GAME.Insect.evolve(); };
         var bAsc = self.$("btn-shichong-ascend");
         if (bAsc) bAsc.onclick = function () { GAME.Insect.ascend(); };
+        var bSiC = self.$("btn-si-contract");
+        if (bSiC) bSiC.onclick = function () { GAME.Insect.contract(); self.renderPuppet(); };
+        var bSiA = self.$("btn-si-advance");
+        if (bSiA) bSiA.onclick = function () { GAME.Insect.advance(); self.renderPuppet(); };
+        var bDRec = self.$("btn-disciple-recruit");
+        if (bDRec) bDRec.onclick = function () { GAME.Bonds.recruit(); self.renderPuppet(); };
+        (p.disciples || []).forEach(function (dd, di) {
+            var bT = self.$("btn-disciple-train-" + di);
+            if (bT) bT.onclick = function () { GAME.Bonds.train(di); self.renderPuppet(); };
+            var bD = self.$("btn-disciple-dispatch-" + di);
+            if (bD) bD.onclick = function () { GAME.Bonds.dispatch(di); self.renderPuppet(); };
+            var bG = self.$("btn-disciple-graduate-" + di);
+            if (bG) bG.onclick = function () { GAME.Bonds.graduate(di); self.renderPuppet(); };
+        });
     },
 
     // ---------- 图鉴·见闻录 ----------

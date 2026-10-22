@@ -134,6 +134,7 @@ GAME.Core = {
         if (GAME.Seize && GAME.Seize.tick) GAME.Seize.tick(months);
         // 元神出游冷却：元婴远巡耗神，需温养月数（Yuanying.tick 递减）
         if (GAME.Yuanying && GAME.Yuanying.tick) GAME.Yuanying.tick(months);
+        if (GAME.Bonds && GAME.Bonds.discipleTick) GAME.Bonds.discipleTick(months);
         // 两强争海：战局随月份自主漂移（强者愈强 + 扰动），参战冷却递减
         if (GAME.Faction && GAME.Faction.warTick) GAME.Faction.warTick(months);
 
@@ -904,7 +905,17 @@ GAME.Core = {
         if (p.isDead) return;
 
         // 按权重抽取事件：恶名越盛越易招来劫道散修；《敛气术》伪装境界让劫匪摸不清深浅
-        var events = GAME.DATA.EVENTS;
+        // 境界门禁 + 双重战线：元婴后按所在战线（碎星海/云国陆地）只收对应事件
+        var atSea = (GAME.Cave2 && GAME.Cave2.atStarSea) ? GAME.Cave2.atStarSea() : false;
+        var events = GAME.DATA.EVENTS.filter(function (ev) {
+            if (ev.minRealm && p.realmIndex < ev.minRealm) return false;
+            if (ev.maxRealm && p.realmIndex > ev.maxRealm) return false;
+            return true;
+        });
+        if (events.some(function (ev) { return ev.front; })) {
+            var want = atSea ? "sea" : "land";
+            events = events.filter(function (ev) { return !ev.front || ev.front === want; });
+        }
         var weightOf = function (ev) {
             var w = ev.weight;
             if (ev.id === "meet_bandit") {
@@ -1099,6 +1110,10 @@ GAME.Core = {
             case "war":
                 // 两强争海：冲阵（开打后由战斗接管）/ 暗杀 / 护送
                 if (GAME.Faction) GAME.Faction.warResolve(o);
+                break;
+            case "repute":
+                // 双重战线/世界事件：阵营声望（silent，文案由 outcome.text 承担）
+                if (GAME.Faction) GAME.Faction.repute(p, o.fid, o.amount, { silent: true });
                 break;
             case "nothing":
             default:

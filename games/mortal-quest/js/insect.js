@@ -24,11 +24,27 @@ GAME.DATA.ITEMS.shijin_larva  = { name: "噬金虫幼虫", type: "insect", quali
 GAME.DATA.ITEMS.shijin_adult  = { name: "噬金虫（成虫）", type: "insect", quality: "上品", atk: 10, price: 1500, desc: "成虫百炼成金，虫云蔽日可蚀法宝。斗法时放出可无视护体灵光、持续融毁敌盾。" };
 GAME.DATA.ITEMS.shijin_king   = { name: "噬金虫王", type: "insect", quality: "极品", atk: 25, price: 4000, desc: "虫群之王，甲壳泛金、口器如剪。虫云所过，法宝护罩寸寸崩解，是魔道终局之倚仗。" };
 
+GAME.DATA.ITEMS.lingchong_egg = { name: "本命灵虫卵", type: "insect", quality: "极品", price: 3000, desc: "元婴妖王巢穴深处的灵虫之卵，通体泛金、内蕴一缕灵识。元婴修士可以精血为契将其孵育为本命伴生灵虫——同生共死，斗法时每回合自动噬咬助你，并可循幼虫→成虫→虫王三阶成长。卵自元婴副本【妖王潮都】【归墟古渊】通关拾得。" };
+
 /* —— 培育线配方（供 UI 展示与逻辑校验共用，改数值只改一处） —— */
 GAME.DATA.INSECT = {
     HATCH:  { liquid: 2 },                        // 卵 → 幼虫：绿液 2 滴
     EVOLVE: { jinshi: 3 },                        // 幼虫 → 成虫：金石矿料 ×3
     ASCEND: { tianhuo_crystal: 1, stones: 500 },  // 成虫 → 虫王：天火晶 ×1 ＋ 灵石 500
+};
+
+/* —— 本命灵虫契约配置（元婴伴生兽，3.5）：契约门禁 + 三阶噬咬加成 + 进阶消耗 —— */
+GAME.DATA.SPIRIT_INSECT = {
+    gate: 19,                                       // 元婴（index 19）方可精血立契
+    tiers: [
+        { name: "幼虫", bite: 0.15 },               // tier 1：每回合按自身攻势 ×0.15 噬咬
+        { name: "成虫", bite: 0.30 },               // tier 2
+        { name: "虫王", bite: 0.50 },               // tier 3：附带撕甲（削敌防御）
+    ],
+    advance: {
+        1: { jinshi: 5 },                           // 幼 → 成：金石矿料 ×5
+        2: { tianhuo_crystal: 2, stones: 2000 },    // 成 → 王：天火晶 ×2 ＋ 灵石 2000
+    },
 };
 
 GAME.Insect = {
@@ -112,5 +128,88 @@ GAME.Insect = {
         GAME.UI.log(king
             ? "噬金虫王领群啃噬，【" + combat.name + "】护体灵光成片剥落，防御崩去一大截！"
             : "噬金虫云噬咬不休，【" + combat.name + "】护盾灵光被蚀去一层，防御已损。", "info");
+    },
+
+    /* ================= 本命灵虫契约（元婴伴生兽，3.5） ================= */
+
+    // 当前是否已契有本命灵虫
+    spiritInsect: function () {
+        var p = GAME.State.p();
+        return p.spiritInsect || null;
+    },
+    // 阶名（tier 1/2/3 → 幼虫/成虫/虫王）
+    tierName: function (t) {
+        var cfg = GAME.DATA.SPIRIT_INSECT || {};
+        var tier = (cfg.tiers || [])[t - 1];
+        return tier ? tier.name : "";
+    },
+    // 每回合噬咬加成系数
+    biteOf: function (t) {
+        var cfg = GAME.DATA.SPIRIT_INSECT || {};
+        var tier = (cfg.tiers || [])[t - 1];
+        return tier ? tier.bite : 0;
+    },
+    // 进阶到下一阶的消耗（null = 已极巅）
+    advanceCost: function (t) {
+        return (GAME.DATA.SPIRIT_INSECT.advance || {})[t] || null;
+    },
+    // 能否契约
+    canContract: function () {
+        var p = GAME.State.p();
+        if (p.spiritInsect) return { ok: false, msg: "你已有一头本命灵虫伴生，一心难容二主。" };
+        if ((p.realmIndex || 0) < GAME.DATA.SPIRIT_INSECT.gate) return { ok: false, msg: "非元婴修为，灵虫不肯认主——元婴后方可以精血立契。" };
+        if (GAME.State.countItem("lingchong_egg") < 1) return { ok: false, msg: "你手头没有本命灵虫卵（可自元婴副本【妖王潮都】【归墟古渊】通关拾得）。" };
+        return { ok: true };
+    },
+    // 精血立契：耗一枚灵虫卵，绑定本命伴生灵虫（tier 1 幼虫）
+    contract: function () {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return;
+        var chk = this.canContract();
+        if (!chk.ok) { GAME.UI.log(chk.msg, "system"); GAME.UI.updateUI(); return; }
+        GAME.State.removeItem("lingchong_egg", 1);
+        p.spiritInsect = { tier: 1, name: "本命灵虫" };
+        GAME.UI.log("你割破指尖，一滴精血落在灵虫卵上——卵壳应声而裂，一尾通体泛金的幼虫吮血而出，与你识海隐隐相连。从此它便是你的【本命灵虫】，同生共死、斗法协同！", "success");
+        GAME.UI.log("【契约】喂食金石矿料可促其蜕壳（幼虫→成虫），天火晶可助其王化（成虫→虫王）。斗法时它每回合自动噬咬助你。", "info");
+        if (GAME.Codex) GAME.Codex.unlockItem("lingchong_egg");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+    },
+    // 进阶：幼虫→成虫→虫王，逐阶消耗
+    advance: function () {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return;
+        if (!p.spiritInsect) { GAME.UI.log("你尚无本命灵虫可供进阶。", "system"); return; }
+        var t = p.spiritInsect.tier || 1;
+        var cost = this.advanceCost(t);
+        if (!cost) { GAME.UI.log("你的本命灵虫已至虫王极巅，无需再进。", "system"); return; }
+        if (cost.jinshi && GAME.State.countItem("jinshi") < cost.jinshi) { GAME.UI.log("进阶需金石矿料 ×" + cost.jinshi + " 喂养（现有 " + GAME.State.countItem("jinshi") + "）。", "system"); return; }
+        if (cost.tianhuo_crystal && GAME.State.countItem("tianhuo_crystal") < cost.tianhuo_crystal) { GAME.UI.log("王化需天火晶 ×" + cost.tianhuo_crystal + " 淬炼虫身（现有 " + GAME.State.countItem("tianhuo_crystal") + "）。", "system"); return; }
+        if (cost.stones && (p.spiritStones || 0) < cost.stones) { GAME.UI.log("王化需灵石 " + cost.stones + " 供其吞食（现有 " + (p.spiritStones || 0) + "）。", "system"); return; }
+        if (cost.jinshi) GAME.State.removeItem("jinshi", cost.jinshi);
+        if (cost.tianhuo_crystal) GAME.State.removeItem("tianhuo_crystal", cost.tianhuo_crystal);
+        if (cost.stones) p.spiritStones -= cost.stones;
+        p.spiritInsect.tier = t + 1;
+        GAME.UI.log("本命灵虫吞尽资粮，甲壳层层蜕变、灵识大涨——进阶为【" + this.tierName(p.spiritInsect.tier) + "】！斗法协同更凶狠。", "success");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+    },
+    // 战斗协同：每回合自动噬咬（combat.attack 调用），按 tier 加成；虫王附带撕甲
+    spiritBite: function (combat) {
+        if (!combat) return 0;
+        var p = GAME.State.p();
+        if (!p.spiritInsect) return 0;
+        var t = p.spiritInsect.tier || 1;
+        var s = (GAME.State.getStats) ? GAME.State.getStats() : {};
+        var base = Math.max(1, Math.round((s.atk || 0) * this.biteOf(t)));
+        combat.hp -= base;
+        if (t >= 3) {
+            var cut = Math.min(8, Math.max(1, Math.round(combat.def_ * 0.08)));
+            combat.def_ = Math.max(1, combat.def_ - cut);
+            GAME.UI.log("虫王当先，金色虫影一口噬下——【" + combat.name + "】甲壳被撕去一角（防御 -" + cut + "），创伤 " + base + " 点！", "info");
+        } else {
+            GAME.UI.log("本命灵虫自袖中疾扑而出，张口咬住【" + combat.name + "】，再添 " + base + " 点创伤！", "info");
+        }
+        return base;
     },
 };
