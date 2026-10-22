@@ -59,12 +59,22 @@ GAME.DATA.MAP = {
         ],
       },
       {
-        id: "star", name: "碎星海篇", minRealm: 16, realmRange: [16, 18],
+        id: "star", name: "碎星海篇", minRealm: 16, realmRange: [16, 21],
         desc: "万里之外的修仙群岛，妖修与散修杂处，灵药灵矿遍地——那是结丹之后的世界。",
         signature: [
           { name: "浮岛妖修巢", desc: "乱星海深处妖修盘踞的浮岛群，是结丹修士真正的磨刀石。" },
           { name: "海外灵矿", desc: "散落各岛的灵脉矿脉，蕴藏玄金石等异宝，引得散修蜂拥。" },
           { name: "散修集市", desc: "无宗门管束的海外黑市，奇物与凶徒并陈，认钱不认人。" },
+          { name: "两强争海", desc: "星阙内海与乱星盟总坛隔海对峙，战局月月不同——押对边者，鸡犬升天。" },
+        ],
+      },
+      {
+        id: "yuanying", name: "元婴篇", minRealm: 19, realmRange: [19, 21],
+        desc: "碎丹成婴，长生始得。元神可离体远游，一念起落便是千里——这一界，终于藏不住你了。",
+        signature: [
+          { name: "元神远巡", desc: "元婴修士一缕元神出窍，山川洞府任尔遨游，古修遗藏亦难逃神识搜刮。" },
+          { name: "天人五衰", desc: "元婴虽寿千载，每三百年仍有一道衰劫叩门——不应对者，跌境旧伤一并复发。" },
+          { name: "开宗立派", desc: "元婴之辈可在碎星海立下山门，传道授业，自此一方之祖。" },
         ],
       },
     ],
@@ -122,6 +132,33 @@ GAME.DATA.MAP = {
             desc: "？？？",
             actions: [],
         },
+
+        /* —— 碎星海三处元婴之地（index 19 起）：两强争海 + 妖兽海眼 —— */
+        {
+            id: "xingque_neihai", name: "星阙内海", kind: "immortal", reqRealm: 19, chapter: "star",
+            reqText: "星阙内海是正道魁首的总坛所在，结丹修士踏进一步，便会被巡海星卫当场格杀。",
+            teaser: "万丈灵光自海底升起，一座倒悬的宫阙压在星阙内海之上——正道魁首的总坛。",
+            desc: "海水是倒着流的。一座万里宫阙沉在海底，琉璃瓦上挂着千年不散的晨光。巡海星卫披甲执戟，往来无声——这里每一个人，都在元婴以上。",
+            actions: [
+                { id: "war_join_xingque", label: "投效星阙参战", hint: "正面冲阵 / 暗杀敌将 / 护送补给，改变两强战局（元婴）" },
+            ],
+        },
+        {
+            id: "luanxing_zongtan", name: "乱星盟总坛", kind: "immortal", reqRealm: 19, chapter: "star",
+            reqText: "乱星盟总坛煞气冲天，结丹修士入内，只会被巡天黑煞当作口粮吞了。",
+            teaser: "黑水翻涌的渊眼之上，九根白骨巨柱撑起一座不夜魔城——乱星盟的总坛。",
+            desc: "九根通天白骨柱下，魔修往来如织。这里不问你杀过谁，只问你够不够狠。盟主的声音自柱顶传来时，整片黑海都在低头。",
+            actions: [
+                { id: "war_join_luanxing", label: "投效乱星盟参战", hint: "正面冲阵 / 暗杀敌将 / 护送补给，改变两强战局（元婴）" },
+            ],
+        },
+        {
+            id: "yaoshou_haiyan", name: "妖兽海眼", kind: "immortal", reqRealm: 19, chapter: "star",
+            reqText: "妖兽海眼是上古大妖的巢穴，结丹修士入内，连尸骨都剩不下一块。",
+            teaser: "海眼深处传来的心跳声，百里外都能听见——那里睡着的东西，比这座海更老。",
+            desc: "海水在这里打着旋下陷，形成一个万里方圆的大漩涡。漩涡深处有光，光里有一座沉船墓场——上古大妖的巢穴，也是它沉睡千年的床。",
+            actions: [],
+        },
     ],
 
     // 双向道路：months = 单程耗时（月），silver = 单程盘缠（世俗银两）
@@ -137,6 +174,9 @@ GAME.DATA.MAP = {
         { id: "r_hf_yj",  from: "huangfeng_gu",  to: "yuejing_cheng", months: 1, silver: 0   },
         { id: "r_jy_yj",  from: "jiayuan_cheng", to: "yuejing_cheng", months: 3, silver: 200 },
         { id: "r_yj_sea", from: "yuejing_cheng", to: "luanxing_hai",  months: 8, silver: 0   },  // 跨海远行——结丹之约
+        { id: "r_sea_xq", from: "luanxing_hai",  to: "xingque_neihai", months: 2, silver: 0   },   // 碎星海 ↔ 星阙内海
+        { id: "r_sea_lx", from: "luanxing_hai",  to: "luanxing_zongtan", months: 2, silver: 0 },   // 碎星海 ↔ 乱星盟总坛
+        { id: "r_sea_ys", from: "luanxing_hai",  to: "yaoshou_haiyan",  months: 3, silver: 0   },  // 碎星海 ↔ 妖兽海眼
     ],
 
     // 苍南谷幻阵门槛：满足其一即可看破而入（已入门派者自不必再挡）

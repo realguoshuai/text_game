@@ -1151,6 +1151,53 @@ GAME.UI = {
             this.$("market-tip").innerText = "【" + (locNames[p.location] || "坊市") + "】 每逢 " + GAME.DATA.MARKET.refreshMonths +
                 " 个月换货；" + (p.karma < -20 ? "你恶名在外，商贾坐地起价" : p.karma > 20 ? "你乐善好施，商贾愿予折扣" : "童叟无欺");
 
+            // 战局提示行（两强争海：僵持时明说无军需铺）
+            if (GAME.Faction && GAME.Faction.warLabel) {
+                this.$("market-tip").innerText = this.$("market-tip").innerText + "　｜　" + GAME.Faction.warLabel(p);
+            }
+
+            // 胜方军需铺：战局 ≥70 / ≤30 才开门（固定价，不随换货刷新）
+            var stallBox = this.$("market-warstall");
+            if (stallBox) {
+                var stall = (GAME.Faction && GAME.Faction.warStall) ? GAME.Faction.warStall(p) : null;
+                if (stall) {
+                    stallBox.style.display = "";
+                    var sideName = stall.side === "xingque" ? "星阙" : "乱星盟";
+                    this.$("warstall-tip").innerHTML = "【" + sideName + "军需铺】" +
+                        (stall.side === "xingque" ? "正道总坛的库房，讲规矩，也讲实力。" : "魔道总坛的货栈，认灵石，不认人。") +
+                        "　战局现 " + GAME.Faction.warValue(p) + " 分，此铺随战局开合。";
+                    var gb = this.$("warstall-goods");
+                    gb.innerHTML = "";
+                    stall.goods.forEach(function (g, i) {
+                        var item = GAME.DATA.ITEMS[g.id] || {};
+                        var left = g.qty - (g.sold || 0);
+                        var row = document.createElement("div");
+                        row.className = "item-row";
+                        var l = document.createElement("div");
+                        l.innerHTML = '<span class="q-' + (item.quality || "凡品") + '">' + (item.name || g.id) + '</span> ×1' +
+                            '<div class="item-desc">' + (item.desc || "") + ' <span class="gold">【' + g.note + "】</span>" +
+                            (left <= 0 ? ' <span class="danger">【已售罄】</span>' : "") + '</div>';
+                        var r = document.createElement("div");
+                        r.className = "item-right";
+                        var pe = document.createElement("span");
+                        pe.className = "gold";
+                        pe.innerText = g.price + "灵石";
+                        var b = document.createElement("button");
+                        b.className = "small-btn btn-gold";
+                        b.innerText = "购买";
+                        b.disabled = left <= 0 || p.spiritStones < g.price;
+                        b.onclick = function () { GAME.Faction.warStallBuy(i); };
+                        r.appendChild(pe);
+                        r.appendChild(b);
+                        row.appendChild(l);
+                        row.appendChild(r);
+                        gb.appendChild(row);
+                    });
+                } else {
+                    stallBox.style.display = "none";
+                }
+            }
+
             // 在售
             var box = this.$("market-goods");
             box.innerHTML = "";
@@ -1394,6 +1441,22 @@ GAME.UI = {
                 }
                 html += '</div>';
             }
+            // 地磁灵山 · 开宗立派（元婴 + 身在碎星海方可）
+            var L = GAME.DATA.LINGSHAN;
+            if (GAME.Cave2.atStarSea()) {
+                html += '<div style="padding:6px 0;"><div><span class="gold">地磁灵山</span>　<span class="item-desc">[立派]</span></div>';
+                if (p.lingShan && p.lingShan.founded) {
+                    html += '<div class="item-desc">你已在此立派（山门 ' + (p.lingShan.months || 0) + ' 个月，威望 ' + (p.lingShan.fame || 0) + '）。地磁承惠：阵法月耗减半、护阵反制 +' +
+                        Math.round(GAME.DATA.LINGSHAN.repelBonus * 100) + '%、每月供奉灵石 ' + L.stipend + ' 枚与百年灵药 ' + L.herbs + ' 株。</div>';
+                } else {
+                    var fChk = GAME.Cave2.canFoundSect();
+                    html += '<div class="item-desc">碎星海深处有一条自生地磁的古灵脉——元婴之辈于此立下山门，地磁自此为你所承。' +
+                        (fChk.ok ? '开山立派、铸山门、安置门下，需灵石 ' + L.cost + ' 枚。' : fChk.why) + '</div>' +
+                        '<button id="btn-cave2-lingshan" class="btn-gold" style="margin-top:4px;"' +
+                        (fChk.ok ? "" : " disabled") + '>开宗立派</button>';
+                }
+                html += '</div>';
+            }
         }
         this.$("cave2-block").innerHTML = html;
 
@@ -1444,6 +1507,8 @@ GAME.UI = {
             var b = self.$("btn-cave2-form" + i);
             if (b) b.onclick = function () { GAME.Cave2.setFormation(f.id); };
         });
+        var bShan = self.$("btn-cave2-lingshan");
+        if (bShan) bShan.onclick = function () { GAME.Cave2.foundSect(); };
         var bHuan = self.$("btn-cave2-huanchen");
         if (bHuan) bHuan.onclick = function () { GAME.Cave2.unlockHuanchen(); self.renderCave2(); };
         var bRepair = self.$("btn-cave2-repair");
@@ -2325,6 +2390,41 @@ GAME.UI = {
             row.appendChild(left); row.appendChild(right);
             box.appendChild(row);
         });
+
+        // 元神出游（元婴期专属）：元神离体远巡——耗神识三成、历时 1 个月、3 个月冷却。
+        // 非元婴整块不渲染（不像丹炉那样留锁定按钮：结丹之辈连"元神"都没听过，无钥匙孔可言）。
+        var roamBlock = this.$("roam-block");
+        if (roamBlock) {
+            if (GAME.Yuanying && GAME.Yuanying.isYuanying(p)) {
+                roamBlock.style.display = "";
+                this.$("roam-info").innerHTML =
+                    '元神 <span class="gold">' + ((GAME.State.getStats() || {}).spirit || 0) + '</span> 点　｜　' +
+                    (GAME.Yuanying.label(p) || "");
+                var rbox = this.$("roam-sites");
+                rbox.innerHTML = "";
+                var chk = GAME.Yuanying.canRoam(p);
+                GAME.Yuanying.roamSites(p).forEach(function (site) {
+                    var row = document.createElement("div");
+                    row.className = "item-row";
+                    var left = document.createElement("div");
+                    left.innerHTML = '远巡 <span class="q-极品">' + site.name + '</span>' +
+                        '<div class="item-desc">' + site.desc + '</div>';
+                    var right = document.createElement("div");
+                    right.className = "item-right";
+                    var b = document.createElement("button");
+                    b.className = "small-btn btn-gold";
+                    b.innerText = "元神出游";
+                    b.disabled = !chk.ok;
+                    if (!chk.ok) b.title = chk.msg;
+                    b.onclick = function () { GAME.Yuanying.roam(site.id); };
+                    right.appendChild(b);
+                    row.appendChild(left); row.appendChild(right);
+                    rbox.appendChild(row);
+                });
+            } else {
+                roamBlock.style.display = "none";
+            }
+        }
 
         // 天下舆图：章节为独立地图页（标签切换 + 主题视觉 + 本篇妖物/机缘）
         var tabsBox = this.$("map-chapter-tabs");

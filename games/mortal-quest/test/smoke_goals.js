@@ -168,8 +168,8 @@ a = G.Goals.action(p6);
 assert('修为满但气血不足 → 先打坐回血', a && a.kind === 'heal' && /恢复气血/.test(a.label));
 assert('回血提示说明硬突破会重伤', a && /重伤/.test(a.why));
 
-// 顶境 → 无下一步可点
-p6.realmIndex = 18;
+// 顶境 → 无下一步可点（元婴后期为当前终点）
+p6.realmIndex = 21;
 p6.currentExp = 0;
 a = G.Goals.action(p6);
 assert('顶境 → 此界已圆满且不可点', a && a.kind === 'done' && a.run === null);

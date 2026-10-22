@@ -747,6 +747,7 @@ GAME.Combat = {
             else if (ctx.type === "relic") GAME.Relic.afterCombat(true, ctx);
             else if (ctx.type === "bonds") GAME.Bonds.nangongwanWin();
             else if (ctx.type === "hunt") GAME.Hunt.afterCombat(true, ctx);
+            else if (ctx.type === "war") GAME.Faction.warAfterCombat(true, ctx);
             else GAME.FZone.afterCombat(true, ctx);
             return;
         }
@@ -802,7 +803,7 @@ GAME.Combat = {
         }
 
         // 玄机世家主线 / 升仙擂台 / 血色禁地：败北不判当场身陨（剧情尚有转圜），按常规折寿失财处理
-        var routed = !!ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic");
+        var routed = !!ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic" || ctx.type === "war");
 
         // 血色禁地：败北由禁地模块全权结算软着陆（玄傀护主背出 / 弃药保命），不走通用折寿失财
         if (routed && ctx.type === "fzone") {
@@ -815,6 +816,13 @@ GAME.Combat = {
         if (routed && ctx.type === "hunt") {
             this.end();
             GAME.Hunt.afterCombat(false, ctx);
+            return;
+        }
+
+        // 两强争海冲阵：败北由拉锯战结算（战局被推回、声望受损），不判当场身陨
+        if (routed && ctx.type === "war") {
+            this.end();
+            GAME.Faction.warAfterCombat(false, ctx);
             return;
         }
 

@@ -209,6 +209,13 @@ GAME.Map = {
             GAME.UI.log(t.visit_family.first, "info");
             GAME.UI.log("尘缘断去，心境 +" + t.visit_family.mind + "（现心境 " + p.mind + "）。", "loot");
             GAME.Core.passTime(t.visit_family.months);
+        } else if (actionId === "war_join_xingque" || actionId === "war_join_luanxing") {
+            // 两强争海：投效参战（元婴门禁 + 身在对应总坛，校验在 Faction.warJoin 内）
+            if (GAME.Faction && GAME.Faction.warJoin) {
+                GAME.Faction.warJoin(actionId === "war_join_xingque" ? "xingque" : "luanxing");
+                return true;
+            }
+            GAME.UI.log("海面上风平浪静，暂无战事可投。", "system");
         } else if (actionId === "heisha_raid") {
             // 云京·夜探皇宫：交由幽冥教副本模块接管
             if (GAME.Heisha) { GAME.Heisha.start(); return true; }
@@ -246,6 +253,7 @@ GAME.Map = {
     // 当前篇章：身在天星海即星海篇；其余按境界阈值回落
     chapterOf: function (realmIndex, location) {
         if (location === "luanxing_hai") return "star";
+        if (realmIndex >= GAME.DATA.YUANING_GATE_INDEX) return "yuanying";
         if (realmIndex >= 16) return "jiedan";
         if (realmIndex >= 13) return "zhuji";
         return "qi";
@@ -272,7 +280,8 @@ GAME.Map = {
     // 节点动态归属章节：碎星海恒属星海篇；筑基陆地节点在结丹后升入结丹篇
     nodeChapter: function (n, ri) {
         if (n.id === "luanxing_hai") return "star";
-        if (n.chapter === "zhuji" && ri >= 22) return "jiedan";
+        // 青梧谷/云京等宗门地：结丹后「升篇」归结丹章（阈值取 JIEDAN_GATE_INDEX，勿写死下标）
+        if (n.chapter === "zhuji" && ri >= GAME.DATA.JIEDAN_GATE_INDEX) return "jiedan";
         return n.chapter || "qi";
     },
 

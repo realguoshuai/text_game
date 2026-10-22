@@ -48,6 +48,14 @@ GAME.DATA.REALMS = [
     { name:"结丹初期",  needExp:11500, breakChance:0.30, failDamage:260, failExpLoss:0.35, deathChance:0.06, maxAge:500, atk:120, def:80,  speed:22, spirit:60,  meditateMonths:12 },
     { name:"结丹中期",  needExp:17800, breakChance:0.18, failDamage:410, failExpLoss:0.42, deathChance:0.09, maxAge:500, atk:170, def:120, speed:28, spirit:85,  meditateMonths:12 },
     { name:"结丹后期",  needExp:null,  breakChance:null, failDamage:null, failExpLoss:0,    deathChance:0,    maxAge:500, atk:290, def:215, speed:38, spirit:145, meditateMonths:12 },
+
+    /* —— 元婴期（index 19~21）：初期 / 中期 / 后期 三块；结丹后期(index18) 经「碎丹成婴」而入。
+     * 寿元跃至千载（元婴方得长生之体）；斗法面板较结丹再翻数倍，结丹修士在其面前已如凡徒。
+     * 结丹后期→元婴初期走 GAME.DATA.YUANING 专用数值（碎丹成婴三铺路，见下方 YUANING 表）；
+     * 元婴内部各块为常规修为突破，沿用 breakChance 等字段。 */
+    { name:"元婴初期",  needExp:26000, breakChance:0.22, failDamage:600, failExpLoss:0.40, deathChance:0.08, maxAge:1000, atk:380, def:280, speed:45, spirit:200, meditateMonths:24 },
+    { name:"元婴中期",  needExp:45000, breakChance:0.14, failDamage:900, failExpLoss:0.45, deathChance:0.10, maxAge:1000, atk:540, def:400, speed:52, spirit:270, meditateMonths:24 },
+    { name:"元婴后期",  needExp:null,  breakChance:null, failDamage:null, failExpLoss:0,    deathChance:0,    maxAge:1000, atk:750, def:560, speed:60, spirit:350, meditateMonths:24 },
 ];
 
 /* 筑基丹链触发边界：练气十三层(index12)→筑基初期(index13) 走 GAME.DATA.ZHUJI 专用数值。
@@ -59,10 +67,11 @@ GAME.DATA.ZHUJI_GATE_INDEX = 12;
 GAME.DATA.JIEDAN_GATE_INDEX = 16;
 GAME.DATA.isJiedan = function (p) { return !!p && p.realmIndex >= GAME.DATA.JIEDAN_GATE_INDEX; };
 GAME.DATA.isZhuji  = function (p) { return !!p && p.realmIndex > GAME.DATA.ZHUJI_GATE_INDEX; };
+GAME.DATA.isYuanying = function (p) { return !!p && p.realmIndex >= GAME.DATA.YUANING_GATE_INDEX; };
 
 /* 大境界（major realm）：0=练气，1=筑基。供战斗「境界绝对压制」计算双方阶层差。
- * 练气=0、筑基=1、结丹=2；后续大境界沿用 初期/中期/后期 三块递增。 */
-GAME.DATA.majorRealm = function (idx) { return idx >= 16 ? 2 : (idx >= 13 ? 1 : 0); };
+ * 练气=0、筑基=1、结丹=2、元婴=3；各大境界均沿用 初期/中期/后期 三块递增。 */
+GAME.DATA.majorRealm = function (idx) { return idx >= 19 ? 3 : (idx >= 16 ? 2 : (idx >= 13 ? 1 : 0)); };
 
 /* —— 筑基冲关数值表（练气十三层 → 筑基专用，由 core.breakthrough 读取）——
  * 伪灵根裸冲：2% 成功，失败 80% 触发【经脉俱断】道消身陨——凡人流的天堑。
@@ -91,4 +100,21 @@ GAME.DATA.JIEDAN = {
     pill:     { chance:0.35, perPill:0.20, perExtra:0.15, cap:1.0, dmgMul:0.3, deathMul:0 },  // 凝丹：服丹免死
     zhengpin: { chance:0.55, perPill:0.20, perExtra:0.15, cap:1.0, dmgMul:0.2, deathMul:0 },  // 正品凝丹
     fake:     { chance:0.20, deathChance:0.30, dmgMul:1.3 }, // 伪凝丹：20%，失败三成身陨
+};
+
+/* 元婴天堑（结丹后期 index18 → 元婴初期 index19）专用数值，由 core.breakthrough 读取。
+ * 无备硬凝：3% 成、失败六成身陨（元婴之难，犹胜结丹）；
+ * 碎丹成婴不走丹链，而走「三铺路」事件（js/yuanying.js 的 yuanying_prep，择一写入 p.yuanyingPrep）：
+ *   借灵药  herb  耗 1 株千年灵药 → 成功率 +15%、反噬 ×0.7
+ *   寻护法  guard 耗 3000 灵石    → 成功率 +5%、反噬 ×0.5 且免身陨
+ *   静养    mind  耗时 6 月、心境 +10 → 成功率 +8%（心境每 10 点另有 +2%）
+ * 铺路加成由 Breakthrough.plan 读取 p.yuanyingPrep 统一结算，面板与结算同源。 */
+GAME.DATA.YUANING_GATE_INDEX = 19;    // 元婴判定门槛（isYuanying 等统一以此为准）
+GAME.DATA.YUANING_GATE_SOURCE = 18;   // 结丹后期为元婴突破源（与 ZHUJI_GATE_INDEX=12 对应练气十三层同理）
+GAME.DATA.YUANING = {
+    bare:   { chance:0.03, deathChance:0.60, dmg:600 },   // 无备硬凝：3% 成，失败六成身陨
+    guardCost: 3000,                                      // 寻护法所需灵石
+    herb:   { add:0.15, dmgMul:0.70 },                     // 借灵药：+15%，反噬 ×0.7
+    guard:  { add:0.05, dmgMul:0.50, deathMul:0 },         // 寻护法：+5%，反噬减半且免死
+    mind:   { add:0.08, mind:10, months:6 },               // 静养：+8%，另耗时 6 月、心境 +10
 };

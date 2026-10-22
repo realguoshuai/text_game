@@ -96,6 +96,21 @@ GAME.DATA.MONSTERS.push(
         loot: [{ id: "tianhuo_crystal", chance: 0.5, qty: [1, 2] }, { id: "pill_jiedan_zhengpin", chance: 0.12, qty: [1, 1] }],
         desc: "魔道六宗派驻外域的巡察，专司清剿异己，周身魔焰环绕。",
     },
+    /* —— 两强争海 · 先锋将（元婴篇）：只由「正面冲阵」调用，不进路遇池 —— */
+    {
+        id: "luanxing_vanguard", name: "乱星盟·先锋将", tier: 5, majorRealm: 3,
+        hp: 22000, atk: 620, def: 420, speed: 55, spirit: 300, exp: 3000,
+        stones: [1200, 2600], killChance: 0, loseAge: [0, 0], loseStonePct: [0.15, 0.3],
+        loot: [{ id: "tianhuo_crystal", chance: 0.5, qty: [1, 3] }],
+        desc: "乱星盟先锋大将，一身煞气凝如实质，刀下亡魂无数。冲阵先过他一关。",
+    },
+    {
+        id: "xingque_vanguard", name: "星阙·前锋督帅", tier: 5, majorRealm: 3,
+        hp: 22000, atk: 620, def: 420, speed: 55, spirit: 300, exp: 3000,
+        stones: [1200, 2600], killChance: 0, loseAge: [0, 0], loseStonePct: [0.15, 0.3],
+        loot: [{ id: "tianhuo_crystal", chance: 0.5, qty: [1, 3] }],
+        desc: "星阙前锋督帅，甲胄上凝着三百年不散的海霜。冲阵先过他一关。",
+    },
     /* —— 心魔凝形（结丹篇）：只由反夺元神失败触发，不进路遇池 —— */
     {
         id: "seize_demon", name: "心魔·凝形", tier: 4, majorRealm: 2,

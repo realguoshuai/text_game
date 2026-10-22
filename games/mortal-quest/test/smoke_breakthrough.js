@@ -101,9 +101,12 @@ ok('无任何加成时成功率 = 0.58', near(plan.successChance, 0.58));
 ok('无加成时 parts 为空', plan.parts.length === 0);
 ok('无加成时反噬倍率 1.0', plan.dmgMul === 1);
 ok('无加成时反噬伤害 = failDamage(40)', plan.failDmg === 40);
+atRealm(21);
+plan = G.Breakthrough.plan(P());
+ok('元婴后期（顶境）plan.ok=false', plan.ok === false && plan.reason === 'top');
 atRealm(18);
 plan = G.Breakthrough.plan(P());
-ok('结丹后期（顶境）plan.ok=false', plan.ok === false && plan.reason === 'top');
+ok('结丹后期 → 元婴天堑 gate=yuanying', plan.ok === true && plan.gate === 'yuanying' && plan.isYuanying === true);
 
 /* ================= ④ 灵脉 ================= */
 section('④ 灵脉（灵石租金的回报）');

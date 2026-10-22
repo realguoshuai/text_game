@@ -36,6 +36,9 @@ GAME.Core = {
         // 灵脉产出：筑基后独辟灵峰，灵脉自行吐纳灵石与灵草（挂机收益）
         if (GAME.Cave2 && p.peak) GAME.Cave2.grantVeinOutput(months);
 
+        // 门派供奉（元婴后开宗立派）：地磁灵山按月供奉灵石与百年灵药
+        if (GAME.Cave2 && GAME.Cave2.sectTribute) GAME.Cave2.sectTribute(months);
+
         // 护山大阵月耗：阵法持续耗养灵石（周天星斗大阵 20/月），养不起则阵散
         if (GAME.Cave2 && GAME.Cave2.tickUpkeep) GAME.Cave2.tickUpkeep(months);
 
@@ -129,6 +132,10 @@ GAME.Core = {
         if (GAME.Faction && GAME.Faction.tick) GAME.Faction.tick(months);
         // 神识夺舍心魔：结丹后方有值得夺的神识；阵法闭关（shielded）不扰
         if (GAME.Seize && GAME.Seize.tick) GAME.Seize.tick(months);
+        // 元神出游冷却：元婴远巡耗神，需温养月数（Yuanying.tick 递减）
+        if (GAME.Yuanying && GAME.Yuanying.tick) GAME.Yuanying.tick(months);
+        // 两强争海：战局随月份自主漂移（强者愈强 + 扰动），参战冷却递减
+        if (GAME.Faction && GAME.Faction.warTick) GAME.Faction.warTick(months);
 
         // 十年回顾：每满 10 年结算一次小结（js/review.js，纯展示）
         if (GAME.Review && GAME.Review.tick) GAME.Review.tick();
@@ -650,13 +657,23 @@ GAME.Core = {
             GAME.UI.updateUI();
             return;
         }
+        // 元婴天堑：结丹后期 → 元婴。破境之前先问「碎丹成婴」铺路（借灵药/寻护法/静养/无备），
+        // 择一写入 p.yuanyingPrep，随后 resume 续破——与心魔劫同一 resume 模式，不另开流程。
+        if (p.realmIndex === GAME.DATA.YUANING_GATE_SOURCE && GAME.Yuanying && GAME.Yuanying.offerPrep(p)) {
+            GAME.UI.log("金丹将碎，元婴欲凝——此乃你一生第二道天堑。铺路就在此时。", "moment");
+            p.pendingEvent = { eventId: "yuanying_prep", resume: "breakthrough" };
+            GAME.UI.updateUI();
+            return;
+        }
+
         var plan = GAME.Breakthrough.plan(p);
-        var isZhuji = plan.isZhuji, atJiedanGate = plan.isJiedan;
+        var isZhuji = plan.isZhuji, atJiedanGate = plan.isJiedan, atYuanyingGate = plan.isYuanying;
         var zhujiPill = plan.zhujiPill, jiedanPill = plan.jiedanPill, pillName = plan.pillName;
         var successChance = plan.successChance, dmgMul = plan.dmgMul, deathMul = plan.deathMul;
         var bareZhuji = plan.bareZhuji, bareJiedan = plan.bareJiedan, fakeJiedan = plan.fakeJiedan;
         if (bareZhuji) GAME.UI.log("筑基天堑！你身负伪灵根，竟欲以肉身硬撼壁障——此乃十死无生之局（成功 " + Math.round(successChance * 100) + "%，失败八成经脉俱断）！", "danger");
         if (bareJiedan) GAME.UI.log("结丹天堑！你竟欲不假外丹、以肉身硬凝金丹——此乃百中无一之局（成功 " + Math.round(successChance * 100) + "%，失败九成五身陨）！", "danger");
+        if (plan.bareYuanying) GAME.UI.log("元婴天堑！金丹已现裂痕，你竟不借外物、无备硬凝——此乃十死无生之局（成功 " + Math.round(successChance * 100) + "%，失败六成身陨）！", "danger");
         // 破境筹备明细入日志：掷骰之前，先让玩家看清自己凑出来的每一分加成
         if (plan.parts.length) {
             var partsTxt = plan.parts.map(function (x) { return x.label + " +" + Math.round(x.add * 100) + "%"; }).join("、");
@@ -671,6 +688,7 @@ GAME.Core = {
                 successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,
                 isZhuji: isZhuji, zhujiPill: zhujiPill, pillName: pillName, bareZhuji: bareZhuji,
                 isJiedan: atJiedanGate, jiedanPill: jiedanPill, bareJiedan: bareJiedan, fakeJiedan: fakeJiedan,
+                isYuanying: atYuanyingGate, bareYuanying: plan.bareYuanying,
                 guardUsed: plan.guardUsed
             };
             GAME.UI.log("壁障将破未破——识海深处黑潮翻涌，旧日心魔乘虚而入，欲扰你道心！", "danger");
@@ -682,6 +700,7 @@ GAME.Core = {
         this._rollBreakthrough({
             successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,
             isZhuji: isZhuji, zhujiPill: zhujiPill, pillName: pillName, bareZhuji: bareZhuji,
+            isYuanying: atYuanyingGate, bareYuanying: plan.bareYuanying,
             guardUsed: plan.guardUsed
         });
     },
@@ -700,6 +719,7 @@ GAME.Core = {
         if (!target) { GAME.UI.updateUI(); return; }
         var isZhuji = ctx.isZhuji, zhujiPill = ctx.zhujiPill, successChance = ctx.successChance, dmgMul = ctx.dmgMul, deathMul = ctx.deathMul, bareZhuji = ctx.bareZhuji, pillName = ctx.pillName;
         var isJiedan = ctx.isJiedan, jiedanPill = ctx.jiedanPill, bareJiedan = ctx.bareJiedan, fakeJiedan = ctx.fakeJiedan;
+        var isYuanying = ctx.isYuanying, bareYuanying = ctx.bareYuanying;
 
         GAME.UI.log("你盘膝而坐，周身灵气开始向壁障冲击……" + ((isZhuji || isJiedan) ? ((bareZhuji || bareJiedan) ? "" : "【" + pillName + "】化作磅礴药力护住心脉！") : ""), "system");
         this.passTime(3);
@@ -752,6 +772,14 @@ GAME.Core = {
                 GAME.Codex.unlockLore("lore_changchun");
                 if (isZhuji) GAME.Codex.unlockLore("lore_zhuji");
             }
+            // 元婴功成：碎丹成婴——清铺路状态，叙事入见闻录
+            if (p.realmIndex === GAME.DATA.YUANING_GATE_INDEX) {
+                p.yuanyingPrep = null;
+                p._yuanyingPrepOffered = false;
+                GAME.UI.log("金丹彻底碎了。碎屑化作一场金色的雨，落进识海——雨止之处，坐着一个眉眼与你一般无二、却只有三寸高的婴孩。元婴成，长生始。", "moment");
+                GAME.UI.log("寿元大限延至 " + newRealm.maxAge + " 岁——你终于在这一界得了几千年的光阴！", "success");
+                if (GAME.Chronicle) GAME.Chronicle.narrate("yuanying_reached", p);
+            }
             // 结丹功成：金丹阴阳两面自分——挂起道途抉择（已择定的老档不重复挂）
             if (p.realmIndex === GAME.DATA.JIEDAN_GATE_INDEX && GAME.Path && GAME.Path.offer(p)) {
                 GAME.UI.log("丹田深处，那枚新凝的金丹忽地裂出阴阳两面——一半炽烈如熔金，一半温润如秋水。道途自分，就在此时。", "moment");
@@ -773,7 +801,7 @@ GAME.Core = {
             }
         } else {
             if (GAME.Alchemy) GAME.Alchemy.consumeJiangchen();
-            var dmg = bareZhuji ? GAME.DATA.ZHUJI.bare.dmg : (bareJiedan ? GAME.DATA.JIEDAN.bare.dmg : Math.round(realm.failDamage * dmgMul));
+            var dmg = bareZhuji ? GAME.DATA.ZHUJI.bare.dmg : (bareJiedan ? GAME.DATA.JIEDAN.bare.dmg : (bareYuanying ? GAME.DATA.YUANING.bare.dmg : Math.round(realm.failDamage * dmgMul)));
             p.currentHp -= dmg;
             // 丹药护心：筑基丹/正品筑基丹护持下的失败，药力吊住心脉——气血不至磨穿（保底 1 点），
             // 否则连服丹链会被反噬逐次放血致死，"资源堆叠抹平资质"便成了空话。伪丹与裸冲不在此列。
@@ -812,6 +840,18 @@ GAME.Core = {
                         p.isDead = true;
                         p.deathReason = "结丹裸冲失败，经脉俱断而亡";
                         GAME.UI.log("壁障轰然反震，你全身经脉寸寸崩断——【经脉俱断】，道消身陨！", "danger");
+                    }
+                }
+            } else if (bareYuanying) {
+                // 元婴无备硬凝失败：六成概率【丹碎婴散】——玄傀护主可软着陆一次
+                if (Math.random() < GAME.DATA.YUANING.bare.deathChance) {
+                    if (this.tryRescue("逆冲反震")) {
+                        GAME.UI.log("你从丹碎婴散的边缘被生生拽回——不假外物硬凝元婴，凶险至此！", "danger");
+                    } else {
+                        p.currentHp = 0;
+                        p.isDead = true;
+                        p.deathReason = "元婴无备硬凝失败，丹碎婴散而亡";
+                        GAME.UI.log("金丹碎屑逆冲回经脉，一寸寸割开你的气海——【丹碎婴散】，道消身陨！", "danger");
                     }
                 }
             } else if (fakeJiedan) {
@@ -974,6 +1014,14 @@ GAME.Core = {
             // 按玩家当下条件裁剪选项（没《不动镇魂诀》不列镇魔、没大阵不列借阵）
             return (GAME.Seize && GAME.Seize.eventFor) ? GAME.Seize.eventFor(GAME.DATA.SEIZE_EVENTS[id]) : GAME.DATA.SEIZE_EVENTS[id];
         }
+        if (GAME.DATA.YUANING_EVENTS && GAME.DATA.YUANING_EVENTS[id]) {
+            // 按玩家当下资源裁剪选项（无千年灵药不列借药、灵石不足不列护法；无备硬凝永远可选）
+            return (GAME.Yuanying && GAME.Yuanying.eventFor) ? GAME.Yuanying.eventFor(GAME.DATA.YUANING_EVENTS[id]) : GAME.DATA.YUANING_EVENTS[id];
+        }
+        if (GAME.DATA.STARWAR_EVENTS && GAME.DATA.STARWAR_EVENTS[id]) {
+            // 按投效阵营覆写文案与 outcomes（星阙 / 乱星盟）
+            return (GAME.Faction && GAME.Faction.eventFor) ? GAME.Faction.eventFor(GAME.DATA.STARWAR_EVENTS[id]) : GAME.DATA.STARWAR_EVENTS[id];
+        }
         return null;
     },
 
@@ -1043,6 +1091,14 @@ GAME.Core = {
             case "seize":
                 // 夺舍来袭三选一：镇魔 / 借阵 / 反夺（反夺失败可能直接开打，交由战斗接管）
                 if (GAME.Seize) { if (GAME.Seize.resolve(o) === "combat") return; }
+                break;
+            case "yuanying":
+                // 碎丹成婴铺路：借灵药 / 寻护法 / 静养 / 无备（择一写入 p.yuanyingPrep）
+                if (GAME.Yuanying) GAME.Yuanying.setPrep(o);
+                break;
+            case "war":
+                // 两强争海：冲阵（开打后由战斗接管）/ 暗杀 / 护送
+                if (GAME.Faction) GAME.Faction.warResolve(o);
                 break;
             case "nothing":
             default:

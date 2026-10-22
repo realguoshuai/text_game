@@ -59,6 +59,22 @@ GAME.DATA.FORMATIONS = [
     { id: "zhouxing", name: "周天星斗大阵", cost: 3000, repelChance: 0.95, upkeep: 20, where: "huanchen", seclude: true },
 ];
 
+/* 地磁灵山（阶段二 · 开宗立派）：碎星海深处一条自生地磁的古灵脉。
+ * 元婴之辈于此立下山门，地磁自此为你所承：
+ *   upkeepMul  阵法月耗减半（地磁稳阵，阵旗不虚耗）
+ *   stipend    每月门派供奉灵石（山门聚气，门下与过路客的香火）
+ *   herbs      每月附赠百年灵药（灵山自产）
+ *   repelBonus 护山大阵反制率 +5%（地磁增幅，上限 0.99）
+ * 对应原著「元磁神山·立派之基」，已去名著化。 */
+GAME.DATA.LINGSHAN = {
+    reqRealm: 19,           // 元婴初期
+    cost: 5000,
+    upkeepMul: 0.5,
+    stipend: 30,
+    herbs: 1,
+    repelBonus: 0.05,
+};
+
 GAME.Cave2 = {
 
     // ---------- 拜入内门：获封师叔，开启月俸 ----------
@@ -190,8 +206,8 @@ GAME.Cave2 = {
     // ---------- 寰尘岛：碎星海深处的隐秘灵岛（周天星斗大阵的所在） ----------
     atStarSea: function () {
         var p = GAME.State.p();
-        if (GAME.Map && GAME.Map.chapterOf) return GAME.Map.chapterOf(p.realmIndex, p.location) === "star";
-        return p.location === "luanxing_hai";
+        // 碎星海节点白名单（元婴期 chapterOf 已归元婴篇，不能再用 chapter 反推）
+        return ["luanxing_hai", "xingque_neihai", "luanxing_zongtan", "yaoshou_haiyan"].indexOf(p.location) >= 0;
     },
     canUnlockHuanchen: function () {
         var p = GAME.State.p();
@@ -213,12 +229,12 @@ GAME.Cave2 = {
         return true;
     },
 
-    // ---------- 阵法月耗：阵法持续耗养灵石，养不起则阵散 ----------
+    // ---------- 阵法月耗：阵法持续耗养灵石，养不起则阵散（地磁灵山立派后减半） ----------
     tickUpkeep: function (months) {
         var p = GAME.State.p();
         var form = this.activeFormation();
         if (!form || !form.upkeep) return true;
-        var cost = form.upkeep * months;
+        var cost = Math.ceil(form.upkeep * this.upkeepMul() * months);
         if (p.spiritStones >= cost) {
             p.spiritStones -= cost;
             return true;
@@ -233,10 +249,10 @@ GAME.Cave2 = {
     // ---------- 魔修/散修潜入：阵法自动反制 ----------
     repelIntruder: function () {
         var p = GAME.State.p();
-        var form = null;
-        GAME.DATA.FORMATIONS.forEach(function (f) { if (f.id === (p.formation || "none")) form = f; });
-        if (!form || !form.repelChance) return false;
-        if (Math.random() < form.repelChance) {
+        var form = this.activeFormation();
+        var chance = this.effectiveRepel();
+        if (!chance) return false;
+        if (Math.random() < chance) {
             var loot = 20 + GAME.Combat.rand(10, 40);   // 缴获储物袋里的灵石
             p.spiritStones += loot;
             GAME.UI.log("夜半阵光暴涨——【" + form.name + "】自动反制，一名魔修被颠乱五行困于阵中！其储物袋被你缴获，得灵石 " + loot + " 枚。", "success");
@@ -249,5 +265,61 @@ GAME.Cave2 = {
     canRecipe2: function (recipe) {
         var p = GAME.State.p();
         return p.realmIndex >= (recipe.realmNeed || 13);
+    },
+
+    /* ---------- 地磁灵山 · 开宗立派（元婴篇） ---------- */
+    // 立派校验：元婴 + 身在碎星海 + 灵石 5000（与寰尘岛平行，不占传送阵线）
+    canFoundSect: function () {
+        var p = GAME.State.p();
+        var L = GAME.DATA.LINGSHAN;
+        if (p.lingShan && p.lingShan.founded) return { ok: false, why: "你已在此立派，山门即根，无须再择地。" };
+        if (p.realmIndex < L.reqRealm) return { ok: false, why: "元婴初期方有开宗立派的底气——结丹之辈，无人肯来投。" };
+        if (!this.atStarSea()) return { ok: false, why: "地磁灵山在碎星海深处——先抵达那片海域。" };
+        if (p.spiritStones < L.cost) return { ok: false, why: "开山立派、铸山门、安置门下，需灵石 " + L.cost + " 枚。" };
+        return { ok: true, why: "" };
+    },
+    foundSect: function () {
+        var p = GAME.State.p();
+        var chk = this.canFoundSect();
+        if (!chk.ok) { GAME.UI.log("立派不可行——" + chk.why, "system"); return false; }
+        var L = GAME.DATA.LINGSHAN;
+        p.spiritStones -= L.cost;
+        p.lingShan = { founded: true, fame: 0, months: 0 };
+        GAME.UI.log("你在碎星海深处那条古灵脉上落下第一块山门石。地磁自你脚下升起，百里内的灵气都开始向你倾斜——【开宗立派】，自此你是一方之祖。", "success");
+        if (GAME.Chronicle) GAME.Chronicle.narrate("lingshan_founded", p);
+        GAME.UI.updateUI();
+        return true;
+    },
+
+    // 门派供奉（挂 passTime，按月）：灵石 + 百年灵药
+    sectTribute: function (months) {
+        var p = GAME.State.p();
+        if (!p.lingShan || !p.lingShan.founded || !months) return 0;
+        var L = GAME.DATA.LINGSHAN;
+        var stones = L.stipend * months;
+        p.spiritStones += stones;
+        p.lingShan.fame += months;
+        p.lingShan.months = (p.lingShan.months || 0) + months;
+        for (var i = 0; i < L.herbs * months; i++) GAME.State.addItem("herb_bainian", 1);
+        return stones;
+    },
+
+    // 阵法月耗系数（地磁稳阵：已立派则减半；阵散与否仍看灵石够不够）
+    upkeepMul: function () {
+        var p = GAME.State.p();
+        return (p.lingShan && p.lingShan.founded) ? GAME.DATA.LINGSHAN.upkeepMul : 1;
+    },
+
+    // 护山大阵反制率（地磁增幅 +5%，上限 0.99）—— repelIntruder 与面板同读此口
+    repelBonus: function () {
+        var p = GAME.State.p();
+        if (!(p.lingShan && p.lingShan.founded)) return 0;
+        return GAME.DATA.LINGSHAN.repelBonus;
+    },
+    effectiveRepel: function () {
+        var form = this.activeFormation();
+        var base = (form && form.repelChance) || 0;
+        if (!base) return 0;                    // 无阵不反制（地磁增幅不凭空生阵）
+        return Math.min(0.99, base + this.repelBonus());
     },
 };

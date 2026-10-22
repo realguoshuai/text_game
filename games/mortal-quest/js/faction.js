@@ -268,3 +268,245 @@ GAME.Faction = {
         return f ? ("【追杀令】" + f.name) : "【追杀令】";
     },
 };
+
+/* =========================================================
+ * 两强争海（阶段二 · 据点拉锯战）：星阙 vs 乱星盟
+ * 战局 p.starWar：0~100，50 为均势；≥70 星阙占上风，≤30 乱星盟占上风。
+ * 战局随月份自主漂移（强者愈强 + 随机扰动），玩家投效参战可亲手扭转。
+ * 战局唯一写入口 = Faction.warShift（与 repute 同纪律：夹紧边界，禁外部直写）。
+ * ========================================================= */
+GAME.DATA.STARWAR = {
+    start: 50, drift: 0.03, wobble: 1.5, bounds: [5, 95],
+    advantage: 70,          // 战局 ≥ 此值 → 星阙占上风；≤ 100-advantage → 乱星盟占上风
+    chargeShift: 12,        // 正面冲阵得胜：战局向本方 +12
+    chargeLoss: 4,          // 冲阵败北：战局向敌方 +4
+    killShift: 20, killLoss: 8,
+    escortShift: 6, escortStones: [500, 900], escortMonths: 1,
+    cd: 6,                  // 每次参战后的休整期（月）
+    killBase: 0.45,         // 暗杀基础成功率（神识另加）
+};
+
+/* 投效参战事件（挂 pendingEvent，走既有事件面板；text/outcomes 由 Faction.eventFor 按阵营覆写） */
+GAME.DATA.STARWAR_EVENTS = {
+    starwar_fight: {
+        id: "starwar_fight",
+        text: "（由 Faction.eventFor 按投效阵营覆写）",
+        choices: [
+            { text: "正面冲阵", tip: "与敌阵先锋将真刀真枪打一场——胜则战局向你方倾 12 分，败则被推回 4 分",
+              outcomes: [{ type: "war", action: "charge" }] },
+            { text: "暗杀敌将", tip: "借夜雨摸进敌营（约四成五成功率，神识高者更稳）——成则倾 20 分还带一笔灵石，败则伤重且被推回 8 分",
+              outcomes: [{ type: "war", action: "kill" }] },
+            { text: "护送补给", tip: "护十艘粮船穿过雷区，全须全尾——战局倾 6 分，另付酬劳（耗时 1 个月）",
+              outcomes: [{ type: "war", action: "escort" }] },
+        ],
+    },
+};
+
+/* 胜方货栈：战局倾覆后，占上风一方的军需铺开门（坊市面板呈现） */
+GAME.DATA.WAR_STALL = {
+    xingque: [
+        { id: "tianhuo_crystal", qty: 5, price: 200, note: "军需五折" },
+        { id: "herb_qiannian",   qty: 2, price: 480, note: "前线紧俏，溢价两成" },
+        { id: "pill_yanshou",    qty: 1, price: 600, note: "原价兑付，不趁火打劫" },
+    ],
+    luanxing: [
+        { id: "tianhuo_crystal", qty: 5, price: 200, note: "军需五折" },
+        { id: "herb_qiannian",   qty: 2, price: 480, note: "前线紧俏，溢价两成" },
+        { id: "pill_huichun",    qty: 5, price: 300, note: "八折，魔道疗伤全靠它" },
+    ],
+};
+
+/* —— Faction 扩展：两强争海（追加式，不动上方既有方法） —— */
+(function () {
+    var W = GAME.DATA.STARWAR;
+    var F = GAME.Faction;
+    if (!F) return;
+
+    // 战局当前值（老存档无 starWar 字段时按均势起算）
+    F.warValue = function (p) {
+        p = p || GAME.State.p();
+        if (!p) return W.start;
+        return (p.starWar == null) ? W.start : p.starWar;
+    };
+
+    // 战局唯一写入口：夹紧边界，返回新值
+    F.warShift = function (p, delta) {
+        p = p || GAME.State.p();
+        if (!p) return W.start;
+        var v = this.warValue(p) + (delta || 0);
+        v = Math.max(W.bounds[0], Math.min(W.bounds[1], v));
+        p.starWar = Math.round(v);
+        return p.starWar;
+    };
+
+    // 当前占上风的一方（null = 僵持，无货栈）
+    F.warSide = function (p) {
+        var v = this.warValue(p);
+        if (v >= W.advantage) return "xingque";
+        if (v <= 100 - W.advantage) return "luanxing";
+        return null;
+    };
+
+    // 战局文案（洞府/地图/坊市共用）
+    F.warLabel = function (p) {
+        var v = this.warValue(p);
+        var side = this.warSide(p);
+        var name = side === "xingque" ? "星阙" : (side === "luanxing" ? "乱星盟" : "两强僵持");
+        var tail = side ? "占上风" : "（势均力敌）";
+        return "两强争海 · " + name + tail + "（战局 " + v + "）";
+    };
+
+    // 月度结算：强者愈强漂移 + 随机扰动 + 参战冷却递减
+    F.warTick = function (months) {
+        var p = GAME.State.p();
+        if (!p || p.isDead || !months) return;
+        var v = this.warValue(p);
+        var shift = 0;
+        for (var i = 0; i < months; i++) {
+            shift += (v + shift - 50) * W.drift + (Math.random() * 2 - 1) * W.wobble;
+        }
+        this.warShift(p, shift);
+        if ((p.warCd || 0) > 0) p.warCd = Math.max(0, p.warCd - months);
+    };
+
+    // 投效参战：元婴门禁 + 须身在对应总坛 + 无事在身 + 休整期已满
+    F.warJoin = function (side) {
+        var p = GAME.State.p();
+        if (!p || p.isDead || p.combat) return;
+        if (p.pendingEvent) return;
+        if (!(GAME.DATA.isYuanying && GAME.DATA.isYuanying(p))) {
+            GAME.UI.log("两强争海是元婴修士的棋局——结丹之辈，连出征的战船都登不上。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
+        var node = side === "xingque" ? "xingque_neihai" : "luanxing_zongtan";
+        if (p.location !== node) {
+            GAME.UI.log("须亲至" + (side === "xingque" ? "星阙内海" : "乱星盟总坛") + "方能领此将令。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
+        if ((p.warCd || 0) > 0) {
+            GAME.UI.log("上一战的伤还没好利索——再歇 " + p.warCd + " 个月方可再登战船。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
+        p.pendingEvent = { eventId: "starwar_fight", side: side };
+        GAME.UI.updateUI();
+    };
+
+    // 事件对象按投效阵营覆写（text 与 outcomes 的 side 字段）
+    F.eventFor = function (ev) {
+        var p = GAME.State.p();
+        var side = (p.pendingEvent && p.pendingEvent.side) || "xingque";
+        var mine = side === "xingque" ? "星阙" : "乱星盟";
+        var foe = side === "xingque" ? "乱星盟" : "星阙";
+        var copy = { id: ev.id, text: "", choices: [] };
+        copy.text = "你在" + mine + "的战船上领了将令。对面" + foe + "的连营百里，灯火如鳞，一直烧到海平线尽头。" +
+            "领令的军官拍了拍你的肩：「此战不拘你怎么打——把他们的势头压下去，就是功。」";
+        copy.choices = (ev.choices || []).map(function (c) {
+            return {
+                text: c.text, tip: c.tip,
+                outcomes: (c.outcomes || []).map(function (o) {
+                    var oo = {};
+                    for (var k in o) oo[k] = o[k];
+                    oo.side = side;
+                    return oo;
+                }),
+            };
+        });
+        return copy;
+    };
+
+    // 结算：冲阵（真战斗，战后由 warAfterCombat 收尾）/ 暗杀 / 护送
+    F.warResolve = function (o) {
+        var p = GAME.State.p();
+        if (!p) return;
+        var side = o.side || "xingque";
+        var sgn = side === "xingque" ? 1 : -1;   // 战局向星阙为正
+        var mine = side === "xingque" ? "星阙" : "乱星盟";
+
+        if (o.action === "charge") {
+            p.warCd = W.cd;
+            p.combatRoute = { type: "war", side: side, action: "charge" };
+            GAME.Combat.start(side === "xingque" ? "luanxing_vanguard" : "xingque_vanguard");
+            return;
+        }
+        if (o.action === "kill") {
+            p.warCd = W.cd;
+            var sp = (GAME.State.getStats() || {}).spirit || 0;
+            var chance = W.killBase + sp / 4000;   // 神识 200 → +5%
+            if (Math.random() < chance) {
+                this.warShift(p, sgn * W.killShift);
+                var gain = 800 + Math.floor(Math.random() * 700);
+                p.spiritStones += gain;
+                this.repute(p, side, 6);
+                GAME.UI.log("你借着夜雨摸进" + (side === "xingque" ? "乱星盟" : "星阙") + "敌营，一指点在敌将眉心，从容而去。" +
+                    "敌军大乱三日——战局向你方倾了 " + W.killShift + " 分，你还顺手带回 " + gain + " 枚灵石。", "success");
+            } else {
+                this.warShift(p, -sgn * W.killLoss);
+                this.repute(p, side, -5);
+                p.currentHp = Math.max(1, Math.round(p.currentHp * 0.75));
+                GAME.UI.log("敌将身边竟藏着一位元婴后期——你一刀递出，反被其气机震退，口吐鲜血。暗杀不成，战局反被推过去 " + W.killLoss + " 分。", "danger");
+            }
+            GAME.UI.updateUI();
+            return;
+        }
+        if (o.action === "escort") {
+            // 先推进这 1 个月行程，再计入休整期（与元神出游同序：冷却放在耗时之后设，免被 tick 扣掉）
+            GAME.Core.passTime(W.escortMonths);
+            p.warCd = W.cd;
+            this.warShift(p, sgn * W.escortShift);
+            var pay = W.escortStones[0] + Math.floor(Math.random() * (W.escortStones[1] - W.escortStones[0]));
+            p.spiritStones += pay;
+            this.repute(p, side, 4);
+            GAME.UI.log("你护着十艘粮船穿过雷区，全须全尾。将令记你一功——战局倾 " + W.escortShift + " 分，付你 " + pay + " 枚灵石。", "success");
+            GAME.UI.updateUI();
+            return;
+        }
+    };
+
+    // 冲阵战后收尾（由 Combat.victory/defeat 按 ctx.type==="war" 路由而来）
+    F.warAfterCombat = function (win, ctx) {
+        var p = GAME.State.p();
+        if (!p) return;
+        var side = (ctx && ctx.side) || "xingque";
+        var sgn = side === "xingque" ? 1 : -1;
+        var mine = side === "xingque" ? "星阙" : "乱星盟";
+        if (win) {
+            this.warShift(p, sgn * W.chargeShift);
+            this.repute(p, side, 6);
+            GAME.UI.log("你斩将夺旗，全身而退。" + mine + "军士气大振——战局向你方倾了 " + W.chargeShift + " 分。", "success");
+        } else {
+            this.warShift(p, -sgn * W.chargeLoss);
+            this.repute(p, side, -3);
+            GAME.UI.log("冲阵失利，你带着伤退回本方战船。战局被对方推过去 " + W.chargeLoss + " 分。", "danger");
+        }
+        p.warCd = W.cd;
+        GAME.UI.updateUI();
+    };
+
+    // 胜方货栈（null = 僵持无货栈）
+    F.warStall = function (p) {
+        var side = this.warSide(p);
+        if (!side) return null;
+        return { side: side, goods: GAME.DATA.WAR_STALL[side] || [] };
+    };
+
+    // 货栈购买：固定价、不刷新、不限量（买空 qty 则缺货）
+    F.warStallBuy = function (i) {
+        var p = GAME.State.p();
+        var stall = this.warStall(p);
+        if (!stall) { GAME.UI.log("两强僵持，并无军需铺开门。", "system"); return; }
+        var g = (stall.goods || [])[i];
+        if (!g) return;
+        if ((g.sold || 0) >= g.qty) { GAME.UI.log("此货已被前面的道友买空了。", "system"); GAME.UI.updateUI(); return; }
+        if (p.spiritStones < g.price) { GAME.UI.log("囊中灵石不足（需 " + g.price + " 枚）。", "system"); GAME.UI.updateUI(); return; }
+        p.spiritStones -= g.price;
+        GAME.State.addItem(g.id, 1);
+        g.sold = (g.sold || 0) + 1;
+        var it = GAME.DATA.ITEMS[g.id] || {};
+        GAME.UI.log("你在" + (stall.side === "xingque" ? "星阙" : "乱星盟") + "军需铺买下【" + (it.name || g.id) + "】（" + g.price + " 灵石）。", "loot");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+    };
+})();

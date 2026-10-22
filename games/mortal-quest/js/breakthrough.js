@@ -39,6 +39,7 @@ GAME.Breakthrough = {
         p = p || GAME.State.p();
         if (p.realmIndex === GAME.DATA.ZHUJI_GATE_INDEX) return "zhuji";
         if (p.realmIndex === GAME.DATA.JIEDAN_GATE_SOURCE) return "jiedan";
+        if (p.realmIndex === GAME.DATA.YUANING_GATE_SOURCE) return "yuanying";
         return "normal";
     },
 
@@ -75,7 +76,7 @@ GAME.Breakthrough = {
         if (!realm || !target) return { ok: false, reason: "top" };
 
         var gate = this.gate(p);
-        var isZhuji = gate === "zhuji", isJiedan = gate === "jiedan";
+        var isZhuji = gate === "zhuji", isJiedan = gate === "jiedan", isYuanying = gate === "yuanying";
 
         // —— 丹药挑选（与旧 core.breakthrough 同优先级：正品 > 普通 > 伪丹）——
         var zhujiPill = null, jiedanPill = null;
@@ -93,7 +94,7 @@ GAME.Breakthrough = {
         var baseChance = (typeof realm.breakChance === "number") ? realm.breakChance : 0;
         var baseLabel = "境界底子";
         var dmgMul = 1, deathMul = 1, chainCap = cfg.cap;
-        var bareZhuji = false, bareJiedan = false, fakeJiedan = false, fakeZhuji = false;
+        var bareZhuji = false, bareJiedan = false, fakeJiedan = false, fakeZhuji = false, bareYuanying = false;
 
         if (isZhuji) {
             var zc = GAME.DATA.ZHUJI;
@@ -132,6 +133,28 @@ GAME.Breakthrough = {
                 bareJiedan = true;
                 baseChance = jc.bare.chance; dmgMul = 1; deathMul = jc.bare.deathChance;
                 baseLabel = "无丹裸冲";
+            }
+        } else if (isYuanying) {
+            // 元婴天堑：不走丹链，读碎丹成婴铺路（p.yuanyingPrep = 'herb'|'guard'|'mind'，择一）
+            var yc = GAME.DATA.YUANING;
+            chainCap = 1.0;
+            var prep = p.yuanyingPrep;
+            if (prep === "herb") {
+                baseChance = yc.bare.chance + yc.herb.add;
+                dmgMul = yc.herb.dmgMul; deathMul = yc.bare.deathChance;
+                baseLabel = "灵药碎丹";
+            } else if (prep === "guard") {
+                baseChance = yc.bare.chance + yc.guard.add;
+                dmgMul = yc.guard.dmgMul; deathMul = yc.guard.deathMul;
+                baseLabel = "同道护法";
+            } else if (prep === "mind") {
+                baseChance = yc.bare.chance + yc.mind.add;
+                dmgMul = 1; deathMul = yc.bare.deathChance;
+                baseLabel = "静养凝神";
+            } else {
+                bareYuanying = true;
+                baseChance = yc.bare.chance; dmgMul = 1; deathMul = yc.bare.deathChance;
+                baseLabel = "无备硬凝";
             }
         }
 
@@ -196,10 +219,12 @@ GAME.Breakthrough = {
         var failDmg;
         if (bareZhuji) failDmg = GAME.DATA.ZHUJI.bare.dmg;
         else if (bareJiedan) failDmg = GAME.DATA.JIEDAN.bare.dmg;
+        else if (bareYuanying) failDmg = GAME.DATA.YUANING.bare.dmg;
         else failDmg = Math.round((realm.failDamage || 0) * dmgMul);
         var deathP;
         if (bareZhuji) deathP = failP * GAME.DATA.ZHUJI.bare.deathChance;
         else if (bareJiedan) deathP = failP * GAME.DATA.JIEDAN.bare.deathChance;
+        else if (bareYuanying) deathP = failP * GAME.DATA.YUANING.bare.deathChance;
         else if (fakeZhuji) deathP = failP * GAME.DATA.ZHUJI.fake.deathChance;
         else if (fakeJiedan) deathP = failP * GAME.DATA.JIEDAN.fake.deathChance;
         else deathP = failP * (realm.deathChance || 0) * deathMul;
@@ -208,9 +233,9 @@ GAME.Breakthrough = {
 
         return {
             ok: true, gate: gate, realm: realm, target: target,
-            isZhuji: isZhuji, isJiedan: isJiedan,
+            isZhuji: isZhuji, isJiedan: isJiedan, isYuanying: isYuanying,
             zhujiPill: zhujiPill, jiedanPill: jiedanPill, pillName: pillName,
-            bareZhuji: bareZhuji, bareJiedan: bareJiedan, fakeJiedan: fakeJiedan, fakeZhuji: fakeZhuji,
+            bareZhuji: bareZhuji, bareJiedan: bareJiedan, fakeJiedan: fakeJiedan, fakeZhuji: fakeZhuji, bareYuanying: bareYuanying,
             baseLabel: baseLabel, baseChance: baseChance,
             parts: parts, addSum: addSum + mindTotalAdd, guardUsed: guardOn, guardReady: guard.ok,
             successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,

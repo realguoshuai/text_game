@@ -331,6 +331,15 @@ GAME.State = {
         if (!p.cultivationPath) p.cultivationPath = "fa";
         if (p.pathChosen == null) p.pathChosen = false;
         if (p.xinmoLevel == null) p.xinmoLevel = 0;   // 心魔侵染（0~3，结丹后随夺舍事件起伏）
+        // 元婴篇：碎丹成婴铺路（p.yuanyingPrep = 'herb'|'guard'|'mind'，择一，破境后清空）
+        if (p.yuanyingPrep === undefined) p.yuanyingPrep = null;
+        if (p.yuanyingStreak == null) p.yuanyingStreak = 0;
+        if (p.yuanyingFails == null) p.yuanyingFails = 0;
+        // 两强争海：战局值（0~100，50 均势；缺省按均势起算）+ 参战休整期（月）
+        if (p.starWar == null) p.starWar = 50;
+        if (p.warCd == null) p.warCd = 0;
+        // 地磁灵山 · 开宗立派（元婴后）：{ founded, fame, months }
+        if (p.lingShan === undefined) p.lingShan = null;
     },
 
     // ---------- 战斗面板：境界基础 + 法器加成 ----------

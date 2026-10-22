@@ -120,6 +120,12 @@
                     <div id="map-info" class="item-desc" data-page-node-id="JvGWIdtm4BgCESyTdgd2Da"></div>
                     <h3 style="margin-top:10px;" data-page-node-id="AKOJYh5K3DlxbtPNttFllL">四通八达</h3>
                     <div id="map-routes" data-page-node-id="CFnk2KizydqqFtCOaJIlmJ"></div>
+                    <!-- 元神出游：元婴期专属（元神离体远巡），非元婴不渲染 -->
+                    <div id="roam-block" style="display:none;">
+                        <h3 style="margin-top:10px;">元神出游 <span class="item-desc" style="font-weight:normal;">（元婴 · 神识远巡）</span></h3>
+                        <div id="roam-info" class="item-desc"></div>
+                        <div id="roam-sites"></div>
+                    </div>
                     <h3 style="margin-top:10px;" data-page-node-id="Yf8uiadUb0UeXO2RGaUD3E">天下舆图 <span class="item-desc" style="font-weight:normal;" data-page-node-id="FeN2R8Cf6VJAQRbbpJgACJ">（随修为渐进解锁）</span></h3>
                     <div id="map-chapter-tabs" class="chapter-tabs"></div>
                     <div id="map-atlas" data-page-node-id="wop9bayoCW5dhOzEH3UoMs"></div>
@@ -173,6 +179,12 @@
                         <h4 class="mkt-sec">本坊市</h4>
                         <div class="item-desc" id="market-tip" data-page-node-id="F4TpZlyvCTK53atp3X2FUR"></div>
                         <div id="market-goods" data-page-node-id="IhMbl4TGXUoD8KTHPJ72uv"></div>
+                        <!-- 两强争海 · 胜方军需铺：战局倾覆后才开门（由 UI 显隐） -->
+                        <div id="market-warstall" style="display:none;">
+                            <h4 class="mkt-sec">军需铺</h4>
+                            <div class="item-desc" id="warstall-tip"></div>
+                            <div id="warstall-goods"></div>
+                        </div>
                         <h4 class="mkt-sec">出售杂物</h4>
                         <div id="market-sell" data-page-node-id="kj6ayXkwKBq42wUMoPqqOt"></div>
                         <button id="btn-leave-market" style="margin-top:8px;" data-page-node-id="hFzFFWfLymLjOWXL1RmnlS">离开坊市，返回洞府</button>
@@ -608,6 +620,7 @@
 <script src="js/chronicle.js"></script>
     <script src="js/path.js"></script>
     <script src="js/seize.js"></script>
+    <script src="js/yuanying.js"></script>
 <script src="js/faction.js"></script>
 <script src="js/ui.js"></script>
 </body>

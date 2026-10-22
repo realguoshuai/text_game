@@ -63,7 +63,17 @@ for (let i = 16; i <= 18; i++) {
   if (!r || !(r.hp > 0) || !(r.mp > 0) || !(r.defSuppress > 0.85) || r.maxAge !== 500) foundOk = false;
 }
 ok('REALMS[16..18] foundation 已写入(hp/mp/defSuppress/maxAge=500)', foundOk);
-ok('结丹后期为当前终点（REALMS[19] 不存在）', !G.DATA.REALMS[19]);
+// 元婴篇（2026-10-22）开启后：REALMS[19..21] = 元婴初/中/后期，结丹后期不再是终点
+ok('元婴三阶已立（REALMS[19..21] 存在）', !!G.DATA.REALMS[19] && !!G.DATA.REALMS[20] && !!G.DATA.REALMS[21]);
+ok('元婴寿元 1000（REALMS[19..21].maxAge）', G.DATA.REALMS[19].maxAge === 1000 && G.DATA.REALMS[21].maxAge === 1000);
+var yyOk = true;
+for (var ri = 19; ri <= 21; ri++) {
+    var r2 = G.DATA.REALMS[ri];
+    if (!r2 || !(r2.hp > 0) || !(r2.mp > 0) || !(r2.defSuppress > 0.94) || r2.maxAge !== 1000) yyOk = false;
+}
+ok('REALMS[19..21] foundation 已写入(hp/mp/defSuppress>0.94/maxAge=1000)', yyOk);
+ok('元婴判定常量（YUANING_GATE_INDEX=19 / isYuanying）', G.DATA.YUANING_GATE_INDEX === 19 && G.DATA.isYuanying({ realmIndex: 19 }) === true && G.DATA.isYuanying({ realmIndex: 18 }) === false);
+ok('大境界编号：元婴=3', G.DATA.majorRealm(19) === 3 && G.DATA.majorRealm(18) === 2);
 
 /* ================= ② JIEDAN 数值表 ================= */
 section('② JIEDAN 数值表结构');

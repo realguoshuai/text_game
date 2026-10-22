@@ -51,10 +51,12 @@ function section(t) { console.log('\n' + t); }
 /* ================= ① MAP.chapters 配置 ================= */
 section('① MAP.chapters 配置');
 const CH = G.DATA.MAP.chapters || [];
-ok('共 4 章', CH.length === 4);
+ok('共 5 章（元婴篇已开）', CH.length === 5);
 const byId = {};
 CH.forEach(function (c) { byId[c.id] = c; });
-ok('含 qi/zhuji/jiedan/star 四章', !!byId.qi && !!byId.zhuji && !!byId.jiedan && !!byId.star);
+ok('含 qi/zhuji/jiedan/star/yuanying 五章', !!byId.qi && !!byId.zhuji && !!byId.jiedan && !!byId.star && !!byId.yuanying);
+ok('元婴篇 minRealm=19', byId.yuanying.minRealm === 19);
+ok('碎星海篇境界区间放宽至元婴（realmRange 含 21）', byId.star.realmRange[0] === 16 && byId.star.realmRange[1] === 21);
 ok('章节名称正确', byId.qi.name === '练气篇' && byId.zhuji.name === '筑基篇' && byId.jiedan.name === '结丹篇' && byId.star.name === '碎星海篇');
 ok('碎星海章 minRealm=16（结丹初期后触及）', byId.star.minRealm === 16);
 // 节点 chapter 字段已落位
@@ -69,8 +71,9 @@ ok('碎星海 chapter=star', nlu && nlu.chapter === 'star');
 section('② chapterOf 分章');
 ok('练气期 → qi', G.Map.chapterOf(5, 'tainan_gu') === 'qi');
 ok('筑基期陆地 → zhuji', G.Map.chapterOf(15, 'huangfeng_gu') === 'zhuji');
-ok('结丹期陆地 → jiedan', G.Map.chapterOf(22, 'huangfeng_gu') === 'jiedan');
-ok('碎星海恒属 star（无论境界）', G.Map.chapterOf(25, 'luanxing_hai') === 'star' && G.Map.chapterOf(21, 'luanxing_hai') === 'star');
+ok('结丹期陆地 → jiedan', G.Map.chapterOf(17, 'huangfeng_gu') === 'jiedan');
+ok('元婴期陆地 → yuanying（元婴篇）', G.Map.chapterOf(19, 'huangfeng_gu') === 'yuanying' && G.Map.chapterOf(21, 'huangfeng_gu') === 'yuanying');
+ok('碎星海恒属 star（无论境界）', G.Map.chapterOf(17, 'luanxing_hai') === 'star' && G.Map.chapterOf(21, 'luanxing_hai') === 'star');
 
 /* ================= ③ nodeChapter 动态归属 ================= */
 section('③ nodeChapter 动态归属（结丹后筑基陆地升入结丹篇）');
@@ -86,13 +89,15 @@ setP(5, 'tainan_gu');
 ok('练气期在苍南谷 → currentChapter=qi', G.Map.currentChapter() === 'qi');
 setP(15, 'huangfeng_gu');
 ok('筑基期在青梧谷 → currentChapter=zhuji', G.Map.currentChapter() === 'zhuji');
-setP(22, 'huangfeng_gu');
+setP(17, 'huangfeng_gu');
 ok('结丹期在青梧谷 → currentChapter=jiedan', G.Map.currentChapter() === 'jiedan');
-setP(25, 'luanxing_hai');
-ok('结丹后于碎星海 → currentChapter=star', G.Map.currentChapter() === 'star');
+setP(19, 'huangfeng_gu');
+ok('元婴期在陆地 → currentChapter=yuanying', G.Map.currentChapter() === 'yuanying');
+setP(21, 'luanxing_hai');
+ok('元婴期于碎星海 → currentChapter=star', G.Map.currentChapter() === 'star');
 
 const chapList = G.Map.chapters();
-ok('chapters() 返回 4 项且含 current 标记', chapList.length === 4 && chapList.some(function (c) { return c.current; }));
+ok('chapters() 返回 5 项且含 current 标记', chapList.length === 5 && chapList.some(function (c) { return c.current; }));
 setP(10, 'qingniu_zhen');
 const cl2 = G.Map.chapters();
 ok('练气期 star 章 reached=false', cl2.filter(function (c) { return c.id === 'star'; })[0].reached === false);
@@ -107,16 +112,19 @@ setP(5, 'tainan_gu');
 let at = G.Map.atlasByChapter();
 ok('练气期：qi 章含 4 节点（幽篁谷/青牛/景阳/苍南）', at.qi.nodes.length === 4);
 ok('练气期：zhuji 章含青梧谷/云京', at.zhuji && at.zhuji.nodes.length === 2);
-ok('练气期：star 章含碎星海', at.star && at.star.nodes.length === 1);
+ok('练气期：star 章含碎星海与三处元婴新地', at.star && at.star.nodes.length === 4);
 ok('练气期：市集未退役（tainan retired=false）', at.qi.nodes.filter(function (n) { return n.id === 'tainan_gu'; })[0].retired === false);
 
-setP(22, 'huangfeng_gu');
+setP(17, 'huangfeng_gu');
 at = G.Map.atlasByChapter();
 ok('结丹期：jiedan 章含青梧谷/云京（动态升篇）', at.jiedan && at.jiedan.nodes.length === 2);
 ok('结丹期：qi 章仍含练气 4 地（旧地）', at.qi && at.qi.nodes.length === 4);
 const tainanInQi = at.qi.nodes.filter(function (n) { return n.id === 'tainan_gu'; })[0];
 ok('结丹期：苍南谷标记 retired=true（低阶坊市退役）', !!tainanInQi && tainanInQi.retired === true);
 ok('结丹期：currentChapter=jiedan 与 atlas 当前章一致', G.Map.currentChapter() === 'jiedan');
+ok('nodeChapter：青梧谷结丹后升归 jiedan（阈值 JIEDAN_GATE_INDEX，勿写死）',
+  G.Map.nodeChapter({ id: 'huangfeng_gu', chapter: 'zhuji' }, G.DATA.JIEDAN_GATE_INDEX) === 'jiedan' &&
+  G.Map.nodeChapter({ id: 'huangfeng_gu', chapter: 'zhuji' }, G.DATA.JIEDAN_GATE_INDEX - 1) === 'zhuji');
 
 /* ================= ⑥ marketRetired ================= */
 section('⑥ marketRetired 低阶坊市退役');
@@ -133,7 +141,7 @@ const rr = function (id) { return G.Map.chapterRealmRange(id); };
 ok('qi 区间 = [0,12]', rr('qi')[0] === 0 && rr('qi')[1] === 12);
 ok('zhuji 区间 = [13,15]', rr('zhuji')[0] === 13 && rr('zhuji')[1] === 15);
 ok('jiedan 区间 = [16,18]', rr('jiedan')[0] === 16 && rr('jiedan')[1] === 18);
-ok('star 区间 = [16,18]', rr('star')[0] === 16 && rr('star')[1] === 18);
+ok('star 区间 = [16,21]（元婴并入星海篇）', rr('star')[0] === 16 && rr('star')[1] === 21);
 
 /* ================= ⑧ monstersOf 本篇妖物 ================= */
 section('⑧ monstersOf 本篇妖物（按境界区间筛选 + 名字解析）');

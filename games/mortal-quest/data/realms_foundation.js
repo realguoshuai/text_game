@@ -42,6 +42,17 @@ GAME.DATA.JIEDAN_FOUNDATION = {
     ],
 };
 
+/* —— 元婴初期/中期/后期梯度（与 realms.js 中 REALMS[19..21] 一一对应） ——
+ * hp/mp 自结丹后期(10500/3200)续涨；sp 神识上限续涨（元神出游、御物、傀儡皆以此为资）；
+ * defSuppress 境界免伤压制系数升至 0.95~0.97（元婴受低境攻击削减 95% 以上）。 */
+GAME.DATA.YUANING_FOUNDATION = {
+    layers: [
+        { hp: 18000, mp: 5000,  sp: 320, defSuppress: 0.95 },  // 元婴初期
+        { hp: 28000, mp: 8000,  sp: 420, defSuppress: 0.96 },  // 元婴中期
+        { hp: 45000, mp: 12000, sp: 550, defSuppress: 0.97 },  // 元婴后期
+    ],
+};
+
 /* 将梯度写入 REALMS[13..21]（幂等：重复加载不叠加） */
 (function applyFoundation() {
     var R = GAME.DATA.REALMS;
@@ -61,7 +72,22 @@ GAME.DATA.JIEDAN_FOUNDATION = {
 (function applyJiedan() {
     var R = GAME.DATA.REALMS;
     var F = GAME.DATA.JIEDAN_FOUNDATION.layers;
-    var base = GAME.DATA.JIEDAN_GATE_SOURCE + 1; // 22
+    var base = GAME.DATA.JIEDAN_GATE_SOURCE + 1; // 16
+    for (var i = 0; i < F.length; i++) {
+        var r = R[base + i];
+        if (!r) continue;
+        r.hp = F[i].hp;
+        r.mp = F[i].mp;
+        r.sp = F[i].sp;
+        r.defSuppress = F[i].defSuppress;
+    }
+})();
+
+/* 将元婴梯度写入 REALMS[19..21]（幂等：重复加载不叠加） */
+(function applyYuanying() {
+    var R = GAME.DATA.REALMS;
+    var F = GAME.DATA.YUANING_FOUNDATION.layers;
+    var base = GAME.DATA.YUANING_GATE_SOURCE + 1; // 19
     for (var i = 0; i < F.length; i++) {
         var r = R[base + i];
         if (!r) continue;
