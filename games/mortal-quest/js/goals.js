@@ -193,12 +193,35 @@ GAME.Goals = {
             where: "洞府 / 历练"
         },
         {
-            id: "endgame",
-            when: function (p) { return p.realmIndex >= 18; },
+            id: "yuanying",
+            when: function (p) { return p.realmIndex === GAME.DATA.YUANING_GATE_SOURCE; },
+            done: function (p) { return p.realmIndex >= GAME.DATA.YUANING_GATE_INDEX; },
+            text: "碎丹成婴，凝结元婴",
+            hint: function (p) {
+                return "已至结丹后期圆满——下一步是元婴天堑。碎丹前可先备千年灵药（药圃/元神出游）或 3000 灵石请护法，铺路更稳";
+            },
+            where: "洞府"
+        },
+        {
+            id: "yuanying_full",
+            when: function (p) {
+                return p.realmIndex >= GAME.DATA.YUANING_GATE_INDEX && p.realmIndex < 21;
+            },
+            done: function (p) { return p.realmIndex >= 21; },
+            text: "元婴三阶圆满",
+            hint: function (p) {
+                return "当前 " + GAME.Goals._realmName(p.realmIndex) +
+                    "——修炼之余可元神出游探秘境、赴碎星海参战或立派（皆元婴专属）";
+            },
+            where: "洞府 / 碎星海"
+        },
+        {
+            id: "top",
+            when: function (p) { return p.realmIndex >= 21; },
             done: function () { return false; },
-            text: "结丹圆满 · 你的道，该有个交代了",
-            hint: function () { return "继续修行或了断尘缘，结局由你此前的抉择决定"; },
-            where: "乱星海"
+            text: "元婴后期圆满 · 此界已至顶，余下自行择道",
+            hint: function () { return "立派、星海争霸、收徒传承，或坐看轮回——此后的路没有标准答案"; },
+            where: "碎星海"
         }
     ],
 
@@ -237,6 +260,25 @@ GAME.Goals = {
         // ② 已至当世顶境
         if (!next) {
             return { kind: "done", label: "此界已圆满", why: "已至顶境，往后只剩自行择道", run: null };
+        }
+
+        // ②b 门槛型顶境：needExp 为 null 但仍有下一境（如结丹后期→元婴的碎丹成婴）。
+        // 这类境界不靠修为填满，而是靠突破时的专属事件（碎丹铺路）进阶，
+        // 所以不应落入"闭关打坐"死循环，而该直接劝突破。
+        if (next && (r.needExp === null || r.needExp === undefined)) {
+            if (hpPct < 0.6) {
+                return {
+                    kind: "heal", label: "先打坐恢复气血",
+                    why: "金丹将碎之境，气血仅 " + hp + "/" + maxHp + "——此时强行突破，失败会重伤",
+                    run: function () { GAME.Core.meditate(); }
+                };
+            }
+            return {
+                kind: "go",
+                label: "尝试突破（碎丹成婴）",
+                why: "已至结丹后期圆满，下一步是元婴天堑——碎丹前可先备千年灵药或 3000 灵石护法更稳" + lastChance,
+                run: function () { GAME.Core.breakthrough(); }
+            };
         }
 
         // ③ 修为已满：先看气血，再劝突破
@@ -283,6 +325,47 @@ GAME.Goals = {
                  plotHint + leftTxt,
             run: function () { GAME.Core.meditate(); }
         };
+    },
+
+    // ---------- 可并行支线（非主线、可随时顺手做的"小事"） ----------
+    // 返回 [{text}]；目标横幅末尾一行小注，最多 3 条，不与主线/紧急项抢戏。
+    // 设计原则：方法论型玩家也该知道"此刻还能做啥"——筑基/结丹后主线塌成空话时尤其有用。
+    parallel: function (p) {
+        if (!p || p.isDead) return [];
+        // 有紧急项（阴毒/尸虫/因果/泄露/觊觎）时，当前目标就是它；并行支线不抢镜
+        var cur = null;
+        try { cur = this.current(); } catch (e) { cur = null; }
+        if (cur && cur.urgent) return [];
+        var self = this, out = [];
+        var atYuan = p.realmIndex >= (GAME.DATA.YUANING_GATE_INDEX || 19);
+
+        // ① 药圃待收（最通用的顺手事，任何境界都可能出现）
+        if (GAME.Plot && GAME.Plot.status) {
+            try {
+                var ps = GAME.Plot.status(p);
+                if (ps && ps.ready > 0) out.push({ text: "药圃 " + ps.ready + " 株灵药已熟，可回洞府收取" });
+            } catch (e) {}
+        }
+
+        // ② 元婴专属支线：元神出游 / 星海战 / 立派
+        // 这些在"元婴三阶圆满"主线 hint 里只是笼统提及，这里落成具体可做的勾选，不算重复
+        if (atYuan) {
+            if (GAME.Yuanying && GAME.Yuanying.canRoam) {
+                try { var rc = GAME.Yuanying.canRoam(p); if (rc && rc.ok) out.push({ text: "元神可出游（云国 / 碎星海秘境）" }); } catch (e) {}
+            }
+            if (GAME.Cave2 && GAME.Cave2.atStarSea && GAME.Cave2.atStarSea()) {
+                if ((p.warCd || 0) <= 0) out.push({ text: "碎星海战事正酣，可投效一方参战" });
+            }
+            var L = GAME.DATA && GAME.DATA.LINGSHAN;
+            if (L && p.spiritStones >= L.cost) {
+                out.push({ text: (GAME.Cave2 && GAME.Cave2.atStarSea && GAME.Cave2.atStarSea())
+                    ? "灵石已足，可在碎星海开宗立派"
+                    : "灵石已足，可赴碎星海开宗立派" });
+            }
+        }
+
+        if (out.length > 3) out = out.slice(0, 3);
+        return out;
     },
 
     // ---------- 取当前目标 ----------

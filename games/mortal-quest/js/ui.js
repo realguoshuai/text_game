@@ -413,6 +413,20 @@ GAME.UI = {
             }
         }
 
+        // 可并行支线：主线之外的"顺手事"，列在横幅末尾一行小注（不喧宾夺主，最多 3 条）
+        var pp = this.$("goal-parallel");
+        if (pp) {
+            var par = [];
+            try { par = (GAME.Goals && GAME.Goals.parallel) ? GAME.Goals.parallel(GAME.State.p()) : []; } catch (e) { par = []; }
+            if (par && par.length) {
+                pp.style.display = "";
+                pp.innerHTML = '<span class="goal-parallel-label">可并行 ·</span> ' +
+                    par.map(function (x) { return '<span class="goal-parallel-item">' + (x.text || "") + '</span>'; }).join('　·　');
+            } else {
+                pp.style.display = "none";
+            }
+        }
+
         // 下一步行动卡：把「目标」落成「现在就点这里」（参考《一念逍遥》常驻下一步）
         var nx = this.$("goal-next");
         if (nx) {

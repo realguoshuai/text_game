@@ -37,6 +37,7 @@ const FILES = [
   'js/sect.js', 'js/puppet.js', 'js/insect.js', 'js/cave2.js',
   'js/cultivation.js', 'js/alchemy.js', 'js/bottle.js', 'js/bonds.js',
   'js/dungeon_heisha.js', 'js/hunt.js', 'js/goals.js',
+  'js/yuanying.js', 'js/faction.js',
 ];
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BASE, f), 'utf8'), sandbox, { filename: f });
 const G = sandbox.GAME;
@@ -128,7 +129,14 @@ g = G.Goals.current();
 assert('筑基后期 → 冲击结丹（未圆满，目标仍为 jiedan）', g && g.id === 'jiedan');
 P().realmIndex = 18;
 g = G.Goals.current();
-assert('结丹圆满 → 结局收束', g && g.id === 'endgame');
+assert('结丹后期 → 碎丹成婴目标', g && g.id === 'yuanying');
+P().realmIndex = 19;
+g = G.Goals.current();
+assert('元婴初期 → 元婴三阶目标', g && g.id === 'yuanying_full');
+P().realmIndex = 21;
+g = G.Goals.current();
+assert('元婴后期 → 顶境目标', g && g.id === 'top');
+P().realmIndex = 18;
 
 // ---------- ⑤ 边界 ----------
 section('⑤ 边界与清单');
@@ -137,7 +145,7 @@ assert('死亡时无目标', G.Goals.current() === null);
 P().isDead = false;
 const all = G.Goals.list();
 assert('list() 返回适用目标清单', Array.isArray(all) && all.length > 0);
-assert('末项目标已完成标记正确', all[all.length - 1].done === false || all[all.length - 1].id === 'endgame');
+assert('末项目标已完成标记正确', all[all.length - 1].done === false || all[all.length - 1].id === 'top');
 
 // ---------- ⑥ 下一步行动（action：目标 → 现在就点哪） ----------
 section('⑥ 下一步行动 action()');
@@ -182,10 +190,47 @@ a = G.Goals.action(p6);
 assert('战斗中 → 先了结眼前之事', a && a.kind === 'story' && a.run === null);
 p6.combat = null;
 
+// 结丹后期（门槛型顶境，needExp 为 null）→ 直接劝突破碎丹，而非闭关死循环
+p6.realmIndex = 18;
+p6.currentExp = 0;
+p6.currentHp = p6.maxHp;
+a = G.Goals.action(p6);
+assert('结丹后期 → 建议突破碎丹成婴（非闭关死循环）', a && a.kind === 'go' && /碎丹成婴/.test(a.label));
+assert('碎丹突破行动可执行', a && typeof a.run === 'function');
+p6.realmIndex = 5;
+
 // 纯函数：调用不写状态
 const expBefore = p6.currentExp, hpBefore = p6.currentHp;
 G.Goals.action(p6);
 assert('action() 不修改玩家状态', p6.currentExp === expBefore && p6.currentHp === hpBefore);
+
+// ---------- ⑦ 并行支线 parallel() ----------
+section('⑦ 并行支线提示 parallel()');
+G.State.createNewPlayer();
+let p7 = P();
+p7.realmIndex = 5;                 // 练气期：不应出现元婴专属支线
+let par0 = G.Goals.parallel(p7);
+assert('parallel() 返回数组', Array.isArray(par0));
+assert('练气无熟药/无元婴支线时为空或仅药圃', Array.isArray(par0));
+
+// 药圃有熟药 → 应提示可收
+p7.plots = [{ y: 1000 }, { y: 1000 }, { y: 1000 }];
+let par1 = G.Goals.parallel(p7);
+assert('药圃有熟药 → 并行提示含"药圃"', par1.some(function (x) { return /药圃/.test(x.text); }));
+assert('并行提示最多 3 条', par1.length <= 3);
+
+// 紧急项存在时 → 并行支线不抢镜（返回空）
+p7.yindu = { months: 6 };
+let par2 = G.Goals.parallel(p7);
+assert('紧急项（阴毒）时并行支线为空', Array.isArray(par2) && par2.length === 0);
+p7.yindu = null;
+p7.plots = null;
+
+// 元婴初期且灵石足 → 应提示可立派（非 yuanying_full 主线激活时）
+p7.realmIndex = 19;
+p7.spiritStones = 6000;
+let par3 = G.Goals.parallel(p7);
+assert('元婴灵石足 → 并行提示含"立派"', par3.some(function (x) { return /立派/.test(x.text); }));
 
 // 死亡 → 无行动
 p6.isDead = true;

@@ -709,6 +709,9 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
 .goal-banner.urgent .goal-main b { color: var(--warning); }
 .goal-hint { display: block; font-size: 12px; color: var(--text-mute); }
 .goal-where { flex-shrink: 0; font-size: 12px; color: var(--text-faint); }
+.goal-parallel { flex: 1 1 100%; margin-top: 3px; padding-top: 3px; font-size: 11px; line-height: 1.5; color: var(--text-mute); border-top: 1px dashed rgba(140,110,70,.22); }
+.goal-parallel-label { color: var(--text-dim); margin-right: 2px; }
+.goal-parallel-item { white-space: normal; }
 
 /* ---------- 下一步行动卡（目标横幅内） ----------
    参考《一念逍遥》《鬼谷八荒》：主界面常驻一个明确可点的下一步，
@@ -3218,6 +3221,7 @@ body.theme-light .injury-alert:hover { background: rgba(163, 52, 31, .2); }
 .goal-banner #goal-next { display: block; margin-top: 2px; padding-top: 2px; border-top: 1px dashed rgba(140,110,70,.22); line-height: 1.4; }
 .goal-banner .goal-next-static { display: inline; }
 .goal-banner .goal-next-why { display: inline; margin-left: 6px; }
+.goal-banner .goal-parallel { display: block; }
 body.theme-light .goal-banner { padding: 6px 12px; }
 body.theme-light .goal-banner #goal-next { border-top-color: rgba(140,110,70,.22); }
 @media (max-width: 900px) {
@@ -3240,6 +3244,8 @@ body.theme-light .goal-main b { color: #2B2520; }
 body.theme-light .goal-hint,
 body.theme-light .goal-next-static,
 body.theme-light .goal-next-why { color: #6E5C49; }
+body.theme-light .goal-parallel { color: #8C7355; border-top-color: rgba(140,110,70,.22); }
+body.theme-light .goal-parallel-label { color: #6E5C49; }
 body.theme-light .actions > button,
 body.theme-light .actions > details > summary {
     background: linear-gradient(180deg, #FAF6EE 0%, #EFE7DA 100%);
