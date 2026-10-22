@@ -72,7 +72,8 @@ ok('元婴战力高于结丹（atk 380 起）', G.DATA.REALMS[19].atk === 380 &&
 ok('YUANING 表：裸冲 3% / 六成身陨 / 600 伤', G.DATA.YUANING.bare.chance === 0.03 && G.DATA.YUANING.bare.deathChance === 0.60 && G.DATA.YUANING.bare.dmg === 600);
 ok('YUANING 三铺路参数', G.DATA.YUANING.herb.add === 0.15 && G.DATA.YUANING.guard.add === 0.05 && G.DATA.YUANING.guard.deathMul === 0 && G.DATA.YUANING.mind.add === 0.08 && G.DATA.YUANING.guardCost === 3000);
 ok('铺路事件四选项（含无备硬凝）', (G.DATA.YUANING_EVENTS.yuanying_prep.choices || []).length === 4);
-ok('出游地两块（云国 + 碎星海）', (G.DATA.ROAM_SITES || []).length === 2 && G.DATA.ROAM_SITES[1].chapter === 'star');
+ok('出游地五块（云国 + 碎星海 + 古战场 + 灵脉秘境 + 星海秘境）', (G.DATA.ROAM_SITES || []).length === 5 && G.DATA.ROAM_SITES[1].chapter === 'star');
+ok('新增三处出游地存在', ['guzhanchang','lingmai','xinghai_mijing'].every(function(id){ return (G.DATA.ROAM_SITES||[]).some(function(s){return s.id===id;}); }));
 ok('出游池权重合计 ≈ 1', Math.abs(G.DATA.ROAM_SITES[0].pool.reduce(function (a, b) { return a + b.chance; }, 0) - 1) < 1e-9);
 
 /* ================= ② 1.1 境界扩展 ================= */

@@ -75,6 +75,60 @@ GAME.DATA.ROAM_SITES = [
         ],
         stones: [600, 1000], exp: 120,
     },
+    {
+        id: "guzhanchang", name: "古战场", chapter: null,
+        desc: "元神掠过一片被岁月磨平的荒原。断戟残旗半埋沙中，地底仍渗着千百年前大战未散的煞气。",
+        pool: [
+            { id: "relic",  chance: 0.25, label: "古修遗蜕" },
+            { id: "art",    chance: 0.15, label: "残魂授艺" },
+            { id: "herb",   chance: 0.15, label: "战场灵药" },
+            { id: "stones", chance: 0.15, label: "兵冢矿脉" },
+            { id: "trap",   chance: 0.20, label: "杀机未消" },
+            { id: "empty",  chance: 0.10, label: "空茫荒原" },
+        ],
+        loot: [
+            { id: "pill_huichun",    chance: 0.5, qty: [1, 2] },
+            { id: "tianhuo_crystal", chance: 0.4, qty: [1, 2] },
+            { id: "beast_soul",      chance: 0.4, qty: [1, 2] },
+        ],
+        stones: [300, 600], exp: 80,
+    },
+    {
+        id: "lingmai", name: "灵脉秘境", chapter: null,
+        desc: "地肺深处一条灵脉裸露，灵气凝成液滴挂在石壁上。此处是炼器炼丹取材的洞天，也藏着地火凶险。",
+        pool: [
+            { id: "stones", chance: 0.30, label: "灵脉矿" },
+            { id: "herb",   chance: 0.25, label: "灵药" },
+            { id: "relic",  chance: 0.20, label: "古修遗宝" },
+            { id: "trap",   chance: 0.15, label: "地火喷涌" },
+            { id: "empty",  chance: 0.10, label: "空寂矿洞" },
+        ],
+        loot: [
+            { id: "tianhuo_crystal", chance: 0.6, qty: [1, 2] },
+            { id: "jinshi",         chance: 0.5, qty: [1, 2] },
+            { id: "iron_ore",       chance: 0.5, qty: [1, 2] },
+        ],
+        stones: [500, 900], exp: 60,
+    },
+    {
+        id: "xinghai_mijing", name: "星海秘境", chapter: "star",
+        desc: "碎星海最深处的空间裂隙，星砂与碎光在虚空中凝成岛屿。这里是元婴修士才敢涉足的终极秘境，机缘与杀机同生。",
+        pool: [
+            { id: "relic",  chance: 0.28, label: "星海古宝" },
+            { id: "art",    chance: 0.18, label: "妖王遗蜕传法" },
+            { id: "herb",   chance: 0.20, label: "星海灵药" },
+            { id: "stones", chance: 0.14, label: "星砂矿" },
+            { id: "trap",   chance: 0.15, label: "空间乱流" },
+            { id: "empty",  chance: 0.05, label: "虚空寂灭" },
+        ],
+        loot: [
+            { id: "yinhun_zhong",    chance: 0.3, qty: [1, 1] },
+            { id: "tianhuo_crystal", chance: 0.6, qty: [2, 3] },
+            { id: "pill_huichun",    chance: 0.5, qty: [2, 3] },
+            { id: "beast_soul",      chance: 0.4, qty: [1, 2] },
+        ],
+        stones: [800, 1400], exp: 160,
+    },
 ];
 
 GAME.Yuanying = {
@@ -225,6 +279,13 @@ GAME.Yuanying = {
         } else if (res.id === "hurt") {
             p.mind = Math.max(0, (p.mind || 0) - 5);
             GAME.UI.log("归途撞上一缕游离煞气，元神被撕去一小角。你闷哼一声收回肉身，识海刺痛许久。（心境 -5）", "danger");
+        } else if (res.id === "art") {
+            p.currentExp += site.exp * 2;
+            p.mind = (p.mind || 0) + 5;
+            GAME.UI.log("你撞见一缕坐化前辈的残魂，他瞥你一眼，隔空点化三句真言——识海豁然开朗。（修为 +" + (site.exp * 2) + "，心境 +5）", "success");
+        } else if (res.id === "trap") {
+            p.mind = Math.max(0, (p.mind || 0) - 6);
+            GAME.UI.log("元神误入一方杀机未消的古阵，被无形锋芒削去一缕神识。你急急抽身，识海刺痛。（心境 -6）", "danger");
         } else {
             GAME.UI.log("元神游遍四野，只撞见些寻常风景。一月方归，一无所获。", "system");
         }

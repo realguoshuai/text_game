@@ -157,7 +157,8 @@ const mJiedan = G.Map.monstersOf('jiedan');
 ok('结丹篇 4 种妖物（散修/妖修/蛟/魔修巡察）', mJiedan.length === 4);
 ok('结丹篇 含 wild_jiaolong', ids(mJiedan).indexOf('wild_jiaolong') >= 0);
 const mStar = G.Map.monstersOf('star');
-ok('碎星海篇 4 种妖物（与结丹同境界带）', mStar.length === 4);
+ok('碎星海篇 7 种妖物（结丹4 + 元婴3 路遇对手并入）', mStar.length === 7);
+ok('碎星海篇 含元婴路遇对手', ids(mStar).indexOf('wild_sanxiu_yuan') >= 0 && ids(mStar).indexOf('wild_yaowang_qinwei') >= 0 && ids(mStar).indexOf('wild_guixu_shou') >= 0);
 ok('碎星海篇 名字已解析', mStar.every(function (m) { return !!m.name && m.name !== m.id; }));
 
 /* ================= ⑨ signaturesOf 本篇机缘 ================= */

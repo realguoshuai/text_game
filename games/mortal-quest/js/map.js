@@ -118,6 +118,38 @@ GAME.Map = {
     },
 
     // ---------- 移动：扣盘缠 → 换地点 → 推进时间（阴毒倒计时同步递减） ----------
+    // 路途奇遇（元婴专属，轻量直接给，不致死）：古宝/授艺/灵药/灵矿/凶险
+    rollWonder: function () {
+        var p = GAME.State.p();
+        var wd = GAME.DATA.MAP_WONDERS;
+        if (!wd) return false;
+        var roll = Math.random(), acc = 0, res = wd.pool[wd.pool.length - 1];
+        for (var i = 0; i < wd.pool.length; i++) { acc += wd.pool[i].chance; if (roll < acc) { res = wd.pool[i]; break; } }
+        if (res.id === "relic") {
+            var eq = wd.relics[Math.floor(Math.random() * wd.relics.length)];
+            GAME.State.addItem(eq, 1);
+            p.currentExp += 300;
+            GAME.UI.log("路旁岩隙嵌着一具古修遗蜕，指间法器犹自生辉。你取其随身之宝，并参悟其上残纹。（得【" + GAME.DATA.ITEMS[eq].name + "】，修为 +300）", "success");
+        } else if (res.id === "art") {
+            p.currentExp += 500; p.mind = (p.mind || 0) + 5;
+            GAME.UI.log("半途遇一缕前辈残魂，隔空授你一段心法真意。（修为 +500，心境 +5）", "success");
+        } else if (res.id === "herb") {
+            GAME.State.addItem("herb_qiannian", 2);
+            GAME.UI.log("崖壁石缝里，两株万年灵药正吞吐月华。你以玉匣小心收了。（【千年灵药】×2）", "loot");
+        } else if (res.id === "stones") {
+            var st = 800 + Math.floor(Math.random() * 701);
+            p.spiritStones += st;
+            GAME.UI.log("路经一处废弃灵脉，矿脉尚余 " + st + " 枚灵石——归你了。", "loot");
+        } else if (res.id === "trap") {
+            p.currentHp = Math.max(1, (p.currentHp || 0) - 200);
+            p.mind = Math.max(0, (p.mind || 0) - 5);
+            GAME.UI.log("一阵莫名眩晕攫住元神——你踏入一处早已无主的幻阵残痕，狼狈脱身，气血与神识皆损。（气血 -200，心境 -5）", "danger");
+        } else {
+            GAME.UI.log("一路山明水秀，却也无甚机缘。", "system");
+        }
+        return true;
+    },
+
     travel: function (routeId) {
         var check = this.canTravel(routeId);
         if (!check.ok) { GAME.UI.log(check.msg, "system"); GAME.UI.updateUI(); return false; }
@@ -169,6 +201,12 @@ GAME.Map = {
                     return true;
                 }
             }
+        }
+
+        // 路途奇遇（元婴专属，轻量直接给，不致死）
+        if (!p.combat && !p.isDead && p.realmIndex >= (GAME.DATA.YUANING_GATE_INDEX || 19)) {
+            var wd = GAME.DATA.MAP_WONDERS;
+            if (wd && Math.random() < wd.chance) { this.rollWonder(); GAME.UI.updateUI(); return true; }
         }
 
         GAME.UI.autoSave();

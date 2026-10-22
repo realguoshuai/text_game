@@ -144,6 +144,57 @@ GAME.DATA.MONSTERS.push(
     }
 );
 
+/* ——————— ①b 元婴期对手（realm 19~21）：majorRealm:3，与元婴玩家同境方称劲敌 ——————— */
+GAME.DATA.MONSTERS.push(
+    {
+        id: "wild_sanxiu_yuan", name: "元婴散修", human: true, tier: 5, majorRealm: 3,
+        hp: 9000, atk: 320, def: 220, speed: 40, spirit: 260, exp: 2200,
+        stones: [500, 1100], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.4],
+        affix: "seizeSoul",
+        loot: [{ id: "tianhuo_crystal", chance: 0.4, qty: [1, 2] }, { id: "pill_jiedan_zhengpin", chance: 0.15, qty: [1, 1] }],
+        desc: "苦修千载方凝婴的散修，一身神识凝如实质，出手狠绝且极善攻心。",
+    },
+    {
+        id: "wild_yaowang_qinwei", name: "妖王亲卫", human: true, tier: 5, majorRealm: 3,
+        hp: 11000, atk: 360, def: 260, speed: 44, spirit: 280, exp: 2600,
+        stones: [600, 1300], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.4],
+        loot: [{ id: "beast_soul", chance: 0.6, qty: [2, 3] }, { id: "tianhuo_crystal", chance: 0.3, qty: [1, 2] }],
+        desc: "妖王座下精锐，甲胄染血，随妖王征战星海多年，煞气逼人。",
+    },
+    {
+        id: "wild_guixu_shou", name: "归墟守兽", isBeast: true, tier: 6, majorRealm: 3,
+        hp: 14000, atk: 420, def: 320, speed: 38, spirit: 300, exp: 3000,
+        stones: [700, 1500], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.4],
+        affix: "thickShell",
+        loot: [{ id: "beast_soul", chance: 0.7, qty: [2, 3] }, { id: "tianhuo_crystal", chance: 0.4, qty: [1, 2] }],
+        desc: "盘踞归墟古渊的远古异兽，鳞甲如玄铁，寻常法器难伤其分毫。",
+    },
+    /* —— 元婴副本 · 双阶段 Boss（只由 HUNTS 调用，不进路遇池） —— */
+    {
+        id: "yaowang_chixiao", name: "赤霄妖王", isBeast: true, tier: 6, majorRealm: 3,
+        hp: 26000, atk: 640, def: 430, speed: 58, spirit: 320, exp: 5000,
+        stones: [1500, 3000], killChance: 0, loseAge: [0, 0], loseStonePct: [0.15, 0.3],
+        affix: "berserk",
+        loot: [{ id: "artifact_zimu_complete", chance: 0.5, qty: [1, 1] }, { id: "tianhuo_crystal", chance: 0.6, qty: [2, 3] }, { id: "yinhun_zhong", chance: 0.2, qty: [1, 1] }],
+        desc: "乱星海妖族共主，赤羽蔽日。气血过三成便妖化狂暴，攻伐陡翻倍——硬撼者多殒于这一瞬。",
+    },
+    {
+        id: "guixu_zhiyan", name: "归墟之眼", isBeast: true, tier: 6, majorRealm: 3,
+        hp: 40000, atk: 700, def: 520, speed: 50, spirit: 360, exp: 6000,
+        stones: [2000, 4000], killChance: 0, loseAge: [0, 0], loseStonePct: [0.15, 0.3],
+        affix: "thickShell", poisonPlayer: { turns: 3, dmg: 30 },
+        loot: [{ id: "artifact_zhetian", chance: 0.5, qty: [1, 1] }, { id: "tianhuo_crystal", chance: 0.7, qty: [2, 3] }, { id: "yinhun_zhong", chance: 0.3, qty: [1, 2] }],
+        desc: "归墟古渊深处的古老存在，眼瞳如渊。鳞甲卸去大半杀伤，吐息带剧毒，沉眠万载只待来犯者。",
+    },
+    {
+        id: "guixu_guard", name: "归墟守仆", human: true, tier: 5, majorRealm: 3,
+        hp: 16000, atk: 520, def: 380, speed: 46, spirit: 330, exp: 3500,
+        stones: [800, 1600], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.4],
+        loot: [{ id: "tianhuo_crystal", chance: 0.5, qty: [1, 2] }, { id: "beast_soul", chance: 0.4, qty: [1, 2] }],
+        desc: "归墟之眼点化的傀儡侍从，无智无觉，唯余千载杀伐本能。",
+    }
+);
+
 /* ——————— ② 路遇事件池（travel 掷点 25%） ——————— */
 GAME.DATA.MAP_ENCOUNTERS = {
     chance: 0.25,          // 每段路途遇敌概率
@@ -160,6 +211,9 @@ GAME.DATA.MAP_ENCOUNTERS = {
         { minRealm: 16, maxRealm: 18, monster: "wild_yaoxiu" },
         { minRealm: 17, maxRealm: 18, monster: "wild_jiaolong" },
         { minRealm: 18, maxRealm: 18, monster: "wild_moxiu_jie" },
+        { minRealm: 19, maxRealm: 20, monster: "wild_sanxiu_yuan" },
+        { minRealm: 20, maxRealm: 21, monster: "wild_yaowang_qinwei" },
+        { minRealm: 21, maxRealm: 21, monster: "wild_guixu_shou" },
     ],
 };
 
@@ -210,11 +264,47 @@ GAME.DATA.HUNTS = {
                 text: "妖修巢穴尽数踏平。你在巢心密室翻出几件被妖修当作压岛之宝的器物。",
             },
         },
+        {
+            id: "hunt_yaowang_chao", name: "乱星海·妖王潮都", reqRealm: 19,
+            teaser: "乱星海妖族共主的潮都深藏于漩涡之下。妖王座下亲卫如云，赤霄妖王沉睡于珊瑚王座——元婴修士真正的试炼场。",
+            waves: ["luanxing_vanguard", "xingque_vanguard", "yaowang_chixiao"],
+            reward: {
+                equip: ["artifact_zimu_complete", "artifact_zhetian"],
+                materials: [{ id: "tianhuo_crystal", qty: 2 }, { id: "yinhun_zhong", qty: 1 }],
+                stones: [1500, 3000],
+                text: "妖王潮都崩塌。你在王座残骸中翻出妖王珍藏的极品法器，与一函以妖血写就的功法残页。",
+            },
+        },
+        {
+            id: "hunt_guixu", name: "归墟古渊", reqRealm: 20,
+            teaser: "大陆极东的归墟古渊，万水归处，亦是万法尽头。渊底沉眠着归墟之眼——传说见过它真容者，无一生还。",
+            waves: ["wild_guixu_shou", "guixu_guard", "guixu_guard", "guixu_zhiyan"],
+            reward: {
+                equip: ["artifact_zimu_complete", "artifact_zhetian", "artifact_tayun"],
+                materials: [{ id: "tianhuo_crystal", qty: 3 }, { id: "beast_soul", qty: 3 }, { id: "yinhun_zhong", qty: 2 }],
+                stones: [2000, 4000],
+                text: "归墟之眼阖目。渊底秘窟洞开，极品法器与稀世材料散落其中，尽归你手。",
+            },
+        },
     ],
     byId: function (id) {
         for (var i = 0; i < this.list.length; i++) if (this.list[i].id === id) return this.list[i];
         return null;
     },
+};
+
+/* ——————— ④ 路途奇遇池（元婴专属，轻量直接给） ——————— */
+GAME.DATA.MAP_WONDERS = {
+    chance: 0.22,          // 元婴赶路时触发奇遇的概率
+    pool: [
+        { id: "relic",  chance: 0.22, label: "古修遗蜕" },
+        { id: "art",    chance: 0.18, label: "前辈残魂授艺" },
+        { id: "herb",   chance: 0.18, label: "万年灵药" },
+        { id: "stones", chance: 0.16, label: "灵脉矿脉" },
+        { id: "trap",   chance: 0.16, label: "陷落幻阵" },
+        { id: "empty",  chance: 0.10, label: "空手而回" },
+    ],
+    relics: ["artifact_zimu_complete", "artifact_zhetian", "artifact_tayun"],
 };
 
 /* 洞口标记物（副本入口信物，防误入） */
