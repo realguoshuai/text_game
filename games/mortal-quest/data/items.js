@@ -105,6 +105,8 @@ GAME.DATA.ITEMS = {
     skill_bingzhui:   { id:"skill_bingzhui",    name:"冰锥术", quality:"上品", type:"skill", price:360, desc:"五行基础攻击法术。修习后斗法中可施放【术法·冰锥术】（38 伤害，冷却 2 回合）。（需青木功四层）", use:{ learnSpell:"bingzhui_shu" } },
     skill_guisha:     { id:"skill_guisha",      name:"鬼煞术", quality:"极品", type:"skill", price:520, desc:"魔道杀伐之术。修习后斗法中可施放【术法·鬼煞术】（55 伤害，冷却 3 回合）；修习沾染煞气。（需青木功六层）", use:{ learnSpell:"guisha_shu", shaQi:8 } },
     skill_dusha:      { id:"skill_dusha",       name:"毒沙掌", quality:"上品", type:"skill", price:340, desc:"黑市狠辣掌法。修习后斗法中可施放【术法·毒沙掌】（42 伤害，冷却 3 回合）。（需青木功四层）", use:{ learnSpell:"dusha_zhang" } },
+    skill_chiming:    { id:"skill_chiming",     name:"赤明魔体诀", quality:"仙品", type:"skill", price:1600, desc:"魔道炼体真诀，黑市最深处的货色。修习后攻击永久 +12，突破反噬 ×0.85；仅体修可参悟，修习沾染煞气。（需青木功十六层·结丹）", use:{ learnSpell:"chiming_moti", shaQi:12 } },
+    skill_zhenhun:    { id:"skill_zhenhun",     name:"不动镇魂诀", quality:"仙品", type:"skill", price:900, desc:"结丹修士压箱底的保命法门。修习后心魔劫反噬 ×0.6，外魔夺舍四成几率直接镇散。（需青木功十六层·结丹）", use:{ learnSpell:"budong_zhenhun" } },
     skill_manli:      { id:"skill_manli",       name:"蛮力诀", quality:"灵品", type:"skill", price:0,   desc:"妖兽炼体残篇，落自妖兽尸身。依法修习，筋骨粗壮，攻击 +3（永久）。", use:{ atkBonus:3 } },
     skill_yaoshou:    { id:"skill_yaoshou",     name:"妖兽炼体诀", quality:"灵品", type:"skill", price:0, desc:"妖兽吐纳之法，落自妖兽尸身。依法修习，皮膜坚厚，气血上限 +30（永久）。", use:{ maxHpBonus:30 } },
 

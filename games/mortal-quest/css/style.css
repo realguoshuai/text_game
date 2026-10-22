@@ -3274,3 +3274,6 @@ body.theme-light .actions > button.act-seal {
     box-shadow: inset 0 0 0 1px rgba(163,52,31,.10), 0 1px 3px rgba(60,45,30,.05);
 }
 body.theme-light .actions > button.act-seal em { color: #8A3428; }
+/* ===== 结丹篇：三阵营声望（敌意声望用主题感知色，不用内联样式） ===== */
+.faction-bad { color: var(--danger-tx); font-weight: bold; }
+.faction-good { color: var(--gold); font-weight: bold; }

@@ -114,6 +114,20 @@ GAME.DATA.SPELLS = {
         dmg:42, cd:3, req:4, evil:true,
         desc:"掌中藏毒，拍中便是一蓬毒沙。造成 42 点伤害，冷却 3 回合。黑市流传的狠辣掌法。（需青木功四层）",
     },
+
+    // —— 结丹新增（体修专属被动功法，黑市秘籍）：以魔道法门铸体——
+    chiming_moti: {
+        id:"chiming_moti", name:"赤明魔体诀", school:"魔道·炼体",
+        req:16, evil:true, tiOnly:true, atkBonus:12, recoilMul:0.85,
+        desc:"魔道炼体法门，以煞气重铸筋骨皮膜。攻击永久 +12；且体魄强横，突破壁障时的反噬伤害 ×0.85。仅体修可参悟，修习沾染煞气。（需青木功十六层·结丹）",
+    },
+
+    // —— 结丹新增（拍卖会高阶功法）：神识守一，外魔不侵——
+    budong_zhenhun: {
+        id:"budong_zhenhun", name:"不动镇魂诀", school:"神识·镇魂",
+        req:16, recoilMul:0.6, immuneChance:0.40,
+        desc:"神识守一之术。心魔劫反噬 ×0.6；外魔循神识而来欲夺舍时，四成几率直接镇散。结丹修士压箱底的保命法门。（需青木功十六层·结丹）",
+    },
 };
 
 /* —— 技能总录：技能中枢（技能页签）唯一数据源 ——
@@ -135,6 +149,8 @@ GAME.DATA.SKILL_CODEX = [
     { kind:"法术", spell:"tianyan_shu", item:"skill_tianyan",    source:"坊市·岚州大城", req:7 },
     { kind:"法术", spell:"guisha_shu",  item:"skill_guisha",     source:"黑市秘籍",       req:6, evil:true },
     { kind:"法术", spell:"dusha_zhang", item:"skill_dusha",      source:"黑市秘籍",       req:4, evil:true },
+    { kind:"功法", spell:"chiming_moti", item:"skill_chiming",    source:"黑市秘籍",       req:16, evil:true },
+    { kind:"功法", spell:"budong_zhenhun", item:"skill_zhenhun",   source:"拍卖会·结丹",    req:16 },
     { kind:"武学", skill:"skill_manli",   item:"skill_manli",   source:"打怪掉落·妖兽", req:0 },
     { kind:"武学", skill:"skill_yaoshou", item:"skill_yaoshou", source:"打怪掉落·妖兽", req:0 },
     { kind:"功法", gongfa:"changchun", source:"苍梧门·玄机子" },

@@ -25,6 +25,8 @@ GAME.DATA.ITEMS.lingmu        = { id: "lingmu",  name: "灵木（旧）",   type
 GAME.DATA.ITEMS.puppet_gongjian = { name: "弓箭傀儡", type: "puppet", quality: "上品", atk: 8,  price: 500, desc: "四级机关弓臂，连珠箭雨。" };
 GAME.DATA.ITEMS.puppet_julang   = { name: "巨狼傀儡", type: "puppet", quality: "极品", atk: 14, price: 900, desc: "四级天火淬骨钢牙巨狼。" };
 GAME.DATA.ITEMS.puppet_juyuan   = { name: "巨猿傀儡", type: "puppet", quality: "极品", atk: 18, price: 2400, desc: "五级巨猿傀儡，铁臂横扫如山压。" };
+GAME.DATA.ITEMS.puppet_zhenji   = { name: "战阵傀儡", type: "puppet", quality: "极品", atk: 22, price: 3600, desc: "结丹档战阵傀儡，甲胄齐整，一列便是十支箭。" };
+GAME.DATA.ITEMS.puppet_heji     = { name: "合击傀儡", type: "puppet", quality: "仙品", atk: 30, price: 6800, desc: "结丹档合击傀儡，两具成阵时可互为表里，神识耗得凶，威力也最猛。" };
 
 /* —— 大衍决：筑基神识暴涨功法（术法目录登记，供图志/技能页读取） —— */
 GAME.DATA.SPELLS.dayan_jue = {
@@ -36,31 +38,49 @@ GAME.DATA.SPELLS.dayan_jue = {
 /* —— 傀儡配置：atk 齐射单发权重基数；spiritCost 操控神识占用（10~20） —— */
 GAME.DATA.PUPPETS = {
     gongjian: {
-        id: "puppet_gongjian", name: "弓箭傀儡", atk: 8, spiritCost: 10,
+        id: "puppet_gongjian", name: "弓箭傀儡", atk: 8, spiritCost: 10, volley: 8,
         materials: [
             { id: "beast_soul",  qty: 2, from: "狩猎二阶妖兽（神识≥25 必得）/ 宗门功勋 30 点兑换 / 黑市轮换" },
             { id: "spirit_wood", qty: 1, from: "玄傀后山伐木（2 月）/ 承露瓶催熟灵木 / 筑基月俸" },
         ],
     },
     julang: {
-        id: "puppet_julang", name: "巨狼傀儡", atk: 14, spiritCost: 15,
+        id: "puppet_julang", name: "巨狼傀儡", atk: 14, spiritCost: 15, volley: 8,
         materials: [
             { id: "spirit_wood", qty: 5, from: "玄傀后山伐木（2 月）/ 承露瓶催熟灵木 / 宗门功勋 20 点兑换" },
             { id: "iron_ore",    qty: 3, from: "玄傀下矿开采（1 月产 2）/ 坊市铁匠铺无限量（15 灵石/块）" },
         ],
     },
     juyuan: {
-        id: "puppet_juyuan", name: "巨猿傀儡", atk: 18, spiritCost: 20,
+        id: "puppet_juyuan", name: "巨猿傀儡", atk: 18, spiritCost: 20, volley: 8,
         materials: [
             { id: "spirit_wood",      qty: 12, from: "玄傀后山伐木 / 承露瓶催熟灵木（1 滴绿液 → 3 根）" },
             { id: "tianhuo_crystal",  qty: 2,  from: "斩魔焰门筑基修士 / 地下黑市每 3 月轮换上架" },
+        ],
+    },
+    /* —— 结丹档：傀儡大军（混编时单具输出更高、占用神识也更重） —— */
+    zhenji: {
+        id: "puppet_zhenji", name: "战阵傀儡", atk: 22, spiritCost: 25, volley: 16,
+        materials: [
+            { id: "spirit_wood",      qty: 8,  from: "玄傀后山伐木 / 承露瓶催熟灵木" },
+            { id: "tianhuo_crystal",  qty: 3,  from: "斩魔焰门修士 / 地下黑市每 3 月轮换上架" },
+            { id: "jinshi",           qty: 2,  from: "结丹档妖兽掉落 / 坊市限量" },
+        ],
+    },
+    heji: {
+        id: "puppet_heji", name: "合击傀儡", atk: 30, spiritCost: 35, volley: 22,
+        materials: [
+            { id: "tianhuo_crystal",  qty: 5,  from: "斩魔焰门修士 / 地下黑市每 3 月轮换上架" },
+            { id: "jinshi",           qty: 4,  from: "结丹档妖兽掉落 / 坊市限量" },
+            { id: "beast_soul",       qty: 6,  from: "狩猎二阶妖兽（神识≥25 必得）" },
         ],
     },
 };
 
 GAME.Puppet = {
 
-    PUPPET_VOLLEY_PER: 8,   // 每具傀儡每回合齐射基础伤害
+    PUPPET_VOLLEY_PER: 8,   // 每具傀儡每回合齐射基础伤害（旧式傀儡未指定 volley 时取此值）
+    MAX_CONTROL: 24,        // 一次最多列阵的傀儡「总数」（安全上限；真正瓶颈仍是神识承载）
 
     // 当前神识上限（SP）：当前境界基础 sp + 大衍决永久加成（spiritBonus）
     maxSpirit: function () {
@@ -143,34 +163,152 @@ GAME.Puppet = {
         return true;
     },
 
-    // ---------- 斗法前激活：神识操控 N 具傀儡参战（按类型） ----------
-    // 神识承载检定：所选傀儡总 spiritCost 不得超当前神识上限；超出则拦截（傀儡失控）。
-    activate: function (count, type) {
+    // ---------- 当前编制（混编军团） ----------
+    // 老存档无 puppetArmy 时，用旧的 puppetsActive 折算成单一类型，行为不回退。
+    army: function () {
         var p = GAME.State.p();
-        var def = GAME.DATA.PUPPETS[type] || GAME.DATA.PUPPETS.gongjian;
-        var owned = GAME.State.countItem(def.id);
-        if (owned < 1) { GAME.UI.log("工坊空空——你尚无一具" + def.name + "可供操控。", "system"); return; }
-        var n = Math.min(count || 1, owned);
-        var cost = n * def.spiritCost;
+        if (p.puppetArmy && p.puppetArmy.length) return p.puppetArmy;
+        if (p.puppetsActive > 0) return [{ type: "gongjian", count: p.puppetsActive }];
+        return [];
+    },
+
+    // 单具每回合齐射伤害（未指定 volley 的旧式傀儡取 PUPPET_VOLLEY_PER）
+    volleyOf: function (def) {
+        if (!def) return 0;
+        return (def.volley != null) ? def.volley : this.PUPPET_VOLLEY_PER;
+    },
+
+    // 编制总占用神识
+    armyCost: function (list) {
+        list = list || this.army();
+        var total = 0;
+        for (var i = 0; i < list.length; i++) {
+            var def = GAME.DATA.PUPPETS[list[i].type];
+            if (def) total += (list[i].count || 0) * def.spiritCost;
+        }
+        return total;
+    },
+
+    /* 编制齐射总伤害：Σ 每型「数量 × 单具 volley」。纯函数，便于结算与测试共读一份。 */
+    armyVolleyOf: function (list) {
+        var total = 0, count = 0;
+        for (var i = 0; i < (list || []).length; i++) {
+            var def = GAME.DATA.PUPPETS[list[i].type];
+            if (!def) continue;
+            var n = list[i].count || 0;
+            if (n <= 0) continue;
+            count += n;
+            total += n * this.volleyOf(def);
+        }
+        return { damage: total, count: count };
+    },
+
+    armyVolley: function () { return this.armyVolleyOf(this.army()); },
+
+    /* ---------- 斗法前激活：神识操控傀儡列阵 ----------
+     * list 可以是：
+     *   · 数组 [{type,count}, ...] —— 混编编制（傀儡大军）
+     *   · 数字 count —— 旧接口，等价于单一类型 type 的 count 具
+     * 神识承载检定：总 spiritCost 不得超当前神识上限；超出则从最贵的一档开始舍弃。 */
+    activate: function (list, type) {
+        var p = GAME.State.p();
+        var comp = [];
+        if (typeof list === "number") {
+            comp = [{ type: type || "gongjian", count: list }];
+        } else if (list && list.length) {
+            comp = list.slice();
+        }
+
+        // 逐型裁剪：拥有的数量为上限
+        var i, kept = [], total = 0;
+        for (i = 0; i < comp.length; i++) {
+            var def = GAME.DATA.PUPPETS[comp[i].type];
+            if (!def) continue;
+            var own = GAME.State.countItem(def.id);
+            var n = Math.min(comp[i].count || 0, own);
+            if (n <= 0) continue;
+            kept.push({ type: comp[i].type, count: n, idx: i });
+            total += n * def.spiritCost;
+        }
+        if (!kept.length) {
+            p.puppetsActive = 0; p.puppetsSp = 0; p.puppetArmy = [];
+            GAME.UI.log("工坊空空——你尚无一具傀儡可供列阵。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
+
+        // 双重约束：神识承载（SP） + 列阵总数上限。超了就从最便宜的一档开始舍弃
+        // （保住强力型号，输出不掉太多）。总数上限只是安全网，真正瓶颈仍是神识。
         var cap = this.maxSpirit();
-        if (cost > cap) {
-            // 神识承载不足：尽量放下便宜的（这里统一按单类，截断到可承载上限）
-            var affordable = Math.floor(cap / def.spiritCost);
-            if (affordable <= 0) {
-                p.puppetsActive = 0;
-                p.puppetsSp = 0;
-                GAME.UI.log("神识上限仅 " + cap + "，操控一具" + def.name + "便需 " + def.spiritCost +
-                    "——神识不足以驭傀，列阵被拦截！", "danger");
+        var maxTotal = this.MAX_CONTROL;
+        var totalCount = 0;
+        for (i = 0; i < kept.length; i++) totalCount += kept[i].count;
+        if (total > cap || totalCount > maxTotal) {
+            kept.sort(function (a, b) {
+                return (GAME.DATA.PUPPETS[b.type].spiritCost) - (GAME.DATA.PUPPETS[a.type].spiritCost);
+            });
+            while (kept.length && (total > cap || totalCount > maxTotal)) {
+                var last = kept[kept.length - 1];
+                var ldef = GAME.DATA.PUPPETS[last.type];
+                if (last.count > 1) { last.count--; total -= ldef.spiritCost; totalCount--; }
+                else { total -= ldef.spiritCost; totalCount--; kept.pop(); }
+            }
+            if (total > cap || !kept.length) {
+                p.puppetsActive = 0; p.puppetsSp = 0; p.puppetArmy = [];
+                GAME.UI.log("神识上限仅 " + cap + "——连一具傀儡都驭不动，列阵被拦截！", "danger");
                 GAME.UI.updateUI();
                 return;
             }
-            n = affordable;
-            cost = n * def.spiritCost;
-            GAME.UI.log("神识上限 " + cap + " 仅可驭 " + n + " 具" + def.name + "（" + cost + " SP），余者暂收。", "warning");
+            GAME.UI.log("神识上限 " + cap + "（" + maxTotal + " 具封顶），仅可列 " + total + " SP / " +
+                totalCount + " 具，余者暂收。", "warning");
         }
-        p.puppetsActive = n;
-        p.puppetsSp = cost;
-        GAME.UI.log("神识铺开如水银泻地——" + n + " 具【" + def.name + "】应念列阵（占用 " + cost + "/" + cap + " SP），随时听令齐射！", "info");
+
+        // 恢复原顺序（玩家自定的编制次序即优先级）
+        kept.sort(function (a, b) { return a.idx - b.idx; });
+        var out = [], count = 0;
+        for (i = 0; i < kept.length; i++) {
+            out.push({ type: kept[i].type, count: kept[i].count });
+            count += kept[i].count;
+        }
+        p.puppetArmy = out;
+        p.puppetsActive = count;
+        p.puppetsSp = total;
+
+        var parts = [];
+        for (i = 0; i < out.length; i++) {
+            parts.push(out[i].count + " 具" + GAME.DATA.PUPPETS[out[i].type].name);
+        }
+        GAME.UI.log("神识铺开如水银泻地——" + parts.join("、") + "应念列阵（占用 " + total + "/" + cap +
+            " SP），随时听令齐射！", "info");
         GAME.UI.updateUI();
+    },
+
+    /* 一键列阵：把神识用到最满。
+     * 排序按「每点神识的齐射产出」从高到低——同额神识下伤害最高。 */
+    activateAll: function () {
+        var p = GAME.State.p();
+        var cap = this.maxSpirit();
+        var types = Object.keys(GAME.DATA.PUPPETS);
+        var self = this;
+        types.sort(function (a, b) {
+            var da = GAME.DATA.PUPPETS[a], db = GAME.DATA.PUPPETS[b];
+            var va = self.volleyOf(da) / da.spiritCost;
+            var vb = self.volleyOf(db) / db.spiritCost;
+            if (vb !== va) return vb - va;
+            return da.spiritCost - db.spiritCost;
+        });
+        var comp = [], used = 0, total = 0, i, j;
+        for (i = 0; i < types.length; i++) {
+            var def = GAME.DATA.PUPPETS[types[i]];
+            var own = GAME.State.countItem(def.id);
+            for (j = 0; j < own; j++) {
+                if (used + def.spiritCost > cap) break;
+                if (total >= this.MAX_CONTROL) break;
+                used += def.spiritCost; total++;
+            }
+            if (j > 0) comp.push({ type: types[i], count: j });
+        }
+        if (!comp.length) { this.activate([]); return; }
+        this.activate(comp);
     },
 };

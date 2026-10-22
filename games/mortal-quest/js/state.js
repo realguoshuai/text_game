@@ -327,6 +327,10 @@ GAME.State = {
         if (p.marketRiskValue == null) p.marketRiskValue = 0;
         if (!p.bonds) p.bonds = {};
         if (p.heisha === undefined) p.heisha = null;
+        // 结丹道途：老存档默认法修且未择定（不补挂事件，避免惊扰已在玩的老档）
+        if (!p.cultivationPath) p.cultivationPath = "fa";
+        if (p.pathChosen == null) p.pathChosen = false;
+        if (p.xinmoLevel == null) p.xinmoLevel = 0;   // 心魔侵染（0~3，结丹后随夺舍事件起伏）
     },
 
     // ---------- 战斗面板：境界基础 + 法器加成 ----------
@@ -373,6 +377,16 @@ GAME.State = {
         var szMul = (GAME.Cultivation && GAME.DATA.SANZHUAN)
             ? 1 + (p.threeTurnCount || 0) * GAME.DATA.SANZHUAN.statGain : 1;
         if (szMul !== 1) s.spirit = Math.round(s.spirit * szMul);
+        // 体修道途：筋骨气血远胜同阶——攻击/防御 ×1.25（道途系数唯一出口 GAME.Path.atkDefMul）
+        var tiMul = (GAME.Path && GAME.Path.atkDefMul) ? GAME.Path.atkDefMul(p) : 1;
+        if (tiMul !== 1) {
+            s.atk = Math.round(s.atk * tiMul);
+            s.def = Math.round(s.def * tiMul);
+        }
+        // 《赤明魔体诀》：魔道炼体功法，攻击永久 +12（仅体修可习，习得存 p.spells）
+        if (p.spells && p.spells.chiming_moti && GAME.DATA.SPELLS && GAME.DATA.SPELLS.chiming_moti) {
+            s.atk += GAME.DATA.SPELLS.chiming_moti.atkBonus || 0;
+        }
         return s;
     },
 };

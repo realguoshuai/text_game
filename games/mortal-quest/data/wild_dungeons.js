@@ -95,6 +95,37 @@ GAME.DATA.MONSTERS.push(
         poisonPlayer: { turns: 3, dmg: 25 },
         loot: [{ id: "tianhuo_crystal", chance: 0.5, qty: [1, 2] }, { id: "pill_jiedan_zhengpin", chance: 0.12, qty: [1, 1] }],
         desc: "魔道六宗派驻外域的巡察，专司清剿异己，周身魔焰环绕。",
+    },
+    /* —— 心魔凝形（结丹篇）：只由反夺元神失败触发，不进路遇池 —— */
+    {
+        id: "seize_demon", name: "心魔·凝形", tier: 4, majorRealm: 2,
+        hp: 1800, atk: 115, def: 55, speed: 22, spirit: 130, exp: 800,
+        stones: [300, 700], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.4],
+        loot: [{ id: "yinhun_zhong", chance: 0.2, qty: [1, 1] }, { id: "tianhuo_crystal", chance: 0.35, qty: [1, 2] }],
+        desc: "你识海里那缕元神借破口凝出的形貌——眉眼与你一般无二，出手却招招指向你的旧伤。",
+    },
+    /* —— 阵营追杀者（结丹篇）：只由【追杀令】调用，不进路遇池 —— */
+    {
+        id: "xingque_hunter", name: "星阙·追缉使", tier: 4, majorRealm: 2,
+        hp: 2400, atk: 98, def: 70, speed: 17, spirit: 110, exp: 600,
+        stones: [400, 800], killChance: 0, loseAge: [0, 0], loseStonePct: [0.3, 0.5],
+        loot: [{ id: "pill_qingxin", chance: 0.35, qty: [1, 1] }, { id: "jinshi", chance: 0.3, qty: [1, 2] }],
+        desc: "星阙麾下专司缉拿的结丹修士，剑法方正，出手却绝不留情。",
+    },
+    {
+        id: "luanxing_hunter", name: "乱星盟·暗煞", tier: 4, majorRealm: 2,
+        hp: 2600, atk: 108, def: 62, speed: 20, spirit: 120, exp: 700,
+        stones: [450, 900], killChance: 0, loseAge: [0, 0], loseStonePct: [0.3, 0.5],
+        poisonPlayer: { turns: 3, dmg: 20 },
+        loot: [{ id: "tianhuo_crystal", chance: 0.4, qty: [1, 2] }, { id: "pill_yanghun", chance: 0.3, qty: [1, 1] }],
+        desc: "魔道联盟的暗煞，行踪不定，出手先下毒——杀人之前从不啰嗦。",
+    },
+    {
+        id: "sanxiu_hunter", name: "散修·赏金客", tier: 4, majorRealm: 2,
+        hp: 2100, atk: 92, def: 55, speed: 18, spirit: 90, exp: 520,
+        stones: [350, 700], killChance: 0, loseAge: [0, 0], loseStonePct: [0.25, 0.45],
+        loot: [{ id: "pill_qingxin", chance: 0.25, qty: [1, 1] }, { id: "beast_soul", chance: 0.4, qty: [1, 2] }],
+        desc: "为赏金卖命的散修，谁出的价钱高就替谁杀人——包括你。",
     }
 );
 

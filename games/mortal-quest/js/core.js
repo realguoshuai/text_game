@@ -36,6 +36,9 @@ GAME.Core = {
         // 灵脉产出：筑基后独辟灵峰，灵脉自行吐纳灵石与灵草（挂机收益）
         if (GAME.Cave2 && p.peak) GAME.Cave2.grantVeinOutput(months);
 
+        // 护山大阵月耗：阵法持续耗养灵石（周天星斗大阵 20/月），养不起则阵散
+        if (GAME.Cave2 && GAME.Cave2.tickUpkeep) GAME.Cave2.tickUpkeep(months);
+
         // 坊市定期换货
         if (p.totalMonths >= p.marketNextRefresh) {
             GAME.Market.refreshGoods();
@@ -121,6 +124,11 @@ GAME.Core = {
 
         // 药圃：洞里那几株药也在跟着长年份（逻辑在 js/plot.js）——时间既花出去，也长在土里
         if (GAME.Plot && GAME.Plot.tick) GAME.Plot.tick(months);
+
+        // 三阵营声望与追杀令（结丹篇）：煞气侵蚀、声望回暖、追杀令掷骰
+        if (GAME.Faction && GAME.Faction.tick) GAME.Faction.tick(months);
+        // 神识夺舍心魔：结丹后方有值得夺的神识；阵法闭关（shielded）不扰
+        if (GAME.Seize && GAME.Seize.tick) GAME.Seize.tick(months);
 
         // 十年回顾：每满 10 年结算一次小结（js/review.js，纯展示）
         if (GAME.Review && GAME.Review.tick) GAME.Review.tick();
@@ -352,6 +360,13 @@ GAME.Core = {
             GAME.UI.updateUI();
             return;
         }
+        // 道途专属功法前置：体修功法须以体修参悟（《赤明魔体诀》——金丹阳面为引）
+        if (spellPre && spellPre.tiOnly && !(GAME.Path && GAME.Path.isTi(p))) {
+            GAME.UI.log("你翻开【" + item.name + "】，只觉字句如烙铁般灼手——此诀须以体修为基、金丹阳面为引方能修习（你而今是" +
+                (GAME.Path ? GAME.Path.name(p) : "法修") + "之道）。姑且收回囊中。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
         GAME.State.removeItem(id);
         p.stats.pillsTaken += 1;
         if (use.exp) {
@@ -415,6 +430,8 @@ GAME.Core = {
         if (use.shaQi && item.type !== "pill") {
             p.shaQi += use.shaQi;
             GAME.UI.log("一股阴煞之气缠绕周身——煞气 +" + use.shaQi + "。此术虽利，却也惹人觊觎。", "danger");
+            // 修习魔功：正道侧目、魔道相惜（声望唯一写入口在 Faction.repute）
+            if (GAME.Faction) GAME.Faction.onLearnDemonic(p);
         }
         // 法术：习得可在斗法中反复施放的术法（门槛校验已在消耗物品前完成）
         if (use.learnSpell) {
@@ -647,8 +664,9 @@ GAME.Core = {
                 partsTxt + "）——合计 " + Math.round(successChance * 100) + "%。", "system");
         }
 
-        // 心魔劫：筑基及以上突破，壁障将破时心魔乘虚而入，先定心再破境
-        if (p.realmIndex >= GAME.DATA.ZHUJI_GATE_INDEX) {
+        // 心魔劫：筑基及以上突破，壁障将破时心魔乘虚而入，先定心再破境。
+        // 尘缘已斩（bonds.js 写入的 xinmoImmunity）者与此劫无缘。
+        if (p.realmIndex >= GAME.DATA.ZHUJI_GATE_INDEX && !p.xinmoImmunity) {
             p._btCtx = {
                 successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,
                 isZhuji: isZhuji, zhujiPill: zhujiPill, pillName: pillName, bareZhuji: bareZhuji,
@@ -715,8 +733,10 @@ GAME.Core = {
             // 练气期维持逐境 +20 的轻量增长，行为与旧档一致。
             // 《三转归元功》：每转气血/法力上限永久 +20%（statMul 参与落位）
             var szMul = (GAME.Cultivation && GAME.Cultivation.statMul) ? GAME.Cultivation.statMul() : 1;
-            if (newRealm.hp != null) { p.maxHp = Math.round(newRealm.hp * szMul); }
-            else { p.maxHp += 20; }
+            // 体修道途：气血上限 ×1.15（道途系数唯一出口 GAME.Path.hpMul；未择定时为 1）
+            var tiHpMul = (GAME.Path && GAME.Path.hpMul) ? GAME.Path.hpMul(p) : 1;
+            if (newRealm.hp != null) { p.maxHp = Math.round(newRealm.hp * szMul * tiHpMul); }
+            else { p.maxHp = Math.round((p.maxHp + 20) * tiHpMul); }
             p.maxMp = newRealm.mp != null ? Math.round(newRealm.mp * szMul) : p.maxMp;
             p.currentHp = p.maxHp;
             p.changchunLevel += 1;   // 《青木功》随破境而深，每层 +5% 命中 / +10% 异常抗性
@@ -731,6 +751,10 @@ GAME.Core = {
             if (GAME.Codex) {
                 GAME.Codex.unlockLore("lore_changchun");
                 if (isZhuji) GAME.Codex.unlockLore("lore_zhuji");
+            }
+            // 结丹功成：金丹阴阳两面自分——挂起道途抉择（已择定的老档不重复挂）
+            if (p.realmIndex === GAME.DATA.JIEDAN_GATE_INDEX && GAME.Path && GAME.Path.offer(p)) {
+                GAME.UI.log("丹田深处，那枚新凝的金丹忽地裂出阴阳两面——一半炽烈如熔金，一半温润如秋水。道途自分，就在此时。", "moment");
             }
             // 练气三层：玄机子见你根基渐稳，终于肯传炼丹手艺——丹炉开启
             if (p.realmIndex === (GAME.DATA.ALCHEMY.unlockRealm || 2)) {
@@ -917,6 +941,8 @@ GAME.Core = {
             p.stats.kills += 1;
             p.shaQi += 5;   // 杀伐之气缠身，黑市销赃更易被尾随
             GAME.State.addKarma(-8);
+            // 斩杀修士 → 三阵营声望随之变动（斩魔道则乱星盟恶、结丹期正道结丹 repute 记之）
+            if (GAME.Faction) GAME.Faction.onKill(p, def.id);
             GAME.UI.log("你心一横，剑光闪过——斩草除根，免留后患。（恶名 +8，煞气 +5，得 " + stones + " 灵石）", "danger");
             GAME.Combat.grantLoot(def.loot, 1, def);
             // 斩杀修士而尸身留在原地：因果追查缠身，高阶修士或循因果寻仇
@@ -942,6 +968,12 @@ GAME.Core = {
             if (GAME.DATA.EVENTS[i].id === id) return GAME.DATA.EVENTS[i];
         }
         if (GAME.DATA.HEART_DEMON && GAME.DATA.HEART_DEMON.id === id) return GAME.DATA.HEART_DEMON;
+        if (GAME.DATA.FACTION_EVENTS && GAME.DATA.FACTION_EVENTS[id]) return GAME.DATA.FACTION_EVENTS[id];
+        if (GAME.DATA.PATH_EVENTS && GAME.DATA.PATH_EVENTS[id]) return GAME.DATA.PATH_EVENTS[id];
+        if (GAME.DATA.SEIZE_EVENTS && GAME.DATA.SEIZE_EVENTS[id]) {
+            // 按玩家当下条件裁剪选项（没《不动镇魂诀》不列镇魔、没大阵不列借阵）
+            return (GAME.Seize && GAME.Seize.eventFor) ? GAME.Seize.eventFor(GAME.DATA.SEIZE_EVENTS[id]) : GAME.DATA.SEIZE_EVENTS[id];
+        }
         return null;
     },
 
@@ -999,6 +1031,18 @@ GAME.Core = {
                 return;
             case "hdmod":
                 p._hdMods = { successAdd: o.successAdd || 0, dmgMul: o.dmgMul || 1 };
+                break;
+            case "hunt":
+                // 追杀令三选一：遁走 / 献金 / 死战（付不起则退化成死战）
+                if (GAME.Faction) GAME.Faction.resolveHunt(o);
+                break;
+            case "pathmod":
+                // 结丹道途抉择：法修 / 体修（一经择定不可更改）
+                if (GAME.Path) GAME.Path.set(p, o.path);
+                break;
+            case "seize":
+                // 夺舍来袭三选一：镇魔 / 借阵 / 反夺（反夺失败可能直接开打，交由战斗接管）
+                if (GAME.Seize) { if (GAME.Seize.resolve(o) === "combat") return; }
                 break;
             case "nothing":
             default:

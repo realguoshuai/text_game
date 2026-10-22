@@ -114,11 +114,26 @@ GAME.Time = {
         if (!def) return null;
         var months = this.monthsOf(p, def.cycles);
         var g = this.guard(p, months);
+        var mind = this.mindOf(months);
+        // 阵法长关：周天星斗大阵在位时长关可「入阵而修」——心境增速翻快、
+        // 闭关期间外敌不得扰；但阵法月耗须由灵石撑住，撑不住则不允闭关。
+        var form = (GAME.Cave2 && GAME.Cave2.activeFormation) ? GAME.Cave2.activeFormation() : null;
+        var shielded = false, upkeep = 0;
+        if (form && form.seclude && def.id === "epic" && g.ok) {
+            upkeep = (form.upkeep || 0) * months;
+            if (p.spiritStones >= upkeep) {
+                shielded = true;
+                mind = Math.floor(months / 3);   // 阵中三月养一心境（平时四月）
+            } else {
+                g = { ok: false, why: "灵石不足，长关撑不起【" + form.name + "】的月耗（需 " + upkeep + " 枚）" };
+            }
+        }
         return {
             id: def.id, name: def.name, note: def.note, cycles: def.cycles,
             months: months,
             exp: this.expOf(p, def.cycles),
-            mind: this.mindOf(months),
+            mind: mind,
+            shielded: shielded, upkeep: upkeep,
             ok: g.ok, why: g.why
         };
     },
@@ -158,6 +173,19 @@ GAME.Time = {
         p.currentExp += t.exp;
         if (t.mind > 0) p.mind = (p.mind || 0) + t.mind;
 
+        // 阵法长关：入阵而修——参悟星轨（神识上限永久 +25，仅首次）、外敌不得扰
+        var form = (GAME.Cave2 && GAME.Cave2.activeFormation) ? GAME.Cave2.activeFormation() : null;
+        if (t.shielded && form) {
+            if (!p.zhouxingInsight) {
+                p.zhouxingInsight = true;
+                p.spiritBonus = (p.spiritBonus || 0) + 25;
+                var capTxt = (GAME.Puppet && GAME.Puppet.maxSpirit) ? ("（现 " + GAME.Puppet.maxSpirit() + "）") : "";
+                GAME.UI.log("阵中二十八宿缓缓流转，你参悟星轨，神识上限永久 +25" + capTxt + "！", "success");
+            }
+            GAME.UI.log("【" + form.name + "】合拢——你在阵中入定，外间风雨不得扰，夺舍与追杀皆被挡在阵外。", "info");
+            if (GAME.Chronicle) GAME.Chronicle.narrate("formation_secluded", p);
+        }
+
         if (t.cycles <= 1) {
             GAME.UI.log("你闭门吐纳 " + t.months + " 个月，杂灵根吸纳的灵气微乎其微，修为 +" + t.exp +
                 (extra ? "（藏经阁 +" + extra + "）" : "") + "。", "info");
@@ -165,7 +193,10 @@ GAME.Time = {
             GAME.UI.log("你闭关苦修 " + t.months + " 个月，出关时蒲团上落了一层灰——修为 +" + t.exp +
                 (t.mind > 0 ? "，心境 +" + t.mind : "") + "。", "info");
         }
+        // 闭关期间挂屏蔽标记：passTime 内的夺舍/追杀检查据此不打断闭关
+        p.seclusion = { id: t.id, shielded: !!t.shielded };
         GAME.Core.passTime(t.months);
+        p.seclusion = null;
         return true;
     },
 

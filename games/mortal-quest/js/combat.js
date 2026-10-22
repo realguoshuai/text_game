@@ -56,8 +56,9 @@ GAME.Combat = {
         } else         if (affix === "berserk") {    // 魔化狂暴：HP<30% 时攻击 +100%
             p.combat.berserk = true;
         }
-        // 机关傀儡齐射：开战捕获已激活的傀儡数（大衍决·控物之术操控 4~8 具）
+        // 机关傀儡齐射：开战捕获已列阵的编制（混编军团按各型 volley 分别结算）
         p.combat.puppets = p.puppetsActive || 0;
+        p.combat.puppetArmy = (GAME.Puppet && GAME.Puppet.army) ? GAME.Puppet.army().slice() : [];
         var s = GAME.State.getStats();
         GAME.UI.log("杀机骤现！你与【" + def.name + "】斗法起来！", "danger");
         GAME.UI.log("（你：攻" + s.atk + " 防" + s.def + " 速" + s.speed + " 识" + s.spirit +
@@ -182,11 +183,17 @@ GAME.Combat = {
         dmg = Math.round(dmg * this.realmDamageMul(p.combat.playerMajor, p.combat.monsterMajor));
         // 厚甲妖壳：物理/法器攻击免伤 50%
         if (p.combat.thickShell) dmg = Math.round(dmg * 0.5);
-        // 机关傀儡齐射（大衍决神识驭器，高频连环集火）
-        if (p.combat.puppets > 0 && GAME.Puppet) {
-            var pv = p.combat.puppets * GAME.Puppet.PUPPET_VOLLEY_PER;
-            dmg += pv;
-            GAME.UI.log("机关傀儡列阵齐射！" + p.combat.puppets + " 具傀儡连珠箭雨，再添 " + pv + " 点伤害！", "info");
+        // 机关傀儡齐射（大衍决神识驭器，高频连环集火；混编按各型 volley 汇总）
+        if (GAME.Puppet && p.combat.puppetArmy && p.combat.puppetArmy.length) {
+            var pv = GAME.Puppet.armyVolleyOf(p.combat.puppetArmy);
+            if (pv.damage > 0) {
+                dmg += pv.damage;
+                GAME.UI.log("机关傀儡列阵齐射！" + pv.count + " 具傀儡连珠箭雨，再添 " + pv.damage + " 点伤害！", "info");
+            }
+        } else if (p.combat.puppets > 0 && GAME.Puppet) {
+            var pv2 = p.combat.puppets * GAME.Puppet.PUPPET_VOLLEY_PER;
+            dmg += pv2;
+            GAME.UI.log("机关傀儡列阵齐射！" + p.combat.puppets + " 具傀儡连珠箭雨，再添 " + pv2 + " 点伤害！", "info");
         }
         if (r.crit && zimuCrit && zimuCrit >= 0.2 && !p.combat.def.bladeImmune) {
             GAME.UI.log("母刃明晃晃格开守势，子刃却自死角无声递出——", "warning");

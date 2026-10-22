@@ -82,6 +82,7 @@ GAME.DATA.CONTENT = {
     BLACK_SKILLS: [
         { id:"skill_guisha", price:520 },
         { id:"skill_dusha",  price:340 },
+        { id:"skill_chiming", price:1600 },
     ],
 
     /* ============ 二·乙、拍卖会（结丹期解锁的高阶交易） ============ */
@@ -97,6 +98,7 @@ GAME.DATA.CONTENT = {
             { id:"recipe_yanghun",  qty:1, startBid:380,  buyout:520  },
             { id:"artifact_frag",   qty:2, startBid:30,   buyout:50   },
             { id:"jinshi",          qty:3, startBid:30,   buyout:45   },
+            { id:"skill_zhenhun",   qty:1, startBid:600,  buyout:900  },
         ],
     },
 

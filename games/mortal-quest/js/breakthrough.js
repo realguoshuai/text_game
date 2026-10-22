@@ -170,6 +170,16 @@ GAME.Breakthrough = {
         // —— 降尘丹：反噬伤害 ×0.2（一次性，失败后消耗）——
         if (GAME.Alchemy && p.jiangchen) dmgMul *= GAME.Alchemy.breakDmgMul();
 
+        // —— 《赤明魔体诀》：魔道炼体，体魄强横——突破反噬 ×0.85（仅体修可习）。
+        // 反噬修正唯一出口 GAME.Path.recoilMul；面板由 dmgMul<1 的"已减伤"一行自动呈现。
+        var recoilMul = (GAME.Path && GAME.Path.recoilMul) ? GAME.Path.recoilMul(p) : 1;
+        if (recoilMul !== 1) dmgMul *= recoilMul;
+
+        // —— 心魔侵染与《不动镇魂诀》：侵染每重 +15%；不动镇魂诀 ×0.6。
+        // 同为反噬修正唯一出口 GAME.Seize.recoilMul；面板由 dmgMul 的"已减伤"一行呈现。
+        var seizeMul = (GAME.Seize && GAME.Seize.recoilMul) ? GAME.Seize.recoilMul(p) : 1;
+        if (seizeMul !== 1) dmgMul *= seizeMul;
+
         // —— 合计：丹药链上限 1.0；常规境界上限 98%（心境按旧规则只补到 98%）——
         var addSum = vein.add + (guardOn ? guard.add : 0) + szAdd;
         var coreChance = Math.min(chainCap, baseChance + addSum);

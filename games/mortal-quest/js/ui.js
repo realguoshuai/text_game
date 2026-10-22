@@ -1364,11 +1364,36 @@ GAME.UI = {
             GAME.DATA.FORMATIONS.forEach(function (f, i) {
                 if (f.id === "none") return;
                 var cur = p.formation === f.id;
+                var can = GAME.Cave2.canSetFormation(f);
+                var locked = !can.ok && !cur;
                 html += '<button id="btn-cave2-form' + i + '" class="' + (cur ? "small-btn" : "btn-gold") + '"' +
-                    (cur || p.spiritStones < f.cost ? " disabled" : "") + ' style="margin:3px 4px 0 0;">' +
+                    (cur || locked ? " disabled" : "") + ' style="margin:3px 4px 0 0;"' +
+                    (locked ? ' title="' + can.why + '"' : "") + '>' +
                     f.name + "（" + f.cost + " 灵石）" + (cur ? " ✓" : "") + '</button>';
             });
-            html += '<div class="item-desc">阵法被动御敌：魔修潜入自动反制并缴获其储物袋。</div></div>';
+            var actForm = GAME.Cave2.activeFormation();
+            if (actForm && actForm.upkeep) {
+                html += '<div class="item-desc">【' + actForm.name + '】月耗 ' + actForm.upkeep +
+                    ' 灵石——阵法持续耗养，撑不住便自行崩散。长关可入阵而修：心境增速翻快，闭关期间外敌不得扰。</div>';
+            } else {
+                html += '<div class="item-desc">阵法被动御敌：魔修潜入自动反制并缴获其储物袋。</div>';
+            }
+            html += '</div>';
+
+            // 寰尘岛：碎星海深处的隐秘灵岛（周天星斗大阵的所在）
+            if (GAME.Cave2.atStarSea()) {
+                html += '<div style="padding:6px 0;"><div><span class="gold">寰尘岛</span></div>';
+                if (p.huanchen) {
+                    html += '<div class="item-desc">你已在寰尘岛上。岛心那座周天星斗大阵，可供长关入阵而修。</div>';
+                } else {
+                    var hChk = GAME.Cave2.canUnlockHuanchen();
+                    html += '<div class="item-desc">碎星海深处藏着一座无鸟无兽的荒岛——传说岛心留着一座上古大阵。' +
+                        (hChk.ok ? '你已摸到岛影，寻岛与落脚需灵石 2000 枚。' : hChk.why) + '</div>' +
+                        '<button id="btn-cave2-huanchen" class="btn-gold" style="margin-top:4px;"' +
+                        (hChk.ok ? "" : " disabled") + '>寻访寰尘岛</button>';
+                }
+                html += '</div>';
+            }
         }
         this.$("cave2-block").innerHTML = html;
 
@@ -1419,6 +1444,8 @@ GAME.UI = {
             var b = self.$("btn-cave2-form" + i);
             if (b) b.onclick = function () { GAME.Cave2.setFormation(f.id); };
         });
+        var bHuan = self.$("btn-cave2-huanchen");
+        if (bHuan) bHuan.onclick = function () { GAME.Cave2.unlockHuanchen(); self.renderCave2(); };
         var bRepair = self.$("btn-cave2-repair");
         if (bRepair) bRepair.onclick = function () { GAME.DemonWar.repairTeleport(); };
         var bEscape = self.$("btn-cave2-escape");
@@ -1444,6 +1471,27 @@ GAME.UI = {
     },
 
     // ---------- 灵宠/傀儡：机关傀儡工坊 + 噬金虫进化树 ----------
+    /* ---------- 傀儡编制草稿（UI 层暂存，点「列阵参战」才写入 p.puppetArmy） ---------- */
+    _puppetDraft: null,
+    puppetDraft: function () {
+        if (!this._puppetDraft) {
+            var a = (GAME.Puppet && GAME.Puppet.army()) || [];
+            this._puppetDraft = a.map(function (x) { return { type: x.type, count: x.count }; });
+        }
+        return this._puppetDraft;
+    },
+    puppetDraftCount: function (key) {
+        var c = 0, d = this.puppetDraft();
+        for (var i = 0; i < d.length; i++) if (d[i].type === key) c += d[i].count;
+        return c;
+    },
+    puppetDraftSet: function (key, count) {
+        var d = this.puppetDraft().filter(function (x) { return x.type !== key; });
+        if (count > 0) d.push({ type: key, count: count });
+        this._puppetDraft = d;
+        this.renderPuppet();
+    },
+
     renderPuppet: function () {
         if (!GAME.Puppet) return;
         var self = this, p = GAME.State.p();
@@ -1474,10 +1522,32 @@ GAME.UI = {
                 });
             }
         });
-        var owned = cnt("puppet_gongjian") + cnt("puppet_julang");
+        // 傀儡编制（混编军团）：可混搭不同型号，点「列阵参战」才生效
+        var cap = GAME.Puppet.maxSpirit();
+        var draftCost = GAME.Puppet.armyCost(this.puppetDraft());
+        var ownedTotal = 0;
+        html += '<div style="padding:6px 0;border-bottom:1px dashed var(--bd);">' +
+            '<div><span class="gold">傀儡编制（混编军团）</span>' +
+            '<span class="item-desc">　神识上限 ' + cap + ' SP</span></div>';
+        Object.keys(GAME.DATA.PUPPETS).forEach(function (key) {
+            var def = GAME.DATA.PUPPETS[key];
+            var own = cnt(def.id);
+            if (!own) return;
+            ownedTotal += own;
+            var cur = self.puppetDraftCount(key);
+            html += '<div style="margin:3px 0;">' +
+                '<span class="item-desc">' + def.name + '　存 ' + own + ' 具｜每具占 ' + def.spiritCost +
+                ' SP，齐射 +' + GAME.Puppet.volleyOf(def) + '</span><br>' +
+                '<button id="btn-puppet-add-' + key + '" class="small-btn"' + (cur >= own ? " disabled" : "") + '>＋</button>' +
+                '<button id="btn-puppet-sub-' + key + '" class="small-btn"' + (cur <= 0 ? " disabled" : "") + '>－</button>' +
+                '<span class="item-desc">　列阵 ' + cur + ' 具</span></div>';
+        });
         html += '<button id="btn-puppet-activate" class="small-btn btn-gold" style="margin-top:4px;"' +
-            (owned < 1 ? " disabled" : "") + '>神识驭傀·列阵参战</button>' +
-            '<span class="item-desc">　现有 ' + owned + ' 具，斗法时齐射（每具 +' + GAME.Puppet.PUPPET_VOLLEY_PER + '）</span></div>';
+            (ownedTotal < 1 ? " disabled" : "") + '>列阵参战</button>' +
+            '<button id="btn-puppet-auto" class="small-btn" style="margin-top:4px;"' +
+            (ownedTotal < 1 ? " disabled" : "") + '>一键列阵</button>' +
+            '<span class="item-desc">　当前编制占用 ' + draftCost + '/' + cap + ' SP' +
+            (draftCost > cap ? '（超了——按神识上限从最贵的一档开始舍弃）' : '') + '</span></div>';
         // 噬金虫进化树（三阶：卵 → 幼虫 → 成虫 → 虫王）
         var In = GAME.DATA.INSECT || {};
         var hatchNeed = (In.HATCH && In.HATCH.liquid) || 2;
@@ -1506,7 +1576,27 @@ GAME.UI = {
             if (b) b.onclick = function () { GAME.Puppet.build(key); };
         });
         var bAct = self.$("btn-puppet-activate");
-        if (bAct) bAct.onclick = function () { GAME.Puppet.activate(GAME.Puppet.MAX_CONTROL); };
+        if (bAct) bAct.onclick = function () {
+            GAME.Puppet.activate(self.puppetDraft());
+            self.renderPuppet();
+        };
+        var bAuto = self.$("btn-puppet-auto");
+        if (bAuto) bAuto.onclick = function () {
+            GAME.Puppet.activateAll();
+            self._puppetDraft = null;   // 草稿重置为实际编制
+            self.renderPuppet();
+        };
+        Object.keys(GAME.DATA.PUPPETS).forEach(function (key) {
+            var bAdd = self.$("btn-puppet-add-" + key);
+            if (bAdd) bAdd.onclick = function () {
+                var own = GAME.State.countItem(GAME.DATA.PUPPETS[key].id);
+                self.puppetDraftSet(key, Math.min(own, self.puppetDraftCount(key) + 1));
+            };
+            var bSub = self.$("btn-puppet-sub-" + key);
+            if (bSub) bSub.onclick = function () {
+                self.puppetDraftSet(key, Math.max(0, self.puppetDraftCount(key) - 1));
+            };
+        });
         var bHat = self.$("btn-shichong-hatch");
         if (bHat) bHat.onclick = function () { GAME.Insect.hatch(); };
         var bEvo = self.$("btn-shichong-evolve");
@@ -1549,6 +1639,32 @@ GAME.UI = {
         var p = GAME.State.p();
         if (this.tab !== "sect" || p.isDead || p.combat) return;  // 可见性由 applyPanels 统一控制
         var self = this;
+
+        // 三阵营声望与追杀令（结丹篇）：容器在 index.html 的 #sect-faction
+        var fbox = this.$("sect-faction");
+        if (fbox) {
+            if (!GAME.Faction) {
+                fbox.innerHTML = "";
+            } else {
+                var fh = '<h3>三阵营声望</h3>';
+                GAME.DATA.FACTIONS.forEach(function (f) {
+                    var v = GAME.Faction.standing(p, f.id);
+                    var cls = v >= 30 ? "faction-good" : (v <= GAME.DATA.FACTION_HUNT_THRESHOLD ? "faction-bad" : "item-desc");
+                    fh += '<div class="item-row">' +
+                        '<div style="flex:1;min-width:0;">' +
+                        '<span class="' + cls + '">' + f.name + '（' + f.camp + '）</span>' +
+                        '<div class="item-desc">' + f.desc + '</div></div>' +
+                        '<div class="item-right" style="max-width:58%;flex-wrap:wrap;">' +
+                        '<span class="' + cls + '">' + (v > 0 ? "+" + v : String(v)) + '</span></div></div>';
+                });
+                if (p.factionHunt) {
+                    fh += '<div class="faction-bad">' + GAME.Faction.huntLabel(p) +
+                        '——悬赏尚未撤下。见闻录里那盏亮着的灯，都可能是等着你露头的人。</div>';
+                }
+                fbox.innerHTML = fh;
+            }
+        }
+
         var box = this.$("sect-missions");
         box.innerHTML = "";
         GAME.DATA.CONTENT.MISSIONS.forEach(function (m) {
@@ -2529,6 +2645,29 @@ GAME.UI = {
         var box = this.$("skill-list");
         if (!box) return;
         box.innerHTML = "";
+        // 道途行：结丹功成时择定的法修/体修（一经择定不可更改）
+        if (GAME.Path) {
+            var pathRow = document.createElement("div");
+            pathRow.className = "item-row";
+            var pl = document.createElement("div");
+            pl.innerHTML = '<span class="q-极品">道途</span> <span class="item-desc">[根本]</span>' +
+                '<div class="item-desc">' + (p.pathChosen ? GAME.Path.name(p) : "未定（结丹后金丹阴阳面自分）") +
+                (p.pathChosen ? "　" + GAME.Path.desc(p) : "") + '</div>';
+            pathRow.appendChild(pl);
+            box.appendChild(pathRow);
+        }
+        // 心魔侵染行（结丹后随夺舍事件起伏；侵染会放大突破时的反噬伤害）
+        if (GAME.Seize && GAME.Seize.label(p)) {
+            var xmRow = document.createElement("div");
+            xmRow.className = "item-row";
+            var xl = document.createElement("div");
+            xl.innerHTML = '<span class="q-极品">心魔</span> <span class="item-desc">[侵染]</span>' +
+                '<div class="item-desc">' + GAME.Seize.label(p) + '——突破时反噬伤害 +' +
+                Math.round(GAME.Seize.level(p) * GAME.DATA.SEIZE.levelDmgPer * 100) +
+                '%（《不动镇魂诀》可镇散，护山大阵可逼退）</div>';
+            xmRow.appendChild(xl);
+            box.appendChild(xmRow);
+        }
         var codex = (GAME.DATA.SKILL_CODEX || []);
         var self = this;
 
@@ -2538,7 +2677,14 @@ GAME.UI = {
             if (e.spell) {
                 learned = !!(p.spells && p.spells[e.spell]);
                 var sp = GAME.DATA.SPELLS[e.spell];
-                if (sp) extra = sp.school + "　" + (sp.dmg ? sp.dmg + " 伤 / 冷却 " + sp.cd + " 回合" : (sp.dodge ? "闪避 " + (sp.dodge * 100) + "%" : (sp.disguise ? "伪装 " + sp.disguise + " 层" : "神识法门")));
+                if (sp) {
+                    if (sp.dmg) extra = sp.school + "　" + sp.dmg + " 伤 / 冷却 " + sp.cd + " 回合";
+                    else if (sp.dodge) extra = sp.school + "　闪避 " + (sp.dodge * 100) + "%";
+                    else if (sp.disguise) extra = sp.school + "　伪装 " + sp.disguise + " 层";
+                    else if (sp.atkBonus) extra = sp.school + "　被动 · 攻击 +" + sp.atkBonus + (sp.recoilMul && sp.recoilMul < 1 ? "，突破反噬 ×" + sp.recoilMul : "") + (sp.tiOnly ? "（仅体修）" : "");
+                    else if (sp.recoilMul || sp.immuneChance) extra = sp.school + "　被动 · 心魔劫反噬 ×" + (sp.recoilMul || 1) + (sp.immuneChance ? "，夺舍镇散 " + Math.round(sp.immuneChance * 100) + "%" : "");
+                    else extra = sp.school + "　被动法门";
+                }
             } else if (e.skill) {
                 learned = !!(p.skills && p.skills[e.skill]);
                 if (e.skill === "skill_manli") extra = "被动 · 攻击 +3（永久）";

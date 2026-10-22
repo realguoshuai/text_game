@@ -78,5 +78,7 @@ GAME.DATA.foundationMaxSpirit = function (p) {
     var baseSp = (realm && realm.sp != null) ? realm.sp : (realm ? realm.spirit : 15);
     // 《三转归元功》散功逆转：每转神识上限永久 +20%
     var mul = 1 + (p.threeTurnCount || 0) * ((GAME.DATA.SANZHUAN && GAME.DATA.SANZHUAN.statGain) || 0.20);
-    return Math.round((baseSp + (p.spiritBonus || 0)) * mul);
+    // 结丹道途：体修以神识换筋骨——上限 ×0.7；法修为基准不作增减（道途系数唯一出口 GAME.Path.spiritMul）
+    var pathMul = (GAME.Path && GAME.Path.spiritMul) ? GAME.Path.spiritMul(p) : 1;
+    return Math.round((baseSp + (p.spiritBonus || 0)) * mul * pathMul);
 };

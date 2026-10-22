@@ -53,6 +53,10 @@ GAME.DATA.FORMATIONS = [
     { id: "none",  name: "无阵",           cost: 0,   repelChance: 0 },
     { id: "wuxing",name: "颠倒五行阵残阵", cost: 300, repelChance: 0.5 },
     { id: "dawan", name: "大五行阵（补全）", cost: 900, repelChance: 0.8 },
+    /* 周天星斗大阵：寰尘岛上的上古遗物（where 决定布阵地点）。
+     * upkeep = 月耗灵石（阵法持续耗养，养不起则阵散）；
+     * seclude = 可行「阵法长关」——心境增速翻快，且闭关期间外敌不得扰。 */
+    { id: "zhouxing", name: "周天星斗大阵", cost: 3000, repelChance: 0.95, upkeep: 20, where: "huanchen", seclude: true },
 ];
 
 GAME.Cave2 = {
@@ -144,21 +148,86 @@ GAME.Cave2 = {
     },
 
     // ---------- 护山大阵：布置/升级 ----------
+    // 布阵门控唯一出口：canSetFormation 供 UI 与执行读同一份判定
+    canSetFormation: function (form) {
+        var p = GAME.State.p();
+        if (!form) return { ok: false, why: "无此阵。" };
+        if (form.where === "huanchen" && !p.huanchen) {
+            return { ok: false, why: "周天星斗大阵是寰尘岛上的上古遗物——先寻到那座岛。" };
+        }
+        if (p.formation === form.id) return { ok: false, why: "此阵已布。" };
+        if (p.spiritStones < form.cost) {
+            return { ok: false, why: "布置" + form.name + "需 " + form.cost + " 枚灵石。" };
+        }
+        return { ok: true, why: "" };
+    },
+
     setFormation: function (formId) {
         var p = GAME.State.p();
         var form = null;
         GAME.DATA.FORMATIONS.forEach(function (f) { if (f.id === formId) form = f; });
         if (!form) return;
         if (p.realmIndex <= GAME.DATA.ZHUJI_GATE_INDEX) { GAME.UI.log("筑基之前，护山大阵无从谈起。", "system"); return; }
-        if (p.formation === formId) { GAME.UI.log("此阵已布。", "system"); return; }
-        if (p.spiritStones < form.cost) {
-            GAME.UI.log("布置" + form.name + "需 " + form.cost + " 枚灵石。", "system");
-            return;
-        }
+        var chk = this.canSetFormation(form);
+        if (!chk.ok) { GAME.UI.log(chk.why, "system"); return; }
         p.spiritStones -= form.cost;
         p.formation = formId;
         GAME.UI.log("阵旗插遍灵峰八方——【" + form.name + "】轰然启动，被动御敌（反制率 " + Math.round(form.repelChance * 100) + "%）！", "success");
         GAME.UI.updateUI();
+    },
+
+    // ---------- 大阵查询 ----------
+    formationDef: function (formId) {
+        var list = GAME.DATA.FORMATIONS || [], f = null;
+        for (var i = 0; i < list.length; i++) if (list[i].id === formId) f = list[i];
+        return f;
+    },
+    activeFormation: function () {
+        var p = GAME.State.p();
+        return this.formationDef(p.formation || "none");
+    },
+
+    // ---------- 寰尘岛：碎星海深处的隐秘灵岛（周天星斗大阵的所在） ----------
+    atStarSea: function () {
+        var p = GAME.State.p();
+        if (GAME.Map && GAME.Map.chapterOf) return GAME.Map.chapterOf(p.realmIndex, p.location) === "star";
+        return p.location === "luanxing_hai";
+    },
+    canUnlockHuanchen: function () {
+        var p = GAME.State.p();
+        if (p.huanchen) return { ok: false, why: "你已在寰尘岛上。" };
+        if (p.realmIndex < 18) return { ok: false, why: "结丹后期方有横渡万里、寻访荒岛的手段。" };
+        if (!this.atStarSea()) return { ok: false, why: "寰尘岛在碎星海深处——先抵达碎星海。" };
+        if (p.spiritStones < 2000) return { ok: false, why: "寻岛与落脚需灵石 2000 枚，囊中羞涩。" };
+        return { ok: true, why: "" };
+    },
+    unlockHuanchen: function () {
+        var p = GAME.State.p();
+        var chk = this.canUnlockHuanchen();
+        if (!chk.ok) { GAME.UI.log("寰尘岛不可得——" + chk.why, "system"); return false; }
+        p.spiritStones -= 2000;
+        p.huanchen = true;
+        GAME.UI.log("你在碎星海面遍寻无果，直到某夜神识扫过一片浮沙——沙下有石，石下有岛。你踏上寰尘岛的一刻，脚下尘土自行排开。", "success");
+        if (GAME.Chronicle) GAME.Chronicle.narrate("huanchen_island", p);
+        GAME.UI.updateUI();
+        return true;
+    },
+
+    // ---------- 阵法月耗：阵法持续耗养灵石，养不起则阵散 ----------
+    tickUpkeep: function (months) {
+        var p = GAME.State.p();
+        var form = this.activeFormation();
+        if (!form || !form.upkeep) return true;
+        var cost = form.upkeep * months;
+        if (p.spiritStones >= cost) {
+            p.spiritStones -= cost;
+            return true;
+        }
+        // 养不起：扣光余资，阵法崩散
+        p.spiritStones = 0;
+        p.formation = "none";
+        GAME.UI.log("阵旗上的灵石耗尽——【" + form.name + "】失了依托，阵光涣散，悄然崩散！", "danger");
+        return false;
     },
 
     // ---------- 魔修/散修潜入：阵法自动反制 ----------
