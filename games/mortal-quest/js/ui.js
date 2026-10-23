@@ -270,6 +270,10 @@ GAME.UI = {
             }
             var entry = document.createElement("div");
             entry.className = "log-entry log-" + type;
+            // 新条目一次性闪光：好事（机缘/获物）金光、坏事（凶险/警讯）红光，
+            // 只在新建节点时触发一次——折叠合并挪动旧节点不会重放动画
+            if (type === "success" || type === "loot") entry.className += " log-flash-good";
+            else if (type === "danger" || type === "warning") entry.className += " log-flash-bad";
             // 时间戳单独一层：与正文同色时，一屏读下来像糊在一起
             var stamp = document.createElement("span");
             stamp.className = "log-time";

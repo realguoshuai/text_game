@@ -3296,6 +3296,33 @@ body.theme-light .actions > button.act-seal em { color: #8A3428; }
 body.theme-light .boon-btn.boon-on { background: rgba(140,94,36,.14); border-color: #8C5E24; }
 body.theme-light .boon-btn em { color: #5C4B3A; }
 
+/* ================= 见闻录新条目闪光（好事金光/坏事红光，仅新建时播一次） ================= */
+.log-entry.log-flash-good { animation: logFlashGood 2.4s ease-out 1; }
+.log-entry.log-flash-bad  { animation: logFlashBad  2.4s ease-out 1; }
+@keyframes logFlashGood {
+    0%   { background-color: rgba(200,162,90,.42); box-shadow: 0 0 10px rgba(226,198,140,.45); }
+    60%  { background-color: rgba(200,162,90,.16); box-shadow: 0 0 5px rgba(226,198,140,.20); }
+    100% { background-color: transparent; box-shadow: none; }
+}
+@keyframes logFlashBad {
+    0%   { background-color: rgba(163,52,31,.40); box-shadow: 0 0 10px rgba(196,85,58,.40); }
+    60%  { background-color: rgba(163,52,31,.15); box-shadow: 0 0 5px rgba(196,85,58,.18); }
+    100% { background-color: transparent; box-shadow: none; }
+}
+/* 浅色：同色系压淡，墨字纸面上不打眼刺目（写在暗色之后，body.theme-light 压过） */
+body.theme-light .log-entry.log-flash-good { animation-name: logFlashGoodLight; }
+body.theme-light .log-entry.log-flash-bad  { animation-name: logFlashBadLight; }
+@keyframes logFlashGoodLight {
+    0%   { background-color: rgba(140,94,36,.28); box-shadow: 0 0 8px rgba(140,94,36,.25); }
+    60%  { background-color: rgba(140,94,36,.10); box-shadow: none; }
+    100% { background-color: transparent; box-shadow: none; }
+}
+@keyframes logFlashBadLight {
+    0%   { background-color: rgba(138,52,40,.24); box-shadow: 0 0 8px rgba(138,52,40,.20); }
+    60%  { background-color: rgba(138,52,40,.09); box-shadow: none; }
+    100% { background-color: transparent; box-shadow: none; }
+}
+
 /* ================= 突破就绪高亮（修为满 → 尝试突破按钮呼吸提醒，深浅两套） ================= */
 .actions > button.bt-ready {
     border-color: #c8a25a;
