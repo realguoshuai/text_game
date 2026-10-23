@@ -37,7 +37,10 @@ GAME.Market = {
             // 怀璧其罪：觊觎度 ≥80 时，离市即被结丹修士神识锁定
             if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
         }
-        GAME.UI.updateUI();
+        // 动身抵达坊市：左栏自动切到「游历 → 市集」货架；离市则原地刷新
+        // （无头测试桩可能不提供 switchTab，退回 updateUI）
+        if (p.atMarket && !p.combat && GAME.UI.switchTab) GAME.UI.switchTab("market");
+        else GAME.UI.updateUI();
     },
 
     // ---------- 换货：按所在地货源池权重抽取，价格 ±20% 浮动 ----------

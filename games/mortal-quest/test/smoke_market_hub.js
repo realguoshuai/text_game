@@ -272,10 +272,31 @@ logged.length = 0;
 G.Core.resolveEventOutcomes([{ chance: 1, type: 'exp', text: '吐纳竟有所得。', amount: [2, 2] }]);
 ok('得修为记【机缘】：type=success', logged.some(x => x.type === 'success'));
 
-// 外出历练即离市：atMarket 必须复位（否则按钮卡「已在坊市中」）
+// 一次掉落多件 → 合并成一行【获物】，不刷屏
+logged.length = 0;
+G.Core.resolveEventOutcomes([{ chance: 1, type: 'loot', text: '洞中遗物！', table: [
+    { id: 'pill_jinsui', chance: 1, qty: [1, 1] },
+    { id: 'talisman_hushen', chance: 1, qty: [1, 1] },
+] }]);
+const gotLines = logged.filter(x => /^获得/.test(x.msg));
+ok('多件掉落合并为一行【获物】', gotLines.length === 1 &&
+    /、/.test(gotLines[0].msg) && /金髓丸/.test(gotLines[0].msg) && /护身符/.test(gotLines[0].msg));
+
+// 外出历练即离市：atMarket 复位，左栏从市集切回大地图
 G.State.p().atMarket = true;
-try { G.Core.explore(); } catch (e) { /* 历练后续可能开战，不影响复位断言 */ }
+U.tab = 'market';
+try { G.Core.explore(); } catch (e) { /* 历练后续可能开战，不影响复位/切页断言 */ }
 ok('外出历练后 atMarket 复位为 false', G.State.p().atMarket === false);
+ok('外出历练：左栏从市集切回大地图', U.tab === 'map');
+
+// 闭关入定同样离市，并让左栏从市集切回洞府
+G.State.p().atMarket = true;
+G.State.p().pendingEvent = null;
+G.State.p().combat = null;
+U.tab = 'market';
+try { G.Core.meditate(); } catch (e) { /* 月度结算可能触发别的事，不影响复位/切页断言 */ }
+ok('闭关打坐后 atMarket 复位为 false', G.State.p().atMarket === false);
+ok('闭关：左栏从市集切回洞府', U.tab === 'home');
 U.log = origLog;
 
 /* ================= 汇总 ================= */

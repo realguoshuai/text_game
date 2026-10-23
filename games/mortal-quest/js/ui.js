@@ -124,6 +124,20 @@ GAME.UI = {
         this.updateUI();
     },
 
+    /* 中栏核心行动（历练/闭关）与左栏视图联动：
+     * ① 清掉「在坊市中」标记（否则人已回洞府，按钮仍卡在"已在坊市中"）；
+     * ② 左栏若正停在市集货架，跟随切回核心视图（历练→大地图，闭关→洞府）。
+     * tabName 省略时只做离市复位、不切页签。 */
+    leaveMarketTo: function (tabName) {
+        var p = GAME.State.p();
+        if (p && p.atMarket) {
+            p.atMarket = false;
+            if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
+        }
+        if (this.tab === "market" && tabName && this.TAB_MAP[tabName]) this.switchTab(tabName);
+        else this.updateUI();
+    },
+
     // ---------- 面板可见性：同一时刻只显一个，整页不溢出 ----------
     // 子面板：标签页(bag/alchemy/market/sect/black/ach/companion) + 紧急面板(combat/track/trial/event/mercy/mo)
     applyPanels: function () {

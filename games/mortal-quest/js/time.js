@@ -236,6 +236,9 @@ GAME.Time = {
                 " 月，到点务必准时收功，迟则生变。", "warning");
         }
 
+        // 入定即离市：清「在坊市中」标记，并让左栏从市集货架切回洞府视图
+        if (GAME.UI && GAME.UI.leaveMarketTo) GAME.UI.leaveMarketTo("home");
+
         var extra = (GAME.Home && GAME.Home.meditateExp) ? GAME.Home.meditateExp() : 0;
         if (opts.healOnly) {
             // 静坐疗伤：气血尽复、重伤标记得清，修为不增

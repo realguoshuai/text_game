@@ -1070,12 +1070,9 @@ GAME.Core = {
     explore: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat || p.pendingEvent) return;
-        // 外出历练即离开坊市：若还挂着「坊市停留」态，先复位，
-        // 否则人已回到幽篁谷，中栏按钮仍卡着「已在坊市中」
-        if (p.atMarket) {
-            p.atMarket = false;
-            if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
-        }
+        // 外出历练即离开坊市：清掉「在坊市中」标记，并让左栏从市集货架跟随回大地图。
+        // （若随后触发事件/战斗，applyPanels 的紧急面板优先级会自行接管左栏）
+        if (GAME.UI && GAME.UI.leaveMarketTo) GAME.UI.leaveMarketTo("map");
         var months = this.rand(1, 3);
         p.stats.explores += 1;
         GAME.UI.log("你背起储物袋外出历练，往返耗时 " + months + " 个月……", "system");
@@ -1231,9 +1228,10 @@ GAME.Core = {
         // 结局文案的日志类型按「实际得失」定，别一律 loot：
         // 只有真拿到道具/灵石才配【获物】；空手/脱险记【历练】，得修为记【机缘】。
         if (o.text) {
+            // 剧情描述按"情境"定色，别一律当【获物】：
+            // 得道具/灵石的分支，描述记【机缘】，具体战利品在下面合并成一行【获物】。
             var _lt = (o.type === "damage" || o.type === "combat") ? "danger"
-                : (o.type === "loot" || o.type === "stones") ? "loot"
-                : (o.type === "exp") ? "success"
+                : (o.type === "exp" || o.type === "loot" || o.type === "stones") ? "success"
                 : (o.type === "nothing") ? "venture"
                 : "info";
             GAME.UI.log(o.text, _lt);
@@ -1241,16 +1239,19 @@ GAME.Core = {
 
         switch (o.type) {
             case "loot":
+                // 同一次掉落的多个道具合并成一行，避免刷屏成「获得【A】」「获得【B】」碎片日志
+                var _got = [];
                 for (j = 0; j < o.table.length; j++) {
                     var g = o.table[j];
                     if (Math.random() < g.chance) {
                         var qty = this.rand(g.qty[0], g.qty[1]);
                         if (qty > 0) {
                             GAME.State.addItem(g.id, qty);
-                            GAME.UI.log("获得【" + GAME.DATA.ITEMS[g.id].name + "】×" + qty + "。", "loot");
+                            _got.push("【" + GAME.DATA.ITEMS[g.id].name + "】×" + qty);
                         }
                     }
                 }
+                if (_got.length) GAME.UI.log("获得" + _got.join("、") + "。", "loot");
                 break;
             case "stones":
                 var stones = this.rand(o.amount[0], o.amount[1]);
