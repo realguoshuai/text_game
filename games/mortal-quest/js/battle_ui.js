@@ -230,7 +230,9 @@ GAME.BattleUI = {
         var mainNm = (parts[0] || "").trim();
         var subNm = parts.slice(1).join(" · ").trim();
         if (!subNm) {
-            var foeKind = def.human ? "修士" : "妖兽";
+            // 人形立绘就别标「妖兽」——头像是散修、注脚写妖兽，图文又对不上
+            var isMan = !!def.human || (GAME.Art && GAME.Art.isHumanAvatar && GAME.Art.isHumanAvatar(c));
+            var foeKind = isMan ? "修士" : "妖兽";
             subNm = (c.def && c.def.majorRealm != null)
                 ? (this.MAJOR[c.monsterMajor] || "练气") + foeKind : foeKind;
         }
@@ -244,7 +246,18 @@ GAME.BattleUI = {
         if (foeGdBar) { foeGdBar.hidden = !(foeGd > 0); foeGdBar.classList.toggle("is-dim", !(foeGd > 0)); }
         this._txt("bp-foe-line", "攻 " + c.atk + "　防 " + def.def + "　速 " + c.speed + "　识 " + c.spirit +
             (c.affix ? "　｜　" + (c.affix === "berserk" ? "狂暴" : c.affix === "thickShell" ? "厚甲" : "夺舍残魂") : ""));
-        document.getElementById("bp-foe-img").src = GAME.Art ? GAME.Art.monsterPortrait(c) : "";
+        // 敌方头像：按「精确名 → 词根 → 类别」三级解析（见 js/art.js）。
+        // 拿的是主名（c.name 已在上面拆过），alt 一并写上，读屏与图挂了都还有话说。
+        var foeImg = document.getElementById("bp-foe-img");
+        if (foeImg) {
+            foeImg.src = GAME.Art ? GAME.Art.resolveEnemyAvatar(c) : "";
+            foeImg.alt = mainNm;
+            // 图没切好/文件缺失时退回通用妖物图，别让圆框空成一个黑洞
+            foeImg.onerror = function () {
+                this.onerror = null;
+                this.src = ((GAME.Art && GAME.Art.PORTRAIT_DIR) || "assets/portraits/") + "m_ape.jpg";
+            };
+        }
 
         // —— 战报 ——
         var logBox = document.getElementById("bp-log");
