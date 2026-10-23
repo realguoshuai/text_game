@@ -208,11 +208,15 @@ GAME.BattleUI = {
         var st = GAME.State.getStats();
 
         // —— 我方 ——
-        this._txt("bp-me-nm", p.name || p.alias || "无名散修");
+        // 左上角主名称优先用道号（如「沈小牧」），别只显示出身（药铺学徒）
+        this._txt("bp-me-nm", p.daoName || p.name || p.alias || "无名散修");
         this._txt("bp-me-tag", "【" + (r.name || "练气") + "】");
         this._bar("bp-me-hp", "bp-me-hp-t", p.currentHp, p.maxHp, "气血 ");
-        this._bar("bp-me-gd", "bp-me-gd-t", c.shield, 40, "罡气 ");
-        document.getElementById("bp-me-gdbar").classList.toggle("is-dim", !(c.shield > 0));
+        var meGd = c.shield || 0;
+        this._bar("bp-me-gd", "bp-me-gd-t", meGd, 40, "罡气 ");
+        // 罡气未激活（为 0）：整条隐藏，别常驻一个空槽
+        var meGdBar = document.getElementById("bp-me-gdbar");
+        if (meGdBar) { meGdBar.hidden = !(meGd > 0); meGdBar.classList.toggle("is-dim", !(meGd > 0)); }
         var meLine = "攻 " + st.atk + "　防 " + st.def + "　速 " + st.speed + "　识 " + st.spirit;
         if (p.companion && p.companion.maxHp) meLine += "　｜　玄傀 " + Math.max(0, p.companion.hp) + "/" + p.companion.maxHp;
         this._txt("bp-me-line", meLine);
@@ -233,8 +237,11 @@ GAME.BattleUI = {
         this._txt("bp-foe-nm", mainNm);
         this._txt("bp-foe-tag", "【" + subNm + "】");
         this._bar("bp-foe-hp", "bp-foe-hp-t", c.hp, c.maxHp, "气血 ");
-        this._bar("bp-foe-gd", "bp-foe-gd-t", 0, 40, "罡气 ");
-        document.getElementById("bp-foe-gdbar").classList.add("is-dim");
+        // 敌方罡气当前无独立模型（恒为 0）：整条隐藏，别常驻「罡气 0 / 40」空槽
+        var foeGd = c.foeShield || 0;
+        this._bar("bp-foe-gd", "bp-foe-gd-t", foeGd, 40, "罡气 ");
+        var foeGdBar = document.getElementById("bp-foe-gdbar");
+        if (foeGdBar) { foeGdBar.hidden = !(foeGd > 0); foeGdBar.classList.toggle("is-dim", !(foeGd > 0)); }
         this._txt("bp-foe-line", "攻 " + c.atk + "　防 " + def.def + "　速 " + c.speed + "　识 " + c.spirit +
             (c.affix ? "　｜　" + (c.affix === "berserk" ? "狂暴" : c.affix === "thickShell" ? "厚甲" : "夺舍残魂") : ""));
         document.getElementById("bp-foe-img").src = GAME.Art ? GAME.Art.monsterPortrait(c) : "";
@@ -264,6 +271,8 @@ GAME.BattleUI = {
             b.className = "bp-cmd";
             b.setAttribute("data-src", cmd.src);
             b.disabled = !src || src.disabled;
+            // 身边无符：与「术法（尚未习得）」同样置灰，别留着高亮大按钮骗点击
+            if (cmd.src === "btn-talisman" && self._talismanCount(p) === 0) b.disabled = true;
             b.innerHTML = '<b>' + cmd.name + '</b><em>' + self._sub(cmd.src, p, c) + "</em>";
             cmds.appendChild(b);
         });
@@ -280,6 +289,8 @@ GAME.BattleUI = {
         this.EXTRAS.forEach(function (id) {
             var src = document.getElementById(id);
             if (!src) return;
+            // 未解锁的旁门手段直接不渲染：新手期不剧透中后期机制，也避免挤到第二行
+            if (!self._chipVisible(id, p)) return;
             var b = document.createElement("button");
             b.className = "bp-chip";
             b.setAttribute("data-src", id);
@@ -292,14 +303,57 @@ GAME.BattleUI = {
         this._drawer(p, c);
     },
 
+    // 囊中符箓总数（战斗符箓）
+    _talismanCount: function (p) {
+        var n = 0, inv = (p && p.inventory) || {};
+        for (var k in inv) {
+            var it = GAME.DATA.ITEMS[k];
+            if (it && it.type === "talisman" && inv[k] > 0) n += inv[k];
+        }
+        return n;
+    },
+
+    // 旁门手段是否已解锁（按"拥有/习得"判定，与回合内外冷却无关）：
+    // 未解锁就不渲染按钮，杜绝新手期剧透与换行
+    _chipVisible: function (id, p) {
+        switch (id) {
+            case "btn-auto-combat":
+            case "btn-desperate":
+                return true;
+            case "btn-coat":          // 涂抹毒囊：需持有带毒性的暗器/毒囊
+                var inv = (p && p.inventory) || {};
+                for (var k in inv) {
+                    var it = GAME.DATA.ITEMS[k];
+                    if (it && it.type === "poison" && it.combat && it.combat.poison && inv[k] > 0) return true;
+                }
+                return false;
+            case "btn-detonate":      // 自爆法器：需装备法器
+                return !!p.artifact;
+            case "btn-fubao":         // 祭起符宝：需持有符宝
+                return GAME.State.countItem("fubao_lvhuang") > 0 || GAME.State.countItem("fubao_luohun") > 0;
+            case "btn-luoyan":        // 流烟步：需已习得
+                return !!(p.skills && p.skills.luoyan);
+            case "btn-blink":         // 眨眼剑法：需持有反光短剑
+                return !!(GAME.DATA.SKILLS && GAME.DATA.SKILLS.blink_sword &&
+                    GAME.State.countItem(GAME.DATA.SKILLS.blink_sword.item) > 0);
+            case "btn-companion-block":
+            case "btn-companion-smash":
+                return !!p.companion;
+            case "btn-insect-cloud":  // 噬金虫云：需成虫或虫王
+                return GAME.State.countItem("shijin_adult") > 0 || GAME.State.countItem("shijin_king") > 0;
+            default:
+                return true;
+        }
+    },
+
     _sub: function (srcId, p, c) {
-        if (srcId === "btn-attack") return "第 " + c.round + " 回合 · 抢先进招";
+        if (srcId === "btn-attack") {
+            // 先手文案必须跟速度走：别在"对方出手极快"的战报下写死"抢先进招"
+            var spd = (GAME.State.getStats && GAME.State.getStats().speed) || 0;
+            return "第 " + c.round + " 回合 · " + (spd >= (c.speed || 0) ? "抢先出招" : "后手接招");
+        }
         if (srcId === "btn-talisman") {
-            var n = 0, inv = p.inventory || {};
-            for (var k in inv) {
-                var it = GAME.DATA.ITEMS[k];
-                if (it && it.type === "talisman" && inv[k] > 0) n += inv[k];
-            }
+            var n = this._talismanCount(p);
             return n ? "身边 " + n + " 张" : "身边无符";
         }
         if (srcId === "btn-spell") {

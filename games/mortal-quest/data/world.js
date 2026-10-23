@@ -30,6 +30,9 @@ GAME.DATA.ORIGINS = [
     },
 ];
 
+/* —— 主角道号：顶栏「道号」与斗法页左上角主名称的统一来源（出身只作别称/起点差异） —— */
+GAME.DATA.DAO_NAME = "沈小牧";
+
 /* —— 炼丹：前期锁死——玄机子的看家本事不外传，练气三层才肯开口教 —— */
 GAME.DATA.ALCHEMY = {
     unlockRealm: 2,     // 练气三层（realmIndex 2）解锁丹炉

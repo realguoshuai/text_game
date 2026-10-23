@@ -61,8 +61,8 @@ GAME.Combat = {
         p.combat.puppetArmy = (GAME.Puppet && GAME.Puppet.army) ? GAME.Puppet.army().slice() : [];
         var s = GAME.State.getStats();
         GAME.UI.log("杀机骤现！你与【" + def.name + "】斗法起来！", "danger");
-        GAME.UI.log("（你：攻" + s.atk + " 防" + s.def + " 速" + s.speed + " 识" + s.spirit +
-            "｜对手：攻" + def.atk + " 防" + def.def + " 速" + def.speed + " 识" + def.spirit + "）", "system");
+        // 四维属性已在斗法页头像下方常驻显示（bp-me-line / bp-foe-line），
+        // 战报里再打一遍纯属重复刷屏——此处不再输出。
         // 《天眼术》：主动探查——开战即看破敌方气血底细与随身宝物成色
         if (p.spells && p.spells.tianyan_shu) {
             var topLoot = "", best = 0;

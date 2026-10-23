@@ -25,6 +25,7 @@ GAME.State = {
             originId: origin.id,
             name: origin.name || "",     // 姓名（由出身注入，如沈牧）
             alias: origin.alias || "",   // 别称（如二愣子）
+            daoName: (GAME.DATA && GAME.DATA.DAO_NAME) || "", // 道号（斗法页/顶栏主名称优先用它）
             clock: { year: st.ageYears || 16, month: st.ageMonths || 0, dailyCircles: 0 }, // 时间微观粒度（年/月/每日大周天计数）
             mp: 20, maxMp: 20,          // 法力（练气二层起 20/20，突破逐境 +10；斗法/施法消耗）
             stamina: 100, maxStamina: 100, // 体力（日常行动/战斗闪避消耗）

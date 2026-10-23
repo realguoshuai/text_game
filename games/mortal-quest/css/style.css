@@ -1947,7 +1947,7 @@ body.battle-folded .battle-page { display: none; }
 }
 .bp-gd.is-dim { opacity: .42; }
 .bp-line {
-    font-size: 11.5px; color: #93a89b; letter-spacing: .3px;
+    font-size: 11.5px; color: #9e9589; letter-spacing: .3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bp-center {
@@ -2034,9 +2034,9 @@ body.battle-folded .battle-page { display: none; }
     cursor: pointer;
 }
 .bp-cmd b { font-size: 16px; letter-spacing: 3px; text-indent: 3px; font-weight: normal; }
-.bp-cmd em { font-style: normal; font-size: 10.5px; color: #a3947a; letter-spacing: .3px; }
+.bp-cmd em { font-style: normal; font-size: 10.5px; color: #9e9589; letter-spacing: .3px; }
 .bp-cmd:hover:not(:disabled) { border-color: #c9a25e; color: #fff3d6; }
-.bp-cmd:disabled { opacity: .36; cursor: not-allowed; }
+.bp-cmd:disabled { opacity: .55; cursor: not-allowed; }
 .bp-cmd.on { border-color: #c9a25e; box-shadow: inset 0 0 18px rgba(220, 170, 80, .32); }
 .bp-cmd::after {
     content: ""; position: absolute; inset: 2px; border-radius: 2px;
@@ -2049,7 +2049,7 @@ body.battle-folded .battle-page { display: none; }
     border: 1px solid #5d5033; border-radius: 3px;
 }
 .bp-chip:hover:not(:disabled) { border-color: #c9a25e; color: #f5e6c6; }
-.bp-chip:disabled { opacity: .42; color: #7d7563; cursor: not-allowed; }
+.bp-chip:disabled { opacity: .55; color: #9e9589; cursor: not-allowed; }
 
 /* 收起后的召回条 */
 .bp-back {
