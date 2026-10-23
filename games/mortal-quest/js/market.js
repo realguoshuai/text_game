@@ -171,7 +171,7 @@ GAME.Market = {
         GAME.UI.updateUI();
     },
 
-    // ---------- 出售（只收凡俗杂物，核心重宝一律不卖） ----------
+    // ---------- 出售（凡俗杂物 + 百年灵药；千年灵药走劫杀事件） ----------
     sell: function (id) {
         var p = GAME.State.p();
         if (!p.atMarket || p.isDead) return;
@@ -183,12 +183,15 @@ GAME.Market = {
             GAME.UI.updateUI();
             return;
         }
-        var gain = this.sellPrice(item.price);
+        // 千年灵药：一露白就是杀局——常规兑换在此截断，交给 herbAlarm 走剧情与遭遇战
+        if (GAME.HerbAlarm && GAME.HerbAlarm.isHot(id)) { GAME.HerbAlarm.trigger(id, "market"); return; }
+        var gain = this.gainOf(id);
         GAME.State.removeItem(id);
         p.spiritStones += gain;
         GAME.UI.log("你将【" + item.name + "】卖给掌柜，得 " + gain + " 灵石。", "trade");
-        // 高年份药草出手，惹人觊觎（≥300 年 +25 / ≥1000 年 +60）
-        if (GAME.Bottle && item.type === "herb") GAME.Bottle.onSellHerb(id);
+        // 灵药出手要留味：百年灵药走药香泄露 + 黑市神识锁定；其余高年份药草走觊觎度
+        if (GAME.HerbAlarm && GAME.HerbAlarm.isCentury(id)) GAME.HerbAlarm.afterSellCentury(id);
+        else if (GAME.Bottle && item.type === "herb") GAME.Bottle.onSellHerb(id);
         GAME.Core.checkAchievements();
         GAME.UI.autoSave();
         GAME.UI.updateUI();
@@ -263,11 +266,24 @@ GAME.Market = {
     },
 
     // ---------- 是否可出售（唯一判据，谁家坊市都走这一把尺子） ----------
-    // ⛔ 只收凡俗杂物与废矿：丹药 / 符箓 / 法器 / 功法秘籍 / 灵药 / 傀儡主材 一律禁售。
-    //    筑基丹 400 灵石贱卖、千年灵药 100 灵石收走，等于把玩家的破境本钱骗走（用户实测踩坑）。
-    //    高阶灵药另有出口——地下黑市（价高但招觊觎），那是拿命换钱的路子，不是随手的杂物。
+    // ⛔ 只收凡俗杂物、废矿与两种灵药：丹药 / 符箓 / 法器 / 功法秘籍 / 傀儡主材 一律禁售。
+    //    筑基丹贱卖、升仙令贱卖，等于把玩家的破境本钱骗走（用户实测踩坑）。
+    //    灵药这一格本轮放开：百年灵药可换厚利（药香泄露 +30 的代价），
+    //    千年灵药"挂得上价、卖不出去"——一出手即触发劫杀事件（js/herbalarm.js）。
     SELLABLE_TYPES: { junk: true },
-    SELLABLE_IDS: { ore: true, junk_scrap: true },
+    SELLABLE_IDS: { ore: true, junk_scrap: true, herb_bainian: true, herb_qiannian: true },
+
+    // 专属收货价：百年灵药是硬通货，不能按杂物五折算（40×0.5=20，等于白送）
+    // 千年灵药也挂得上货架，但它根本卖不出去——见 canSell 下的注释
+    SELL_PRICE: { herb_bainian: 120 },
+
+    // 收货价唯一出口：有专属价走专属价，其余按基准价 × sellRatio
+    gainOf: function (id) {
+        var fixed = this.SELL_PRICE[id];
+        if (typeof fixed === "number") return fixed;
+        var item = GAME.DATA.ITEMS[id];
+        return item ? this.sellPrice(item.price) : 0;
+    },
 
     canSell: function (id) {
         var item = GAME.DATA.ITEMS[id];
@@ -276,5 +292,7 @@ GAME.Market = {
         if (item.noSell) return false;
         if (this.SELLABLE_TYPES[item.type]) return true;
         return !!this.SELLABLE_IDS[id];
+        // 注：herb_qiannian 在此为 true，只为让它在"出售"列表里看得见、点得着；
+        //     真正卖不卖得掉由 sell() 里的 HerbAlarm 拦截决定。
     },
 };

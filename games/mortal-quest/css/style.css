@@ -3557,3 +3557,23 @@ body.theme-light #map-actions .item-row.is-main button { box-shadow: 0 0 0 1px #
 }
 
 
+
+/* ================= 千年灵药出手 · 药香惊变（#herb-alarm-modal） =================
+ * 复用 .modal-mask / .modal-box / .modal-head / .event-choices，只补正文排版：
+ * 引文用左竖线夹注，旁白用次级灰，双按钮沿用 .btn-danger / .small-btn。
+ * 不改任何既有选择器，也不新增 --danger 之外的色值。 */
+.herb-alarm-body { padding: 14px 18px 16px; }
+.herb-alarm-quote {
+    font-size: 14px; line-height: 1.9; color: var(--text-strong);
+    border-left: 2px solid var(--danger-bd);
+    padding: 2px 0 2px 12px;
+    margin: 2px 0 12px;
+}
+.herb-alarm-note {
+    font-size: 13px; line-height: 1.7; color: var(--text-mute);
+    margin-bottom: 14px;
+}
+.herb-alarm-note .danger { color: var(--danger-tx); }
+body.theme-light .herb-alarm-quote { color: #3B2C1B; border-left-color: #A2351F; }
+body.theme-light .herb-alarm-note { color: #6B5A44; }
+body.theme-light .herb-alarm-note .danger { color: #8C2B1E; }

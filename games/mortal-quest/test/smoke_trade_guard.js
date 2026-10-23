@@ -119,8 +119,8 @@ U.updateUI();
 /* ================= ① 核心道具禁售 ================= */
 section('① 出售杂物：核心战略道具一律不上货架');
 const PROTECTED = [
-    ['pill_zhuji', '筑基丹'], ['pill_zhengpin', '正品筑基丹'], ['herb_qiannian', '千年灵药'],
-    ['herb_bainian', '百年灵药'], ['herb_xuanbing', '五百年玄冰花'], ['herb_longlin', '千年龙鳞果'],
+    ['pill_zhuji', '筑基丹'], ['pill_zhengpin', '正品筑基丹'],
+    ['herb_xuanbing', '五百年玄冰花'], ['herb_longlin', '千年龙鳞果'],
     ['pill_huichun', '回春散'], ['pill_huanglong', '黄龙丹'], ['pill_jinsui', '金髓丸'],
     ['talisman_huoqiu', '火球符'], ['artifact_qingyun', '下品法器'], ['skill_huoqiushu', '火球术秘籍'],
     ['recipe_ningyuan', '凝元丹方'], ['shengxian_ling', '升仙令'], ['beast_soul', '妖兽精魄'],
@@ -134,6 +134,13 @@ if (leaked.length) console.log('    漏网：' + leaked.join(', '));
 ok('废矿与凡俗杂物仍可出手（低阶矿石 / 废铁）',
     G.Market.canSell('ore') === true && G.Market.canSell('junk_scrap') === true);
 ok('灵石本身不可出售（货币除外）', G.Market.canSell('mid_stone') === false);
+// 本轮放开：百年灵药换厚利（代价是药香），千年灵药"挂得上价、卖不出去"（出手即劫杀）
+ok('百年灵药已放开出售', G.Market.canSell('herb_bainian') === true);
+ok('百年灵药走专属收货价 120（不按杂物五折）', G.Market.gainOf('herb_bainian') === 120);
+ok('千年灵药仍挂在货架上（点得着才有后续劫杀）', G.Market.canSell('herb_qiannian') === true);
+ok('高阶灵药仍全数禁售（玄冰花/龙鳞果/天灵果）',
+    G.Market.canSell('herb_xuanbing') === false && G.Market.canSell('herb_longlin') === false &&
+    G.Market.canSell('herb_tianling') === false);
 
 // 强行调用 sell 也必须被拦：不扣物、不给钱、日志说人话
 p.atMarket = true;

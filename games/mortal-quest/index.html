@@ -575,6 +575,23 @@
     </div>
 </div>
 
+<!-- 千年灵药出手：药香惊变（常规售出被拦截 → 剧情警告 → 强制遭遇战） -->
+<div id="herb-alarm-modal" class="modal-mask" style="display:none;" data-page-node-id="herb_alarm_modal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <span>药香惊变</span>
+        </div>
+        <div class="herb-alarm-body">
+            <div class="herb-alarm-quote">你刚取出千年灵药，浓郁药香瞬间弥漫整个掌柜阁楼。掌柜眼中闪过一丝贪婪，皮笑肉不笑地稳住你，暗中却早已捏碎了传音符……</div>
+            <div class="herb-alarm-note" id="herb-alarm-note"></div>
+            <div class="event-choices">
+                <button id="btn-herb-fight" class="btn-danger">拔剑迎战（生死斗）</button>
+                <button id="btn-herb-flee" class="small-btn">抛下灵药，夺门而逃</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 脚本按依赖顺序加载：数据层 -> 状态 -> 存档 -> 战斗 -> 核心 -> 坊市 -> 扩展模块 -> 界面 -->
 <script src="data/realms.js"></script>
 <script src="data/realms_foundation.js"></script>
@@ -619,6 +636,7 @@
 <script src="js/cultivation.js"></script>
 <script src="js/alchemy.js"></script>
 <script src="js/bottle.js"></script>
+<script src="js/herbalarm.js"></script>
 <script src="js/bonds.js"></script>
 <script src="js/dungeon_heisha.js"></script>
 <script src="js/secret_relic.js"></script>

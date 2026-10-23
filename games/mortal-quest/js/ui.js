@@ -163,6 +163,8 @@ GAME.UI = {
         // 兜底：未知页签回落大地图，避免整页空白
         if (!this.TAB_MAP[this.tab]) this.tab = "map";
         var visible = urgent || this.TAB_MAP[this.tab];
+        // 千年灵药惊变弹窗：独立于面板可见性（遮罩层），读档后也能凭存档里的 herbPending 弹回来
+        if (GAME.HerbAlarm && GAME.HerbAlarm.sync) GAME.HerbAlarm.sync();
 
         var self = this;
         ["map-panel", "bag-panel", "alchemy-panel", "market-panel", "home-panel", "sect-panel", "companion-panel",
@@ -1641,19 +1643,24 @@ GAME.UI = {
             if (!sellable.length) sellBox.innerHTML = '<div class="empty-tip">没有可出售之物。</div>';
             sellable.forEach(function (id) {
                 var item = GAME.DATA.ITEMS[id];
-                var gain = GAME.Market.sellPrice(item.price);
+                var hot = !!(GAME.HerbAlarm && GAME.HerbAlarm.isHot(id));
+                var gain = GAME.Market.gainOf(id);
                 var row = document.createElement("div");
                 row.className = "item-row";
                 var left = document.createElement("div");
-                left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + p.inventory[id];
+                // 灵药两行旁注：百年写清"卖完留味"，千年写清"卖不出去、只见血"
+                left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + p.inventory[id] +
+                    (hot ? '<div class="item-desc danger">重宝露白 · 一出手怕是要见血</div>'
+                        : (GAME.HerbAlarm && GAME.HerbAlarm.isCentury(id)
+                            ? '<div class="item-desc">药香压不住：出手后药香泄露 +30</div>' : ''));
                 var right = document.createElement("div");
                 right.className = "item-right";
                 var g = document.createElement("span");
                 g.className = "gold";
-                g.innerText = "+" + gain + "灵石";
+                g.innerText = hot ? "掌柜不敢收" : "+" + gain + "灵石";
                 var b = document.createElement("button");
-                b.className = "small-btn";
-                b.innerText = "出售";
+                b.className = "small-btn" + (hot ? " btn-danger" : "");
+                b.innerText = hot ? "出手" : "出售";
                 b.onclick = function () { GAME.Market.sell(id); };
                 right.appendChild(g);
                 right.appendChild(b);
@@ -2488,15 +2495,17 @@ GAME.UI = {
         sellable.forEach(function (id) {
             var row = document.createElement("div");
             row.className = "item-row";
+            var hot = !!(GAME.HerbAlarm && GAME.HerbAlarm.isHot(id));
             var left = document.createElement("div");
-            left.innerHTML = '<span class="q-' + GAME.DATA.ITEMS[id].quality + '">' + GAME.DATA.ITEMS[id].name + '</span> ×' + GAME.State.countItem(id);
+            left.innerHTML = '<span class="q-' + GAME.DATA.ITEMS[id].quality + '">' + GAME.DATA.ITEMS[id].name + '</span> ×' + GAME.State.countItem(id) +
+                (hot ? '<div class="item-desc danger">重宝露白 · 掌事只想要你的药，不想给钱</div>' : '');
             var right = document.createElement("div");
             right.className = "item-right";
             var g = document.createElement("span");
             g.className = "gold"; g.innerText = "黑市价 " + cfg[id] + "灵石";
             var b = document.createElement("button");
-            b.className = "small-btn btn-gold";
-            b.innerText = "销赃";
+            b.className = "small-btn" + (hot ? " btn-danger" : " btn-gold");
+            b.innerText = hot ? "出手" : "销赃";
             awayBtn(b);
             b.onclick = function () { GAME.BlackMarket.sellBlack(id); };
             right.appendChild(g); right.appendChild(b);
@@ -3228,16 +3237,18 @@ GAME.UI = {
             var item = GAME.DATA.ITEMS[id];
             var row = document.createElement("div");
             row.className = "item-row";
+            var hot = !!(GAME.HerbAlarm && GAME.HerbAlarm.isHot(id));
             var left = document.createElement("div");
-            left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + p.inventory[id];
+            left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + p.inventory[id] +
+                (hot ? '<div class="item-desc danger">重宝露白 · 一出手怕是要见血</div>' : '');
             var right = document.createElement("div");
             right.className = "item-right";
             var price = document.createElement("span");
             price.className = "gold";
-            price.innerText = GAME.Tainan.sellPrice(id) + " 灵石";
+            price.innerText = hot ? "不敢收" : GAME.Tainan.sellPrice(id) + " 灵石";
             var b = document.createElement("button");
-            b.className = "small-btn btn-gold";
-            b.innerText = "脱手";
+            b.className = "small-btn" + (hot ? " btn-danger" : " btn-gold");
+            b.innerText = hot ? "出手" : "脱手";
             b.onclick = function () { GAME.Tainan.sell(id); };
             right.appendChild(price); right.appendChild(b);
             row.appendChild(left); row.appendChild(right);

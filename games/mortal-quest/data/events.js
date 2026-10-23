@@ -84,6 +84,22 @@ GAME.DATA.MONSTERS = [
             { id:"talisman_huoqiu", chance:0.30, qty:[1,1] },
         ]
     },
+    // —— 新增（千年灵药露白）：筑基邪修半路截杀，夺药不成反被摸尸 ——
+    // 不入常规遭遇池，只由 js/herbalarm.js 的卖药事件召唤；败北走 routed 通用结算（折寿失财）
+    {
+        id:"herb_ambusher", name:"筑基邪修 · 血手屠三",
+        human:true, cultivator:true, majorRealm:1,
+        hp:420, atk:34, def:20, speed:12, spirit:32, exp:90,
+        stones:[120,240], killChance:0, loseAge:[2,4], loseStonePct:[0.3,0.5],
+        loot:[
+            { id:"herb_qiannian",    chance:0.25, qty:[1,1] },
+            { id:"talisman_danuoyi", chance:0.20, qty:[1,1] },
+            { id:"mid_stone",        chance:0.55, qty:[1,2] },
+            { id:"artifact_qingyuan",chance:0.10, qty:[1,1] },
+        ],
+        text:"血手屠三一身血腥气，出手皆是要害——他等在坊市外，等的就是你手里那株千年灵药。",
+    },
+
     {
         id:"mo_daifu", name:"玄机子 · 魔银手", human:true, bladeImmune:true, moEvent:true,
         hp:200, atk:24, def:12, speed:10, spirit:18, exp:0,

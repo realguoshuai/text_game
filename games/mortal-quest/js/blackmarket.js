@@ -153,12 +153,15 @@ GAME.BlackMarket = {
         var cfg = GAME.DATA.CONTENT.TRIAL.blackPrice;
         if (!cfg[herbId]) { GAME.UI.log("此物黑市不收。", "system"); GAME.UI.updateUI(); return; }
         if (GAME.State.countItem(herbId) < 1) return;
+        // 千年灵药：黑市掌事也吃不下这口——药香一出，等的不是价，是刀（见 js/herbalarm.js）
+        if (GAME.HerbAlarm && GAME.HerbAlarm.isHot(herbId)) { GAME.HerbAlarm.trigger(herbId, "black"); return; }
         GAME.State.removeItem(herbId);
         var price = cfg[herbId];
         p.spiritStones += price;
         GAME.UI.log("你于地下黑市脱手【" + GAME.DATA.ITEMS[herbId].name + "】，得 " + price + " 灵石（远高于坊市）。", "trade");
-        // 高阶灵药出手即惹觊觎——坊市已禁收灵药，这里是它唯一的变现口，也是唯一的招祸口
-        if (GAME.Bottle && GAME.Bottle.onSellHerb) GAME.Bottle.onSellHerb(herbId);
+        // 高阶灵药出手即惹觊觎（≥300 年 +25 / ≥1000 年 +60）；百年灵药另走药香泄露 + 神识锁定
+        if (GAME.HerbAlarm && GAME.HerbAlarm.isCentury(herbId)) GAME.HerbAlarm.afterSellCentury(herbId);
+        else if (GAME.Bottle && GAME.Bottle.onSellHerb) GAME.Bottle.onSellHerb(herbId);
 
         // 隐匿判定：煞气升概率，敛气等级降概率
         var failChance = 0.15 + p.shaQi * 0.02 - p.concealLevel * 0.12 -

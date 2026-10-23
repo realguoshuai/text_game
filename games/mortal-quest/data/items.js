@@ -21,8 +21,8 @@ GAME.DATA.ITEMS = {
 
     // —— 承露瓶产出（特殊材料，不入市、不可出售） ——
     liquid_green:  { id:"liquid_green",  name:"承露瓶绿液",  quality:"极品", type:"material", price:0, desc:"瓶中日月所凝，一滴可催熟百年灵药，五滴可催千年。" },
-    herb_bainian:  { id:"herb_bainian",  name:"百年灵药",    quality:"灵品", type:"herb",     price:40, desc:"绿液催熟所成，炼丹主材。亦可生嚼，草木清气小幅增修为——然药力暴烈、连服渐抗，远不及炼丹之效。", use:{ eatExp:5, eatMonths:1 } },
-    herb_qiannian: { id:"herb_qiannian", name:"千年灵药",    quality:"上品", type:"herb",     price:200, desc:"五滴绿液方可催熟，筑基丹必需主药。妖兽腹中偶有遗存。药性更猛，生嚼进益多于百年灵药，仍逊于丹药。", use:{ eatExp:15, eatMonths:1 } },
+    herb_bainian:  { id:"herb_bainian",  name:"百年灵药",    quality:"灵品", type:"herb",     price:40, desc:"绿液催熟所成，炼丹主材。亦可生嚼，草木清气小幅增修为——然药力暴烈、连服渐抗，远不及炼丹之效。坊市肯出厚价收之，只是出手之后药香难掩。", use:{ eatExp:5, eatMonths:1 } },
+    herb_qiannian: { id:"herb_qiannian", name:"千年灵药",    quality:"上品", type:"herb",     price:200, desc:"五滴绿液方可催熟，筑基丹必需主药。妖兽腹中偶有遗存。药性更猛，生嚼进益多于百年灵药，仍逊于丹药。药香一出满城皆闻——坊市与黑市都不敢当场收，只等你露白。", use:{ eatExp:15, eatMonths:1 } },
 
     // —— 丹药 ——
     pill_huanglong:{ id:"pill_huanglong", name:"黄龙丹", quality:"灵品", type:"pill", price:80,  desc:"药力浑厚，修为 +25。",   use:{ exp:25 } },

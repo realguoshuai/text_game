@@ -46,6 +46,9 @@ GAME.Tainan = {
     },
 
     sellPrice: function (id) {
+        // 有专属收货价的货品（百年灵药）走同一张嘴报价，别让散修坊市另报一个数
+        if (GAME.Market && GAME.Market.SELL_PRICE && typeof GAME.Market.SELL_PRICE[id] === "number")
+            return GAME.Market.SELL_PRICE[id];
         var item = GAME.DATA.ITEMS[id];
         if (!item) return 0;
         return Math.max(1, Math.round(item.price * this.cfg().sellRatio));
@@ -64,10 +67,13 @@ GAME.Tainan = {
         var p = GAME.State.p();
         if (!this.at() || p.isDead) return false;
         if (!GAME.State.countItem(id) || !this.canSell(id)) return false;
+        // 千年灵药：散修坊市同样不敢当场收——露白即招劫杀（与 GAME.Market 同一口径）
+        if (GAME.HerbAlarm && GAME.HerbAlarm.isHot(id)) { GAME.HerbAlarm.trigger(id, "tainan"); return false; }
         var gain = this.sellPrice(id);
         GAME.State.removeItem(id);
         p.spiritStones += gain;
         GAME.UI.log("你将【" + GAME.DATA.ITEMS[id].name + "】脱手，得 " + gain + " 枚灵石。", "trade");
+        if (GAME.HerbAlarm && GAME.HerbAlarm.isCentury(id)) GAME.HerbAlarm.afterSellCentury(id);
         GAME.Core.checkAchievements();
         GAME.UI.autoSave();
         GAME.UI.updateUI();

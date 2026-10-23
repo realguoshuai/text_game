@@ -537,7 +537,11 @@ GAME.Combat = {
         }
         if (Math.random() < chance) {
             GAME.UI.log("你御风而逃，成功甩脱【" + p.combat.name + "】！狼狈，但性命保住了。", "system");
-            return this.end();
+            var fctx = p.combat.ctx;
+            this.end();
+            // 千年灵药劫杀：遁走＝"逃跑"分支——人保住了，药囊在缠斗中脱手
+            if (fctx && fctx.type === "herbalarm" && GAME.HerbAlarm) GAME.HerbAlarm.afterCombat(false, fctx, "flee");
+            return;
         }
         GAME.UI.log("遁走失败！对方一记法术轰在你退路上，不得不回身再战！", "danger");
         this.enemyTurn();
@@ -781,7 +785,7 @@ GAME.Combat = {
 
         // 景阳城玄机世家主线 / 升仙大会擂台 / 血色禁地：直接入袋，交还对应模块继续剧情
         // （不走"杀/放"抉择——此三者由剧情验收，不是随机遭遇）
-        if (ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic")) {
+        if (ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic" || ctx.type === "herbalarm")) {
             p.spiritStones += stones;
             p.stats.kills += 1;
             this.grantLoot(def.loot, 1, def);
@@ -794,6 +798,7 @@ GAME.Combat = {
             else if (ctx.type === "relic") GAME.Relic.afterCombat(true, ctx);
             else if (ctx.type === "bonds") GAME.Bonds.nangongwanWin();
             else if (ctx.type === "hunt") GAME.Hunt.afterCombat(true, ctx);
+            else if (ctx.type === "herbalarm") GAME.HerbAlarm.afterCombat(true, ctx);
             else if (ctx.type === "war") GAME.Faction.warAfterCombat(true, ctx);
             else GAME.FZone.afterCombat(true, ctx);
             return;
@@ -851,7 +856,7 @@ GAME.Combat = {
         }
 
         // 玄机世家主线 / 升仙擂台 / 血色禁地：败北不判当场身陨（剧情尚有转圜），按常规折寿失财处理
-        var routed = !!ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic" || ctx.type === "war");
+        var routed = !!ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic" || ctx.type === "war" || ctx.type === "herbalarm");
 
         // 血色禁地：败北由禁地模块全权结算软着陆（玄傀护主背出 / 弃药保命），不走通用折寿失财
         if (routed && ctx.type === "fzone") {
@@ -920,6 +925,7 @@ GAME.Combat = {
         if (!p.isDead) {
             if (routed) {
                 if (ctx.type === "jiayuan") GAME.Jiayuan.afterCombat(false, ctx);
+                else if (ctx.type === "herbalarm") GAME.HerbAlarm.afterCombat(false, ctx);
                 else GAME.Tainan.afterCombat(false, ctx);
             } else {
                 this._settle();
