@@ -499,6 +499,7 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
 .log-info { color: var(--text); }
 .log-story { color: var(--gold-tx); border-left: 3px solid var(--gold); padding-left: 8px; }
 .log-loot { color: var(--gold); }
+.log-venture { color: var(--text-mute); }
 
 /* ---------- 窄屏 / 手机：放弃"锁一屏"，改为整页自然滚动，确保都能点到 ---------- */
 @media (max-width: 900px) {
@@ -1563,6 +1564,7 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
 .log-info    { color: #43331f; }
 .log-story   { color: #6d4a16; border-left: 2px solid #b08d57; padding-left: 8px; }
 .log-loot    { color: #8a5a1a; }
+.log-venture { color: #7b6550; }
 .log-moment  { background: rgba(176,141,87,.14); border: 1px solid #c8b28a; color: #5b4329; }
 
 /* ---------- 封面 ---------- */
@@ -2342,16 +2344,16 @@ details.dropdown .dd-body .btn-why { color: var(--warning); }
  * 用 nowrap + 省略号：放不下时截的是进度提示的尾巴，不是标题。 */
 .goal-main { flex: 1 1 130px; min-width: 0; display: flex; align-items: baseline; gap: 7px; }
 .goal-main b {
-    /* 不收缩：标题是这张卡唯一必须读完的信息，
-       放不下时该截的是旁边那句进度提示（"当前第 1 幕 / 共 6 幕"）。 */
+    /* 标题与描述都允许自然折行：横幅已是块级流（见文件末 .goal-banner 段），
+       再套 nowrap+省略号会把「前五幕已了——待你突破练气四层……」的尾部硬吞掉。 */
     flex: 0 0 auto; max-width: 100%; display: block;
     color: var(--text-strong); font-size: 13.5px; line-height: 1.45;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word;
 }
 .goal-hint {
     flex: 0 1 auto; min-width: 0; display: block; margin: 0;
     font-size: 11px; color: #AEA492;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word;
 }
 .goal-where { display: none; }
 /* 下一步：按钮与原因同一行，原因超长才折行（原来各占一行，白占 40px） */
@@ -3267,11 +3269,11 @@ body.theme-light .actions > button:disabled,
 body.theme-light .actions > details > summary.is-locked {
     background: #E8E2D5;
     border-color: #D2C8B8;
-    color: #7a6f63;
+    color: #756a5e;
     box-shadow: none;
 }
 body.theme-light .actions > button:disabled em,
-body.theme-light .actions > details > summary.is-locked em { color: #7a6f63; }
+body.theme-light .actions > details > summary.is-locked em { color: #756a5e; }
 body.theme-light .actions > .act-hero-btn {
     background: linear-gradient(180deg, #FAF6EE 0%, #EFE7DA 100%);
     border-color: #C4B59E;

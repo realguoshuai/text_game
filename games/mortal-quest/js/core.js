@@ -1070,6 +1070,12 @@ GAME.Core = {
     explore: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat || p.pendingEvent) return;
+        // 外出历练即离开坊市：若还挂着「坊市停留」态，先复位，
+        // 否则人已回到幽篁谷，中栏按钮仍卡着「已在坊市中」
+        if (p.atMarket) {
+            p.atMarket = false;
+            if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
+        }
         var months = this.rand(1, 3);
         p.stats.explores += 1;
         GAME.UI.log("你背起储物袋外出历练，往返耗时 " + months + " 个月……", "system");
@@ -1222,7 +1228,16 @@ GAME.Core = {
             roll -= outcomes[i].chance;
         }
 
-        if (o.text) GAME.UI.log(o.text, o.type === "damage" || o.type === "combat" ? "danger" : "loot");
+        // 结局文案的日志类型按「实际得失」定，别一律 loot：
+        // 只有真拿到道具/灵石才配【获物】；空手/脱险记【历练】，得修为记【机缘】。
+        if (o.text) {
+            var _lt = (o.type === "damage" || o.type === "combat") ? "danger"
+                : (o.type === "loot" || o.type === "stones") ? "loot"
+                : (o.type === "exp") ? "success"
+                : (o.type === "nothing") ? "venture"
+                : "info";
+            GAME.UI.log(o.text, _lt);
+        }
 
         switch (o.type) {
             case "loot":

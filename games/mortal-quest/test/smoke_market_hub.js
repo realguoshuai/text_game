@@ -250,6 +250,34 @@ p5.spiritStones = 150;
 U.updateUI();
 ok('灵石足 100：兑中阶灵石按钮可用', els['btn-exchange-stone'].disabled === false);
 
+/* ================= ⑥ 历练结算标签 & 离市复位 ================= */
+section('⑥ 历练结算标签 & 外出后坊市态复位');
+const p6 = G.State.createNewPlayer('wanderer');
+const logged = [];
+const origLog = U.log;
+U.log = function (msg, type) { logged.push({ msg: msg, type: type || 'info' }); };
+
+// nothing 结局 → 记【历练】(venture)，绝不落【获物】(loot)
+G.Core.resolveEventOutcomes([{ chance: 1, type: 'nothing', text: '药苗早被人采去，你空手而归。' }]);
+const lastNothing = logged[logged.length - 1] || {};
+ok('空手结局不标【获物】：type=venture', lastNothing.type === 'venture' && /空手而归/.test(lastNothing.msg || ''));
+
+// 真掉道具 → 仍记 loot
+logged.length = 0;
+G.Core.resolveEventOutcomes([{ chance: 1, type: 'loot', text: '竟有一株灵药！', table: [{ id: 'herb_bainian', chance: 1, qty: [1, 1] }] }]);
+ok('实得道具仍标【获物】：type=loot', logged.some(x => x.type === 'loot'));
+
+// 得修为 → 记【机缘】(success)，不是【获物】
+logged.length = 0;
+G.Core.resolveEventOutcomes([{ chance: 1, type: 'exp', text: '吐纳竟有所得。', amount: [2, 2] }]);
+ok('得修为记【机缘】：type=success', logged.some(x => x.type === 'success'));
+
+// 外出历练即离市：atMarket 必须复位（否则按钮卡「已在坊市中」）
+G.State.p().atMarket = true;
+try { G.Core.explore(); } catch (e) { /* 历练后续可能开战，不影响复位断言 */ }
+ok('外出历练后 atMarket 复位为 false', G.State.p().atMarket === false);
+U.log = origLog;
+
 /* ================= 汇总 ================= */
 console.log('\n' + '─'.repeat(46));
 console.log(`  结果：${pass} 通过 / ${fail} 失败`);

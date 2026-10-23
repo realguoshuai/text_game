@@ -286,7 +286,7 @@ GAME.UI = {
             entry.appendChild(stamp);
             // 语义标签：机缘/凶险/警讯/获物 前置加粗，深浅主题都靠各 type 自身的配色保辨识度；
             // 已带【突破成功】这类自带标签的消息不重复加
-            var TAGS = { success: "机缘", danger: "凶险", warning: "警讯", loot: "获物" };
+            var TAGS = { success: "机缘", danger: "凶险", warning: "警讯", loot: "获物", venture: "历练" };
             if (TAGS[type] && message.indexOf("【") !== 0) {
                 var tag = document.createElement("span");
                 tag.className = "log-tag";
@@ -1555,7 +1555,14 @@ GAME.UI = {
             var max = f.levels.length;
             var n = GAME.Home.next(f.id);
             var why = GAME.Home.canUpgrade(f.id);
-            var cur = lv > 0 ? f.levels[lv - 1].effect : "尚未开辟";
+            var p = GAME.State.p();
+            // 未开辟态按设施给具体语义：灵田别用「尚未开辟」（易与顶部药圃混淆），
+            // 丹房在练气三层开启丹炉前投入也是白搭——提前说清
+            var cur = lv > 0 ? f.levels[lv - 1].effect
+                : (f.id === "lingtian" ? "凡土药畦（未升阶）——打理药圃采收时可多收几株灵药" : "尚未开辟");
+            if (f.id === "danfang" && lv === 0 && p.realmIndex < 2) {
+                cur += "（需练气三层开启丹炉后生效）";
+            }
             var need = "已至顶阶";
             if (n) {
                 need = "灵石 " + n.stones + "　工期 " + n.months + " 月";
