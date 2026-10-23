@@ -3381,3 +3381,52 @@ body.theme-light .goal-banner[data-crisis="poison"] .goal-tag {
 }
 body.theme-light .goal-banner[data-crisis="poison"] .goal-main b { color: #8E2A1D; }
 body.theme-light .goal-banner[data-crisis="poison"] .goal-hint { color: #7A4438; }
+
+/* ================= 目标框「前往」书签按钮（.goal-go） =================
+ * 目标横幅原本只写"前往：某某"一句干话，玩家还得自己去左栏翻。
+ * 这里做成小印章式的微凸起书签：底纹极浅、下缘一道重影，点下去有回弹感。
+ * 暗色走暗金，浅色走羊皮纸 + 赭石描边（规则顺序：浅色必须写在暗色之后）。 */
+.goal-go {
+    display: inline-block; vertical-align: 1px;
+    margin: 0 0 0 2px; padding: 1px 8px 2px;
+    font-family: inherit; font-size: 11.5px; line-height: 1.55; letter-spacing: .2px;
+    color: #DCBB86; background: rgba(200,162,90,.10);
+    border: 1px solid rgba(200,162,90,.42); border-radius: 2px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 1px 2px rgba(0,0,0,.32);
+    cursor: pointer;
+    transition: color .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.goal-go:hover:not(:disabled) {
+    color: #F4E0B6; background: rgba(200,162,90,.24); border-color: rgba(226,198,140,.75);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 4px rgba(0,0,0,.38);
+}
+.goal-go:active:not(:disabled) {
+    box-shadow: inset 0 2px 3px rgba(0,0,0,.42);
+}
+/* 门槛未达：颜色压下去但仍可点——点它是"指路"，不是"闯关" */
+.goal-go.is-gated {
+    color: #C9A98A; background: rgba(160,120,80,.10);
+    border-color: rgba(180,140,96,.40); border-style: dashed;
+}
+.goal-go.is-gated:hover:not(:disabled) {
+    color: #EBCFA8; background: rgba(180,140,96,.20); border-color: rgba(210,170,120,.70);
+}
+/* 已在当地：彻底静音 */
+.goal-go:disabled {
+    color: #8E8A7E; background: transparent; border-color: rgba(140,130,110,.32);
+    box-shadow: none; cursor: default;
+}
+body.theme-light .goal-go {
+    color: #7A4E1B; background: #F5EAD6; border-color: #C9B18C;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 1px 1px rgba(60,45,30,.12);
+}
+body.theme-light .goal-go:hover:not(:disabled) {
+    color: #5A3612; background: #EEDFC0; border-color: #8C5E24;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 3px rgba(60,45,30,.18);
+}
+body.theme-light .goal-go.is-gated {
+    color: #8A5A1A; background: #F8F1E1; border-color: #CDB894; border-style: dashed;
+}
+body.theme-light .goal-go:disabled {
+    color: #9A9184; background: transparent; border-color: #D5C9B4; box-shadow: none;
+}

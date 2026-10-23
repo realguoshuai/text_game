@@ -64,13 +64,20 @@ GAME.Goals = {
                 if (p.jiayuanDone) {
                     return "玄机世家线索已断（剩 " + left + "），改走坊市 / 黑市求暖阳宝玉或高阶解毒丹";
                 }
-                return "剩 " + left + "，暖阳宝玉或高阶丹药可镇压；阴毒未解时长关会被拒，硬闭只会坐死在蒲团上";
+                return "剩 " + left + "，暖阳宝玉或高阶丹药可镇压（坊市 / 黑市皆有流通）；阴毒未解时长关会被拒，硬闭只会坐死在蒲团上";
             },
             where: function (p) {
                 if (GAME.Goals._has(p, "nuan_yang_bao_yu")) return "丹药";
                 if (p.location === "jiayuan_cheng" && !p.jiayuanDone) return "";   // 已在此地：正文已说明找谁
                 if (p.jiayuanDone) return "坊市 / 黑市";
                 return "景阳城 / 坊市 · 黑市";
+            },
+            // 「前往」按钮的落点：有解药就翻背包，否则先奔景阳城／市集黑市
+            whereTo: function (p) {
+                if (GAME.Goals._has(p, "nuan_yang_bao_yu")) return { kind: "tab", tab: "bag" };
+                if (p.location === "jiayuan_cheng" && !p.jiayuanDone) return null;
+                if (p.jiayuanDone) return { kind: "tab", tab: "market", sub: "black" };
+                return { kind: "map", node: "jiayuan_cheng" };
             }
         },
         {
@@ -81,7 +88,8 @@ GAME.Goals = {
             hint: function (p) {
                 return "剩 " + (p.shichong.months || 0) + " 个月，期限一到必有一战";
             },
-            where: "洞府"
+            where: "洞府",
+            whereTo: { kind: "tab", tab: "home" }
         },
         {
             id: "causal", urgent: true,
@@ -101,7 +109,8 @@ GAME.Goals = {
             hint: function (p) {
                 return "泄露 " + Math.floor(p.leak) + "/100，下月长老神识将掠过药园";
             },
-            where: "百草园"
+            where: "百草园",
+            whereTo: { kind: "tab", tab: "home" }   // 百草园在洞府页
         },
         {
             id: "risk", urgent: true,
@@ -141,20 +150,49 @@ GAME.Goals = {
             id: "tainan",
             when: function (p) { return !p.sectId; },
             done: function (p) { return !!(p.tainan && p.tainan.leitaiDone); },
-            text: "赴苍南小会，夺一席之地",
-            hint: function (p) {
-                var t = p.tainan || { leitai: 0 };
-                return "擂台已胜 " + (t.leitai || 0) + " 场，进前三方可得升仙令";
+            // 已握升仙令的玩家不该再被赶去擂台：原著里锈牌本身就是通行证，
+            // 「进前三方可得升仙令」是错的口径（擂台实际只发筑基丹），一并改掉。
+            text: function (p) {
+                return GAME.Goals._has(p, "shengxian_ling")
+                    ? "持升仙令赴苍南谷，免试拜入山门"
+                    : "赴苍南小会，夺一席之地";
             },
-            where: "苍南山"
+            hint: function (p) {
+                var G = GAME.Goals;
+                if (G._has(p, "shengxian_ling")) {
+                    return p.shengxianLore
+                        ? "锈牌即是通行令，不必再上擂台；你已参透「以令映纹」的口诀，验令长老另有厚赐"
+                        : "锈牌即是通行令，不必再上擂台；持令者连苍南谷外的掩形幻阵都可径直看破";
+                }
+                var t = p.tainan || { leitai: 0 };
+                return "擂台已胜 " + (t.leitai || 0) + " 场，进前三方可得筑基丹";
+            },
+            where: "苍南山",
+            whereTo: { kind: "map", node: "tainan_gu" }
         },
         {
             id: "joinsect",
             when: function () { return true; },
             done: function (p) { return !!p.sectId; },
-            text: "凭升仙令拜入宗门",
-            hint: function () { return "拜入后方可领月俸、换宗门贡献"; },
-            where: "宗门"
+            text: function (p) {
+                return GAME.Goals._has(p, "shengxian_ling")
+                    ? "至苍南谷出示升仙令，拜入青梧谷"
+                    : "凭升仙令拜入宗门";
+            },
+            hint: function (p) {
+                if (GAME.Goals._has(p, "shengxian_ling")) {
+                    return "入谷后于【苍南小会】出示升仙令即可，验令长老当场引你入门";
+                }
+                if (p.tainan && p.tainan.leitaiDone) {
+                    return "擂台三场只换得筑基丹；拜山另需一枚升仙令——玄机子遗箧里似压着一块铁牌";
+                }
+                return "拜入后方可领月俸、换宗门贡献";
+            },
+            where: function (p) { return GAME.Goals._has(p, "shengxian_ling") ? "苍南谷" : "宗门"; },
+            whereTo: function (p) {
+                // 宗门页在拜入前是锁着的，指过去只会挨一句「尚未拜入宗门」——有令时才给落点
+                return GAME.Goals._has(p, "shengxian_ling") ? { kind: "map", node: "tainan_gu" } : null;
+            }
         },
         {
             id: "herbs",
@@ -169,7 +207,8 @@ GAME.Goals = {
                 self.HERBS.forEach(function (h) { if (!self._has(p, h)) miss.push(self._name(h)); });
                 return miss.length ? ("还差：" + miss.join("、")) : "三药已齐，可开炉炼丹";
             },
-            where: "血色禁地"
+            where: "血色禁地",
+            whereTo: { kind: "tab", tab: "dungeon" }
         },
         {
             id: "zhengpin",
@@ -181,7 +220,8 @@ GAME.Goals = {
             done: function (p) { return GAME.Goals._has(p, "pill_zhengpin"); },
             text: "开炉炼制正品筑基丹",
             hint: function () { return "洞府丹房：三味主药 + 灵石 100；正品成功率 +50%"; },
-            where: "洞府"
+            where: "洞府",
+            whereTo: { kind: "tab", tab: "home" }
         },
         {
             id: "zhuji",
@@ -194,7 +234,8 @@ GAME.Goals = {
                     ? ("当前 " + GAME.Goals._realmName(p.realmIndex) + "，修为 " + Math.floor(p.currentExp) + "，丹药已备")
                     : ("当前 " + GAME.Goals._realmName(p.realmIndex) + "，尚缺筑基丹一枚");
             },
-            where: "洞府"
+            where: "洞府",
+            whereTo: { kind: "tab", tab: "home" }
         },
 
         // ===== 主线：筑基期 =====
@@ -209,7 +250,8 @@ GAME.Goals = {
                 for (k in p.heisha.guards) if (p.heisha.guards[k]) g++;
                 return "已破血仆 " + g + "/4，血玉蜘蛛未除";
             },
-            where: "云京"
+            where: "云京",
+            whereTo: { kind: "map", node: "yuejing_cheng" }
         },
         {
             id: "jiedan",
@@ -219,7 +261,8 @@ GAME.Goals = {
             hint: function (p) {
                 return "当前 " + GAME.Goals._realmName(p.realmIndex) + "（结丹后期圆满 = 18/18）";
             },
-            where: "洞府 / 历练"
+            where: "洞府 / 历练",
+            whereTo: { kind: "tab", tab: "home" }
         },
         {
             id: "yuanying",
@@ -229,7 +272,8 @@ GAME.Goals = {
             hint: function (p) {
                 return "已至结丹后期圆满——下一步是元婴天堑。碎丹前可先备千年灵药（药圃/元神出游）或 3000 灵石请护法，铺路更稳";
             },
-            where: "洞府"
+            where: "洞府",
+            whereTo: { kind: "tab", tab: "home" }
         },
         {
             id: "yuanying_full",
@@ -242,7 +286,8 @@ GAME.Goals = {
                 return "当前 " + GAME.Goals._realmName(p.realmIndex) +
                     "——修炼之余可元神出游探秘境、赴碎星海参战或立派（皆元婴专属）";
             },
-            where: "洞府 / 碎星海"
+            where: "洞府 / 碎星海",
+            whereTo: { kind: "tab", tab: "home" }
         },
         {
             id: "top",
@@ -250,7 +295,8 @@ GAME.Goals = {
             done: function () { return false; },
             text: "元婴后期圆满 · 此界已至顶，余下自行择道",
             hint: function () { return "立派、星海争霸、收徒传承，或坐看轮回——此后的路没有标准答案"; },
-            where: "碎星海"
+            where: "碎星海",
+            whereTo: { kind: "map", node: "luanxing_hai" }
         }
     ],
 
@@ -441,8 +487,62 @@ GAME.Goals = {
             text: typeof d.text === "function" ? d.text(p) : d.text,
             hint: d.hint ? (typeof d.hint === "function" ? d.hint(p) : d.hint) : "",
             where: typeof d.where === "function" ? (d.where(p) || "") : (d.where || ""),
+            whereTo: d.whereTo || null,
             goto: d.goto
         };
+    },
+
+    // ---------- 「前往：XXX」这一行该落成什么动作（纯计算，执行交给 UI.goWhere） ----------
+    // 返回 { kind, label, state, ... }：
+    //   kind="tab"  切功能页签（市集 / 洞府 / 背包 / 副本…），sub="black" 时滚到地下黑市
+    //   kind="map"  大地图地点：state=ok 一键动身 / blocked 指路并报出门槛 / here 已在当地
+    //   kind="goto" 目标自带跳转函数（如苍梧门六幕开幕）
+    //   kind="text" 没有可落点，原样当文本
+    wherePlan: function (g, p) {
+        if (!g || !g.where) return null;
+        p = p || (GAME.State && GAME.State.p());
+        if (!p) return null;
+        var wt = g.whereTo;
+        if (typeof wt === "function") wt = wt(p);
+        if (!wt) {
+            if (typeof g.goto === "function") return { kind: "goto", label: "前往：" + g.where + " ›", run: g.goto };
+            return { kind: "text", label: "前往：" + g.where };
+        }
+        if (wt.kind === "tab") {
+            return { kind: "tab", tab: wt.tab, sub: wt.sub || "", label: "前往：" + g.where + " ›" };
+        }
+        if (wt.kind !== "map") return { kind: "text", label: "前往：" + g.where };
+
+        var M = GAME.Map;
+        var node = (M && M.node) ? M.node(wt.node) : null;
+        if (!node) return { kind: "text", label: "前往：" + g.where };
+        var need = node.reqRealm || 0;
+        var needName = (GAME.DATA.REALMS[need] || {}).name || "";
+        // 人已经站在这儿：按钮没有意义，直接封掉（阴毒在城里时全靠这条）
+        if (p.location === wt.node) {
+            return { kind: "map", state: "here", disabled: true, node: wt.node, nodeName: node.name, label: "已在当地" };
+        }
+        var plan = { kind: "map", node: wt.node, nodeName: node.name, needName: needName, needRealm: need };
+        var route = null, routes = (M && M.routes) ? M.routes() : [];
+        routes.forEach(function (r) { if (r.targetId === wt.node) route = r; });
+        var gate = (p.realmIndex < need) ? ("（需" + needName + "）") : "";
+        if (!route) {
+            plan.state = "blocked";
+            plan.label = "前往：" + node.name + gate + " ›";
+            plan.why = "此地尚在路途之外——先回到与【" + node.name + "】相通的那座城镇，才好动身。";
+            return plan;
+        }
+        plan.route = route.id;
+        var chk = M.canTravel(route.id);
+        if (chk.ok) {
+            plan.state = "ok";
+            plan.label = "前往：" + node.name + " ›";
+        } else {
+            plan.state = "blocked";
+            plan.label = "前往：" + node.name + gate + " ›";
+            plan.why = chk.msg;
+        }
+        return plan;
     },
 
     // ---------- 全部适用目标（供未来的"目标清单"面板使用） ----------

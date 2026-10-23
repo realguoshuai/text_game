@@ -29,7 +29,7 @@ GAME.Jiayuan = {
             return false;
         }
         if (p.jiayuanDone) {
-            GAME.UI.log("玄机世家之事已了。颜氏仍在城中操持旧业，只是再无需你出手。", "system");
+            // 已了结：只重绘、不再往见闻录追加同一句收尾——连点会把整栏刷成复读机
             GAME.UI.updateUI();
             return false;
         }

@@ -533,18 +533,29 @@ GAME.UI = {
         var h = this.$("goal-hint"); if (h) h.innerText = g.hint || "";
         var w = this.$("goal-where");
         if (w) {
-            if (g.where && !GAME.State.p().isDead) {
-                if (typeof g.goto === "function") {
-                    // 可点击跳转：把地点名渲染成链接（如「苍梧门」→ 跳到六幕开幕）
-                    w.innerHTML = '前往：<span class="goal-where-link" id="goal-where-link">' + (g.where || "") + '</span>';
-                    var link = this.$("goal-where-link");
-                    if (link) link.onclick = function () { try { g.goto(); } catch (e) { console.error(e); } };
+            w.innerHTML = "";
+            var wp = GAME.State.p();
+            if (g.where && !wp.isDead) {
+                // 「前往：XXX」不再是一句干话：能走的直接动身，走不了的就指路并说清缺什么。
+                var plan = null;
+                try { plan = (GAME.Goals && GAME.Goals.wherePlan) ? GAME.Goals.wherePlan(g, wp) : null; } catch (e) { plan = null; }
+                if (plan && plan.kind !== "text") {
+                    var goBtn = document.createElement("button");
+                    goBtn.id = "goal-go";
+                    goBtn.className = "goal-go" + (plan.state === "here" ? " is-here" : "") +
+                        (plan.state === "blocked" ? " is-gated" : "");
+                    goBtn.innerText = plan.label;
+                    goBtn.disabled = !!plan.disabled;
+                    if (plan.disabled) goBtn.title = "你已身在此地";
+                    else if (plan.state === "blocked") goBtn.title = plan.why || "";
+                    var selfGo = this;
+                    goBtn.onclick = function () { selfGo.goWhere(plan); };
+                    w.appendChild(goBtn);
                 } else {
                     w.innerText = "前往：" + g.where;
                 }
-            } else {
-                w.innerText = "";   // 死亡态：目标横幅交由 applyDeathLock 显示「道陨」，此处留空
             }
+            // 死亡态：目标横幅交由 applyDeathLock 显示「道陨」，此处留空（w 已清空）
         }
 
         // 可并行支线：主线之外的"顺手事"，列在横幅末尾一行小注（不喧宾夺主，最多 3 条）
@@ -586,6 +597,66 @@ GAME.UI = {
                 }
             }
         }
+    },
+
+    /* ---------- 目标框「前往」按钮的执行端 ----------
+     * 三类落点各走真实函数：页签 → switchTab（同一把锁）、地点 → Map.travel（同一套校验）、
+     * 自带跳转 → goal.goto。走不通时绝不硬闯（不许一条横幅把修为门槛跳过去），
+     * 只把地图翻到那一页、把那一行滚进视野，再用见闻录说明缺什么。 */
+    goWhere: function (plan) {
+        if (!plan) return;
+        var p = GAME.State.p();
+        if (!p || p.isDead) return;
+
+        if (plan.kind === "goto") {
+            try { if (typeof plan.run === "function") plan.run(); } catch (e) { console.error(e); }
+            return;
+        }
+        if (plan.kind === "tab") {
+            var why = this.tabLock ? this.tabLock(plan.tab) : "";
+            if (why) { this.log(why, "system"); return; }
+            this.switchTab(plan.tab);
+            this.scrollToSection(plan.sub === "black" ? "black-section"
+                : (plan.tab === "market" ? "market-local" : ""));
+            return;
+        }
+        if (plan.kind === "map") {
+            // 已在当地：按钮本已置灰，这里再兜一道，免得程序内调用把地图翻来翻去还报一句废话
+            if (plan.disabled || plan.state === "here") return;
+            if (plan.state === "ok" && plan.route && GAME.Map && GAME.Map.travel) {
+                GAME.Map.travel(plan.route);
+                return;
+            }
+            this.switchTab("map");
+            this.scrollToMapNode(plan.node);
+            var msg;
+            if (typeof plan.needRealm === "number" && p.realmIndex < plan.needRealm) {
+                msg = "前往【" + plan.nodeName + "】需" + plan.needName + "修为，当前道行不足，宜先闭关苦修。";
+            } else {
+                msg = plan.why || "眼前还动身不得。";
+            }
+            this.log(msg, "warning");
+            return;
+        }
+    },
+
+    // 把某个区块滚进视野（面板刚切过去，DOM 已就位，直接滚即可）
+    scrollToSection: function (id) {
+        if (!id || typeof document === "undefined" || !document.getElementById) return;
+        try {
+            var el = document.getElementById(id);
+            if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (e) {}
+    },
+
+    // 大地图定位到某个地点：优先「四通八达」那一条，其次「天下舆图」里的条目
+    scrollToMapNode: function (nodeId) {
+        if (!nodeId || typeof document === "undefined" || !document.querySelector) return;
+        try {
+            var el = document.querySelector('#map-routes [data-node="' + nodeId + '"]') ||
+                     document.querySelector('#map-atlas [data-node="' + nodeId + '"]');
+            if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (e) {}
     },
 
     // ---------- 破境筹备面板 ----------
@@ -2716,6 +2787,7 @@ GAME.UI = {
             var chk = GAME.Map.canTravel(r.id);
             var row = document.createElement("div");
             row.className = "item-row";
+            row.setAttribute("data-node", r.targetId);   // 目标框「前往」按钮靠它把这一行滚进视野
             var left = document.createElement("div");
             var sub;
             if (!r.unlocked) {
@@ -2821,6 +2893,7 @@ GAME.UI = {
             grp.nodes.forEach(function (n) {
                 var row = document.createElement("div");
                 row.className = "item-row";
+                row.setAttribute("data-node", n.id);
                 var left = document.createElement("div");
                 if (n.unlocked) {
                     left.innerHTML = (n.here ? '<span class="gold">【此地】</span>' : "") +
@@ -2917,8 +2990,10 @@ GAME.UI = {
             r2.className = "item-right";
             var b2 = document.createElement("button");
             b2.className = "small-btn btn-gold";
-            b2.innerText = "行事";
+            // 玄机世家是一次性主线：了结之后入口只报"已了结"，不再给一个点了刷日志的按钮
+            b2.innerText = (a.id === "mo_house" && GAME.State.p().jiayuanDone) ? "已了结" : "行事";
             b2.disabled = !chk2.ok;
+            if (!chk2.ok) b2.title = chk2.msg;
             b2.onclick = function () { GAME.Map.doAction(a.id); };
             r2.appendChild(b2);
             row2.appendChild(l2); row2.appendChild(r2);

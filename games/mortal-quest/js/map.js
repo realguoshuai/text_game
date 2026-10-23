@@ -226,6 +226,10 @@ GAME.Map = {
         (node.actions || []).forEach(function (a) { if (a.id === actionId) act = a; });
         if (!act) return { ok: false, msg: "此地并无此事可做。" };
         var p = GAME.State.p();
+        // 玄机世家是一次性主线：了结之后入口必须封存，否则每点一次就往见闻录刷一遍收尾话
+        if (actionId === "mo_house" && p.jiayuanDone) {
+            return { ok: false, msg: "玄机世家之事已了，颜氏仍在城中操持旧业。" };
+        }
         // 玄机世家：身在城中再点一次＝继续追问颜氏，本就不是"抽身离开"，
         // 不能被 busyMsg 里那条"此时抽身恐失信于颜氏"反拦住（玩家会以为入口坏了）。
         var resumeMansion = (actionId === "mo_house" && p.jiayuan && p.location === "jiayuan_cheng");

@@ -111,7 +111,14 @@ ok('途中：主标题含「阴毒噬心」', /阴毒噬心/.test(T('goal-text')
 ok('途中：主标题含「赴景阳城寻解药」', /赴景阳城寻解药/.test(T('goal-text')));
 ok('途中：主标题报剩余年数', /剩 2 年/.test(T('goal-text')));
 ok('途中：主标题无「—」占位符', !/^—$/.test(T('goal-text')));
-ok('途中：导引保留坊市/黑市这条退路', /坊市/.test(T('goal-where')) && /黑市/.test(T('goal-where')));
+// 「前往」已升级为按钮：读按钮文案而不是容器 innerText
+function WL() {
+    const w = els['goal-where'];
+    const b = w && w.children && w.children[0];
+    return b ? (b.innerText || '') : (w ? w.innerText : '');
+}
+ok('途中：导引保留坊市/黑市这条退路', /坊市/.test(T('goal-hint')) && /黑市/.test(T('goal-hint')));
+ok('途中：前往按钮指向景阳城', /景阳城/.test(WL()));
 ok('途中：下一步 = 前往景阳城寻解药', (act() || {}).label === '前往景阳城寻解药');
 
 P().location = 'jiayuan_cheng';
@@ -123,7 +130,7 @@ ok('城内：下一步 = 入墨府 / 玄机世家', (act() || {}).label === '入
 P().jiayuanDone = true;
 regoal();
 ok('线索已断：主标题改「阴毒噬骨」', /阴毒噬骨/.test(T('goal-text')) && /速寻解毒之法/.test(T('goal-text')));
-ok('线索已断：退路指回坊市 / 黑市', /坊市 \/ 黑市/.test(T('goal-where')));
+ok('线索已断：退路指回坊市 / 黑市', /坊市 \/ 黑市/.test(WL()));
 ok('线索已断：下一步 = 赴坊市 / 黑市', (act() || {}).label === '赴坊市 / 黑市寻解毒之物');
 
 P().jiayuanDone = false;
