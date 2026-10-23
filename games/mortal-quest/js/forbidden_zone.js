@@ -38,6 +38,8 @@ GAME.FZone = {
             return;
         }
 
+        if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
+            GAME.Core.stopAutoCult("已入血色禁地，赤雾封山——洞府里的蒲团只能先搁下。");
         p.fzone = {
             herbs: {},                      // 已夺主药 { herbId: qty }
             restLeft: this.cfg().restCount, // 剩余调息次数

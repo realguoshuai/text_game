@@ -84,6 +84,8 @@ GAME.Map = {
         if (p.trial) return "血月试炼尚在进行，脱身不得。";
         if (p.moEvent) return "玄机子的元神仍在纠缠，此刻走不开。";
         if (p.hunt) return "你正在狩猎场中，收势而退后方可上路。";
+        if (p.fzone) return "身陷血色禁地，脱身不得。";
+        if (p.relic) return "正在古修遗迹中探秘，此时抽身，前功尽弃。";
         if (p.mansion) return "你正潜伏在墨府之中，此时抽身，前功尽弃。";
         if (p.jiayuan && p.location === "jiayuan_cheng") return "玄机世家的事正到紧要处，此时抽身，恐失信于颜氏。";
         return null;

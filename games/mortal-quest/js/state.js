@@ -75,6 +75,7 @@ GAME.State = {
             combat: null,           // 战斗状态机（null = 非战斗）
             trial: null,            // 血月试炼状态 { stepsLeft, active }
             fzone: null,            // 血色禁地状态 { stepsLeft, elite, settle }（js/forbidden_zone.js）
+            inDungeon: false,       // 身在秘境：State.p() 每次按 fzone/trial/relic/hunt 现算回写，勿当独立真值读写
             causal: null,           // 因果追查 { months }（斩杀修士未毁尸，高阶修士循因果寻仇）
             garden: null,           // 百草园管事 { due }（青梧谷特权，due=距上交草药的月数）
             zhujiStreak: 0,         // 筑基本轮连服次数（每多服一枚 +25%；成功后清零）
@@ -127,7 +128,33 @@ GAME.State = {
     // 取玩家（保证任何时刻可安全访问）
     p: function () {
         if (!this.player) this.createNewPlayer();
+        // 秘境标志随取随算：p.inDungeon 只是 State.inDungeon() 的镜像，存档里不另存一份真值——
+        // 两份状态必然漂移（血色禁地有五条退出路径，漏改一条就把人永久锁在秘境里）。
+        this.player.inDungeon = this.inDungeon(this.player);
         return this.player;
+    },
+
+    /* ---------- 秘境（副本）空间：唯一判据 ----------
+     * 玩家"身在秘境"时不占洞府、不见坊市：闭关、催熟、炼丹、历练一概做不得。
+     * 覆盖四处持久状态：血色禁地 p.fzone / 血月试炼 p.trial / 古修遗迹 p.relic / 狩猎副本 p.hunt。
+     * ★ 只此一个出口：UI 置灰（ui.js）、动作拦停（core.js/time.js）、页签锁死（switchTab）
+     *   都问它，别在别处另写一套真假判定——两套状态就是两套 bug。 */
+    dungeonName: function (p) {
+        p = p || this.p();
+        if (p.fzone) return "血色禁地";
+        if (p.trial) return "血月试炼";
+        if (p.relic) return "古修遗迹";
+        if (p.hunt) {
+            var d = (GAME.DATA.HUNTS && GAME.DATA.HUNTS.byId) ? GAME.DATA.HUNTS.byId(p.hunt.id) : null;
+            return (d && d.name) || "狩猎秘境";
+        }
+        return "";
+    },
+    inDungeon: function (p) { return !!this.dungeonName(p); },
+    // 统一的置灰/回执文案（UI 与动作拦截共用同一句，玩家读到的话不会打架）
+    dungeonWhy: function (p) {
+        var n = this.dungeonName(p);
+        return n ? ("身处" + n + "秘境中，四面皆敌，无法分心闭关与催熟药圃！") : "";
     },
 
     // ---------- 官方预设：筑基期体验存档 ----------

@@ -111,6 +111,13 @@ GAME.UI = {
             this.log("强敌环伺，需先分出胜负或施展遁术脱离。", "danger");
             return;
         }
+        // 秘境之中：页签一律锁死，只能在紧急面板里「前进一步 / 调息 / 撤离」。
+        // 置灰只是挡鼠标，这里是总闸——openPlot 之类程序内跳转同样被拦下。
+        var _dg = (GAME.State.dungeonName ? GAME.State.dungeonName(p) : "");
+        if (_dg && name !== this.tab) {
+            this.log("身处" + _dg + "秘境中，四面皆敌——脱身之前，其余去处一概走不得。", "danger");
+            return;
+        }
         // 页签前置锁：秘境/宗门/副本/傀儡/丹炉未到条件时一律拦下（理由与置灰提示同一把尺子）
         var lockWhy = this.tabLock(name);
         if (lockWhy) { this.log(lockWhy, "system"); return; }
@@ -163,6 +170,10 @@ GAME.UI = {
         // 兜底：未知页签回落大地图，避免整页空白
         if (!this.TAB_MAP[this.tab]) this.tab = "map";
         var visible = urgent || this.TAB_MAP[this.tab];
+        // 秘境空间：urgent 面板只覆盖了禁地/试炼，古修遗迹与狩猎副本没有专属紧急面板，
+        // 页签得另按这条尺子锁一次，否则人能一边探遗迹一边切去洞府闭关。
+        var dgName = GAME.State.dungeonName ? GAME.State.dungeonName(p) : "";
+        var dgWhy = dgName ? ("身处" + dgName + "秘境中——先了结或撤离，再来张罗别处的事") : "";
         // 千年灵药惊变弹窗：独立于面板可见性（遮罩层），读档后也能凭存档里的 herbPending 弹回来
         if (GAME.HerbAlarm && GAME.HerbAlarm.sync) GAME.HerbAlarm.sync();
 
@@ -182,8 +193,8 @@ GAME.UI = {
                 // 悬停看前置条件；程序内调用由 switchTab 同一把尺子拦下。
                 var lockWhy = this.tabLock(t);
                 btn.className = "small-btn" + (this.tab === t ? " tab-on" : "") + (lockWhy ? " tab-lock" : "");
-                btn.disabled = !!urgent || !!lockWhy;
-                btn.title = lockWhy;
+                btn.disabled = !!urgent || !!lockWhy || !!dgName;
+                btn.title = lockWhy || dgWhy;
                 // 刚达标的页签：补一条【新功能解锁】高光（读档首帧只给一句总述，不刷屏）
                 if (!this._tabLit) this._tabLit = {};
                 if (!lockWhy && this._tabLit[t] === false) {
@@ -213,8 +224,9 @@ GAME.UI = {
         var gBtns = document.querySelectorAll("#nav-groups .nav-g");
         for (var gi = 0; gi < gBtns.length; gi++) {
             var on = gBtns[gi].getAttribute("data-nav-group") === curGroup;
-            gBtns[gi].className = "nav-g" + (on ? " nav-on" : "") + (urgent ? " nav-locked" : "");
-            gBtns[gi].disabled = !!urgent;
+            gBtns[gi].className = "nav-g" + (on ? " nav-on" : "") + ((urgent || dgName) ? " nav-locked" : "");
+            gBtns[gi].disabled = !!urgent || !!dgName;
+            gBtns[gi].title = dgName ? dgWhy : "";
         }
 
         this.dedupeHeadings(visible);
@@ -778,6 +790,10 @@ GAME.UI = {
     openPlot: function () {
         var p = GAME.State.p();
         if (!p || p.isDead) return;
+        if (GAME.State.inDungeon && GAME.State.inDungeon(p)) {
+            this.log(GAME.State.dungeonWhy(p), "danger");
+            return;
+        }
         if (this.tab !== "home") this.switchTab("home");
         var box = this.$("plot-box");
         if (box) {
@@ -954,13 +970,24 @@ GAME.UI = {
             // 按钮可用性：死亡 / 战斗 / 待决事件 / 玄机子阶段一三 / 六幕剧情进行中 时锁定洞府操作
             var dead = p.isDead, busy = !!p.combat || (!!p.moEvent && !p.combat), waiting = !!p.pendingEvent || !!p.pendingMercy;
             var inStory = !!(GAME.Qixuan && GAME.Qixuan.active());   // 炼骨崖考核等剧情抉择期间，闭关类全部禁点
-            var lock = dead || busy || waiting || inStory;
-            var ids = ["btn-meditate","btn-catalyze-bainian","btn-catalyze-qiannian","btn-breakthrough","btn-explore","btn-market","btn-sect"];
-            var lockWhy = inStory ? "剧情进行中" : busy ? "战斗/事件未了" : waiting ? "有待决事件" : dead ? "已身陨" : "";
+            // 秘境（血色禁地/血月试炼/古修遗迹/狩猎副本）：人不在洞府，功课一概做不得。
+            // 判据只在 State.inDungeon（见 state.js），置灰文案与动作拦停同一句话。
+            var dgName = GAME.State.dungeonName ? GAME.State.dungeonName(p) : "";
+            var inDungeon = !!dgName;
+            var lock = dead || busy || waiting || inStory || inDungeon;
+            var ids = ["btn-meditate","btn-meditate-5","btn-meditate-10","btn-meditate-full",
+                       "btn-catalyze-bainian","btn-catalyze-qiannian","btn-breakthrough","btn-explore","btn-market","btn-sect"];
+            var lockWhy = inDungeon ? GAME.State.dungeonWhy(p)
+                : inStory ? "剧情进行中" : busy ? "战斗/事件未了" : waiting ? "有待决事件" : dead ? "已身陨" : "";
+            // 秘境里闭关/催熟/炼丹/历练/突破/坊市六七个按钮同因：按钮内小字只写短句（照旧例
+            // 「战斗/事件未了」一行放得下），整句挂 title 供悬停——否则行动栏被同一句话铺满。
+            var lockWhyInline = inDungeon ? "秘境之中，无从闭关" : lockWhy;
+            var lockTitle = inDungeon ? GAME.State.dungeonWhy(p) : "";
             for (var i = 0; i < ids.length; i++) {
                 var lbtn = this.$(ids[i]);
                 lbtn.disabled = lock;
-                this._why(lbtn, lock ? lockWhy : "");
+                this._why(lbtn, lock ? lockWhyInline : "");
+                lbtn.title = lock ? lockTitle : "";
             }
             // 丹炉：练气三层前灰显不可点（玄机子未传手艺）
             var alchOk = !lock && GAME.Core.canAlchemy();
@@ -968,15 +995,18 @@ GAME.UI = {
             bAlch.disabled = !alchOk;
             var _asub = this.$("alchemy-sub");
             if (_asub) _asub.innerText = alchOk ? "丹方 · 取材 · 文火"
-                : (GAME.Core.canAlchemy() ? (lock ? lockWhy : "丹火未熄") : "需练气三层");
+                : (GAME.Core.canAlchemy() ? (inDungeon ? "秘境之中，丹火难起" : (lock ? lockWhy : "丹火未熄")) : "需练气三层");
+            bAlch.title = alchOk ? "" : lockTitle;
+            this._why(bAlch, alchOk ? "" : (lock ? lockWhyInline : ""));
             var tAlch = this.$("tab-alchemy");
             if (tAlch) tAlch.disabled = !GAME.Core.canAlchemy();
             // 杂役堂只在幽篁谷且有宗门身份时可用；血色禁地副本入口同理（旧试炼入口已撤）
             var atHome = p.location === GAME.DATA.MAP.start;
             this.$("btn-sect").disabled = lock || !atHome || !p.sectId;
-            this._why(this.$("btn-sect"), lock ? lockWhy
+            this._why(this.$("btn-sect"), lock ? lockWhyInline
                 : !p.sectId ? "尚未拜入宗门"
                 : !atHome ? "须回幽篁谷（宗门驻地）" : "");
+            this.$("btn-sect").title = lock ? lockTitle : "";
 
             var _ssub = this.$("sect-sub");
             if (_ssub) _ssub.innerText = p.sectId ? "杂役堂 · 贡献 " + p.sectContrib : "";
@@ -998,7 +1028,8 @@ GAME.UI = {
                 _ac.innerText = _run ? "暂停持续闭关" : "开启持续闭关";
                 _ac.className = "small-btn dd-item" + (_run ? " btn-danger" : " btn-gold");
                 _ac.disabled = !_run && !!lock;
-                this._why(_ac, _run ? "" : (lock ? lockWhy : "每 0.6 秒自动结算一次打坐"));
+                this._why(_ac, _run ? "" : (lock ? lockWhyInline : "每 0.6 秒自动结算一次打坐"));
+                _ac.title = (!_run && lock) ? lockTitle : "";
             }
 
             // 闭关分档：同一个寿元池，玩家自己决定一次花几个月、换多少修为与心境
@@ -1010,7 +1041,8 @@ GAME.UI = {
                     if (!_tb) continue;
                     _tb.innerText = _t.name + " " + _t.cycles + " 周天（" + GAME.Time.priceLabel(_t) + "）";
                     _tb.disabled = lock || !_t.ok;
-                    this._why(_tb, lock ? lockWhy : (_t.ok ? "" : _t.why));
+                    this._why(_tb, lock ? lockWhyInline : (_t.ok ? "" : _t.why));
+                    _tb.title = lock ? lockTitle : "";
                 }
                 var _dn = this.$("dd-time-text");
                 if (_dn) {
@@ -1049,7 +1081,8 @@ GAME.UI = {
                 else bt.innerText = "尝试突破（" + _btTxt + "）";
                 bt.disabled = lock || p.currentExp < realm.needExp;
                 var lackExp = Math.ceil(realm.needExp - p.currentExp);
-                this._why(bt, lock ? lockWhy : (lackExp > 0 ? "还差 " + lackExp + " 修为" : ""));
+                this._why(bt, lock ? lockWhyInline : (lackExp > 0 ? "还差 " + lackExp + " 修为" : ""));
+                bt.title = lock ? lockTitle : "";
             } else {
                 // 兜底：破境模块未载入时退回旧文案，别让整条渲染链断在这里
                 var _btTxt2 = ((typeof realm.breakChance === "number") ? (realm.breakChance * 100).toFixed(0) + "%" : "未知");
@@ -1057,7 +1090,8 @@ GAME.UI = {
                 else bt.innerText = "尝试突破 (" + _btTxt2 + ")";
                 bt.disabled = lock || p.currentExp < realm.needExp;
                 var lackExp2 = Math.ceil(realm.needExp - p.currentExp);
-                this._why(bt, lock ? lockWhy : (lackExp2 > 0 ? "还差 " + lackExp2 + " 修为" : ""));
+                this._why(bt, lock ? lockWhyInline : (lackExp2 > 0 ? "还差 " + lackExp2 + " 修为" : ""));
+                bt.title = lock ? lockTitle : "";
             }
             // 修为已满且可突破 → 高亮按钮提醒（浅/深色各一套，见 style.css .bt-ready）
             if (bt) bt.classList.toggle("bt-ready", realm.needExp !== null && !bt.disabled && p.currentExp >= realm.needExp);
@@ -1068,8 +1102,9 @@ GAME.UI = {
             var _liq = function (b, need) {
                 if (!b) return;
                 b.disabled = lock || p.liquid < need;
-                this._why(b, lock ? lockWhy : (p.liquid < need
+                this._why(b, lock ? lockWhyInline : (p.liquid < need
                     ? "灵液不足：需 " + need + " 滴（现有 " + (p.liquid || 0) + "）" : ""));
+                b.title = lock ? lockTitle : "";
             }.bind(this);
             _liq(this.$("btn-catalyze-bainian"), 1);
             _liq(this.$("btn-catalyze-qiannian"), 5);
@@ -1164,7 +1199,8 @@ GAME.UI = {
             var _mkBtn = this.$("btn-market");
             if (_mkBtn) {
                 _mkBtn.disabled = lock || dead || !!p.atMarket;
-                this._why(_mkBtn, p.atMarket ? "已在坊市中" : (lock ? lockWhy : ""));
+                this._why(_mkBtn, p.atMarket ? "已在坊市中" : (lock ? lockWhyInline : ""));
+                _mkBtn.title = (lock && !p.atMarket) ? lockTitle : "";
             }
             // 存档按钮：交战之中无暇烙印轮回石（否则残血/必死回合存档，读档卡死战斗局）
             var bs = this.$("btn-save");

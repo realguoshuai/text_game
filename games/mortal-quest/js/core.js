@@ -254,9 +254,19 @@ GAME.Core = {
     // 打坐：伪灵根每次只得 1 修为——凡人流核心压迫。
     // ★ 时间账一律交给 GAME.Time（寿元预算 / 分档 / 地雷守卫都在那里；药圃年份问 GAME.Plot），
     //   这里只保留"点一下 = 一个周天"的旧语义，避免出现第二套耗时与产出公式。
+    // 秘境之中做不得洞府功课：判据只在 State（见 state.js），回执与按钮置灰同一句话。
+    _dungeonBlock: function () {
+        var why = GAME.State.dungeonWhy ? GAME.State.dungeonWhy() : "";
+        if (!why) return false;
+        GAME.UI.log(why, "danger");
+        GAME.UI.updateUI();
+        return true;
+    },
+
     meditate: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
+        if (this._dungeonBlock()) return;
         if (!GAME.Time || !GAME.Time.seclude) {
             GAME.UI.log("时序紊乱，无法入定。", "danger");
             return;
@@ -271,6 +281,7 @@ GAME.Core = {
     meditateTimes: function (n) {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return 0;
+        if (this._dungeonBlock()) return 0;
         var done = 0;
         var toFull = (n === "full");
         var limit = toFull ? 300 : Math.max(1, n | 0);
@@ -308,6 +319,7 @@ GAME.Core = {
         if (this._autoTimer) { this.stopAutoCult("你自行收功，吐纳止息。"); return; }
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
+        if (this._dungeonBlock()) return;
         // 先记基线再检定——"闭关期间新凝了绿液/灵药熟了"是与开局比，不是与 -1 比
         this._autoLiquid = p.liquid || 0;
         this._autoReady = (GAME.Plot && GAME.Plot.status) ? (GAME.Plot.status(p).ready || 0) : 0;
@@ -344,6 +356,9 @@ GAME.Core = {
         p = p || GAME.State.p();
         if (p.isDead) return "你已经身陨，闭关自然中止。";
         if (p.combat) return "斗法陡生，闭关中止。";
+        if (GAME.State.inDungeon && GAME.State.inDungeon(p)) {
+            return "已入" + GAME.State.dungeonName(p) + "秘境，四面皆敌——洞府里的功课只能先搁下。";
+        }
         if (p.wounded) return "你气血未复，继续闭关只怕淤积伤势——先静坐疗伤。";
         var realm = GAME.DATA.REALMS[p.realmIndex];
         if (realm && realm.needExp != null && p.currentExp >= realm.needExp) {
@@ -370,6 +385,7 @@ GAME.Core = {
     catalyze: function (drops, herbId) {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
+        if (this._dungeonBlock()) return;
         if (p.liquid < drops) {
             GAME.UI.log("瓶中绿液不足 " + drops + " 滴，强行催动毫无反应。", "system");
             GAME.UI.updateUI();
@@ -414,6 +430,7 @@ GAME.Core = {
     alchemy: function (index) {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
+        if (this._dungeonBlock()) return;
         if (!this.canAlchemy()) {
             GAME.UI.log("你连火候都看不懂——玄机子的炼丹手艺不外传，待你练气三层再说不迟。", "system");
             GAME.UI.updateUI();
@@ -1070,6 +1087,7 @@ GAME.Core = {
     explore: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat || p.pendingEvent) return;
+        if (this._dungeonBlock()) return;
         // 外出历练即离开坊市：清掉「在坊市中」标记，并让左栏从市集货架跟随回大地图。
         // （若随后触发事件/战斗，applyPanels 的紧急面板优先级会自行接管左栏）
         if (GAME.UI && GAME.UI.leaveMarketTo) GAME.UI.leaveMarketTo("map");

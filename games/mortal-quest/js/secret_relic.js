@@ -35,6 +35,8 @@ GAME.Relic = {
             GAME.UI.updateUI();
             return;
         }
+        if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
+            GAME.Core.stopAutoCult("已入古修遗迹，石门落锁——洞府里的功课只能先搁下。");
         p.relic = { stepsLeft: cfg.steps, active: true };
         GAME.State.setCd("relic", cfg.cooldownMonths);
         GAME.UI.log("你推开古修洞府的石门，尘封千载的灵机扑面而来——十二步探秘，生死未卜。", "danger");

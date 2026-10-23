@@ -204,6 +204,12 @@ GAME.Time = {
             GAME.UI.updateUI();
             return false;
         }
+        // 秘境之中：闭关档位（静修/闭关/苦修/长关）一律入不得定
+        if (GAME.State.inDungeon && GAME.State.inDungeon(p)) {
+            GAME.UI.log(GAME.State.dungeonWhy(p), "danger");
+            GAME.UI.updateUI();
+            return false;
+        }
         opts = opts || {};
         var t = this.tier(p, id || "short");
         if (!t) return false;

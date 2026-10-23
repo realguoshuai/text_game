@@ -29,6 +29,8 @@ GAME.Trial = {
             GAME.UI.updateUI();
             return;
         }
+        if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
+            GAME.Core.stopAutoCult("已入血月试炼，二十步生死——洞府里的功课只能先搁下。");
         p.trial = { stepsLeft: this.cfg().steps, active: true };
         GAME.State.setCd("trial", this.cfg().cooldownMonths || 6);
         p.stats.trialsEntered += 1;

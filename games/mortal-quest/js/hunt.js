@@ -47,6 +47,8 @@ GAME.Hunt = {
         var chk = this.canEnter(id);
         if (!chk.ok) { GAME.UI.log(chk.msg, "system"); GAME.UI.updateUI(); return false; }
         var d = chk.d;
+        if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
+            GAME.Core.stopAutoCult("已入" + d.name + "秘境，凶物在侧——洞府里的功课只能先搁下。");
         p.hunt = { id: d.id, wave: 0 };
         GAME.UI.log("你循着兽皮舆图摸到【" + d.name + "】——" + d.teaser, "info");
         return this.startWave(d, 0);
