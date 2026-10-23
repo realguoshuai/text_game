@@ -3356,3 +3356,28 @@ body.theme-light .actions > button.bt-ready:hover:not(:disabled) { border-color:
 
 /* ================= 见闻录语义标签（突破自带【】不重复加；配色继承各 type） ================= */
 .log-tag { font-weight: 700; letter-spacing: .5px; }
+
+/* ================= 阴毒危机横幅（data-crisis="poison"） =================
+ * 阴毒是唯一"倒计时归零即道消"的 debuff，普通紧急项的琥珀色压不住，
+ * 故从左脊到标签整体转朱砂暗红 #a8382b；浅色另给一套羊皮纸底 + 同色脊。 */
+.goal-banner[data-crisis="poison"] {
+    background-color: #211a18;
+    background-image: radial-gradient(60% 60% at 18% 0%, rgba(168,56,43,.18), transparent 62%);
+    border-color: #5C322A;
+    border-left-color: #a8382b;
+}
+.goal-banner[data-crisis="poison"] .goal-tag {
+    background: rgba(168,56,43,.26); color: #EBAB9B; border-color: rgba(168,56,43,.62); font-weight: 600;
+}
+.goal-banner[data-crisis="poison"] .goal-main b { color: #F0B6A6; }
+.goal-banner[data-crisis="poison"] .goal-hint { color: #C79E93; }
+body.theme-light .goal-banner[data-crisis="poison"] {
+    background: #FBF0EC;
+    border: 1px solid #D8AFA4;
+    border-left: 4px solid #a8382b;
+}
+body.theme-light .goal-banner[data-crisis="poison"] .goal-tag {
+    background: #a8382b; color: #FFF4EF; border: none;
+}
+body.theme-light .goal-banner[data-crisis="poison"] .goal-main b { color: #8E2A1D; }
+body.theme-light .goal-banner[data-crisis="poison"] .goal-hint { color: #7A4438; }

@@ -516,7 +516,8 @@ GAME.Combat = {
         if (!p.companion || p.companion.hp <= 0) { GAME.UI.log("玄傀不在身旁，无从出招。", "system"); return; }
         var dmg = Math.round(p.companion.maxHp * 0.30);   // 基于生命上限的钝击
         p.combat.hp -= dmg;
-        GAME.UI.log("玄傀玄龟功催动，铁拳如锤轰在【" + p.combat.name + "】身上，造成 " + dmg + " 点钝击！", "success");
+        // 这是你自己的随从在打架，不是天降机缘——用 info，与「玄傀铁躯横挡」保持同一档
+        GAME.UI.log("玄傀玄龟功催动，铁拳如锤轰在【" + p.combat.name + "】身上，造成 " + dmg + " 点钝击！", "info");
         if (p.combat.hp <= 0) return this.victory();
         this.enemyTurn();
     },

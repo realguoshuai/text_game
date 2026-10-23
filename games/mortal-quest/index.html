@@ -120,6 +120,10 @@
                 <div class="panel" id="map-panel" data-page-node-id="TOJ1GgnbEgMlV3V1Twg3hQ">
                     <h3 data-page-node-id="8CP5AS1Vn5AUzNH4en7PVn">岚州舆图</h3>
                     <div id="map-info" class="item-desc" data-page-node-id="JvGWIdtm4BgCESyTdgd2Da"></div>
+                    <!-- 此地可为：当前所在地的专属交互。提到「四通八达」之前——
+                         玩家读完地点介绍，先看"在这儿能干什么"，再决定往哪走。 -->
+                    <h3 style="margin-top:10px;" data-page-node-id="mSo7J5fW2FCUYYBhyASDod">此地可为</h3>
+                    <div id="map-actions" data-page-node-id="ucKs25Hx0oNmblu9YOBPO1"></div>
                     <h3 style="margin-top:10px;" data-page-node-id="AKOJYh5K3DlxbtPNttFllL">四通八达</h3>
                     <div id="map-routes" data-page-node-id="CFnk2KizydqqFtCOaJIlmJ"></div>
                     <!-- 元神出游：元婴期专属（元神离体远巡），非元婴不渲染 -->
@@ -133,8 +137,6 @@
                     <div id="map-atlas" data-page-node-id="wop9bayoCW5dhOzEH3UoMs"></div>
                     <div class="highlight" style="margin-top:8px;">—— 狩猎之地（按修为开放） ——</div>
                     <div id="map-hunts"></div>
-                    <h3 style="margin-top:10px;" data-page-node-id="mSo7J5fW2FCUYYBhyASDod">此地可为</h3>
-                    <div id="map-actions" data-page-node-id="ucKs25Hx0oNmblu9YOBPO1"></div>
                     <div class="combat-actions" id="map-shop-entry" style="margin-top:10px;">
                         <button id="btn-map-shop" class="small-btn btn-gold">去市集（坊市 · 旧货摊 · 地下黑市）</button>
                     </div>
@@ -473,7 +475,7 @@
     <div id="goal-banner" class="goal-banner">
         <span class="goal-tag" id="goal-tag">当前目标</span>
         <span class="goal-main">
-            <b id="goal-text">—</b>
+            <b id="goal-text"></b>
             <span class="goal-hint" id="goal-hint"></span>
         </span>
         <span class="goal-where" id="goal-where"></span>

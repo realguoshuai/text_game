@@ -221,13 +221,16 @@ GAME.Map = {
 
     // ---------- 地点专属行动 ----------
     canDoAction: function (actionId) {
-        if (this.busyMsg()) return { ok: false, msg: this.busyMsg() };
         var node = this.cur();
         var act = null;
         (node.actions || []).forEach(function (a) { if (a.id === actionId) act = a; });
         if (!act) return { ok: false, msg: "此地并无此事可做。" };
-        // 一次性行动：做过之后不再重复
         var p = GAME.State.p();
+        // 玄机世家：身在城中再点一次＝继续追问颜氏，本就不是"抽身离开"，
+        // 不能被 busyMsg 里那条"此时抽身恐失信于颜氏"反拦住（玩家会以为入口坏了）。
+        var resumeMansion = (actionId === "mo_house" && p.jiayuan && p.location === "jiayuan_cheng");
+        if (!resumeMansion && this.busyMsg()) return { ok: false, msg: this.busyMsg() };
+        // 一次性行动：做过之后不再重复
         if (actionId === "farewell" && p.farewellDone) return { ok: false, msg: "故人已别，不必再来。" };
         if (actionId === "visit_family" && p.visitFamilyDone) return { ok: false, msg: "尘缘已断，再入家门徒惹伤怀。" };
         return { ok: true, act: act };

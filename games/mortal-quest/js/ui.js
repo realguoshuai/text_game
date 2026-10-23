@@ -435,10 +435,12 @@ GAME.UI = {
                     if (locked[k].classList) locked[k].classList.remove("dead-locked");
                 }
             } catch (e) {}
-            // 还原目标横幅（若曾被「道陨」覆盖）
+            // 还原目标横幅（仅当确实是被「道陨」覆盖过的残留，勿误清阴毒等正常紧急目标）
             var gb = this.$("goal-banner");
-            if (gb && gb.className && gb.className.indexOf("urgent") >= 0) {
+            var wasDeath = !!(gb && gb.getAttribute && gb.getAttribute("data-deathlock") === "1");
+            if (wasDeath) {
                 gb.className = "goal-banner";
+                if (gb.removeAttribute) gb.removeAttribute("data-deathlock");
                 var gt = this.$("goal-tag"); if (gt) gt.innerText = "";
                 var gx = this.$("goal-text"); if (gx) gx.innerText = "";
                 var gh = this.$("goal-hint"); if (gh) gh.innerText = "";
@@ -472,6 +474,7 @@ GAME.UI = {
         if (gb2) {
             gb2.style.display = "";
             gb2.className = "goal-banner urgent";
+            if (gb2.setAttribute) gb2.setAttribute("data-deathlock", "1");
             var gt2 = self.$("goal-tag"); if (gt2) gt2.innerText = "道陨";
             var gx2 = self.$("goal-text"); if (gx2) gx2.innerText = (p.deathReason || "未知") + "——今生已止，仅可重入轮回或读取轮回石。";
             var gh2 = self.$("goal-hint"); if (gh2) gh2.innerText = "读回最近一次轮回石，即可从那一刻重来。";
@@ -513,8 +516,16 @@ GAME.UI = {
         if (!g) { box.style.display = "none"; return; }
         box.style.display = "";
         box.className = "goal-banner" + (g.urgent ? " urgent" : "");
+        // 危机标记：阴毒（倒计时归零即道消）走朱砂暗红，与普通紧急目标区分开
+        if (box.setAttribute) {
+            if (g.crisis) box.setAttribute("data-crisis", g.crisis);
+            else if (box.removeAttribute) box.removeAttribute("data-crisis");
+        }
         var tag = this.$("goal-tag");
-        if (tag) tag.innerText = g.urgent ? "当务之急" : "当前目标";
+        if (tag) {
+            tag.innerText = (g.crisis === "poison") ? "急务 · 阴毒缠身"
+                : (g.urgent ? "当务之急" : "当前目标");
+        }
         // 空态兜底：目标文本为空或残留占位符「—」时，填一句按境界的默认导引，
         // 不让中栏顶部挂着一个光秃秃的破折号（加载体验档/无主线阶段实测反馈）
         var gText = (g.text && g.text !== "—" && g.text !== "-") ? g.text : "";

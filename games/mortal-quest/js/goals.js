@@ -27,6 +27,12 @@ GAME.Goals = {
         var R = GAME.DATA && GAME.DATA.REALMS;
         return (R && R[idx]) ? R[idx].name : ("第" + idx + "境");
     },
+    // 阴毒倒计时的人话剩余量：满一年报「X 年」，不足一年报「X 个月」
+    _yinduLeft: function (y) {
+        var m = Math.max(0, (y && y.months) || 0);
+        if (m >= 12) return (Math.round((m / 12) * 10) / 10) + " 年";
+        return m + " 个月";
+    },
 
     // 筑基三味主药（血色禁地 / 血月试炼产出）
     HERBS: ["herb_tianling", "herb_yumo", "herb_zihou"],
@@ -34,15 +40,38 @@ GAME.Goals = {
     // ---------- 目标定义（顺序即优先级：越靠前越先做） ----------
     DEFS: [
         // ===== 紧急：活下去 =====
+        // 阴毒是全游戏唯一"倒计时归零即道消"的 debuff，故置于全部目标之首（含其它紧急项）。
+        // 文案按玩家所处环节动态收窄：服下解药 → 城内寻人 → 赴城途中 → 线索已断另寻他法。
         {
-            id: "yindu", urgent: true,
+            id: "yindu", urgent: true, crisis: "poison",
             when: function (p) { return !!p.yindu; },
             done: function () { return false; },
-            text: "解除体内阴毒",
-            hint: function (p) {
-                return "仅剩 " + (p.yindu.months || 0) + " 个月，需暖阳宝玉或高阶丹药镇压";
+            text: function (p) {
+                var G = GAME.Goals, left = G._yinduLeft(p.yindu);
+                if (G._has(p, "nuan_yang_bao_yu")) return "暖阳宝玉在手 · 即刻服下解去阴毒";
+                if (p.location === "jiayuan_cheng" && !p.jiayuanDone) {
+                    return "探访城中【墨府 / 玄机世家】，寻取克制阴毒之物";
+                }
+                if (p.jiayuanDone) return "阴毒噬骨（仅余 " + left + "）· 速寻解毒之法";
+                return "阴毒噬心（剩 " + left + "）· 赴景阳城寻解药";
             },
-            where: "坊市 / 黑市"
+            hint: function (p) {
+                var G = GAME.Goals, left = G._yinduLeft(p.yindu);
+                if (G._has(p, "nuan_yang_bao_yu")) return "丹药页服下，阴毒立解——别再拖";
+                if (p.location === "jiayuan_cheng" && !p.jiayuanDone) {
+                    return "颜氏与玄机世家都握有半条线索；此地亦有坊市可寻暖阳宝玉";
+                }
+                if (p.jiayuanDone) {
+                    return "玄机世家线索已断（剩 " + left + "），改走坊市 / 黑市求暖阳宝玉或高阶解毒丹";
+                }
+                return "剩 " + left + "，暖阳宝玉或高阶丹药可镇压；阴毒未解时长关会被拒，硬闭只会坐死在蒲团上";
+            },
+            where: function (p) {
+                if (GAME.Goals._has(p, "nuan_yang_bao_yu")) return "丹药";
+                if (p.location === "jiayuan_cheng" && !p.jiayuanDone) return "";   // 已在此地：正文已说明找谁
+                if (p.jiayuanDone) return "坊市 / 黑市";
+                return "景阳城 / 坊市 · 黑市";
+            }
         },
         {
             id: "shichong", urgent: true,
@@ -257,6 +286,23 @@ GAME.Goals = {
             return { kind: "story", label: "先了结眼前之事", why: "有未决的战斗或事件，处理完才可闭关", run: null };
         }
 
+        // ①b 阴毒在身：此刻一切都要让位于解毒——别再让"还差 N 修为"盖过生存危机
+        if (p.yindu) {
+            var yl = this._yinduLeft(p.yindu);
+            if (this._has(p, "nuan_yang_bao_yu")) {
+                return { kind: "go", label: "服下暖阳宝玉", why: "解药在手，服下即解——只剩 " + yl + "，没必要再耗", run: null };
+            }
+            if (p.location === "jiayuan_cheng" && !p.jiayuanDone) {
+                return { kind: "go", label: "入墨府 / 玄机世家", why: "城内两处皆握有解药线索，先问人，再谈修为", run: null };
+            }
+            return {
+                kind: "go",
+                label: p.jiayuanDone ? "赴坊市 / 黑市寻解毒之物" : "前往景阳城寻解药",
+                why: "阴毒尚余 " + yl + "，归零即道消——闭关与历练都得往后排" + lastChance,
+                run: null
+            };
+        }
+
         // ② 已至当世顶境
         if (!next) {
             return { kind: "done", label: "此界已圆满", why: "已至顶境，往后只剩自行择道", run: null };
@@ -391,9 +437,11 @@ GAME.Goals = {
         return {
             id: d.id,
             urgent: !!d.urgent,
+            crisis: d.crisis || "",
             text: typeof d.text === "function" ? d.text(p) : d.text,
-            hint: d.hint ? d.hint(p) : "",
-            where: d.where || ""
+            hint: d.hint ? (typeof d.hint === "function" ? d.hint(p) : d.hint) : "",
+            where: typeof d.where === "function" ? (d.where(p) || "") : (d.where || ""),
+            goto: d.goto
         };
     },
 
