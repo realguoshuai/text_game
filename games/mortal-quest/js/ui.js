@@ -279,7 +279,11 @@ GAME.UI = {
                     // 合并后挪到末尾，避免时间顺序错乱（旧条目顶着最新时间戳）
                     box.appendChild(target);
                     if (atBottom && typeof box.scrollHeight === "number") {
-                        requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
+                        var selfFold = this;
+                        requestAnimationFrame(function () {
+                            box.scrollTop = box.scrollHeight;
+                            selfFold._syncLogScroll(box);
+                        });
                     }
                     if (GAME.BattleUI) GAME.BattleUI.feed(message, type);
                     return;
@@ -321,11 +325,26 @@ GAME.UI = {
             while (box.childElementCount > this.MAX_LOG) box.removeChild(box.firstChild);
             // 吸底放在下一帧：批量追加日志时本帧布局可能未稳，直接设可能被旧高度截断
             if (atBottom && typeof box.scrollHeight === "number") {
-                requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
+                var selfLog = this;
+                requestAnimationFrame(function () {
+                    box.scrollTop = box.scrollHeight;
+                    selfLog._syncLogScroll(box);
+                });
             }
             // 斗法页另存一份战报（只读旁路，不改任何战斗状态）
             if (GAME.BattleUI) GAME.BattleUI.feed(message, type);
         } catch (e) { console.error("log异常", e); }
+    },
+
+    // ---------- 见闻录顶部渐隐开关 ----------
+    // 滚动容器的上沿必然"切"在一个随机位置，落点不好就是半行字——截图看着像字被削掉一截。
+    // 这里只做一件事：滚起来时给容器挂 .log-scrolled，由 CSS 在上沿做 12px 渐隐；
+    // 停在顶端（首条完整可见）时摘掉，保证第一条日志原样清楚。
+    _syncLogScroll: function (box) {
+        box = box || this.$("log-box");
+        if (!box || !box.classList) return;
+        if (box.scrollTop > 1) box.classList.add("log-scrolled");
+        else box.classList.remove("log-scrolled");
     },
 
     // ---------- 死亡：禁用一切主操作，仅留存档区 ----------
@@ -540,11 +559,18 @@ GAME.UI = {
                 // 「前往：XXX」不再是一句干话：能走的直接动身，走不了的就指路并说清缺什么。
                 var plan = null;
                 try { plan = (GAME.Goals && GAME.Goals.wherePlan) ? GAME.Goals.wherePlan(g, wp) : null; } catch (e) { plan = null; }
-                if (plan && plan.kind !== "text") {
+                if (plan && plan.kind !== "text" && plan.state === "here") {
+                    // 已在当地：旧写法是一枚置灰按钮 + 方头方脑的灰框，紧贴在句末汉字上，
+                    // 看着像"可点却点不动"的坏控件。改成一句随正文走的古风夹注，
+                    // 不占按钮位、不带边框（字号/行距一律继承，免得与前半句两套字）。
+                    var here = document.createElement("span");
+                    here.className = "goal-here";
+                    here.innerText = "（你已身处当地）";
+                    w.appendChild(here);
+                } else if (plan && plan.kind !== "text") {
                     var goBtn = document.createElement("button");
                     goBtn.id = "goal-go";
-                    goBtn.className = "goal-go" + (plan.state === "here" ? " is-here" : "") +
-                        (plan.state === "blocked" ? " is-gated" : "");
+                    goBtn.className = "goal-go" + (plan.state === "blocked" ? " is-gated" : "");
                     goBtn.innerText = plan.label;
                     goBtn.disabled = !!plan.disabled;
                     if (plan.disabled) goBtn.title = "你已身在此地";
@@ -3039,21 +3065,25 @@ GAME.UI = {
             huntBox.appendChild(row);
         });
 
-        // 地点专属行动
+        // 地点专属行动（含按剧情动态补出的门，如持升仙令拜山）：
+        // 渲染与 Map.canDoAction 读同一份 nodeActions，免得"看得见却报此地无此事"
         var ab = this.$("map-actions");
         ab.innerHTML = "";
-        (node.actions || []).forEach(function (a) {
+        var acts = (GAME.Map && GAME.Map.nodeActions) ? GAME.Map.nodeActions(p) : (node.actions || []);
+        acts.forEach(function (a) {
             var chk2 = GAME.Map.canDoAction(a.id);
             var row2 = document.createElement("div");
-            row2.className = "item-row";
+            row2.className = "item-row" + (a.main ? " is-main" : "");
             var l2 = document.createElement("div");
-            l2.innerHTML = a.label + '<div class="item-desc">' + (chk2.ok ? a.hint : chk2.msg) + '</div>';
+            l2.innerHTML = (a.main ? '<span class="highlight">' + a.label + '</span>' : a.label) +
+                '<div class="item-desc">' + (chk2.ok ? a.hint : chk2.msg) + '</div>';
             var r2 = document.createElement("div");
             r2.className = "item-right";
             var b2 = document.createElement("button");
             b2.className = "small-btn btn-gold";
             // 玄机世家是一次性主线：了结之后入口只报"已了结"，不再给一个点了刷日志的按钮
-            b2.innerText = (a.id === "mo_house" && GAME.State.p().jiayuanDone) ? "已了结" : "行事";
+            b2.innerText = (a.id === "mo_house" && p.jiayuanDone) ? "已了结"
+                : (a.id === "join_sect" ? "拜入山门" : "行事");
             b2.disabled = !chk2.ok;
             if (!chk2.ok) b2.title = chk2.msg;
             b2.onclick = function () { GAME.Map.doAction(a.id); };
@@ -3061,7 +3091,7 @@ GAME.UI = {
             row2.appendChild(l2); row2.appendChild(r2);
             ab.appendChild(row2);
         });
-        if (!(node.actions || []).length) ab.innerHTML = '<div class="empty-tip">此地无事可做。</div>';
+        if (!acts.length) ab.innerHTML = '<div class="empty-tip">此地无事可做。</div>';
 
         // 苍南小会：身抵苍南谷时显现为折叠入口，否则整体隐藏
         // （散修坊市与货币兑换已移至【市集】页签，此处只留升仙大会）
@@ -3836,6 +3866,13 @@ GAME.UI = {
         var p = GAME.State.p();
         var on = null;
         GAME.DATA.ORIGINS.forEach(function (o) { if (o.id === p.originId) on = o; });
+        // 见闻录滚动时同步"顶部渐隐"开关（手动上下翻阅也算）——只挂一次，重复开局不叠监听
+        var lb = this.$("log-box");
+        if (lb && lb.addEventListener && !this._logScrollBound) {
+            var selfLb = this;
+            this._logScrollBound = true;
+            lb.addEventListener("scroll", function () { selfLb._syncLogScroll(lb); });
+        }
         this.log("你以【" + (on ? on.name : "流浪散修") + "】之身踏入修仙界，天生四系杂灵根，资质低劣。", "system");
         this.log("提示：打坐半年只得 1 修为，百年苦修难出练气四层。欲破境筑基，唯有丹药、绿液与历练夺宝。", "system");
     },

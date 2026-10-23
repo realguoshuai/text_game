@@ -3487,3 +3487,73 @@ body.theme-light #plot-head:hover #plot-head-more, body.theme-light #plot-head:f
 .plot-row { flex-wrap: wrap; row-gap: 2px; }
 .plot-row .bt-rn { flex: 1 1 auto; }
 .plot-row .plot-btn { flex: 0 0 auto; max-width: 100%; }
+
+/* ================= 目标栏「已在当地」夹注（.goal-here） =================
+ * 原先这里是 .goal-go 的一枚置灰按钮：方框紧贴句末汉字，像个点不动的坏控件。
+ * 现在只作一句随正文走的夹注——字号、行距、字色全部继承前半句，
+ * 只把颜色压淡一档，让"你已经在这儿了"读起来是话，不是按钮。 */
+.goal-here {
+    display: inline;
+    margin-left: 2px;
+    /* 字号与行距照抄 .goal-main b（正文句，13.5px / 1.45）：
+       容器 .goal-where 是 12px（给旧按钮用的），只写 inherit 会缩成小字，与前半句两套字。 */
+    font-size: 13.5px;
+    line-height: 1.45;
+    letter-spacing: inherit;
+    white-space: nowrap;     /* 夹注整块换行，不把「（你已身／处当地）」从中间劈开 */
+    /* 比正文淡一档、比 --text-faint 亮一档：--text-faint 在纸面主题里几乎糊进底纹，读不出来 */
+    color: #9C927F;
+}
+body.theme-light .goal-here { color: #7B6A55; }
+
+/* ================= 四通八达：长提示与「动身」互不挤占 =================
+ * 「（银两不足，可耗 1 灵石抵扣）」这类长括号说明会把左侧文案顶到按钮边上，
+ * 窄屏下甚至压到「动身」上。这里把两列的身份写死：
+ *   左列 = 吃掉全部剩余宽度（basis 0 + min-width 0，长句只在自家折行）；
+ *   右列 = 只按内容取宽、绝不收缩（flex-shrink:0），绝不会被文字推着变形。 */
+#map-routes .item-row { align-items: flex-start; }
+#map-routes .item-row > div:first-of-type {
+    flex: 1 1 0%;
+    min-width: 0;
+    padding-right: 6px;      /* 与按钮之间留一口气，末字不再"贴着"键面 */
+    overflow-wrap: anywhere;
+}
+#map-routes .item-right {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    white-space: nowrap;     /* 「动身」二字永不折成两行 */
+}
+
+/* ================= 此地可为 · 主线级入口（.is-main） =================
+ * 拜山是主线一步，混在一排灰扑扑的「行事」里玩家会看不见。
+ * 行首立一道旧金竖边、标题提亮一档；浅色主题改用赭石（规则顺位在暗色之后）。 */
+#map-actions .item-row.is-main {
+    border-left: 2px solid rgba(200,162,90,.62);
+    padding-left: 8px;
+    border-radius: 2px 4px 4px 2px;
+    background: linear-gradient(90deg, rgba(200,162,90,.10), transparent 62%);
+}
+#map-actions .item-row.is-main .highlight { color: #F0DCB0; letter-spacing: .3px; }
+#map-actions .item-row.is-main button {
+    box-shadow: 0 0 0 1px rgba(226,198,140,.55), 0 1px 4px rgba(0,0,0,.35);
+}
+body.theme-light #map-actions .item-row.is-main {
+    border-left-color: #A9762E;
+    background: linear-gradient(90deg, rgba(176,141,87,.16), transparent 62%);
+}
+body.theme-light #map-actions .item-row.is-main .highlight { color: #6D4310; }
+body.theme-light #map-actions .item-row.is-main button { box-shadow: 0 0 0 1px #C39A5E; }
+
+/* ================= 见闻录首行不再被上沿削掉半行 =================
+ * #log-box 是滚动容器：自动吸底后，顶端必然落在一条日志的中间，看着像"字被边框切了半截"。
+ * 两处收口：
+ *   ① 顶部补 6px 呼吸位（原 padding-top 只有 2px，首条几乎贴着上沿）；
+ *   ② 滚起来时挂 .log-scrolled，上沿 10px 做一段渐隐——旧条目是"淡出画面"，
+ *      而不是被硬切一刀；停在顶端（首条完整可见）时类名摘掉，首条原样清楚。 */
+#log-box { padding-top: 6px; }
+#log-box.log-scrolled {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+}
+
+

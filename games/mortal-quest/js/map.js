@@ -243,12 +243,38 @@ GAME.Map = {
     },
 
     // ---------- 地点专属行动 ----------
+    // 节点自带的 actions 只写"这地方永久有啥"，写不了"你手上有某物时才有的门"。
+    // 苍南谷原先 actions 为空 —— 持升仙令的人站在谷里，读到的却是「此地无事可做」，
+    // 拜山入口只藏在折叠的【苍南小会】里，等于没有。这里按剧情补出动态行动，
+    // 渲染（renderMap）与执行（canDoAction/doAction）都读同一份，不各写一套。
+    nodeActions: function (p) {
+        var node = this.cur();
+        var out = (node.actions || []).slice();
+        p = p || GAME.State.p();
+        if (node.id === "tainan_gu" && !p.sectId && GAME.State.countItem("shengxian_ling") > 0) {
+            out.push({
+                id: "join_sect",
+                label: "持升仙令面见宗门长老",
+                hint: "锈牌一亮，验令长老当场引你入门；青梧谷的山门自此为你敞开。",
+                main: true          // 主线级入口：渲染时行首加一道旧金边，不与寻常「行事」混作一片
+            });
+        }
+        return out;
+    },
+
     canDoAction: function (actionId) {
         var node = this.cur();
-        var act = null;
-        (node.actions || []).forEach(function (a) { if (a.id === actionId) act = a; });
-        if (!act) return { ok: false, msg: "此地并无此事可做。" };
         var p = GAME.State.p();
+        var act = null;
+        this.nodeActions(p).forEach(function (a) { if (a.id === actionId) act = a; });
+        if (!act) return { ok: false, msg: "此地并无此事可做。" };
+        // 苍南谷拜山：令牌是唯一凭证（擂台三场只换筑基丹，不换门籍）
+        if (actionId === "join_sect") {
+            if (p.sectId) return { ok: false, msg: "你已有山门可归。" };
+            if (GAME.State.countItem("shengxian_ling") <= 0) {
+                return { ok: false, msg: "你身上并无【升仙令】。若无此物，只有上擂台一条路。" };
+            }
+        }
         // 玄机世家是一次性主线：了结之后入口必须封存，否则每点一次就往见闻录刷一遍收尾话
         if (actionId === "mo_house" && p.jiayuanDone) {
             return { ok: false, msg: "玄机世家之事已了，颜氏仍在城中操持旧业。" };
@@ -297,6 +323,13 @@ GAME.Map = {
             // 交由景阳城玄机世家主线模块接管
             GAME.Jiayuan.start();
             return true;
+        } else if (actionId === "join_sect") {
+            // 拜山唯一出口：走 Tainan.joinByToken（扣令牌、发门籍、发赐物、记图鉴秘闻都在里面）
+            if (!GAME.Tainan || !GAME.Tainan.joinByToken) { GAME.UI.log("山门今日无人当值。", "system"); return false; }
+            var joined = GAME.Tainan.joinByToken();
+            // 拜入之后「门派」页签才解锁——顺势点亮并切过去，免得玩家还在地图上找下一步
+            if (joined && GAME.UI && GAME.UI.switchTab) GAME.UI.switchTab("sect");
+            return joined;
         }
         GAME.UI.autoSave();
         GAME.UI.updateUI();

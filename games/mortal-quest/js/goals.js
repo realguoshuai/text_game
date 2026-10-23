@@ -160,9 +160,11 @@ GAME.Goals = {
             hint: function (p) {
                 var G = GAME.Goals;
                 if (G._has(p, "shengxian_ling")) {
-                    return p.shengxianLore
+                    var at = (p.location === "tainan_gu")
+                        ? "——人已到谷中，到【此地可为】点「持升仙令面见宗门长老」即可" : "";
+                    return (p.shengxianLore
                         ? "锈牌即是通行令，不必再上擂台；你已参透「以令映纹」的口诀，验令长老另有厚赐"
-                        : "锈牌即是通行令，不必再上擂台；持令者连苍南谷外的掩形幻阵都可径直看破";
+                        : "锈牌即是通行令，不必再上擂台；持令者连苍南谷外的掩形幻阵都可径直看破") + at;
                 }
                 var t = p.tainan || { leitai: 0 };
                 return "擂台已胜 " + (t.leitai || 0) + " 场，进前三方可得筑基丹";
@@ -181,7 +183,12 @@ GAME.Goals = {
             },
             hint: function (p) {
                 if (GAME.Goals._has(p, "shengxian_ling")) {
-                    return "入谷后于【苍南小会】出示升仙令即可，验令长老当场引你入门";
+                    // 人已站在谷里：别再让他去翻折叠块。大地图「此地可为」已挂出拜山按钮，
+                    // 这里直接指到那一行（两边文案同源，改一处不漏另一处）。
+                    if (p.location === "tainan_gu") {
+                        return "人已在谷中——到【岚州舆图 · 此地可为】点「持升仙令面见宗门长老」，验令长老当场引你入门";
+                    }
+                    return "入谷后于【此地可为】出示升仙令即可，验令长老当场引你入门";
                 }
                 if (p.tainan && p.tainan.leitaiDone) {
                     return "擂台三场只换得筑基丹；拜山另需一枚升仙令——玄机子遗箧里似压着一块铁牌";
