@@ -3436,3 +3436,54 @@ body.theme-light .goal-go:disabled {
  * 单列一档：比 info 暖一点、比 loot 沉一点，能一眼认出"这是我花钱/卖货的一笔"。 */
 .log-trade { color: var(--gold-tx); }
 body.theme-light .log-trade { color: #6B4B12; }
+
+/* ================= 药圃状态条：可点 + 右侧实况 =================
+ * 原先它是一条死的状态栏：挂个 0/3 就再没别的用处。现在整条是「打理药圃」的入口，
+ * 右侧补灵田等阶与手上存药——空垄时改成一句"点击打理药圃 ›"，让 0/3 自己会说话。
+ * 暗色用旧金、浅色用赭石，规则顺序：浅色一律写在暗色之后。 */
+#plot-head {
+    cursor: pointer;
+    flex-wrap: wrap; row-gap: 1px;
+    border-radius: 2px;
+    transition: background-color .15s ease, color .15s ease;
+}
+#plot-head:hover, #plot-head:focus-visible {
+    background-color: rgba(176,141,87,.12);
+    outline: none;
+}
+#plot-head:hover b, #plot-head:focus-visible b { color: #f0dcae; }
+#plot-head:active { background-color: rgba(176,141,87,.20); }
+#plot-head-more {
+    margin-left: auto;
+    font-size: 11px; letter-spacing: .3px; color: #8f7d5e;
+    white-space: nowrap;
+    transition: color .15s ease;
+}
+#plot-head:hover #plot-head-more, #plot-head:focus-visible #plot-head-more { color: #c9a266; }
+
+body.theme-light #plot-head:hover, body.theme-light #plot-head:focus-visible { background-color: rgba(140,110,60,.14); }
+body.theme-light #plot-head:hover b, body.theme-light #plot-head:focus-visible b { color: #5A3612; }
+body.theme-light #plot-head-more { color: #8C7355; }
+body.theme-light #plot-head:hover #plot-head-more, body.theme-light #plot-head:focus-visible #plot-head-more { color: #7A4E1B; }
+
+/* ================= 催熟菜单副标题（.cata-sub） =================
+ * 每个催熟项一句"这东西拿来干什么 ＋ 手上现有几份"。
+ * 颜色走 inherit：按钮禁用变灰时副标题跟着灰，深浅两套主题都不必各写一遍。 */
+.cata-sub {
+    display: block;
+    margin-top: 1px;
+    font-size: 11px; line-height: 1.4; font-style: normal;
+    letter-spacing: .2px; opacity: .82;
+    color: inherit;
+    text-align: left;
+}
+
+/* ================= 洞府折叠面板占满整行 =================
+ * 破境筹备 / 药圃原本混在 .combat-actions（三列网格）里，各只分到三分之一宽，
+ * 于是"第 1 垄 / 空地 / 移栽（需百年灵药×1）"挤成一团、文字互相压住。
+ * 这两块是折叠数据面板，不是按钮，本该各占一整行。 */
+#bt-prep, #plot-box { grid-column: 1 / -1; }
+/* 药圃行的窄宽自适应：名字与年份可缩，按钮不抢位 */
+.plot-row { flex-wrap: wrap; row-gap: 2px; }
+.plot-row .bt-rn { flex: 1 1 auto; }
+.plot-row .plot-btn { flex: 0 0 auto; max-width: 100%; }

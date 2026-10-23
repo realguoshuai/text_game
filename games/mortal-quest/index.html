@@ -84,11 +84,12 @@
     <div id="workspace" data-page-node-id="miDdDGGRuA0M4UnwChNkf4">
 
         <div id="left-col" data-page-node-id="Hw2irYum2Lt7PMHm1NUjzG">
-            <!-- 药圃：土里长着的，才是最实在的寿元 -->
-            <div id="plot-head">
+            <!-- 药圃：土里长着的，才是最实在的寿元。整条可点，直接跳到洞府药圃面板 -->
+            <div id="plot-head" role="button" tabindex="0" title="点击打理药圃（修行 → 洞府）">
                 <b>药圃</b>
                 <span id="plot-head-text">0 / 3 垄在长</span>
                 <span class="ph-line"></span>
+                <span id="plot-head-more"></span>
             </div>
 
             <!-- 功能导航：先选「想做什么」（一级分组），再看「在哪做」（二级页签） -->
@@ -518,11 +519,11 @@
                                 <details class="dropdown" id="dd-catalyze">
                     <summary class="act-tile">灵液催熟<em>绿液 <span id="dd-liquid-text">0</span> 滴</em></summary>
                     <div class="dd-body">
-						<button id="btn-catalyze-bainian" class="small-btn dd-item" style="display:block;width:100%;">催熟百年灵药 (1滴)</button>
-                											<button id="btn-catalyze-qiannian" class="small-btn dd-item" style="display:block;width:100%;">催熟千年灵药 (5滴)</button>
-                											<button id="btn-catalyze-wood" class="small-btn dd-item" style="display:block;width:100%;">催熟灵木幼苗 (1滴 得灵木×3)</button>
-                											<button id="btn-catalyze-xuanbing" class="small-btn dd-item" style="display:block;width:100%;">催熟五百年玄冰花 (5滴)</button>
-                											<button id="btn-catalyze-longlin" class="small-btn dd-item" style="display:block;width:100%;">催熟千年龙鳞果 (10滴)</button>
+						<button id="btn-catalyze-bainian" class="small-btn dd-item" style="display:block;width:100%;">催熟百年灵药<em id="cata-bainian-sub" class="cata-sub">1 滴 → 百年灵药×1</em></button>
+                											<button id="btn-catalyze-qiannian" class="small-btn dd-item" style="display:block;width:100%;">催熟千年灵药<em id="cata-qiannian-sub" class="cata-sub">5 滴 → 千年灵药×1</em></button>
+                											<button id="btn-catalyze-wood" class="small-btn dd-item" style="display:block;width:100%;">催熟灵木幼苗<em id="cata-wood-sub" class="cata-sub">1 滴 → 百年灵木×3</em></button>
+                											<button id="btn-catalyze-xuanbing" class="small-btn dd-item" style="display:block;width:100%;">催熟五百年玄冰花<em id="cata-xuanbing-sub" class="cata-sub">5 滴 → 五百年玄冰花×1</em></button>
+                											<button id="btn-catalyze-longlin" class="small-btn dd-item" style="display:block;width:100%;">催熟千年龙鳞果<em id="cata-longlin-sub" class="cata-sub">10 滴 → 千年龙鳞果×1</em></button>
                     </div>
                 </details>
                 <button id="btn-alchemy" class="act-tile" data-page-node-id="gblIVqM1sB7jc2HqejS797">开炉炼丹<em id="alchemy-sub">需练气三层</em></button>

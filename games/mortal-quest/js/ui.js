@@ -744,6 +744,22 @@ GAME.UI = {
         }
     },
 
+    /* 打理药圃：左上角那条状态条的唯一动作。
+     * 一步到位——切到「修行 → 洞府」、把折叠的药圃面板展开、滚进视野。
+     * 玩家在左栏看见"0 / 3 垄在长"就能伸手点，不必自己找页签再找折叠。 */
+    openPlot: function () {
+        var p = GAME.State.p();
+        if (!p || p.isDead) return;
+        if (this.tab !== "home") this.switchTab("home");
+        var box = this.$("plot-box");
+        if (box) {
+            box.style.display = "";
+            try { box.open = true; } catch (e) {}
+            if (box.setAttribute) box.setAttribute("open", "open");   // details 默认收起，替他展开
+        }
+        this.scrollToSection("plot-box");
+    },
+
     // ---------- 药圃面板 ----------
     // 时间不只是花掉的，也是长在土里的：三垄地，把百年灵药养到千年。
     // ★ 年份与"还差几月"一律问 GAME.Plot，别在这里自己算。
@@ -759,6 +775,20 @@ GAME.UI = {
 
         var head = this.$("plot-head-text");
         if (head) head.innerText = st.growing + " / " + st.plots + " 垄在长" + (st.ready > 0 ? " · " + st.ready + " 株可收" : "");
+
+        // 状态条右侧：灵田等阶 ＋ 手上存药。空垄时改成一句"点击打理药圃 ›"——
+        // 光挂一个 0/3 的死数字，玩家既不知道点得动，也不知道该拿什么去种。
+        var more = this.$("plot-head-more");
+        if (more) {
+            var _lv = (GAME.Home && GAME.Home.level) ? GAME.Home.level("lingtian") : 0;
+            var _lt = _lv > 0 ? ("灵田 " + _lv + " 阶") : "凡土药畦";
+            var _qian = GAME.State.countItem("herb_qiannian");
+            if (st.growing === 0) {
+                more.innerText = _lt + " · 点击打理药圃 ›";
+            } else {
+                more.innerText = _lt + " · 存药 百年×" + st.seed + (_qian > 0 ? " 千年×" + _qian : "");
+            }
+        }
 
         var sum = this.$("plot-sum");
         if (sum) {
@@ -1018,6 +1048,15 @@ GAME.UI = {
             _liq(this.$("btn-catalyze-wood"), 1);
             _liq(this.$("btn-catalyze-xuanbing"), 5);
             _liq(this.$("btn-catalyze-longlin"), 10);
+            // 催熟菜单的副标题：产出来是干什么用的 ＋ 手上现有几份。
+            // 原来只有一句"得灵木×3"，玩家对着它根本猜不出灵木为何物。
+            var _cn = function (id) { return GAME.State.countItem(id); };
+            var _catSub = function (elId, txt) { var el = this.$(elId); if (el) el.innerText = txt; }.bind(this);
+            _catSub("cata-bainian-sub", "1 滴 → 百年灵药×1 · 药圃移栽苗 / 炼丹主材 · 现有 " + _cn("herb_bainian") + " 株");
+            _catSub("cata-qiannian-sub", "5 滴 → 千年灵药×1 · 筑基丹主药 · 现有 " + _cn("herb_qiannian") + " 株");
+            _catSub("cata-wood-sub", "1 滴 → 百年灵木×3 · 傀儡骨架主材 · 现有 " + _cn("spirit_wood") + " 根");
+            _catSub("cata-xuanbing-sub", "5 滴 → 五百年玄冰花×1 · 元灵丹主材 / 拜师礼 · 现有 " + _cn("herb_xuanbing") + " 株");
+            _catSub("cata-longlin-sub", "10 滴 → 千年龙鳞果×1 · 结丹级天地灵珍（老怪见之动心）· 现有 " + _cn("herb_longlin") + " 株");
 
             // —— 异常警示行：有异常才亮（煞气/阴毒/觊觎度/药香泄露） ——
             var aw = function (id, on) { var el = this.$(id); if (el) el.style.display = on ? "" : "none"; }.bind(this);
@@ -2805,6 +2844,18 @@ GAME.UI = {
                 sub = '<span class="warning">修为不足</span> — ' + r.lockMsg;
             } else {
                 sub = r.months + " 个月，" + (r.silver > 0 ? "盘缠 " + r.silver + " 两" : "不需盘缠");
+                // 钱的事单独问 payPlan（与按钮置灰同一出口）：
+                //   · 灵石也掏不出 → 直说不走；
+                //   · 要靠灵石抵、而且这条路本身走得通 → 写明"可耗 1 灵石抵扣"
+                //     （被幻阵/修为拦下时不写，否则玩家会以为是钱的问题，跑去找灵石）
+                if (r.silver > 0 && GAME.Map && GAME.Map.payPlan) {
+                    var _pay = GAME.Map.payPlan(p, r.silver);
+                    if (!_pay.ok) {
+                        sub += ' <span class="warning">（银两与灵石皆不足，走不得）</span>';
+                    } else if (_pay.fallback && chk.ok) {
+                        sub += ' <span class="gold">（银两不足，可耗 1 灵石抵扣）</span>';
+                    }
+                }
             }
             left.innerHTML = '前往 <span class="' + (r.unlocked ? "q-灵品" : "item-desc") + '">' + r.targetName + '</span>' +
                 '<div class="item-desc">' + sub + '</div>';
@@ -3751,6 +3802,15 @@ GAME.UI = {
         this.$("btn-save-close").onclick = function () { self.closeSaveModal(); };
         this.$("btn-zhuji-preset").onclick = function () { self.startPresetZhuji(); };
         this.$("btn-theme").onclick = function () { self.toggleTheme(); };
+
+        // 左上角药圃状态条：点它去打理药圃（一条不可点的静止状态栏，等于一句废话）
+        var bPlotHead = this.$("plot-head");
+        if (bPlotHead) {
+            bPlotHead.onclick = function () { self.openPlot(); };
+            bPlotHead.onkeydown = function (e) {
+                if (e && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); self.openPlot(); }
+            };
+        }
 
         // 铁奴·玄傀：激活与日常派遣
         this.$("btn-companion-activate").onclick = function () { GAME.Core.activateCompanion(); };

@@ -111,7 +111,7 @@ GAME.Map = {
         // 盘缠：银两不足可用灵石折抵（见 payPlan），不再因为"灵石满身、银两为零"被困死在城里
         var pay = this.payPlan(p, target.silver);
         if (!pay.ok) {
-            return { ok: false, msg: "盘缠不足（需 " + target.silver + " 两），身上灵石连折抵都不够——先在凡俗城池接点营生。" };
+            return { ok: false, msg: "盘缠不足（需 " + target.silver + " 两），身上连一枚灵石也无——先在凡俗城池接点营生，或卖掉些杂物换灵石。" };
         }
         if (target.targetId === "tainan_gu" && !(p.location === "tainan_gu") && !this.canEnterTainan()) {
             return { ok: false, msg: GAME.DATA.MAP.array.failText };
@@ -153,18 +153,20 @@ GAME.Map = {
     },
 
     // ---------- 盘缠支付方案（唯一出口） ----------
-    // 世俗规矩收银两，可修士身上常只有灵石：银两不足时按 1 灵石 = 100 两折补，
-    // 免得身家颇丰的修士因为囊中 0 两被困死在城中（用户在景阳城实测卡死）。
-    STONE_TO_SILVER: 100,
+    // 世俗规矩收银两，可修士身上常只有灵石。原来按 1 灵石 = 100 两折算"需要几枚"，
+    // 于是身家颇丰的人因为囊中 0 两被困死在城中（用户在景阳城实测卡死）。
+    // 现在：银两够就只扣银两；不够则把身上银两抵作盘缠，再拿「一枚低阶灵石」补足整程
+    // ——驿站兑碎银是按程算的，没人会为一趟车马数你几块灵石。
+    // ★ 盘缠判定的唯一出口：canTravel / travel / renderMap 的置灰都读它的 ok。
+    STONE_TO_SILVER: 100,          // 仅作"一枚灵石值多少两"的换算参考（行商兑换同价）
     payPlan: function (p, cost) {
         cost = Math.max(0, Math.round(cost || 0));
         var silver = (typeof p.silver === "number" && isFinite(p.silver)) ? p.silver : 0;
         var stones = (typeof p.spiritStones === "number" && isFinite(p.spiritStones)) ? p.spiritStones : 0;
-        if (silver >= cost) return { ok: true, silver: cost, stones: 0, short: 0 };
+        if (silver >= cost) return { ok: true, silver: cost, stones: 0, short: 0, fallback: false };
         var short = cost - silver;
-        var need = Math.ceil(short / this.STONE_TO_SILVER);
-        if (stones < need) return { ok: false, silver: silver, stones: need, short: short };
-        return { ok: true, silver: silver, stones: need, short: short };
+        if (stones < 1) return { ok: false, silver: silver, stones: 1, short: short, fallback: true };
+        return { ok: true, silver: silver, stones: 1, short: short, fallback: true };
     },
 
     travel: function (routeId) {
