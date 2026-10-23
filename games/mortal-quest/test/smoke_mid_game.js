@@ -95,9 +95,11 @@ p.spiritStones = 200;
 setRand(0.5);
 p.leak = 0;
 for (var i = 0; i < 5; i++) G.Garden.catalyze("herb_bainian", false);
-ok("无职暗田催熟 5 次泄露值累计 50（10×5）", p.leak === 50);
+// 药香日常消减（2026-10-22 起）：每次催熟耗 1 月，当月自然散味 1 点（有百年灵药在身 ×1）
+// 故 5 次催熟 = 5×(10−1) = 45，而非旧无消减时代的 50
+ok("无职暗田催熟 5 次泄露值累计 45（10×5，每月自然消减 1）", p.leak === 45);
 var stonesBeforeCatch = p.spiritStones;
-for (i = 0; i < 3; i++) G.Garden.catalyze("herb_bainian", false);   // 第 8 次达 80 → 触发掠园
+for (i = 0; i < 4; i++) G.Garden.catalyze("herb_bainian", false);   // 第 9 次推至 82 ≥ 80 → 触发掠园
 ok("泄露值达预警线触发神识掠园：查获后回落至 40", p.leak === 40);
 ok("查获罚没：灵石遭罚（低于原值）", p.spiritStones < stonesBeforeCatch);
 

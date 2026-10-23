@@ -81,6 +81,20 @@ GAME.Bottle = {
         return this.risk();
     },
 
+    // 日常消减（core.passTime 委派）：此前觊觎度只降不升的出口只有「被截杀后破财」，
+    // 不主动消减等于卡死——黑市销一次赃，头顶就永远悬着结丹修士（用户实测反馈）。
+    // 公式与药香一致：每月 1 + 敛气阶×2（敛气术越高，越不容易被人盯上）。
+    decayRisk: function (months) {
+        var p = GAME.State.p();
+        if (!(p.marketRiskValue > 0) || !(months > 0)) return;
+        var dec = months * (1 + (p.concealLevel || 0) * 2);
+        p.marketRiskValue = Math.max(0, p.marketRiskValue - dec);
+        if (p.marketRiskValue <= 0 && p.riskWarned) {
+            p.riskWarned = false;
+            GAME.UI.log("风头过去，再无人惦记你身上那点家当——觊觎的目光已移开。", "info");
+        }
+    },
+
     /* ================= ③ 危机触发与逃生检定 ================= */
     // 离开坊市时调用：返回 true 表示触发了【结丹期修士神识锁定】
     onLeaveMarket: function () {

@@ -727,6 +727,24 @@ GAME.Combat = {
         }
     },
 
+    /* ---------- 人形敌修储物袋：杀人夺宝的开盲盒 ----------
+     * 只对「杀了对方」的路径生效（ratio=1）。留活口不取袋——跪地求饶时顺手牵袋
+     * 不算英雄，也与"六成财物"的宽厚设定重复。袋子阶级按敌修境界分三档，
+     * 袋里有什么要看运气，但神识够不够强行震禁制是硬门槛（见 Core.openPouch）。
+     */
+    pouchDrop: function (def, ratio) {
+        if (!def || !def.human) return;
+        if (ratio != null && ratio < 1) return;
+        if (Math.random() >= 0.70) return;
+        // 阶级分档：majorRealm 0=练气 1=筑基 2=结丹 3=元婴；tier 1~2=练气 3=筑基 4=结丹 5=元婴
+        var mr = def.majorRealm || 0, tier = def.tier || 1;
+        var id = (mr >= 3 || tier >= 5) ? "pouch_jiedan" : ((mr >= 1 || tier >= 3) ? "pouch_zhuji" : "pouch_low");
+        GAME.State.addItem(id, 1);
+        this._note(id, 1);
+        GAME.UI.log("你翻过尸身，从其腰间解下一只储物袋——" + GAME.DATA.ITEMS[id].name +
+            "。袋口残余一缕神识烙印，须设法抹除方能开启。", "loot");
+    },
+
     // ---------- 战胜：搜刮战利品（杀人夺宝） ----------
     victory: function () {
         var p = GAME.State.p();
@@ -744,6 +762,7 @@ GAME.Combat = {
             p.spiritStones += stones;
             p.stats.kills += 1;
             this.grantLoot(def.loot, 1, def);
+            this.pouchDrop(def, 1);   // 人形敌修（血侍/擂台敌/禁地守敌）：杀人夺袋
             this.end();
             if (ctx.type === "jiayuan") GAME.Jiayuan.afterCombat(true, ctx);
             else if (ctx.type === "leitai") GAME.Tainan.afterCombat(true, ctx);
@@ -762,6 +781,7 @@ GAME.Combat = {
             p.spiritStones += stones;
             GAME.UI.log("你从尸身上搜出 " + stones + " 枚灵石。", "loot");
             this.grantLoot(def.loot, 1, def);
+            this.pouchDrop(def, 1);
             p.stats.kills += 1;
             this.end();
             GAME.Trial.afterCombat(true);

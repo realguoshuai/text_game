@@ -9,7 +9,11 @@ var GAME = window.GAME = window.GAME || {};
 
 GAME.UI = {
 
-    MAX_LOG: 200,        // 日志最多保留条数，超出删最旧，避免长局卡顿
+    MAX_LOG: 120,        // 日志最多保留条数，超出删最旧，避免长局卡顿（打坐类已折叠，120 够用）
+    FOLD_SCAN: 12,       // 折叠时向上找同键条目的最大跨度：一次闭关里世界事件能刷出一串日志
+    //                   （黑市/坊市换货 3 条 + 「第一滴绿液」剧情瞬间 5 条 ≈ 8 条），窗口必须盖住，
+    //                   否则连续打坐照样被插队顶成新条目。盖到 12 为止：再往上通常是另有一段
+    //                   经历（打了一场、跑了一图），那时分开计数反而清楚。
     started: false,      // 是否已选定出身开局
     selectedOrigin: null,
     tab: "bag",          // 当前面板页签：bag / alchemy / market / ach
@@ -61,6 +65,26 @@ GAME.UI = {
     // 页签键 ≠ 按钮 id 的别名：副本页的按钮叫 tab-fzone（历史命名）
     TAB_BTN: { dungeon: "fzone" },
 
+    // 可锁页签的展示名（【新功能解锁】提示里用，不硬编码进各调用点）
+    TAB_LOCK_NAME: { alchemy: "开炉炼丹", companion: "灵宠 · 傀儡", sect: "宗门", secret: "秘境舆图", dungeon: "副本 · 试炼" },
+
+    /* ---------- 页签前置锁：没到的功能不玩"点了没反应"，也不凭空消失 ----------
+     * 返回空串 = 可用；否则即置灰理由（鼠标悬停可见，switchTab 里同文拦下）。
+     * 读档全量兼容：锁不落存档，每次渲染按当下境界/物品现算——中后期存档自然全亮。 */
+    tabLock: function (t) {
+        var p = GAME.State.p();
+        if (t === "alchemy" && GAME.Core && !GAME.Core.canAlchemy())
+            return "练气三层后，玄机子才肯教你开炉";
+        if (t === "companion" && !p.companion && !p.spiritInsect)
+            return "炼化铁奴·玄傀或孵育本命灵虫后，此处方有用处";
+        if (t === "sect" && !p.sectId) return "尚未拜入宗门——散修一人，宗门门前冷落";
+        if (t === "secret" && p.realmIndex <= (GAME.DATA.ZHUJI_GATE_INDEX || 12))
+            return "筑基之后，方有资格踏入秘境舆图";
+        if (t === "dungeon" && p.realmIndex < ((GAME.DATA.CONTENT.FZONE || {}).enterRealm || 9))
+            return "练气十层后，方有本钱闯血色禁地";
+        return "";
+    },
+
     groupOf: function (tab) {
         for (var i = 0; i < this.NAV_GROUPS.length; i++) {
             if (this.NAV_GROUPS[i].tabs.indexOf(tab) >= 0) return this.NAV_GROUPS[i].id;
@@ -80,11 +104,16 @@ GAME.UI = {
     switchTab: function (name) {
         if (!this.TAB_MAP[name]) return;
         var p = GAME.State.p();
-        // 丹炉：练气三层前锁死（玄机子未传手艺）
-        if (name === "alchemy" && !GAME.Core.canAlchemy()) {
-            this.log("玄机子的炼丹手艺不外传——待你练气三层，他自会开口。", "system");
+        // 交战/夺舍对决/神识尾随之中：导航一律锁死。
+        // applyPanels 只把按钮置灰（挡鼠标），这里是总闸——任何路径（含程序内调用）
+        // 都别想在斗法中途切走去洞府/市集，无代价跳过战斗。要脱身，须胜出或施遁术/神行符。
+        if (p && (p.combat || p.tracking || (p.moEvent && !p.combat))) {
+            this.log("强敌环伺，需先分出胜负或施展遁术脱离。", "danger");
             return;
         }
+        // 页签前置锁：秘境/宗门/副本/傀儡/丹炉未到条件时一律拦下（理由与置灰提示同一把尺子）
+        var lockWhy = this.tabLock(name);
+        if (lockWhy) { this.log(lockWhy, "system"); return; }
         if (name === "skill" && p.isDead) {
             this.log("你已身死道消，无从研习。", "system");
             return;
@@ -131,12 +160,27 @@ GAME.UI = {
         for (var t in this.TAB_MAP) {
             var btn = this.$("tab-" + (this.TAB_BTN[t] || t));
             if (btn) {
-                // 丹炉：练气三层前 switchTab 会直接拒绝（等于"点了没反应"）。
-                // 改成显式锁定——看得见"有个丹炉还没开"，比入口凭空消失更有引导性。
-                var locked = (t === "alchemy" && GAME.Core && !GAME.Core.canAlchemy());
-                btn.className = "small-btn" + (this.tab === t ? " tab-on" : "") + (locked ? " tab-lock" : "");
-                btn.disabled = !!urgent || locked;
-                btn.title = locked ? "练气三层后，玄机子才肯教你开炉" : "";
+                // 页签前置锁：练气初期满屏 11 个页签，一半是点不开的空面板——半成品感太重。
+                // 没到条件的显式置灰（看得见"有个丹炉还没开"比入口凭空消失更有引导性），
+                // 悬停看前置条件；程序内调用由 switchTab 同一把尺子拦下。
+                var lockWhy = this.tabLock(t);
+                btn.className = "small-btn" + (this.tab === t ? " tab-on" : "") + (lockWhy ? " tab-lock" : "");
+                btn.disabled = !!urgent || !!lockWhy;
+                btn.title = lockWhy;
+                // 刚达标的页签：补一条【新功能解锁】高光（读档首帧只给一句总述，不刷屏）
+                if (!this._tabLit) this._tabLit = {};
+                if (!lockWhy && this._tabLit[t] === false) {
+                    GAME.UI.log("【新功能解锁】" + (this.TAB_LOCK_NAME[t] || t) + " 已开启，不妨去看上一看。", "success");
+                }
+                this._tabLit[t] = !lockWhy;
+            }
+        }
+
+        // 读档首帧：中后期存档直接全亮时给一句总述（逐条解锁日志留给"达成条件"那一刻，不刷屏）
+        if (this._tabLit && !this._litAnnounced) {
+            this._litAnnounced = true;
+            for (var lt in this.TAB_LOCK_NAME) {
+                if (this._tabLit[lt]) { GAME.UI.log("前世记忆回归——诸般手段，随这身境界次第归来。", "info"); break; }
             }
         }
 
@@ -177,12 +221,53 @@ GAME.UI = {
     },
 
     // ---------- 日志 ----------
-    log: function (message, type) {
+    // fold（第三参）= { fold:"meditate", months, exp, mind }：向上找最近一条同键条目，
+    // 累加改写该节点、不新开一条——连续打坐几十次曾把「绿液凝结」等剧情瞬间顶出视野
+    //（用户实测反馈）。跨度上限见 FOLD_SCAN，避免把隔了整场战斗的两次打坐并成一条。
+    log: function (message, type, fold) {
         type = type || "info";
         try {
             var box = this.$("log-box");
             if (!box) return;
             var p = GAME.State.p();
+            var key = (fold && typeof fold === "object") ? fold.fold : null;
+            var atBottom = true;
+            if (typeof box.scrollHeight === "number" && typeof box.clientHeight === "number") {
+                atBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 48;
+            }
+            // 折叠：向上找最近一条同键条目（允许中间插几条系统日志），累加耗时/产出后
+            // 就地更新文本与时间戳，并把它挪回末尾——保持「最近的动作在最底部」
+            if (key) {
+                var target = null;
+                var kids = box.children;
+                for (var i = kids.length - 1, back = 0; i >= 0 && back < this.FOLD_SCAN; i--, back++) {
+                    var k = (kids[i].getAttribute && kids[i].getAttribute("data-fold")) || null;
+                    if (k === key) { target = kids[i]; break; }
+                    if (k) break; // 别种折叠条目：那是另一批连续操作的结尾，不跨批合并
+                }
+                if (target) {
+                    var acc = target._foldAcc || { n: 0, months: 0, exp: 0, mind: 0 };
+                    acc.n += 1;
+                    acc.months += fold.months || 0;
+                    acc.exp += fold.exp || 0;
+                    acc.mind += fold.mind || 0;
+                    target._foldAcc = acc;
+                    var fst = target.querySelector ? target.querySelector(".log-time") : null;
+                    if (fst) fst.innerText = "[" + p.ageYears + "岁" + p.ageMonths + "月]";
+                    var fbd = target.querySelector ? target.querySelector(".log-msg") : null;
+                    if (fbd) {
+                        fbd.innerText = " 你打坐修行，累计 " + acc.n + " 轮 · " + acc.months +
+                            " 个月——修为 +" + acc.exp + (acc.mind > 0 ? "，心境 +" + acc.mind : "") + "。";
+                    }
+                    // 合并后挪到末尾，避免时间顺序错乱（旧条目顶着最新时间戳）
+                    box.appendChild(target);
+                    if (atBottom && typeof box.scrollHeight === "number") {
+                        requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
+                    }
+                    if (GAME.BattleUI) GAME.BattleUI.feed(message, type);
+                    return;
+                }
+            }
             var entry = document.createElement("div");
             entry.className = "log-entry log-" + type;
             // 时间戳单独一层：与正文同色时，一屏读下来像糊在一起
@@ -193,14 +278,23 @@ GAME.UI = {
             body.className = "log-msg";
             body.innerText = " " + message;
             entry.appendChild(stamp);
+            // 语义标签：机缘/凶险/警讯/获物 前置加粗，深浅主题都靠各 type 自身的配色保辨识度；
+            // 已带【突破成功】这类自带标签的消息不重复加
+            var TAGS = { success: "机缘", danger: "凶险", warning: "警讯", loot: "获物" };
+            if (TAGS[type] && message.indexOf("【") !== 0) {
+                var tag = document.createElement("span");
+                tag.className = "log-tag";
+                tag.innerText = "【" + TAGS[type] + "】";
+                entry.appendChild(tag);
+            }
             entry.appendChild(body);
+            if (key) {
+                entry.setAttribute("data-fold", key);
+                entry._foldAcc = { n: 1, months: fold.months || 0, exp: fold.exp || 0, mind: fold.mind || 0 };
+            }
             // 新条目接在末尾。原来是 column-reverse + insertBefore(firstChild)：
             // 好处是 CSS 原生吸底，坏处是条目不满一屏时整块贴到底，标题底下一大片空。
             // 改成正常流，吸底交给下面两行——但只在玩家本来就在底部时才抢滚动位置。
-            var atBottom = true;
-            if (typeof box.scrollHeight === "number" && typeof box.clientHeight === "number") {
-                atBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 48;
-            }
             box.appendChild(entry);
             // 裁剪：正常流下最旧的一条在头部
             while (box.childElementCount > this.MAX_LOG) box.removeChild(box.firstChild);
@@ -247,6 +341,12 @@ GAME.UI = {
                 : "空着"],
             ["故人", r.bonds.length > 0 ? r.bonds.length + " 位" : "无"]
         ];
+
+        // 局外账本：本世道韵结算（坐化时已由 Mortality.die 落入 localStorage）
+        var dres = GAME.Reincarn && GAME.Reincarn.lastResult;
+        if (dres && dres.gained > 0) {
+            rows.push(["轮回道韵", "道碑新录 <b class='gold'>+" + dres.gained + "</b>（存 " + dres.total + " 点，来世开局可兑遗泽）"]);
+        }
 
         var html = "";
         // 有些出身没有名只有别称（如"二愣子"），别拼成"无名散修 二愣子"
@@ -395,7 +495,10 @@ GAME.UI = {
         box.className = "goal-banner" + (g.urgent ? " urgent" : "");
         var tag = this.$("goal-tag");
         if (tag) tag.innerText = g.urgent ? "当务之急" : "当前目标";
-        var t = this.$("goal-text"); if (t) t.innerText = g.text || "暂无特定目标，可四处游历或闭关破境";
+        // 空态兜底：目标文本为空或残留占位符「—」时，填一句按境界的默认导引，
+        // 不让中栏顶部挂着一个光秃秃的破折号（加载体验档/无主线阶段实测反馈）
+        var gText = (g.text && g.text !== "—" && g.text !== "-") ? g.text : "";
+        var t = this.$("goal-text"); if (t) t.innerText = gText || "暂无特定目标，可四处游历或闭关破境";
         var h = this.$("goal-hint"); if (h) h.innerText = g.hint || "";
         var w = this.$("goal-where");
         if (w) {
@@ -670,7 +773,18 @@ GAME.UI = {
             // 景阳城·玄机世家篇 / 苍南小会：所在地 / 银两 / 心境 / 门派
             var curNode = GAME.Map.cur();
             this.$("location-text").innerText = curNode ? curNode.name : "流落无依";
+            // 顶栏银两：筑基后世俗银两全无购买力，常驻即成死数据——收纳进「更多属性」，
+            // 原位置换为中阶灵石（终局面眼/大额支付通行）。消耗口在市集·凡俗城池（雇镖局）。
+            var pastQi = p.realmIndex > (GAME.DATA.ZHUJI_GATE_INDEX || 12);
+            var scCell = this.$("silver-cell"), msCell = this.$("midstone-cell"), smMore = this.$("silver-more");
+            if (scCell) scCell.style.display = pastQi ? "none" : "";
+            if (msCell) msCell.style.display = pastQi ? "" : "none";
+            if (smMore) smMore.style.display = pastQi ? "" : "none";
             this.$("silver-text").innerText = p.silver || 0;
+            if (pastQi) {
+                this.$("midstone-text").innerText = GAME.State.countItem("mid_stone");
+                this.$("silver-more-text").innerText = p.silver || 0;
+            }
             this.$("mind-text").innerText = p.mind || 0;
             this.$("sect-text").innerText = p.sectId ? GAME.DATA.TAINAN.token.sectName + "门下" : "散修";
 
@@ -704,11 +818,25 @@ GAME.UI = {
             var _ssub = this.$("sect-sub");
             if (_ssub) _ssub.innerText = p.sectId ? "杂役堂 · 贡献 " + p.sectContrib : "";
 
-            // 打坐耗时随境界递增（按钮文案动态）
+            // 打坐耗时随境界递增（按钮文案动态）；重伤未愈时主按钮改为「静坐疗伤」
             var mm = realm.meditateMonths || 3;
             var _msub = this.$("meditate-sub");
-            if (_msub) _msub.innerText = mm + " 月 · +1 修为";
-            else this.$("btn-meditate").innerText = "闭关打坐 (" + mm + "月 · +1修为)";
+            if (_msub) _msub.innerText = p.wounded
+                ? "静坐疗伤（耗 " + mm + " 月 · 复原气血）"
+                : mm + " 月 · +1 修为";
+            else this.$("btn-meditate").innerText = p.wounded
+                ? "静坐疗伤 (" + mm + "月 · 复原气血)"
+                : "闭关打坐 (" + mm + "月 · +1修为)";
+
+            // 持续闭关开关：运行时给「暂停」态（btn-danger），锁定时不许新开、但运行中要能停
+            var _ac = this.$("btn-auto-cult");
+            if (_ac) {
+                var _run = !!(GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning());
+                _ac.innerText = _run ? "暂停持续闭关" : "开启持续闭关";
+                _ac.className = "small-btn dd-item" + (_run ? " btn-danger" : " btn-gold");
+                _ac.disabled = !_run && !!lock;
+                this._why(_ac, _run ? "" : (lock ? lockWhy : "每 0.6 秒自动结算一次打坐"));
+            }
 
             // 闭关分档：同一个寿元池，玩家自己决定一次花几个月、换多少修为与心境
             if (GAME.Time && GAME.Time.tiers) {
@@ -841,7 +969,12 @@ GAME.UI = {
             var _mksub = this.$("market-sub");
             if (_mksub) _mksub.innerText = p.atMarket ? "已在坊市中" : "耗时 1 月";
             else this.$("btn-market").innerText = p.atMarket ? "坊市中" : "前往坊市 (耗时1月)";
-            this.$("btn-save").disabled = dead;
+            // 存档按钮：交战之中无暇烙印轮回石（否则残血/必死回合存档，读档卡死战斗局）
+            var bs = this.$("btn-save");
+            if (bs) {
+                bs.disabled = dead || !!p.combat;
+                bs.title = (!dead && p.combat) ? "斗法凶险，无暇烙印轮回石" : "";
+            }
 
             // 进入坊市时自动切到市集页签（仅在状态跃迁那一次触发）
             // 离开坊市时不再夺走页签——市集已常驻，玩家可能正在看黑市或兑换
@@ -963,20 +1096,65 @@ GAME.UI = {
             '<div class="od-line">' + cur.desc + '</div>' +
             '<div class="od-line">起始 — 灵石 <span class="gold">' + st.spiritStones + '</span> ｜ 年龄 ' + st.ageYears +
             ' 岁 ｜ 气血上限 ' + st.maxHp + ' ｜ 绿液 <span class="highlight">' + st.liquid + '</span> 滴</div>' +
-            '<div class="od-line">随身 — ' + invText + '</div>';
+            '<div class="od-line">随身 — ' + invText + '</div>' +
+            this._renderBoons();
+
+        // 遗泽词条点选（多选，余额校验在 toggle 里）
+        var boons = GAME.Reincarn ? GAME.Reincarn.BOONS : [];
+        for (var bi = 0; bi < boons.length; bi++) {
+            (function (b) {
+                var btn = self.$("boon-" + b.id);
+                if (btn) btn.onclick = function () {
+                    self._boonSel = self._boonSel || {};
+                    if (self._boonSel[b.id]) delete self._boonSel[b.id];
+                    else self._boonSel[b.id] = true;
+                    self.renderOrigin();
+                };
+            })(boons[bi]);
+        }
 
         // 开局时隐藏主界面：工作区整体收起，出身面板独占一屏
         this.setPlayMode(false);
     },
 
+    // 出身页底部的轮回道韵与遗泽词条（局外账本在 localStorage，不入存档）
+    _renderBoons: function () {
+        if (!GAME.Reincarn) return "";
+        var meta = GAME.Reincarn.load();
+        var sel = this._boonSel || {};
+        var spent = 0;
+        GAME.Reincarn.BOONS.forEach(function (b) { if (sel[b.id]) spent += b.cost; });
+        var html = '<div class="od-line boon-head">轮回道韵 <span class="gold">' + meta.daoyun + '</span> 点' +
+            (spent > 0 ? '　已选遗泽 −' + spent : '') + '</div>';
+        if (GAME.Reincarn.lastResult && GAME.Reincarn.lastResult.gained > 0) {
+            html += '<div class="od-line item-desc">上一世' + GAME.Reincarn.lastResult.why +
+                '，道碑新录 <span class="gold">+' + GAME.Reincarn.lastResult.gained + '</span> 道韵。</div>';
+        }
+        html += '<div class="boon-list">';
+        GAME.Reincarn.BOONS.forEach(function (b) {
+            var on = !!sel[b.id];
+            var afford = meta.daoyun - spent >= b.cost;
+            html += '<button id="boon-' + b.id + '" class="small-btn boon-btn' + (on ? " boon-on" : "") + '"' +
+                (!on && !afford ? " disabled" : "") + '>' +
+                '<b>' + b.name + '</b><em>' + b.cost + ' 道韵 — ' + b.desc + '</em></button>';
+        });
+        html += '</div>';
+        return html;
+    },
+
     startGame: function (originId) {
         GAME.State.createNewPlayer(originId);
+        // 先把遗泽写进当世（后续 updateUI/面板渲染都读得到），日志等 initLogs 之后再补
+        var boonSel = this._boonSel || null;
+        var boonLines = boonSel && GAME.Reincarn ? GAME.Reincarn.applySelected(GAME.State.p(), boonSel) : [];
+        this._boonSel = null;
         this.started = true;
         this.tab = "map";
         this._lastAtMarket = undefined;
         this._lastLocation = undefined;   // 首次 updateUI 不触发"跃迁"提示
         this.setPlayMode(true);                 // 含 workspace 还原为 grid，否则两栏塌陷
         this.initLogs();
+        for (var bl = 0; bl < boonLines.length; bl++) this.log(boonLines[bl], "loot");
         if (GAME.Qixuan) GAME.Qixuan.start();   // 苍梧门六幕开局：炼骨崖考核
         // 前世洞府：地里那几株药接着长（只传给新局，领过即焚）
         if (GAME.Mortality && GAME.Mortality.claim) {
@@ -1036,9 +1214,15 @@ GAME.UI = {
             row.className = "item-row";
 
             var left = document.createElement("div");
+            // 精进修为丹：实时显示丹毒渐抗后的药效（前三颗十足，之后逐颗递减）
+            var potency = "";
+            if (item.type === "pill" && item.use && item.use.exp && GAME.Core && GAME.Core.pillPotency) {
+                var pot = GAME.Core.pillPotency(id);
+                potency = '<div class="item-desc">丹毒渐抗：已服 ' + pot.taken + ' 颗，现药效 ×' + pot.mult.toFixed(2) + '</div>';
+            }
             left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + qty +
                 ' <span class="item-desc">[' + item.quality + ']</span>' +
-                '<div class="item-desc">' + item.desc + '</div>';
+                '<div class="item-desc">' + item.desc + '</div>' + potency;
 
             var right = document.createElement("div");
             right.className = "item-right";
@@ -1057,6 +1241,13 @@ GAME.UI = {
                     htip.innerText = "炼丹主药";
                     right.appendChild(htip);
                 }
+            } else if (item.type === "pouch") {
+                // 敌修储物袋：抹除禁制开盲盒——神识够直接震碎烙印，不够只能水磨数月
+                var bp = document.createElement("button");
+                bp.className = "small-btn btn-gold";
+                bp.innerText = "抹除禁制开启";
+                bp.onclick = function () { GAME.Core.openPouch(id); };
+                right.appendChild(bp);
             } else if (item.use) {
                 // 丹药 / 功法 / 宝玉等：凡有"服用效果"者皆可服（takePill 内含逐类处理）
                 var b = document.createElement("button");
@@ -1997,7 +2188,23 @@ GAME.UI = {
             var jt = this.$("junk-tip"); if (jt) jt.innerHTML = "";
             return;
         }
-        var blkHide = this.$("black-lock"); if (blkHide) { blkHide.style.display = "none"; blkHide.innerHTML = ""; }
+        var blkHide = this.$("black-lock");
+        // 所在地校验：不在苍南谷时黑市只作「货单展示」——交易按钮一律置灰，
+        // 文案明说须先动身前往（与 Tainan.buy / BlackMarket 各处的 at() 守卫同口径）
+        var atBlack = !!(GAME.BlackMarket && GAME.BlackMarket.at());
+        if (blkHide) {
+            if (atBlack) { blkHide.style.display = "none"; blkHide.innerHTML = ""; }
+            else {
+                blkHide.style.display = "";
+                blkHide.innerHTML = '<span class="danger">黑市门路只在苍南山 · 苍南谷开张——你身处异地，只能看看传闻中的货单；交易须先动身前往（大地图赶路耗时以月计）。</span>';
+            }
+        }
+        var awayBtn = function (b, label) {
+            if (atBlack) return b;
+            b.disabled = true;
+            b.innerText = label || "需前往苍南谷";
+            return b;
+        };
 
         GAME.BlackMarket.ensureJunk();     // 首次进入才铺货（空数组 truthy，判断在 ensureJunk 内）
         var self = this;
@@ -2025,11 +2232,13 @@ GAME.UI = {
             ba.className = "small-btn";
             ba.innerText = "鉴定";
             ba.disabled = g.appraised || p.spiritStones < 0;
+            awayBtn(ba);
             ba.onclick = function () { GAME.BlackMarket.appraise(i); };
             var bb = document.createElement("button");
             bb.className = "small-btn btn-gold";
             bb.innerText = "购买";
             bb.disabled = p.spiritStones < g.price;
+            awayBtn(bb);
             bb.onclick = function () { GAME.BlackMarket.buyJunk(i); };
             right.appendChild(ba); right.appendChild(bb);
             row.appendChild(left); row.appendChild(right);
@@ -2059,6 +2268,7 @@ GAME.UI = {
                 b.className = "small-btn btn-gold";
                 b.innerText = "购买";
                 b.disabled = p.spiritStones < g.price;
+                awayBtn(b);
                 b.onclick = function () { GAME.BlackMarket.buyRotation(i); };
                 r.appendChild(b);
                 row.appendChild(l); row.appendChild(r);
@@ -2083,6 +2293,7 @@ GAME.UI = {
             var b = document.createElement("button");
             b.className = "small-btn btn-gold";
             b.innerText = "销赃";
+            awayBtn(b);
             b.onclick = function () { GAME.BlackMarket.sellBlack(id); };
             right.appendChild(g); right.appendChild(b);
             row.appendChild(left); row.appendChild(right);
@@ -2110,6 +2321,7 @@ GAME.UI = {
                 b.className = "small-btn btn-gold";
                 b.innerText = "购入";
                 b.disabled = p.spiritStones < g.price || GAME.State.countItem(g.id) > 0;
+                awayBtn(b);
                 b.onclick = function () { GAME.BlackMarket.buySkill(i); };
                 right.appendChild(price); right.appendChild(b);
                 row.appendChild(left); row.appendChild(right);
@@ -3104,6 +3316,12 @@ GAME.UI = {
     },
     doRestart: function (skipConfirm) {
         if (!skipConfirm && !window.confirm("重入轮回将删除当前存档与今生进度，确定？")) return;
+        if (GAME.Core && GAME.Core.stopAutoCult) GAME.Core.stopAutoCult(null);   // 旧局的钟，别敲新局的人
+        // 主动兵解：本世成绩折算轮回道韵（坐化路线在 Mortality.die 里已结算）
+        if (GAME.Reincarn && !GAME.State.p()._daoyunSettled) {
+            var dset = GAME.Reincarn.settle(GAME.State.p(), "兵解重入轮回");
+            if (dset && dset.gained > 0) this._daoyunToast = dset;
+        }
         GAME.Storage.clear();
         // 清除死亡态：否则回到出身页时死亡锁仍未解除，按钮全灰、需手动刷新
         var pp = GAME.State.p();
@@ -3247,6 +3465,12 @@ GAME.UI = {
         var pp = GAME.State.p();
         this.log("【官方筑基期存档】你以筑基初期之身睁眼——神识已修至《大衍决》四层圆满，气血 " + pp.maxHp +
             "、法力 " + pp.maxMp + "、灵石 " + pp.spiritStones + "。十年苦修尽数跳过，且去领略机关傀儡、噬金虫群与魔道终局。", "success");
+        // 开局导引（跳关体验档实测反馈：目标栏空白、见闻录没有前情，玩家不知从何下手）：
+        // 一段前情提要 + 一条眼下的路 + 核心宝物的去处，全都指向既有面板的真实按钮。
+        this.log("【前情提要】你乃沈牧，四系杂灵根之身，百年苦修刚破筑基——练气期寿元已尽，前路只剩结丹一线生机。" +
+            "储物袋里备着魔道终局三物（紫纹宝竹 · 中阶灵石 · 修复阵盘）与噬金虫起步套装（金噬虫卵 · 金石 · 天火晶）。", "system");
+        this.log("【眼下的路】① 大地图奔云京，夜战幽冥教（云国皇城主线）→ ② 回洞府冲结丹（凝丹之路）→ " +
+            "③ 碎星海开宗立派，或启魔道终局。机关傀儡与灵虫培育，都在「身家 · 灵宠/傀儡」页；黑市门路在苍南谷。", "info");
         this.updateUI();
     },
 
@@ -3273,6 +3497,12 @@ GAME.UI = {
         var bMktGo = this.$("btn-market-go"); if (bMktGo) bMktGo.onclick = function () { GAME.Market.toggle(); };
         var bEx = this.$("btn-exchange-stone");
         if (bEx) bEx.onclick = function () { GAME.Market.exchangeStone(); };
+        // 批量出手凡物（市集·出售杂物）
+        var bJunk = this.$("btn-sell-junk");
+        if (bJunk) bJunk.onclick = function () { GAME.Market.sellJunkAll(); };
+        // 世俗城镇：雇凡人镖局打探消息（50 两 · 1 月）
+        var bScout = this.$("btn-silver-scout");
+        if (bScout) bScout.onclick = function () { GAME.Market.scoutNews(); };
 
         this.$("btn-attack").onclick = function () { GAME.Combat.attack(); };
         var bac = this.$("btn-auto-combat");
@@ -3448,6 +3678,7 @@ GAME.UI = {
     bind("btn-meditate-5", function () { GAME.Core.meditateTimes(5); });
         bind("btn-meditate-10", function () { GAME.Core.meditateTimes(10); });
         bind("btn-meditate-full", function () { GAME.Core.meditateTimes("full"); });
+        bind("btn-auto-cult", function () { GAME.Core.autoCult(); });
     },
 };
 

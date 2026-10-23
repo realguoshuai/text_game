@@ -42,6 +42,35 @@ GAME.Garden = {
         GAME.UI.updateUI();
     },
 
+    // ---------- 药香日常消减（core.passTime 委派，非门人也消——散修催熟同样积泄露值） ----------
+    // 此前泄露值只能靠「神识掠过」事件下降，不主动消减等于卡死：玩家再也不敢用绿液（用户实测反馈）。
+    // 公式：每月 1 + 敛气阶×2；储物袋与药圃都没有百年以上灵药时，药香加快归零（×3）。
+    decayLeak: function (months) {
+        var p = GAME.State.p();
+        if (!(p.leak > 0) || !(months > 0)) return;
+        var conceal = p.concealLevel || 0;
+        var dec = months * (1 + conceal * 2);
+        if (!this._hasAgedHerb(p)) dec *= 3;   // 无百年以上灵药在身：药香加快散尽
+        var before = p.leak;
+        p.leak = Math.max(0, p.leak - dec);
+        if (before > 0 && p.leak <= 0) {
+            GAME.UI.log("日子久了，那股子药香终于散尽——再无人能循着味道寻你的门。", "info");
+        }
+    },
+
+    // 身上/地里是否有百年以上灵药（药香源）：储物袋百年/千年灵药 + 药圃已满千年者
+    _hasAgedHerb: function (p) {
+        if (GAME.State.countItem("herb_bainian") > 0) return true;
+        if (GAME.State.countItem("herb_qiannian") > 0) return true;
+        try {
+            if (GAME.Plot && GAME.Plot.status) {
+                var ps = GAME.Plot.status(p);
+                if (ps && (ps.ready || 0) > 0) return true;
+            }
+        } catch (e) {}
+        return false;
+    },
+
     // ---------- 半年结（core.passTime 委派）：神识掠过结算 + 明田上缴 ----------
     tick: function (months) {
         var p = GAME.State.p();

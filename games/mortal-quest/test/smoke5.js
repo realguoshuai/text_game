@@ -31,9 +31,10 @@ sandbox.Math = Object.assign(Object.create(Math), { random: function () { return
 vm.createContext(sandbox);
 
 // 加载顺序同 index.html（insect.js 定义 jinshi，炼丹配方交叉引用需要它）
-["data/realms.js", "data/items.js", "data/skills.js", "data/events.js", "data/world.js", "data/worldmap.js", "data/content.js",
+["data/realms.js", "data/realms_foundation.js", "data/items.js", "data/skills.js", "data/events.js", "data/world.js", "data/worldmap.js", "data/content.js",
+ "data/qixuan_events.js", "data/demon_war_events.js", "data/skills_foundation.js", "data/items_foundation.js", "data/dungeon_heisha.js", "data/secret_relic.js", "data/wild_dungeons.js",
  "js/state.js", "js/storage.js", "js/combat.js", "js/core.js", 'js/time.js', 'js/plot.js', 'js/mortality.js', 'js/breakthrough.js', "js/moEvent.js", "js/market.js",
- "js/map.js", "js/jiayuan.js", "js/mansion.js", "js/tainan.js", "js/sect.js", "js/blackmarket.js", "js/trial.js", "js/insect.js"
+ "js/map.js", "js/jiayuan.js", "js/mansion.js", "js/tainan.js", "js/sect.js", "js/blackmarket.js", "js/trial.js", "js/insect.js", "js/seize.js"
 ].forEach(function (f) {
     vm.runInContext(fs.readFileSync(path.join(BASE, f), "utf8"), sandbox, { filename: f });
 });
@@ -146,16 +147,23 @@ ok("本派门人不受境界所限", G.Map.nodeUnlocked("huangfeng_gu").ok === t
 
 // —— 天下舆图：未解锁者隐去详情，只留所需境界 ——
 p = reset();
-ok("舆图七节点齐全（含后期月京城/乱星海）", G.Map.atlas().length === 7);
+ok("舆图十节点齐全（含后期云京皇城/碎星海/星阙内海/妖兽海眼/乱星盟总坛）", G.Map.atlas().length === 10);
 ok("练气一层舆图中多处未解锁", G.Map.atlas().filter(function (n) { return !n.unlocked; }).length >= 3);
 ok("未解锁条目均带所需境界", G.Map.atlas().filter(function (n) { return !n.unlocked; })
     .every(function (n) { return (n.reqRealmName || "").length > 0 && n.lockMsg.indexOf("需") >= 0; }));
 ok("当前所在地在舆图中标出", G.Map.atlas().some(function (n) { return n.here && n.id === "shenshou_gu"; }));
 p.realmIndex = 13;
-ok("筑基初期解锁至月京城，碎星海仍锁（需结丹初期）", G.Map.atlas().filter(function (n) { return !n.unlocked; })
-    .map(function (n) { return n.id; }).join(",") === "luanxing_hai");
-p.realmIndex = 16;   // 结丹初期
-ok("结丹初期后舆图全部解锁", G.Map.atlas().every(function (n) { return n.unlocked; }));
+ok("筑基初期解锁至云京皇城；碎星海/星阙内海/妖兽海眼/乱星盟总坛仍锁", G.Map.atlas().filter(function (n) { return !n.unlocked; })
+    .map(function (n) { return n.id; }).join(",") === "luanxing_hai,xingque_neihai,luanxing_zongtan,yaoshou_haiyan");
+p.realmIndex = 5; p.sectId = "huangfenggu";   // 练气期持身份玉简：青梧谷直入
+ok("持青梧谷玉简者不受境界所限", G.Map.nodeUnlocked("huangfeng_gu").ok === true);
+p.sectId = null; p.realmIndex = 16;   // 结丹初期：碎星海开，星阙内海/妖兽海眼/总坛要元婴
+ok("结丹初期碎星海开、星阙内海/妖兽海眼/总坛仍锁", (function () {
+    var locked = G.Map.atlas().filter(function (n) { return !n.unlocked; }).map(function (n) { return n.id; });
+    return locked.join(",") === "xingque_neihai,luanxing_zongtan,yaoshou_haiyan";
+})());
+p.realmIndex = 19;   // 元婴初期：舆图全部开放
+ok("元婴初期后舆图全部解锁", G.Map.atlas().every(function (n) { return n.unlocked; }));
 
 /* ================= ② 景阳城玄机世家主线 ================= */
 console.log("\n【2】景阳城·玄机世家主线（解毒副本）");
@@ -446,8 +454,11 @@ console.log("\n【5】数据表交叉引用完整性");
         if (!G.Map.node(r.from)) bad.push("MAP.routes → 未知起点 " + r.from);
         if (!G.Map.node(r.to)) bad.push("MAP.routes → 未知终点 " + r.to);
     });
+    // 由代码模块接管、不走 actionText 通用通道的 action（校验在各自模块内）
+    var CODE_ACTIONS = { war_join_xingque: 1, war_join_luanxing: 1 };
     G.DATA.MAP.nodes.forEach(function (n) {
         (n.actions || []).forEach(function (a) {
+            if (CODE_ACTIONS[a.id]) return;
             if (!G.DATA.MAP.actionText[a.id]) bad.push("MAP.node." + n.id + " → 缺 actionText." + a.id);
         });
     });

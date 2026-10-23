@@ -8,6 +8,17 @@ var GAME = window.GAME = window.GAME || {};
 
 GAME.BlackMarket = {
 
+    // ---------- 所在地校验：黑市门路只在苍南山 · 苍南谷开张 ----------
+    // 与「本坊市」同规矩：坊市交易须与所在强绑定，不许隔空买卖——
+    // 否则大地图「动身前往（耗时 X 月）」的空间约束形同虚设（用户实测反馈）。
+    at: function () { return GAME.State.p().location === "tainan_gu"; },
+
+    _away: function () {
+        GAME.UI.log("黑市门路只在苍南山 · 苍南谷一代开张——你如今身处异地，须先动身前往。", "system");
+        GAME.UI.updateUI();
+        return false;
+    },
+
     // ---------- 旧货摊进货（未鉴定货架） ----------
     refreshJunk: function () {
         var cfg = GAME.DATA.CONTENT.BLACKMARKET_JUNK;
@@ -66,7 +77,8 @@ GAME.BlackMarket = {
         if (p.totalMonths >= p.blackNextRefresh) {
             this.refreshRotation();
             p.blackNextRefresh = p.totalMonths + cfg.months;
-            GAME.UI.log("地下黑市换了一批门路——筑基散修所需的紧俏材料悄然上架。", "system");
+            // 隔空听不见苍南谷的动静：只有身在当地，才晓得黑市换了门路
+            if (this.at()) GAME.UI.log("地下黑市换了一批门路——筑基散修所需的紧俏材料悄然上架。", "system");
         }
     },
 
@@ -78,6 +90,7 @@ GAME.BlackMarket = {
     buyRotation: function (index) {
         var p = GAME.State.p();
         if (p.isDead) return;
+        if (!this.at()) return this._away();
         var g = (p.blackGoods || [])[index];
         if (!g || g.qty <= 0) return;
         if (p.spiritStones < g.price) {
@@ -98,6 +111,7 @@ GAME.BlackMarket = {
     appraise: function (index) {
         var p = GAME.State.p();
         if (p.isDead) return;
+        if (!this.at()) return this._away();
         var g = p.junkGoods[index];
         if (!g) return;
         if (g.appraised) { GAME.UI.log("此物已鉴定过了。", "system"); GAME.UI.updateUI(); return; }
@@ -117,6 +131,7 @@ GAME.BlackMarket = {
     buyJunk: function (index) {
         var p = GAME.State.p();
         if (p.isDead) return;
+        if (!this.at()) return this._away();
         var g = p.junkGoods[index];
         if (!g) return;
         if (p.spiritStones < g.price) { GAME.UI.log("灵石不足，摊主嗤之以鼻。", "system"); GAME.UI.updateUI(); return; }
@@ -134,6 +149,7 @@ GAME.BlackMarket = {
     sellBlack: function (herbId) {
         var p = GAME.State.p();
         if (p.isDead) return;
+        if (!this.at()) return this._away();
         var cfg = GAME.DATA.CONTENT.TRIAL.blackPrice;
         if (!cfg[herbId]) { GAME.UI.log("此物黑市不收。", "system"); GAME.UI.updateUI(); return; }
         if (GAME.State.countItem(herbId) < 1) return;
@@ -160,6 +176,7 @@ GAME.BlackMarket = {
     buySkill: function (index) {
         var p = GAME.State.p();
         if (p.isDead) return;
+        if (!this.at()) return this._away();
         var cfg = GAME.DATA.CONTENT.BLACK_SKILLS;
         if (!cfg || !cfg[index]) return;
         var g = cfg[index];

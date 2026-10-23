@@ -124,8 +124,9 @@ ok('练气期：黑市销赃区清空', els['black-sell'].children.length === 0)
 ok('练气期：黑市秘籍区清空', els['black-skills'].children.length === 0);
 ok('练气期：黑市材料门路区清空', els['black-rotation'].children.length === 0);
 
-// 筑基玩家
+// 筑基玩家（黑市门路在苍南谷——2026-10-22 起交易与所在地强绑定）
 q1.realmIndex = 13;
+q1.location = 'tainan_gu';
 U.updateUI();
 ok('筑基期：黑市锁定提示撤去（不含「须筑基期」）', htmlOf('black-lock').indexOf('须筑基期') < 0);
 ok('筑基期：旧货摊已铺货（有子节点）', els['junk-goods'].children.length > 0);

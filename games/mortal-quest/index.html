@@ -48,8 +48,9 @@
             <span class="id-cell"><em>境界</em><b id="realm-text" class="highlight">练气一层</b></span>
             <span class="id-cell id-gauge"><em>修为</em><b id="exp-text">0 / 20</b><span class="id-bar"><i id="exp-fill"></i></span></span>
             <span class="id-cell id-gauge"><em>气血</em><b id="hp-text">100 / 100</b><span class="id-bar hp"><i id="hp-fill"></i></span></span>
-            <span class="id-cell"><em>灵石</em><b id="stone-text" class="gold">0</b></span>
-            <span class="id-cell"><em>银两</em><b id="silver-text">0</b></span>
+                            <span class="id-cell"><em>灵石</em><b id="stone-text" class="gold">0</b></span>
+                            <span class="id-cell" id="silver-cell"><em>银两</em><b id="silver-text">0</b></span>
+                            <span class="id-cell" id="midstone-cell" style="display:none;"><em>中阶灵石</em><b id="midstone-text" class="gold">0</b></span>
             <span class="id-cell"><em>绿液</em><b id="liquid-text" class="highlight">0</b></span>
             <span class="id-cell"><em>所在</em><b id="location-text" class="highlight">幽篁谷</b></span>
             <details class="stats-more" id="stats-more">
@@ -67,6 +68,7 @@
                     <div><em>心境</em><b id="mind-text">0</b></div>
                     <div><em>门派</em><b id="sect-text">散修</b></div>
                     <div><em>因果</em><b id="causal-text">无</b></div>
+                    <div id="silver-more" style="display:none;"><em>银两</em><b id="silver-more-text">0</b></div>
                 </div>
             </details>
         </div>
@@ -185,7 +187,7 @@
                             <div class="item-desc" id="warstall-tip"></div>
                             <div id="warstall-goods"></div>
                         </div>
-                        <h4 class="mkt-sec">出售杂物</h4>
+                        <h4 class="mkt-sec">出售杂物 <button id="btn-sell-junk" class="small-btn" style="margin-left:6px;font-size:11px;padding:1px 8px;">批量出手凡物</button></h4>
                         <div id="market-sell" data-page-node-id="kj6ayXkwKBq42wUMoPqqOt"></div>
                         <button id="btn-leave-market" style="margin-top:8px;" data-page-node-id="hFzFFWfLymLjOWXL1RmnlS">离开坊市，返回洞府</button>
                     </div>
@@ -236,6 +238,7 @@
                         <div class="combat-actions" id="silver-actions">
                             <button id="btn-exchange-1" class="small-btn" data-page-node-id="Uz5Opf7EDsaRoeUb8YLtit">兑 1 灵石（100 两）</button>
                             <button id="btn-exchange-5" class="small-btn" data-page-node-id="Y3HSA8m0gCMFcmwJBHi34p">兑 5 灵石（500 两）</button>
+                            <button id="btn-silver-scout" class="small-btn" style="margin-top:4px;">雇镖局打探消息（50 两 · 1 月）</button>
                         </div>
                     </div>
                 </div>
@@ -380,7 +383,7 @@
                     <div class="item-desc">筑基修士可闯的秘境尽列于此——有造化，也有杀机。点选秘境即可前往，莫要贸然轻入。</div>
                     <div id="secret-list"></div>
                     <h3 style="margin-top:12px;">秘境游历</h3>
-                    <div class="item-desc">不入秘境深处，只在 periphery 游走探看——或有奇遇，亦或空手而返。每次探看耗 1 月。</div>
+                    <div class="item-desc">不入秘境深处，只在外围游走探看——或有奇遇，亦或空手而返。每次探看耗 1 月。</div>
                     <div class="combat-actions">
                         <button id="btn-secret-roam" class="btn-gold">秘境游历（随机奇遇）</button>
                     </div>
@@ -498,6 +501,8 @@
                         <button id="btn-meditate-5" class="small-btn dd-item" style="display:block;width:100%;">连修 5 次</button>
                         <button id="btn-meditate-10" class="small-btn dd-item" style="display:block;width:100%;">连修 10 次</button>
                         <button id="btn-meditate-full" class="small-btn dd-item" style="display:block;width:100%;">直修至本境圆满</button>
+                        <button id="btn-auto-cult" class="small-btn dd-item" style="display:block;width:100%;">开启持续闭关</button>
+                        <div class="dd-note">持续闭关自动流转岁月，每逢要命关头自会停下等你定夺。</div>
                     </div>
                 </details>
                                 <details class="dropdown" id="dd-catalyze">
@@ -623,6 +628,7 @@
     <script src="js/seize.js"></script>
     <script src="js/yuanying.js"></script>
 <script src="js/faction.js"></script>
+<script src="js/reincarn.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

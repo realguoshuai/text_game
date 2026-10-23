@@ -244,6 +244,7 @@ console.log('==== 五、宗门与坊市黑市渠道（覆盖） ====');
   const cfg = G.DATA.CONTENT.BLACK_ROTATION;
   assert('黑市轮换周期为 3 月', !!cfg && cfg.months === 3);
   const t = reset(13);
+  t.location = 'tainan_gu';       // 黑市门路只在苍南谷（2026-10-22 起与所在地强绑定）
   setRand(0.2);                       // 各货源命中上架
   G.BlackMarket.tickRotation();
   assert('黑市首期铺货成功', Array.isArray(t.blackGoods) && t.blackGoods.length >= 1);

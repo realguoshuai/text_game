@@ -162,6 +162,73 @@ GAME.Market = {
         GAME.UI.updateUI();
     },
 
+    // ---------- 批量出手凡物（矿石 · 废铁等纯废料，一键结算） ----------
+    // 中后期储物袋积一堆一阶废料，单点出售是体力活（用户实测反馈）。
+    // 只走 GAME.DATA.JUNK_IDS 白名单——主材（金石/精魄/灵木）绝不入列，防止误卖。
+    sellJunkAll: function () {
+        var p = GAME.State.p();
+        if (!p.atMarket || p.isDead || p.combat) return false;
+        var ids = GAME.DATA.JUNK_IDS || [];
+        var gain = 0, names = [];
+        for (var i = 0; i < ids.length; i++) {
+            var id = ids[i], qty = p.inventory[id] || 0;
+            if (qty <= 0) continue;
+            var item = GAME.DATA.ITEMS[id];
+            if (!item) continue;
+            gain += this.sellPrice(item.price) * qty;
+            names.push(item.name + "×" + qty);
+            delete p.inventory[id];
+        }
+        if (!names.length) {
+            GAME.UI.log("储物袋里没有凡物可出手（矿石、废铁之流才走这条门路）。", "system");
+            GAME.UI.updateUI();
+            return false;
+        }
+        p.spiritStones += gain;
+        GAME.UI.log("你摊出" + names.join("、") + "，掌柜过眼一掂，付你 " + gain + " 灵石。", "loot");
+        GAME.Core.checkAchievements();
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+        return true;
+    },
+
+    // ---------- 世俗城镇：雇凡人镖局打探消息（50 两 · 1 月） ----------
+    // 筑基后世俗银两再无购买力，顶栏常驻即成死数据（用户实测反馈）。
+    // 凡俗城池开这个消耗口：银子换成跑路月数与情报，聊胜于无，但不白挂。
+    scoutNews: function () {
+        var p = GAME.State.p();
+        var node = (GAME.Map && GAME.Map.cur) ? (GAME.Map.cur() || {}) : {};
+        if (p.isDead || p.combat) return false;
+        if (node.kind !== "mortal") {
+            GAME.UI.log("凡人镖局只在外城凡俗地界设桩，这等仙家福地无桩可雇。", "system");
+            GAME.UI.updateUI();
+            return false;
+        }
+        if ((p.silver || 0) < 50) {
+            GAME.UI.log("囊中盘缠不足 50 两，镖局把头懒得抬眼。", "system");
+            GAME.UI.updateUI();
+            return false;
+        }
+        p.silver -= 50;
+        var tips = [];
+        if (p.marketNextRefresh != null) {
+            var mk = Math.max(0, p.marketNextRefresh - (p.totalMonths || 0));
+            tips.push("坊市每逢一旬换货，" + (mk > 0 ? "距今约 " + mk + " 个月" : "这几日正要上新") + "，紧俏材料要赶早");
+        }
+        if (p.junkNextRefresh != null) {
+            var jk = Math.max(0, p.junkNextRefresh - (p.totalMonths || 0));
+            tips.push("旧货摊" + (jk > 0 ? "约 " + jk + " 个月后换货" : "刚换过一批生面孔") + "，未鉴定的货水深");
+        }
+        tips.push("后山妖兽近来躁动，单身修士切莫贪晚进山");
+        tips.push("修邪法的修士常在深夜出没，专挑独行客下手，结伴为妙");
+        tips.push("山下来的行商说，升仙大会三年一期，擂台三连胜有造化");
+        tips.push("老镖头喝多了透露：黑市门路三月一换，手快者有，手慢者无");
+        var tip = tips[Math.floor(Math.random() * tips.length)];
+        GAME.UI.log("你摸出 50 两盘缠雇了趟镖局耳报。老镖头压低嗓子：「" + tip + "。」（耗 1 月）", "info");
+        GAME.Core.passTime(1);
+        return true;
+    },
+
     // ---------- 是否可出售 ----------
     canSell: function (id) {
         var item = GAME.DATA.ITEMS[id];

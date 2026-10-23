@@ -128,6 +128,8 @@ console.log('\n【2】坊市淘宝 + 黑市销赃');
 // 盲买被坑：0.99 ≥ 0.5 → junk_scrap
 setRand(0.99);
 p = reset(0);
+// 黑市门路只在苍南山 · 苍南谷开张（BlackMarket.at 所在地绑定）
+p.location = 'tainan_gu';
 p.spiritStones = 200;
 G.BlackMarket.refreshJunk();
 stoneB = p.spiritStones;
@@ -138,6 +140,7 @@ assert('盲买被坑得废铁(junk_scrap)', G.State.countItem('junk_scrap') === 
 // 神识鉴定后如实得真品：筑基 spirit=22 满足 needSpirit≤10
 setRand(0.01);
 p = reset(13);
+p.location = 'tainan_gu';
 p.spiritStones = 200;
 G.BlackMarket.refreshJunk();
 G.BlackMarket.appraise(0); // junk_rusty needSpirit=8 < 22
@@ -148,6 +151,7 @@ assert('鉴定后如实得真品(sword_fragment)', G.State.countItem('sword_frag
 // 黑市销赃：煞气高(50) → 必被尾随
 setRand(0.01);
 p = reset(0);
+p.location = 'tainan_gu';
 p.shaQi = 50;
 G.State.addItem('herb_bainian', 2);
 stoneB = p.spiritStones;
@@ -158,6 +162,7 @@ assert('煞气高触发神识尾随', p.tracking !== null && p.tracking.stones =
 // 黑市销赃：敛气高(10) → 安然脱身
 setRand(0.5);
 p = reset(0);
+p.location = 'tainan_gu';
 p.concealLevel = 10;
 G.State.addItem('herb_qiannian', 1);
 G.BlackMarket.sellBlack('herb_qiannian');

@@ -2458,7 +2458,7 @@ body.theme-light .id-cell em { color: #8C7355; }
 body.theme-light .id-cell b { color: #2B2723; }
 body.theme-light .id-cell b.highlight { color: #2E6B57; }
 body.theme-light .id-cell b.gold { color: #8C5E24; }
-body.theme-light .id-gauge .id-bar { background: #D8CDBE; border-color: #C9B79A; }
+body.theme-light .id-gauge .id-bar { background: #D6CBBD; border-color: #C9B79A; }
 body.theme-light .id-bar i { background: linear-gradient(90deg, #3F7D68, #7FB79C); }
 body.theme-light .id-bar.hp i { background: linear-gradient(90deg, #8C2B1E, #C0573C); }
 body.theme-light .alert-tag {
@@ -2661,12 +2661,12 @@ body.theme-light .goal-banner.urgent {
     background-image: linear-gradient(rgba(163,52,31,.07), rgba(163,52,31,.07)), var(--grain);
 }
 body.theme-light .goal-main b { color: #231F1B; }
-body.theme-light .goal-hint { color: #8C7355; }
+body.theme-light .goal-hint { color: #5C4B3A; }
 body.theme-light .goal-tag { background: rgba(163,52,31,.10); color: #A3341F; border-color: rgba(163,52,31,.42); }
 body.theme-light .goal-next { border-top-color: rgba(140,110,70,.24); }
 body.theme-light .goal-next-btn { background: rgba(176,141,87,.16); border-color: #9C7430; color: #6D4A16; }
 body.theme-light .goal-next-btn:hover { background: rgba(176,141,87,.30); }
-body.theme-light .goal-next-why { color: #8C7355; }
+body.theme-light .goal-next-why { color: #5C4B3A; }
 body.theme-light .goal-where-link { color: #8C5E24; }
 
 /* ---------- 8. 动作牌：象牙竹牌。这是浅色模式最关键的一处 ---------- */
@@ -2773,8 +2773,10 @@ body.theme-light details.dropdown .dd-body {
     border: 1px solid var(--line-2);
     box-shadow: inset 0 0 22px rgba(150,120,70,.09), 0 14px 34px rgba(90,70,50,.24);
 }
+/* 副文本（耗时/修为/绿液/预览）：#8C7355 在宣纸上发飘，11px 小字对比度不足——
+ * 统一加深到熟褐 #5C4B3A（与 .actions em 同档，用户实测要求）。进度条底轨见 .id-bar 已是 #D8CDBE。 */
 body.theme-light details.dropdown .dd-body .dd-note,
-body.theme-light details.dropdown .dd-body #dd-sec-preview { color: #8C7355; }
+body.theme-light details.dropdown .dd-body #dd-sec-preview { color: #5C4B3A; }
 body.theme-light details.dropdown .dd-body .tier-btn { border-left: 3px solid #B08D57; }
 body.theme-light details.dropdown .dd-body .btn-why { color: #A2351F; }
 
@@ -3244,7 +3246,7 @@ body.theme-light .goal-main b { color: #2B2520; }
 body.theme-light .goal-hint,
 body.theme-light .goal-next-static,
 body.theme-light .goal-next-why { color: #6E5C49; }
-body.theme-light .goal-parallel { color: #8C7355; border-top-color: rgba(140,110,70,.22); }
+body.theme-light .goal-parallel { color: #5C4B3A; border-top-color: rgba(140,110,70,.22); }
 body.theme-light .goal-parallel-label { color: #6E5C49; }
 body.theme-light .actions > button,
 body.theme-light .actions > details > summary {
@@ -3258,8 +3260,8 @@ body.theme-light .actions > details > summary:hover {
     border-color: #8C5E24;
     background: linear-gradient(180deg, #FFFFFF 0%, #F5ECE0 100%);
 }
-body.theme-light .actions > button { color: #2B2520; }
-body.theme-light .actions em { color: #6B5945; opacity: 1; }
+body.theme-light .actions > button { color: #26201B; }
+body.theme-light .actions em { color: #5C4B3A; opacity: 1; }
 body.theme-light .actions > button:disabled,
 body.theme-light .actions > details > summary.is-locked {
     background: #E8E2D5;
@@ -3283,3 +3285,16 @@ body.theme-light .actions > button.act-seal em { color: #8A3428; }
 /* ===== 结丹篇：三阵营声望（敌意声望用主题感知色，不用内联样式） ===== */
 .faction-bad { color: var(--danger-tx); font-weight: bold; }
 .faction-good { color: var(--gold); font-weight: bold; }
+
+/* ================= 轮回道韵 · 遗泽词条（出身页，随主题走变量） ================= */
+.boon-head { margin-top: 10px; font-weight: 700; }
+.boon-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.boon-btn { text-align: left; line-height: 1.5; }
+.boon-btn b { font-size: 13px; }
+.boon-btn em { display: block; font-style: normal; font-size: 11px; opacity: .85; }
+.boon-btn.boon-on { background: rgba(160,124,60,.18); border-color: #8C5E24; }
+body.theme-light .boon-btn.boon-on { background: rgba(140,94,36,.14); border-color: #8C5E24; }
+body.theme-light .boon-btn em { color: #5C4B3A; }
+
+/* ================= 见闻录语义标签（突破自带【】不重复加；配色继承各 type） ================= */
+.log-tag { font-weight: 700; letter-spacing: .5px; }

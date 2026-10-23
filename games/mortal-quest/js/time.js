@@ -77,9 +77,12 @@ GAME.Time = {
     },
 
     // 修为：一周天 +1（与旧 meditate 完全一致，藏经阁加成照旧）
+    // 洗髓易筋遗泽：伪灵根提纯，吸纳效率 ×1.5（向上取整），预览与结算同源
     expOf: function (p, cycles) {
         var extra = (GAME.Home && GAME.Home.meditateExp) ? GAME.Home.meditateExp() : 0;
-        return cycles * (1 + extra);
+        var exp = cycles * (1 + extra);
+        if (p && p.trueRoot) exp = Math.ceil(exp * 1.5);
+        return exp;
     },
 
     // 心境：每 mindPerMonths 月 +1（静坐养的是心，与天象无关）
@@ -104,6 +107,45 @@ GAME.Time = {
             return { ok: false, why: "体内阴毒 " + p.yindu.months + " 月后发作，闭 " + months + " 月来不及" };
         }
         return { ok: true, why: "" };
+    },
+
+    /* ================= 关内危急中断（暴毙防呆） =================
+     * guard 只拦「必死」（耗时 ≥ 寿元/毒发倒计时）；但「出关时只剩 1 月寿元」
+     * 「出关时毒距发作只剩 1 月」同样是绝局——玩家连吃延寿丹/解毒丹的窗口都没有。
+     * 这里按整周天截断本档闭关：宁可少修，不留「一点下去就坐化」。
+     * 缓冲：寿元至少留 3 月，阴毒/尸虫至少留 1 月（留出反应时间）。
+     */
+    KEEP_LIFE: 3,
+    KEEP_POISON: 1,
+
+    _clampTier: function (p, t) {
+        var left = this.remain(p).total;
+        var maxM = t.months, why = "";
+        if (left - this.KEEP_LIFE < maxM) {
+            maxM = left - this.KEEP_LIFE;
+            why = "寿元只余 " + this._fmt(left) + "，须留 " + this.KEEP_LIFE + " 月应对变故";
+        }
+        if (p.yindu && typeof p.yindu.months === "number") {
+            var m1 = p.yindu.months - this.KEEP_POISON;
+            if (m1 < maxM) {
+                maxM = m1;
+                why = "体内阴毒 " + p.yindu.months + " 月后发作，须留 " + this.KEEP_POISON + " 月寻药化解";
+            }
+        }
+        if (p.shichong && typeof p.shichong.months === "number") {
+            var m2 = p.shichong.months - this.KEEP_POISON;
+            if (m2 < maxM) {
+                maxM = m2;
+                why = "尸虫丸 " + p.shichong.months + " 月后毒发，须留 " + this.KEEP_POISON + " 月早做打算";
+            }
+        }
+        if (maxM >= t.months) return { forced: false };
+        var per = this.monthsOf(p, 1);
+        var cycles = Math.floor(maxM / per);
+        if (cycles < 1) {
+            return { impossible: true, why: why || "连一个周天都嫌凶险，先设法延寿/解毒，勿再入定" };
+        }
+        return { forced: true, cycles: cycles, months: cycles * per, why: why };
     },
 
     // 一档闭关的完整账（UI 与执行读同一份）
@@ -153,7 +195,8 @@ GAME.Time = {
     /* ================= ③ 分配：执行 ================= */
 
     // 闭关的唯一执行出口（Core.meditate 也走这里，保证只有一条路径）
-    seclude: function (id) {
+    // opts.healOnly = true：重伤疗伤档——只费年月、复原气血、清除重伤标记，不涨修为（战败惩罚的意义所在）
+    seclude: function (id, opts) {
         var p = GAME.State.p();
         if (!p || p.isDead || p.combat) return false;
         if (p.pendingEvent || p.pendingMercy) {
@@ -161,6 +204,7 @@ GAME.Time = {
             GAME.UI.updateUI();
             return false;
         }
+        opts = opts || {};
         var t = this.tier(p, id || "short");
         if (!t) return false;
         if (!t.ok) {
@@ -169,9 +213,33 @@ GAME.Time = {
             return false;
         }
 
+        // 关内危急中断：按整周天截断（留寿元 3 月 / 毒发 1 月的反应窗口）
+        var cut = this._clampTier(p, t);
+        if (cut.impossible) {
+            GAME.UI.log("无法闭关——" + cut.why + "。", "danger");
+            GAME.UI.updateUI();
+            return false;
+        }
+        if (cut.forced) {
+            t.cycles = cut.cycles;
+            t.months = cut.months;
+            t.exp = this.expOf(p, cut.cycles);
+            t.mind = this.mindOf(cut.months);
+            if (t.shielded && t.upkeep) t.upkeep = Math.ceil(t.upkeep * cut.months / (t.months || 1));
+            GAME.UI.log("【强行破关】你心下悚然——" + cut.why + "。只敢入定 " + cut.months +
+                " 月，到点务必准时收功，迟则生变。", "warning");
+        }
+
         var extra = (GAME.Home && GAME.Home.meditateExp) ? GAME.Home.meditateExp() : 0;
-        p.currentExp += t.exp;
-        if (t.mind > 0) p.mind = (p.mind || 0) + t.mind;
+        if (opts.healOnly) {
+            // 静坐疗伤：气血尽复、重伤标记得清，修为不增
+            p.currentHp = p.maxHp;
+            delete p.wounded;
+            GAME.UI.log("你静坐调息 " + t.months + " 个月，行功过气，淤塞的经脉尽数通畅——气血尽复，重伤已愈。", "success");
+        } else {
+            p.currentExp += t.exp;
+            if (t.mind > 0) p.mind = (p.mind || 0) + t.mind;
+        }
 
         // 阵法长关：入阵而修——参悟星轨（神识上限永久 +25，仅首次）、外敌不得扰
         var form = (GAME.Cave2 && GAME.Cave2.activeFormation) ? GAME.Cave2.activeFormation() : null;
@@ -186,12 +254,14 @@ GAME.Time = {
             if (GAME.Chronicle) GAME.Chronicle.narrate("formation_secluded", p);
         }
 
+        // 修炼日志带折叠键（fold）：见闻录把连续打坐累加成一条，不刷屏（疗伤档不折叠）
+        var foldArg = opts.healOnly ? null : { fold: "meditate", months: t.months, exp: t.exp, mind: t.mind };
         if (t.cycles <= 1) {
             GAME.UI.log("你闭门吐纳 " + t.months + " 个月，杂灵根吸纳的灵气微乎其微，修为 +" + t.exp +
-                (extra ? "（藏经阁 +" + extra + "）" : "") + "。", "info");
+                (extra ? "（藏经阁 +" + extra + "）" : "") + "。", "info", foldArg);
         } else {
             GAME.UI.log("你闭关苦修 " + t.months + " 个月，出关时蒲团上落了一层灰——修为 +" + t.exp +
-                (t.mind > 0 ? "，心境 +" + t.mind : "") + "。", "info");
+                (t.mind > 0 ? "，心境 +" + t.mind : "") + "。", "info", foldArg);
         }
         // 闭关期间挂屏蔽标记：passTime 内的夺舍/追杀检查据此不打断闭关
         p.seclusion = { id: t.id, shielded: !!t.shielded };

@@ -142,6 +142,8 @@ GAME.Mortality = {
         var r = this.reckon(p);
         p.reckoning = r;                        // 存入当世，UI 直接读（死亡不入档，无污染风险）
         GAME.UI.log("【坐化】" + p.deathReason + "。你盘膝于洞府深处，最后一口气散在蒲团上。", "danger");
+        // 局外结算：轮回道韵入道碑（localStorage，跨周目保留）
+        if (GAME.Reincarn) GAME.Reincarn.settle(p, "坐化");
         return r;
     },
 

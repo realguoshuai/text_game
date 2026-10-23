@@ -143,6 +143,44 @@ GAME.DATA.ITEMS = {
     recipe_yanghun:  { id:"recipe_yanghun",  name:"养魂丹方", quality:"上品", type:"recipe", price:340, learns:"pill_yanghun",  desc:"养魂丹炼制之法（妖兽精魄＋天火晶）。黑市/奇遇/副本可得。" },
 };
 
+/* —— 凡物清单：市集「批量出手凡物」只结算这些，绝不碰主材 ——
+ * 收录原则：无任何消耗出口、只会越攒越多的纯废料。
+ * ⚠️ 未鉴定的旧货摊货（junk_skin/junk_rusty/junk_furnace）故意不收：
+ *    鉴定前比鉴定后值钱，须先去黑市旧货摊鉴定，别让一键兜售把宝贝当废铁卖。 */
+GAME.DATA.JUNK_IDS = ["ore", "junk_scrap"];
+
+/* —— 敌修储物袋（杀人夺宝盲盒）：袋口残留主人一缕神识烙印，须抹除禁制方能开启 ——
+ * 三档对应敌修阶级：低阶=练气散修 / 筑基=魔焰鬼灵血侍之流 / 结丹=老怪与渡劫期。
+ * sealSpirit=强行震碎所需神识；不足则只能水磨 sealMonths 个月慢慢化开（时间是代价，不是概率）。 */
+GAME.DATA.ITEMS.pouch_low    = { id:"pouch_low",    name:"【低阶修士储物袋】", quality:"凡品", type:"pouch", price:15,  tier:1, sealSpirit:10, sealMonths:2,
+    desc:"练气期散修的遗物。袋口缠着一缕淡薄神识烙印，抹除后方能开启。" };
+GAME.DATA.ITEMS.pouch_zhuji  = { id:"pouch_zhuji",  name:"【筑基邪修储物袋】", quality:"灵品", type:"pouch", price:60,  tier:2, sealSpirit:25, sealMonths:4,
+    desc:"筑基修士的遗物。烙印深沉，神识不足者只能以水磨工夫慢慢化开。" };
+GAME.DATA.ITEMS.pouch_jiedan = { id:"pouch_jiedan", name:"【结丹修士储物袋】", quality:"上品", type:"pouch", price:200, tier:3, sealSpirit:45, sealMonths:6,
+    desc:"结丹老怪的遗物。烙印凝如实质，妄启者反受其噬。" };
+
+/* —— 储物袋战利品池：按袋 tier 加权随机（开袋一次 rolls = 2+tier 次）——
+ * stones 为特殊项（直接结算灵石）；recipe 类拾得即研习化入识海（与既有规则一致）。
+ * 高阶袋多掉高阶物：结丹袋才有金髓丸/养魂丹方，低阶袋以疗伤散与凡物为主——
+ * 「杀人放火厉飞雨」的盲盒感来自不确定，但不该让练气小散修掏出结丹丹方。 */
+GAME.DATA.POUCH_LOOT = {
+    1: [
+        { id:"stones", w:30, qty:[30,120] },
+        { id:"pill_huichun", w:20 }, { id:"talisman_dici", w:12 }, { id:"talisman_huoqiu", w:10 },
+        { id:"pill_huanglong", w:10 }, { id:"junk_scrap", w:8 }, { id:"ore", w:6 }, { id:"recipe_ningyuan", w:4 }
+    ],
+    2: [
+        { id:"stones", w:26, qty:[120,400] },
+        { id:"pill_juling", w:16 }, { id:"pill_huanglong", w:14 }, { id:"talisman_hushen", w:10 },
+        { id:"beast_soul", w:10 }, { id:"recipe_juling", w:8 }, { id:"shadan_suipian", w:6 }, { id:"pill_zhuji", w:4 }, { id:"mid_stone", w:6 }
+    ],
+    3: [
+        { id:"stones", w:22, qty:[400,1200] },
+        { id:"pill_jinsui", w:16 }, { id:"pill_yanghun", w:12 }, { id:"talisman_jingang", w:10 },
+        { id:"recipe_qingxin", w:10 }, { id:"recipe_yanghun", w:8 }, { id:"mid_stone", w:10 }, { id:"pill_jiedan", w:4 }, { id:"herb_qiannian", w:8 }
+    ]
+};
+
 /* —— 炼丹配方表：按优先级从高到低排列，炼丹时依次匹配 ——
  * （高阶丹优先消耗药材，避免攒筑基丹材料时被低阶丹抢走） */
 GAME.DATA.RECIPES = [

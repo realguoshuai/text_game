@@ -42,18 +42,18 @@ GAME.Core = {
         // 护山大阵月耗：阵法持续耗养灵石（周天星斗大阵 20/月），养不起则阵散
         if (GAME.Cave2 && GAME.Cave2.tickUpkeep) GAME.Cave2.tickUpkeep(months);
 
-        // 坊市定期换货
+        // 坊市定期换货（身在苍南谷才听得见市井动静；货照样换，回来就是新一批）
         if (p.totalMonths >= p.marketNextRefresh) {
             GAME.Market.refreshGoods();
             p.marketNextRefresh += GAME.DATA.MARKET.refreshMonths;
-            GAME.UI.log("坊市又换了一批新货。", "system");
+            if (GAME.Tainan && GAME.Tainan.at()) GAME.UI.log("坊市又换了一批新货。", "system");
         }
 
         // 旧货摊定期换货（与坊市同节奏；买空后不再即时补货，须等下个换货期）
         if (p.totalMonths >= p.junkNextRefresh) {
             GAME.BlackMarket.refreshJunk();
             p.junkNextRefresh += GAME.DATA.MARKET.refreshMonths;
-            GAME.UI.log("坊市旧货摊又上了一批新货。", "system");
+            if (GAME.Tainan && GAME.Tainan.at()) GAME.UI.log("坊市旧货摊又上了一批新货。", "system");
         }
 
         // 地下黑市：每 3 月轮换一批筑基材料（妖兽精魄 / 天火晶，限量）
@@ -120,10 +120,15 @@ GAME.Core = {
             }
         }
 
+        // 药香日常消减（非门人也消：散修催熟同样积泄露值；公式见 Garden.decayLeak）
+        // 顺序：先散味，再结算百草园半年结/神识掠园——长老月末才巡园，药香是整个月慢慢散的
+        if (GAME.Garden && GAME.Garden.decayLeak) GAME.Garden.decayLeak(months);
         // 百草园结算（逻辑在 js/garden.js）：①管事明田半年结；②无职弟子暗田泄露值
         // 达 80 后的「神识掠园」查获。两者都在 Garden.tick 里，故须按「是否青梧谷门人」
         // 调用，而不能只看 p.garden——否则无职弟子的掠园预警永不兑现（死代码）。
         if (GAME.Garden && GAME.Garden.active && GAME.Garden.active()) GAME.Garden.tick(months);
+        // 觊觎度日常消减（黑市销赃/坊市卖老药推高后，靠年月与敛气术慢慢散去）
+        if (GAME.Bottle && GAME.Bottle.decayRisk) GAME.Bottle.decayRisk(months);
 
         // 药圃：洞里那几株药也在跟着长年份（逻辑在 js/plot.js）——时间既花出去，也长在土里
         if (GAME.Plot && GAME.Plot.tick) GAME.Plot.tick(months);
@@ -240,7 +245,9 @@ GAME.Core = {
             GAME.UI.log("时序紊乱，无法入定。", "danger");
             return;
         }
-        GAME.Time.seclude("short");
+        // 重伤未愈：打坐改为「静坐疗伤」——只费年月、复原气血、清重伤标记，不涨修为。
+        // 否则战败重伤毫无代价，照样打坐涨修为，失败惩罚失去意义（用户实测反馈）。
+        GAME.Time.seclude("short", { healOnly: !!p.wounded });
     },
 
     // 批量打坐：连修 n 次（n<=0 或 "full" 表示一直修到本境圆满）
@@ -264,6 +271,82 @@ GAME.Core = {
         if (done > 1) GAME.UI.log("你一连闭关苦修 " + done + " 轮，出关时蒲团上落了一层灰。", "system");
         GAME.UI.updateUI();
         return done;
+    },
+
+    /* ---------- 持续闭关（自动时间流） ----------
+     * 玩家视角：练气期到筑基期要狂点几十上百次"闭关打坐"，那是体力活不是玩法。
+     * 开启后每 600ms 自动结算一次打坐，月份/修为/绿液凝结/药圃生长自然流转。
+     * ★ 智能打断是核心：一旦出现"必须由人拍板"的时刻，立即停机并把决策权交还玩家——
+     *   ① 修为已满，摸到当前境界瓶颈；② 绿液新凝或灵药成熟；③ 剧情节点
+     *   （待决事件/战后处置/玄机子翻脸/神识尾随/觊觎满将遭截杀）；④ 重伤、阴毒将发、
+     *   寿元不足一年。见闻录每次都给一句人话原因，绝不无声停摆。
+     */
+    _autoTimer: null,
+    _autoRef: null,
+    _autoLiquid: 0,
+    _autoReady: 0,
+
+    autoCultRunning: function () { return !!this._autoTimer; },
+
+    autoCult: function () {
+        if (this._autoTimer) { this.stopAutoCult("你自行收功，吐纳止息。"); return; }
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return;
+        // 先记基线再检定——"闭关期间新凝了绿液/灵药熟了"是与开局比，不是与 -1 比
+        this._autoLiquid = p.liquid || 0;
+        this._autoReady = (GAME.Plot && GAME.Plot.status) ? (GAME.Plot.status(p).ready || 0) : 0;
+        var why = this._autoStopWhy(p);
+        if (why) { GAME.UI.log(why, "warning"); GAME.UI.updateUI(); return; }
+        this._autoRef = p;
+        this._autoLiquid = p.liquid || 0;
+        this._autoReady = (GAME.Plot && GAME.Plot.status) ? (GAME.Plot.status(p).ready || 0) : 0;
+        var self = this;
+        this._autoTimer = setInterval(function () { self._autoTick(); }, 600);
+        GAME.UI.log("你摆好蒲团开始持续闭关吐纳——每逢要命关头，自会停下等你定夺。", "info");
+        GAME.UI.updateUI();
+    },
+
+    stopAutoCult: function (reason) {
+        if (this._autoTimer) { clearInterval(this._autoTimer); this._autoTimer = null; }
+        this._autoRef = null; this._autoLiquid = 0; this._autoReady = 0;
+        if (reason) GAME.UI.log("【持续闭关中止】" + reason, "warning");
+        if (GAME.UI.updateUI) GAME.UI.updateUI();
+    },
+
+    _autoTick: function () {
+        var p = GAME.State.p();
+        // 重开/读档换了局：静默撤定时器，别拿旧局的钟敲新局的人
+        if (this._autoRef && p !== this._autoRef) { this.stopAutoCult(null); return; }
+        var why = this._autoStopWhy(p);
+        if (why) { this.stopAutoCult(why); return; }
+        GAME.Core.meditate();
+        if (GAME.UI.updateUI) GAME.UI.updateUI();
+    },
+
+    // 停机原因；null = 可以继续。修为满/绿液·灵药新成/剧情节点/重伤阴毒寿元，逐项检定。
+    _autoStopWhy: function (p) {
+        p = p || GAME.State.p();
+        if (p.isDead) return "你已经身陨，闭关自然中止。";
+        if (p.combat) return "斗法陡生，闭关中止。";
+        if (p.wounded) return "你气血未复，继续闭关只怕淤积伤势——先静坐疗伤。";
+        var realm = GAME.DATA.REALMS[p.realmIndex];
+        if (realm && realm.needExp != null && p.currentExp >= realm.needExp) {
+            return "修为已满，正触摸着当前境界的瓶颈——该考虑突破了，继续枯坐也是无用。";
+        }
+        if (p.pendingEvent) return "前路有变故找上你来，须先做了断。";
+        if (p.pendingMercy) return "手下败将跪地求饶，如何处置须你亲自定夺。";
+        if (p.moEvent) return "玄机子那边生出动静，不可在此关头闭关。";
+        if (p.tracking) return "有神识遥遥尾随，闭关无异于闭目待噬。";
+        if ((p.marketRiskValue || 0) >= 80) return "你身上家当惹来的觊觎已满——再不出面，截杀的就要摸进来了。";
+        if (p.yindu && (p.yindu.months || 0) <= 2) return "体内阴毒翻涌，大限将至，须立刻设法化解！";
+        if (GAME.Time && GAME.Time.remain(p).total < 12) return "寿元不足一年，再闭关便是坐以待毙。";
+        // 会话进度项（只在运行中比对）：开启前记录过基线，闭关期间新凝的绿液/成熟的灵药要人来看
+        if (this._autoTimer && (p.liquid || 0) > this._autoLiquid) return "承露瓶中新凝出绿液——灵液妙用无穷，正待人决断。";
+        if (this._autoTimer && GAME.Plot && GAME.Plot.status && (GAME.Plot.status(p).ready || 0) > this._autoReady) {
+            return "药圃之中有灵药成熟，采收正当其时。";
+        }
+        if (GAME.Qixuan && GAME.Qixuan.active()) return "剧情关头，闭关暂停。";
+        return null;
     },
 
     // 绿液催熟：1 滴 -> 百年灵药；5 滴 -> 千年灵药
@@ -350,6 +433,16 @@ GAME.Core = {
     },
 
     // 服用丹药（zhuji 丹不能直接吃，只能突破时消耗）
+    // 精进修为丹药的当前药效（丹毒渐抗）：前三颗 100%，之后每颗 -15%，最低 30%。
+    // 背包描述与服用日志都读这一份，玩家在吃药前就知道还剩多少劲儿。
+    pillPotency: function (id) {
+        var p = GAME.State.p();
+        p.pillExpCount = p.pillExpCount || {};               // 老存档无此字段，安全兜底
+        var taken = p.pillExpCount[id] || 0;
+        var mult = taken < 3 ? 1 : Math.max(0.3, 1 - (taken - 2) * 0.15);
+        return { taken: taken, free: 3, mult: mult };
+    },
+
     takePill: function (id) {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
@@ -378,8 +471,15 @@ GAME.Core = {
         GAME.State.removeItem(id);
         p.stats.pillsTaken += 1;
         if (use.exp) {
-            p.currentExp += use.exp;
-            GAME.UI.log("你服下【" + item.name + "】，滚滚药力在丹田化开，修为 +" + use.exp + "！", "success");
+            // 丹毒渐抗：同一种精进修为的丹药，前三颗药效十足，往后逐颗递减（最低三成）。
+            // 伪灵根的残酷就在这儿——想靠黄龙丹堆到筑基，堆到后面等于白嗑；破局靠
+            // 掌天瓶催熟高年份灵药炼高阶丹、或狩猎妖丹，不是靠同阶丹硬灌。
+            var pot = this.pillPotency(id);
+            var gain = Math.max(1, Math.round(use.exp * pot.mult * (GAME.Reincarn ? GAME.Reincarn.pillMult(p) : 1)));
+            p.currentExp += gain;
+            p.pillExpCount[id] = pot.taken + 1;
+            var note = pot.mult < 1 ? "（连服渐抗，此颗药效 ×" + pot.mult.toFixed(2) + "）" : "";
+            GAME.UI.log("你服下【" + item.name + "】，滚滚药力在丹田化开，修为 +" + gain + note + "！", "success");
         }
         if (use.ageBonus) {
             p.ageBonus += use.ageBonus;
@@ -497,6 +597,53 @@ GAME.Core = {
         var note = mult < 1 ? "（连服生药，药力渐抗，效用 ×" + mult.toFixed(2) + "）" : "";
         GAME.UI.log("你生嚼下一株【" + item.name + "】，草木清气直灌丹田——修为 +" + gain + note + "。", "success");
         this.passTime(item.use.eatMonths || 1);
+    },
+
+    // ---------- 敌修储物袋：抹除禁制，开盲盒 ----------
+    // 神识够 → 直接震碎袋口烙印（1 个月收拾）；不够 → 水磨 sealMonths 个月慢慢化开。
+    // 代价是时间不是概率——磨开封口那一刻，袋里有什么全看天意（凡人流摸尸）。
+    openPouch: function (id) {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat || p.pendingEvent || p.pendingMercy) return;
+        var item = GAME.DATA.ITEMS[id];
+        if (!item || item.type !== "pouch" || GAME.State.countItem(id) < 1) return;
+
+        var spirit = GAME.State.getStats().spirit;
+        var seal = item.sealSpirit || 10;
+        if (spirit < seal) {
+            var months = item.sealMonths || 2;
+            GAME.UI.log("袋口那缕神识烙印深沉，你神识不足以强行震碎——只能日复一日以灵力水磨。", "warning");
+            GAME.Core.passTime(months);
+            if (p.isDead) return;
+            GAME.UI.log("耗费 " + months + " 个月，袋口烙印终于淡去。", "system");
+        } else {
+            GAME.Core.passTime(1);
+            if (p.isDead) return;
+        }
+
+        GAME.State.removeItem(id, 1);
+        var pool = (GAME.DATA.POUCH_LOOT || {})[item.tier || 1] || [];
+        var total = 0, i;
+        for (i = 0; i < pool.length; i++) total += pool[i].w;
+        var rolls = 2 + (item.tier || 1), stones = 0, got = [];
+        for (i = 0; i < rolls && pool.length; i++) {
+            var roll = Math.random() * total, l = pool[pool.length - 1];
+            for (var j = 0; j < pool.length; j++) { if (roll < pool[j].w) { l = pool[j]; break; } roll -= pool[j].w; }
+            if (l.id === "stones") {
+                var q = GAME.Core.rand(l.qty[0], l.qty[1]);
+                p.spiritStones += q;
+                stones += q;
+            } else {
+                var idef = GAME.DATA.ITEMS[l.id];
+                if (!idef) continue;
+                GAME.State.addItem(l.id, 1);
+                got.push("【" + idef.name + "】");
+            }
+        }
+        GAME.UI.log("你指尖灵光吞吐，强行震碎袋口残留的神识烙印，将内里珍藏尽数倒出——灵石 ×" + stones +
+            (got.length ? "，" + got.join("、") : "，此外别无长物") + "。", "loot");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
     },
 
     // 装备/更换法器（旧法器自动退回储物袋）
@@ -987,6 +1134,7 @@ GAME.Core = {
             GAME.State.addKarma(-12);
             GAME.UI.log("你掐动法诀，一团烈火将尸身与血迹焚为齑粉——死无对证，因果无从追查。（恶名 +12，煞气 +8，得 " + stones + " 灵石）", "danger");
             GAME.Combat.grantLoot(def.loot, 1, def);
+            GAME.Combat.pouchDrop(def, 1);   // 焚尸前先取袋：摸尸盲盒照开
         } else if (option === 0) {
             p.spiritStones += stones;
             p.stats.kills += 1;
@@ -996,6 +1144,7 @@ GAME.Core = {
             if (GAME.Faction) GAME.Faction.onKill(p, def.id);
             GAME.UI.log("你心一横，剑光闪过——斩草除根，免留后患。（恶名 +8，煞气 +5，得 " + stones + " 灵石）", "danger");
             GAME.Combat.grantLoot(def.loot, 1, def);
+            GAME.Combat.pouchDrop(def, 1);   // 杀人夺袋：凡人流的开盲盒时刻
             // 斩杀修士而尸身留在原地：因果追查缠身，高阶修士或循因果寻仇
             if (def.cultivator) {
                 p.causal = { months: 12 };

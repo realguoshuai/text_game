@@ -198,7 +198,7 @@ ok('散修坊市购买：物品已入储物袋', G.State.countItem(first.id) >= 
 section('④ 地下黑市：在市集页签下渲染（原实现硬绑 tab==="black"）');
     const p3 = G.State.createNewPlayer('wanderer');
     p3.realmIndex = 13;   // 黑市现已要求筑基期，验黑市须以筑基身进入
-    p3.location = 'qingniu_zhen';
+    p3.location = 'tainan_gu';   // 且须身在苍南谷（2026-10-22 起坊市/黑市与所在地强绑定）
     p3.spiritStones = 5000;
     U.updateUI();
 U.tab = 'market';
