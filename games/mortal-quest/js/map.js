@@ -108,8 +108,10 @@ GAME.Map = {
         var p = GAME.State.p();
         // 修为不到：出不了这道无形的坎（青梧谷等宗门另认门人身份）
         if (!target.unlocked) return { ok: false, msg: target.lockMsg };
-        if (p.silver < target.silver) {
-            return { ok: false, msg: "盘缠不足（需 " + target.silver + " 两）。可先在凡俗城池寻行商【兑换市银】。" };
+        // 盘缠：银两不足可用灵石折抵（见 payPlan），不再因为"灵石满身、银两为零"被困死在城里
+        var pay = this.payPlan(p, target.silver);
+        if (!pay.ok) {
+            return { ok: false, msg: "盘缠不足（需 " + target.silver + " 两），身上灵石连折抵都不够——先在凡俗城池接点营生。" };
         }
         if (target.targetId === "tainan_gu" && !(p.location === "tainan_gu") && !this.canEnterTainan()) {
             return { ok: false, msg: GAME.DATA.MAP.array.failText };
@@ -150,6 +152,21 @@ GAME.Map = {
         return true;
     },
 
+    // ---------- 盘缠支付方案（唯一出口） ----------
+    // 世俗规矩收银两，可修士身上常只有灵石：银两不足时按 1 灵石 = 100 两折补，
+    // 免得身家颇丰的修士因为囊中 0 两被困死在城中（用户在景阳城实测卡死）。
+    STONE_TO_SILVER: 100,
+    payPlan: function (p, cost) {
+        cost = Math.max(0, Math.round(cost || 0));
+        var silver = (typeof p.silver === "number" && isFinite(p.silver)) ? p.silver : 0;
+        var stones = (typeof p.spiritStones === "number" && isFinite(p.spiritStones)) ? p.spiritStones : 0;
+        if (silver >= cost) return { ok: true, silver: cost, stones: 0, short: 0 };
+        var short = cost - silver;
+        var need = Math.ceil(short / this.STONE_TO_SILVER);
+        if (stones < need) return { ok: false, silver: silver, stones: need, short: short };
+        return { ok: true, silver: silver, stones: need, short: short };
+    },
+
     travel: function (routeId) {
         var check = this.canTravel(routeId);
         if (!check.ok) { GAME.UI.log(check.msg, "system"); GAME.UI.updateUI(); return false; }
@@ -157,7 +174,10 @@ GAME.Map = {
         var target = check.target;
         var from = this.cur();
 
-        p.silver -= target.silver;
+        var pay = this.payPlan(p, target.silver);
+        if (!pay.ok) { GAME.UI.log("盘缠不足，走不得了。", "system"); GAME.UI.updateUI(); return false; }
+        p.silver = Math.max(0, (p.silver || 0) - pay.silver);
+        if (pay.stones > 0) p.spiritStones = Math.max(0, (p.spiritStones || 0) - pay.stones);
         // 《御风诀》：驭风赶路，每程省 1 个月（最低 1 月）
         var months = target.months;
         if (p.spells && p.spells.yufeng_shu && GAME.DATA.SPELLS.yufeng_shu) {
@@ -170,7 +190,8 @@ GAME.Map = {
             months = Math.max(1, Math.round(months * 0.5));
             if (months < m0) GAME.UI.log("【踏云靴】云气托足，行程减半（" + m0 + " → " + months + " 个月）。", "info");
         }
-        GAME.UI.log("你自【" + from.name + "】动身，一路风尘前往【" + target.targetName + "】，车马盘缠耗去 " + target.silver + " 两。", "system");
+        GAME.UI.log("你自【" + from.name + "】动身，一路风尘前往【" + target.targetName + "】，车马盘缠耗去 " + target.silver + " 两。" +
+            (pay.stones > 0 ? "（随身银两不足，在驿站拿 " + pay.stones + " 枚灵石兑了碎银补足）" : ""), "system");
         p.location = target.targetId;
         // 离开原址时若仍在「坊市停留」态，需复位——否则人已到别处、按钮却还挂着「已在坊市中」
         if (p.atMarket) {

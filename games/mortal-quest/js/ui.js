@@ -131,8 +131,9 @@ GAME.UI = {
     leaveMarketTo: function (tabName) {
         var p = GAME.State.p();
         if (p && p.atMarket) {
-            p.atMarket = false;
-            if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
+            // 统一走 Market.leave：离市状态复位只有一个出口，别在这里另写一套
+            if (GAME.Market && GAME.Market.leave) GAME.Market.leave(true);
+            else { p.atMarket = false; if (GAME.Bottle) GAME.Bottle.onLeaveMarket(); }
         }
         if (this.tab === "market" && tabName && this.TAB_MAP[tabName]) this.switchTab(tabName);
         else this.updateUI();
@@ -300,7 +301,7 @@ GAME.UI = {
             entry.appendChild(stamp);
             // 语义标签：机缘/凶险/警讯/获物 前置加粗，深浅主题都靠各 type 自身的配色保辨识度；
             // 已带【突破成功】这类自带标签的消息不重复加
-            var TAGS = { success: "机缘", danger: "凶险", warning: "警讯", loot: "获物", venture: "历练" };
+            var TAGS = { success: "机缘", danger: "凶险", warning: "警讯", loot: "获物", venture: "历练", trade: "交易" };
             if (TAGS[type] && message.indexOf("【") !== 0) {
                 var tag = document.createElement("span");
                 tag.className = "log-tag";
@@ -1088,8 +1089,16 @@ GAME.UI = {
             badge("badge-companion", GAME.State.countItem("chong_egg") > 0, 0);
             var _mksub = this.$("market-sub");
             var _mkRt = (GAME.Market && GAME.Market.travelTime) ? GAME.Market.travelTime() : 1;
-            if (_mksub) _mksub.innerText = p.atMarket ? "已在坊市中" : ("往返 " + _mkRt + " 月");
-            else this.$("btn-market").innerText = p.atMarket ? "坊市中" : ("前往坊市 (往返" + _mkRt + "月)");
+            var _mkTxt = _mkRt > 0 ? ("往返 " + _mkRt + " 月") : "就地入市";
+            if (_mksub) _mksub.innerText = p.atMarket ? "已在坊市中" : _mkTxt;
+            else this.$("btn-market").innerText = p.atMarket ? "坊市中" : ("前往坊市 (" + _mkTxt + ")");
+            // 已在市中 → 此按钮必须置灰：否则连点会「离市→再入市」反复刷日志。
+            // 真要离市走市集页的「离开坊市，返回洞府」。
+            var _mkBtn = this.$("btn-market");
+            if (_mkBtn) {
+                _mkBtn.disabled = lock || dead || !!p.atMarket;
+                this._why(_mkBtn, p.atMarket ? "已在坊市中" : (lock ? lockWhy : ""));
+            }
             // 存档按钮：交战之中无暇烙印轮回石（否则残血/必死回合存档，读档卡死战斗局）
             var bs = this.$("btn-save");
             if (bs) {
@@ -1478,8 +1487,10 @@ GAME.UI = {
                 " 个月换货；" + (p.karma < -20 ? "你恶名在外，商贾坐地起价" : p.karma > 20 ? "你乐善好施，商贾愿予折扣" : "童叟无欺");
 
             // 战局提示行（两强争海：僵持时明说无军需铺）
+            // 未入碎星海篇不给这行——练气期在岚州坊市抬头看见"乱星盟占上风"纯属剧透。
             if (GAME.Faction && GAME.Faction.warLabel) {
-                this.$("market-tip").innerText = this.$("market-tip").innerText + "　｜　" + GAME.Faction.warLabel(p);
+                var _wl = GAME.Faction.warLabel(p);
+                if (_wl) this.$("market-tip").innerText = this.$("market-tip").innerText + "　｜　" + _wl;
             }
 
             // 胜方军需铺：战局 ≥70 / ≤30 才开门（固定价，不随换货刷新）

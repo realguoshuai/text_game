@@ -3430,3 +3430,9 @@ body.theme-light .goal-go.is-gated {
 body.theme-light .goal-go:disabled {
     color: #9A9184; background: transparent; border-color: #D5C9B4; box-shadow: none;
 }
+
+/* ================= 交易日志（市集买卖） =================
+ * 买卖是拿钱换东西，不是打怪捡的——旧代码借用 loot（【获物】），语义全错。
+ * 单列一档：比 info 暖一点、比 loot 沉一点，能一眼认出"这是我花钱/卖货的一笔"。 */
+.log-trade { color: var(--gold-tx); }
+body.theme-light .log-trade { color: #6B4B12; }

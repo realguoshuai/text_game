@@ -290,12 +290,18 @@ console.log('==== 六、高年份药草销赃 → 觊觎度满值 → 神识锁�
   add("talisman_chuansong", 0);
   G.Market.toggle();
   assert('进入坊市', p.atMarket === true);
+  // 核心禁售：坊市杂物架绝不再收灵药（"筑基丹 400 灵石贱卖"那类事故的根）
+  assert('坊市拒收灵药（核心药材禁售）', G.Market.canSell("herb_xuanbing") === false);
+  assert('坊市拒收丹药/符箓/法器', G.Market.canSell("pill_zhuji") === false &&
+      G.Market.canSell("talisman_huoqiu") === false && G.Market.canSell("artifact_qingyun") === false);
+  assert('凡俗杂物仍可出手（废矿/废铁）', G.Market.canSell("ore") === true && G.Market.canSell("junk_scrap") === true);
+
   const risk0 = G.Bottle.risk();
-  G.Market.sell("herb_xuanbing");
-  assert('出售 500 年玄冰花 → 觊觎度 +25', G.Bottle.risk() === risk0 + 25);
+  G.Bottle.onSellHerb("herb_xuanbing");   // 灵药唯一出口＝黑市销赃，其内部调的就是这个
+  assert('售出 500 年玄冰花 → 觊觎度 +25', G.Bottle.risk() === risk0 + 25);
 
   // 出售千年药草：觊觎度 +60（累计 85 → 越过 80 警戒线）
-  G.Market.sell("herb_longlin");
+  G.Bottle.onSellHerb("herb_longlin");
   assert('出售 1000 年龙鳞果 → 觊觎度再 +60（封顶 100）', G.Bottle.risk() >= 80);
   assert('觊觎度满值触发警戒提示', p.riskWarned === true);
 
@@ -316,8 +322,7 @@ console.log('==== 六、高年份药草销赃 → 觊觎度满值 → 神识锁�
 
   // 均不满足：被截杀，玄傀替死断后
   G.Bottle.addRisk(100);          // 再度拉满
-  G.Market.toggle();              // 再次进入坊市
-  G.Market.sell("herb_longlin");  // 无龙鳞果则卖不出——直接手动拉满风险
+  G.Market.toggle();              // 再次进入坊市（灵药已在坊市禁售，风险直接手动拉满）
   p.marketRiskValue = 100;
   G.Market.toggle();              // 离开 → 再次锁定
   p.riskHunt = true;              // 确保 hunting 态

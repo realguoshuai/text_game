@@ -168,7 +168,15 @@ const m0 = month();
 let err = click(els['btn-market-go'], '[前往坊市]');
 ok('点击「前往坊市」不抛错', err === null);
 ok('跑商生效：已身处坊市', p.atMarket === true);
-ok('跑商成本保留：耗时推进（山间小集亦须赶路）', month() > m0);
+ok('城镇自带市集：就近入市不耗年月（青牛镇）', month() === m0);
+ok('山野洞府仍须赶路（幽篁谷 2 月）', (function () {
+    const keep = p.location; p.location = 'shenshou_gu';
+    const tt = G.Market.travelTime(); p.location = keep; return tt === 2;
+})());
+ok('城镇 travelTime 归零（景阳城）', (function () {
+    const keep = p.location; p.location = 'jiayuan_cheng';
+    const tt = G.Market.travelTime(); p.location = keep; return tt === 0;
+})());
 ok('进坊市后本坊市货架区显现', shown('market-local'));
 ok('「前往坊市」入口隐去', !shown('market-away'));
 ok('坊市货架已铺货', els['market-goods'].children.length > 0);

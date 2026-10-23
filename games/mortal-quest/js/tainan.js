@@ -51,9 +51,13 @@ GAME.Tainan = {
         return Math.max(1, Math.round(item.price * this.cfg().sellRatio));
     },
 
+    // 与本坊市同一把尺子（GAME.Market.canSell）：丹药/符箓/灵药/傀儡主材都不收，
+    // 免得散修坊市成为绕过禁售的侧门
     canSell: function (id) {
         var item = GAME.DATA.ITEMS[id];
-        return !!item && item.type !== "currency" && item.type !== "treasure";
+        if (!item) return false;
+        if (item.type === "treasure") return false;
+        return !!(GAME.Market && GAME.Market.canSell) ? GAME.Market.canSell(id) : (item.type !== "currency");
     },
 
     sell: function (id) {
@@ -63,7 +67,7 @@ GAME.Tainan = {
         var gain = this.sellPrice(id);
         GAME.State.removeItem(id);
         p.spiritStones += gain;
-        GAME.UI.log("你将【" + GAME.DATA.ITEMS[id].name + "】脱手，得 " + gain + " 枚灵石。", "loot");
+        GAME.UI.log("你将【" + GAME.DATA.ITEMS[id].name + "】脱手，得 " + gain + " 枚灵石。", "trade");
         GAME.Core.checkAchievements();
         GAME.UI.autoSave();
         GAME.UI.updateUI();

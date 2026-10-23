@@ -156,7 +156,9 @@ GAME.BlackMarket = {
         GAME.State.removeItem(herbId);
         var price = cfg[herbId];
         p.spiritStones += price;
-        GAME.UI.log("你于地下黑市脱手【" + GAME.DATA.ITEMS[herbId].name + "】，得 " + price + " 灵石（远高于坊市）。", "loot");
+        GAME.UI.log("你于地下黑市脱手【" + GAME.DATA.ITEMS[herbId].name + "】，得 " + price + " 灵石（远高于坊市）。", "trade");
+        // 高阶灵药出手即惹觊觎——坊市已禁收灵药，这里是它唯一的变现口，也是唯一的招祸口
+        if (GAME.Bottle && GAME.Bottle.onSellHerb) GAME.Bottle.onSellHerb(herbId);
 
         // 隐匿判定：煞气升概率，敛气等级降概率
         var failChance = 0.15 + p.shaQi * 0.02 - p.concealLevel * 0.12 -

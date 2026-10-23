@@ -9,7 +9,16 @@ var GAME = window.GAME = window.GAME || {};
 GAME.Market = {
 
     // ---------- 各地至坊市的路程耗时（按距离差异化） ----------
+    // 城镇 / 仙家聚集地自带市集：抬脚就到，不耗年月（景阳城是岚州大城，说"山路迢迢"纯属穿帮）；
+    // 只有山野洞府（kind=cave）才要真跋涉。
+    townMarket: function () {
+        var node = (GAME.Map && GAME.Map.cur) ? (GAME.Map.cur() || null) : null;
+        if (!node) return false;
+        return node.kind === "mortal" || node.kind === "immortal";
+    },
+
     travelTime: function () {
+        if (this.townMarket()) return 0;
         var p = GAME.State.p();
         var m = GAME.DATA.MARKET.travelMonthsByLoc || {};
         return m[p.location] || GAME.DATA.MARKET.travelMonths;
@@ -26,21 +35,36 @@ GAME.Market = {
     toggle: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat || p.pendingEvent || p.pendingMercy) return;
-        if (!p.atMarket) {
-            p.atMarket = true;
-            if (!p.marketGoods || !p.marketGoods.length) this.refreshGoods();
-            GAME.UI.log("你动身前往坊市，山路迢迢，往返耗时 " + this.travelTime() + " 个月。", "system");
-            GAME.Core.passTime(this.travelTime());
-        } else {
-            p.atMarket = false;
-            GAME.UI.log("你离开坊市，返回住处。", "system");
-            // 怀璧其罪：觊觎度 ≥80 时，离市即被结丹修士神识锁定
-            if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
+        if (p.atMarket) {
+            // 已在市中：只做状态复位，且不写日志——"离开→再进"连着点会把见闻录刷成复读机
+            this.leave(true);
+            GAME.UI.updateUI();
+            return;
         }
-        // 动身抵达坊市：左栏自动切到「游历 → 市集」货架；离市则原地刷新
+        p.atMarket = true;
+        if (!p.marketGoods || !p.marketGoods.length) this.refreshGoods();
+        var tt = this.travelTime();
+        if (tt > 0) {
+            GAME.UI.log("你动身前往坊市，山路迢迢，往返耗时 " + tt + " 个月。", "system");
+        } else {
+            GAME.UI.log("你步入坊市，贩夫走卒的吆喝扑面而来——就近入市，不费时日。", "system");
+        }
+        if (tt > 0) GAME.Core.passTime(tt);
+        // 动身抵达坊市：左栏自动切到「游历 → 市集」货架
         // （无头测试桩可能不提供 switchTab，退回 updateUI）
-        if (p.atMarket && !p.combat && GAME.UI.switchTab) GAME.UI.switchTab("market");
+        if (!p.isDead && !p.combat && GAME.UI.switchTab) GAME.UI.switchTab("market");
         else GAME.UI.updateUI();
+    },
+
+    // ---------- 离市：唯一复位出口（silent 时静默，不写日志） ----------
+    leave: function (silent) {
+        var p = GAME.State.p();
+        if (!p || !p.atMarket) return false;
+        p.atMarket = false;
+        if (!silent) GAME.UI.log("你离开坊市，返回住处。", "system");
+        // 怀璧其罪：觊觎度 ≥80 时，离市即被结丹修士神识锁定
+        if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
+        return true;
     },
 
     // ---------- 换货：按所在地货源池权重抽取，价格 ±20% 浮动 ----------
@@ -147,17 +171,22 @@ GAME.Market = {
         GAME.UI.updateUI();
     },
 
-    // ---------- 出售（货币与已装备法器不可售） ----------
+    // ---------- 出售（只收凡俗杂物，核心重宝一律不卖） ----------
     sell: function (id) {
         var p = GAME.State.p();
         if (!p.atMarket || p.isDead) return;
         var item = GAME.DATA.ITEMS[id];
         if (!item || !GAME.State.countItem(id)) return;
         if (item.type === "currency") return;
+        if (!this.canSell(id)) {
+            GAME.UI.log("掌柜摆手：「【" + item.name + "】是修士的本钱，不是货架上的杂货，收不得。」", "system");
+            GAME.UI.updateUI();
+            return;
+        }
         var gain = this.sellPrice(item.price);
         GAME.State.removeItem(id);
         p.spiritStones += gain;
-        GAME.UI.log("你将【" + item.name + "】卖给掌柜，得 " + gain + " 灵石。", "loot");
+        GAME.UI.log("你将【" + item.name + "】卖给掌柜，得 " + gain + " 灵石。", "trade");
         // 高年份药草出手，惹人觊觎（≥300 年 +25 / ≥1000 年 +60）
         if (GAME.Bottle && item.type === "herb") GAME.Bottle.onSellHerb(id);
         GAME.Core.checkAchievements();
@@ -188,7 +217,8 @@ GAME.Market = {
             return false;
         }
         p.spiritStones += gain;
-        GAME.UI.log("你摊出" + names.join("、") + "，掌柜过眼一掂，付你 " + gain + " 灵石。", "loot");
+        // 一次批量出手只落一条总账——逐件刷屏会把真正的剧情日志顶出视野
+        GAME.UI.log("你摊出" + names.join("、") + "，掌柜过眼一掂，付你 " + gain + " 灵石。", "trade");
         GAME.Core.checkAchievements();
         GAME.UI.autoSave();
         GAME.UI.updateUI();
@@ -232,9 +262,19 @@ GAME.Market = {
         return true;
     },
 
-    // ---------- 是否可出售 ----------
+    // ---------- 是否可出售（唯一判据，谁家坊市都走这一把尺子） ----------
+    // ⛔ 只收凡俗杂物与废矿：丹药 / 符箓 / 法器 / 功法秘籍 / 灵药 / 傀儡主材 一律禁售。
+    //    筑基丹 400 灵石贱卖、千年灵药 100 灵石收走，等于把玩家的破境本钱骗走（用户实测踩坑）。
+    //    高阶灵药另有出口——地下黑市（价高但招觊觎），那是拿命换钱的路子，不是随手的杂物。
+    SELLABLE_TYPES: { junk: true },
+    SELLABLE_IDS: { ore: true, junk_scrap: true },
+
     canSell: function (id) {
         var item = GAME.DATA.ITEMS[id];
-        return !!item && item.type !== "currency";
+        if (!item) return false;
+        if (item.type === "currency") return false;
+        if (item.noSell) return false;
+        if (this.SELLABLE_TYPES[item.type]) return true;
+        return !!this.SELLABLE_IDS[id];
     },
 };

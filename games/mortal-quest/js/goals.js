@@ -409,11 +409,18 @@ GAME.Goals = {
             if (ps && ps.ready > 0) plotHint = "；药圃有 " + ps.ready + " 株满千年可收";
             else if (ps && ps.nextLeft != null) plotHint = "；药圃 " + ps.growing + " 株在长，最近 " + GAME.Plot._fmtMonths(ps.nextLeft) + "后可收";
         }
+        // 与「尝试突破」按钮读同一份推演（Breakthrough.plan）：两处百分比必须同源。
+        // 旧写法读 realm.breakChance 静态底子，按钮读 plan.successChance（已计入灵脉/护法/心境/丹道），
+        // 于是同一时刻出现"58% 对 64%"打架（用户实测）。
+        var chPlan = null;
+        try { chPlan = (GAME.Breakthrough && GAME.Breakthrough.plan) ? GAME.Breakthrough.plan(p) : null; } catch (e) { chPlan = null; }
+        var chNow = (chPlan && chPlan.ok) ? chPlan.successChance
+            : ((typeof r.breakChance === "number") ? r.breakChance : null);
         return {
             kind: "heal",
             label: "",   // 目标框底部不重复"闭关打坐（X月·+1修为）"——动作网格已有此按钮，此处只留差距信息
             why: "还差 " + need + " 修为可尝试突破" +
-                 (typeof r.breakChance === "number" ? "（届时成功率 " + Math.round(r.breakChance * 100) + "%）" : "") +
+                 (chNow !== null ? "（届时成功率 " + Math.round(chNow * 100) + "%）" : "") +
                  plotHint + leftTxt,
             run: function () { GAME.Core.meditate(); }
         };

@@ -347,8 +347,16 @@ GAME.DATA.WAR_STALL = {
         return null;
     };
 
+    // 战局是否该被玩家知晓：碎星海篇（结丹后，realmIndex ≥ 16）才有"两强争海"这回事。
+    // 练气期在岚州坊市抬头看见"乱星盟占上风"，等于把跨篇章底牌翻了——一律不显示。
+    F.warUnlocked = function (p) {
+        p = p || GAME.State.p();
+        return !!p && (p.realmIndex || 0) >= 16;
+    };
+
     // 战局文案（洞府/地图/坊市共用）
     F.warLabel = function (p) {
+        if (!this.warUnlocked(p)) return "";
         var v = this.warValue(p);
         var side = this.warSide(p);
         var name = side === "xingque" ? "星阙" : (side === "luanxing" ? "乱星盟" : "两强僵持");
@@ -485,8 +493,9 @@ GAME.DATA.WAR_STALL = {
         GAME.UI.updateUI();
     };
 
-    // 胜方货栈（null = 僵持无货栈）
+    // 胜方货栈（null = 僵持无货栈 / 未入碎星海篇）
     F.warStall = function (p) {
+        if (!this.warUnlocked(p)) return null;
         var side = this.warSide(p);
         if (!side) return null;
         return { side: side, goods: GAME.DATA.WAR_STALL[side] || [] };
