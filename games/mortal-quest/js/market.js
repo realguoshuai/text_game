@@ -271,7 +271,8 @@ GAME.Market = {
     //    灵药这一格本轮放开：百年灵药可换厚利（药香泄露 +30 的代价），
     //    千年灵药"挂得上价、卖不出去"——一出手即触发劫杀事件（js/herbalarm.js）。
     SELLABLE_TYPES: { junk: true },
-    SELLABLE_IDS: { ore: true, junk_scrap: true, herb_bainian: true, herb_qiannian: true },
+    SELLABLE_IDS: { ore: true, junk_scrap: true, herb_bainian: true, herb_qiannian: true,
+                    beast_hide: true, beast_bone: true },
 
     // 专属收货价：百年灵药是硬通货，不能按杂物五折算（40×0.5=20，等于白送）
     // 千年灵药也挂得上货架，但它根本卖不出去——见 canSell 下的注释

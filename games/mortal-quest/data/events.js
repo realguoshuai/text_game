@@ -24,8 +24,11 @@ GAME.DATA.MONSTERS = [
         id:"wolf", name:"铁齿狼 · 一阶妖兽", isBeast:true, tier:1,
         hp:55, atk:9, def:2, speed:8, spirit:3, exp:18,
         stones:[6,16], killChance:0.10, loseAge:[1,2], loseStonePct:[0.3,0.6],
+        lootClass:"beast",     // 普通野兽：只出皮毛、碎骨、低阶矿石
         loot:[
-            { id:"herb_bainian",  chance:0.10, qty:[1,1] },
+            { id:"beast_hide", chance:0.50, qty:[1,1] },
+            { id:"beast_bone", chance:0.32, qty:[1,2] },
+            { id:"ore",        chance:0.10, qty:[1,1] },
         ]
     },
     {
@@ -33,21 +36,24 @@ GAME.DATA.MONSTERS = [
         human: true,   // 是人，不是妖兽：战胜后可选择灭口或留活口，影响善恶
         hp:80, atk:13, def:5, speed:8, spirit:9, exp:30,
         stones:[20,50], killChance:0.20, loseAge:[1,3], loseStonePct:[0.4,0.8],
+        lootClass:"minion",     // 低阶小怪：符箓、低阶丹药、材料
         loot:[
             { id:"talisman_huoshe", chance:0.30, qty:[1,1] },
             { id:"pill_huanglong",  chance:0.20, qty:[1,1] },
-            { id:"herb_bainian",    chance:0.15, qty:[1,2] },
+            { id:"beast_bone",      chance:0.20, qty:[1,1] },
         ]
     },
     {
         id:"wolfking", name:"铁齿狼王 · 一阶巅峰妖兽", isBeast:true, tier:1,
         hp:150, atk:20, def:8, speed:11, spirit:8, exp:60,
         stones:[40,90], killChance:0.35, loseAge:[2,4], loseStonePct:[0.5,0.9],
+        scalable:true,         // 它是野外池里的一员：练气十二层撞上时也得有三四百血
+        lootClass:"boss",      // 一阶大妖：可出百年灵药、法器残片；千年灵药绝禁野外
         loot:[
-            { id:"herb_qiannian",    chance:0.30, qty:[1,1] },
-            { id:"artifact_qingyuan",chance:0.10, qty:[1,1] },
-            { id:"pill_jinsui",      chance:0.25, qty:[1,1] },
-            { id:"herb_bainian",     chance:0.40, qty:[1,3] },
+            { id:"herb_bainian",     chance:0.30, qty:[1,1] },
+            { id:"artifact_frag",    chance:0.30, qty:[1,2] },
+            { id:"pill_jinsui",      chance:0.20, qty:[1,1] },
+            { id:"beast_hide",       chance:0.60, qty:[1,2] },
             { id:"skill_manli",      chance:0.18, qty:[1,1] },   // 妖兽炼体残篇：蛮力诀
         ]
     },
@@ -113,8 +119,10 @@ GAME.DATA.MONSTERS = [
         id:"jingjiao_guard", name:"惊蛟会帮众 · 拦路刁徒",
         human:true, hp:70, atk:12, def:4, speed:8, spirit:4, exp:15,
         stones:[10,30], killChance:0.15, loseAge:[0,1], loseStonePct:[0.3,0.5],
+        lootClass:"minion",
         loot:[
-            { id:"herb_bainian", chance:0.30, qty:[1,1] },
+            { id:"beast_bone",  chance:0.20, qty:[1,1] },
+            { id:"pill_huichun", chance:0.18, qty:[1,1] },
         ]
     },
     {
@@ -257,27 +265,13 @@ GAME.DATA.EVENTS = [
         ]
     },
     {
-        id:"meet_wolf", weight:24,
-        text:"草丛簌簌一响，一头铁齿狼红着眼睛扑了出来！",
+        // 野外遭遇：不再钉死某一只怪，交由 js/encounter.js 按「所在地 + 境界」抽池。
+        // 文案也由 Encounter.meetText() 现写（text 留空 → 不重复打一条空日志）。
+        id:"wild_meet", weight:44,
+        text:"",
         choices:null,
         outcomes:[
-            { chance:1.0, type:"combat", monster:"wolf" },
-        ]
-    },
-    {
-        id:"meet_bandit", weight:14,
-        text:"山路拐角，一名黑衣散修拦住去路：「识相的，把储物袋留下！」",
-        choices:null,
-        outcomes:[
-            { chance:1.0, type:"combat", monster:"bandit" },
-        ]
-    },
-    {
-        id:"meet_wolfking", weight:6,
-        text:"林间寒风骤起，一双碧目在阴影中亮起——是传闻中的铁齿狼王！",
-        choices:null,
-        outcomes:[
-            { chance:1.0, type:"combat", monster:"wolfking" },
+            { chance:1.0, type:"combat", monster:"@wild" },
         ]
     },
     {
@@ -314,7 +308,7 @@ GAME.DATA.EVENTS = [
                         { id:"herb_qiannian",  chance:0.25, qty:[1,1] },
                         { id:"herb_bainian",   chance:1.0,  qty:[1,3] },
                     ]},
-                    { chance:0.40, type:"combat", text:"骨堆下猛然窜出一头守巢的铁齿狼！", monster:"wolf" },
+                    { chance:0.40, type:"combat", text:"骨堆下猛然窜出一头守巢的妖兽！", monster:"@wild" },
                 ]
             },
             {

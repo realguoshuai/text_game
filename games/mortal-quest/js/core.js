@@ -1125,7 +1125,8 @@ GAME.Core = {
             roll -= weightOf(events[i]);
         }
 
-        GAME.UI.log("【历练】" + picked.text, "info");
+        // 动态遭遇（text 留空）的文案由 Encounter.meetText 现写 —— 别先打一条空的【历练】
+        if (picked.text) GAME.UI.log("【历练】" + picked.text, "info");
         if (picked.choices && picked.choices.length) {
             // 分支选项型：挂起等玩家点选
             p.pendingEvent = { eventId: picked.id };
@@ -1294,6 +1295,18 @@ GAME.Core = {
                 }
                 break;
             case "combat":
+                // "@wild"：野外遭遇不钉死某一只怪，交给 Encounter 按「所在地 + 境界」抽池。
+                // 抽不出（数据缺项/池空）就当作一场无事，绝不空开一场没有对手的斗法。
+                if (o.monster === "@wild") {
+                    var foe = (GAME.Encounter && GAME.Encounter.pick) ? GAME.Encounter.pick(p) : null;
+                    if (!foe) {
+                        GAME.UI.log("四下寂寂，并无敌影近身。", "venture");
+                        break;
+                    }
+                    GAME.UI.log(GAME.Encounter.meetText(foe, p), "danger");
+                    GAME.Combat.start(foe.id); // 战斗自行接管 UI 刷新
+                    return;
+                }
                 GAME.Combat.start(o.monster); // 战斗自行接管 UI 刷新
                 return;
             case "hdmod":

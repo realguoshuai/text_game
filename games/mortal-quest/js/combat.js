@@ -56,6 +56,10 @@ GAME.Combat = {
         } else         if (affix === "berserk") {    // 魔化狂暴：HP<30% 时攻击 +100%
             p.combat.berserk = true;
         }
+        // 敌人数值随动缩放：野外遭遇池里的怪（def.scalable）在此刻锚到玩家身上——
+        // 气血对标玩家上限、攻击加在玩家防御之上、修为与灵石随强度走。
+        // 剧情战 / 副本 BOSS 不带 scalable 标记，数值原样不动。
+        if (GAME.Encounter && GAME.Encounter.scaleCombat) GAME.Encounter.scaleCombat(p);
         // 机关傀儡齐射：开战捕获已列阵的编制（混编军团按各型 volley 分别结算）
         p.combat.puppets = p.puppetsActive || 0;
         p.combat.puppetArmy = (GAME.Puppet && GAME.Puppet.army) ? GAME.Puppet.army().slice() : [];
@@ -69,10 +73,11 @@ GAME.Combat = {
             var QORD = { "凡品":1, "灵品":2, "上品":3, "极品":4 };
             (def.loot || []).forEach(function (l) {
                 var it = GAME.DATA.ITEMS[l.id];
+                if (!it) return;                 // 数据表引用了未加载的物品：略过，别让探查把开战打断
                 var q = QORD[it.quality] || 0;
                 if (q > best && l.chance >= 0.3) { best = q; topLoot = it.name + "（" + it.quality + "）"; }
             });
-            GAME.UI.log("【天眼术】神识扫过——其气血约 " + def.hp + "、攻 " + def.atk + " 防 " + def.def +
+            GAME.UI.log("【天眼术】神识扫过——其气血约 " + p.combat.maxHp + "、攻 " + p.combat.atk + " 防 " + p.combat.def_ +
                 "；随身之物：" + (topLoot || "并无可观") + "。战避之心，你可定了。", "info");
         }
         if (s.speed >= def.speed) GAME.UI.log("你身法略快，抢得先机！", "info");
@@ -699,6 +704,9 @@ GAME.Combat = {
     // ---------- 发放战利品：ratio 为获取比例（留活口时只拿六成） ----------
     grantLoot: function (loot, ratio, def) {
         ratio = ratio || 1;
+        // 掉落阶级闸门：def 带 lootClass 时先按 "野兽/小怪/精英/首领" 白名单筛一遍，
+        // 千年灵药与筑基重宝在野外一只都撬不出来（数据写错也进不了袋子）。
+        if (def && GAME.Encounter && GAME.Encounter.lootFilter) loot = GAME.Encounter.lootFilter(def, loot);
         for (var i = 0; i < loot.length; i++) {
             var l = loot[i];
             var idef = GAME.DATA.ITEMS[l.id];
@@ -777,16 +785,19 @@ GAME.Combat = {
         var p = GAME.State.p();
         var def = p.combat.def;
         var ctx = p.combat.ctx;
-        var stones = this.rand(def.stones[0], def.stones[1]);
+        // 缩放过的遭遇：灵石与修为按强度走（p.combat.stonesGain / expGain 由 Encounter 写入）
+        var sRange = (p.combat && p.combat.stonesGain) ? p.combat.stonesGain : def.stones;
+        var stones = this.rand(sRange[0], sRange[1]);
+        var expGain = (p.combat && typeof p.combat.expGain === "number") ? p.combat.expGain : (def.exp || 0);
         // ★ 本场明细账：从这一行起，grantLoot / materialDrops / pouchDrop 里的 _note
         //   才有着落处。此后每一条"赢了"的分支都必须带着这本账去 handleCombatVictory，
         //   不许再出现"东西入袋了、见闻录写了、玩家什么也没看见"的静默收场。
-        this._rec = { win: true, foe: this.shortName(def.name), exp: def.exp || 0, stones: stones, items: [] };
+        this._rec = { win: true, foe: this.shortName(def.name), exp: expGain, stones: stones, items: [] };
 
         GAME.UI.log("【" + p.combat.name + "】轰然倒地！", "success");
         if (GAME.Moments) GAME.Moments.fire("first_kill", p.combat.name);
-        p.currentExp += def.exp;
-        GAME.UI.log("斗法之余灵台清明，修为增加 " + def.exp + " 点。", "success");
+        p.currentExp += expGain;
+        GAME.UI.log("斗法之余灵台清明，修为增加 " + expGain + " 点。", "success");
 
         // 景阳城玄机世家主线 / 升仙大会擂台 / 血色禁地 / 狩猎 / 遗迹 / 劫杀：
         // 直接入袋，再交还对应模块续推剧情（不走"杀/放"抉择——这些由剧情验收）
