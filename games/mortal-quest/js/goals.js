@@ -319,7 +319,7 @@ GAME.Goals = {
         }
         return {
             kind: "heal",
-            label: "闭关打坐（" + (r.meditateMonths || 3) + " 月 · +1 修为）",
+            label: "",   // 目标框底部不重复"闭关打坐（X月·+1修为）"——动作网格已有此按钮，此处只留差距信息
             why: "还差 " + need + " 修为可尝试突破" +
                  (typeof r.breakChance === "number" ? "（届时成功率 " + Math.round(r.breakChance * 100) + "%）" : "") +
                  plotHint + leftTxt,

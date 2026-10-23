@@ -172,6 +172,11 @@ GAME.Map = {
         }
         GAME.UI.log("你自【" + from.name + "】动身，一路风尘前往【" + target.targetName + "】，车马盘缠耗去 " + target.silver + " 两。", "system");
         p.location = target.targetId;
+        // 离开原址时若仍在「坊市停留」态，需复位——否则人已到别处、按钮却还挂着「已在坊市中」
+        if (p.atMarket) {
+            p.atMarket = false;
+            if (GAME.Bottle) GAME.Bottle.onLeaveMarket();
+        }
 
         var to = this.node(target.targetId);
         if (target.targetId === "tainan_gu" && to) {

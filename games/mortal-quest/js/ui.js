@@ -226,6 +226,8 @@ GAME.UI = {
     //（用户实测反馈）。跨度上限见 FOLD_SCAN，避免把隔了整场战斗的两次打坐并成一条。
     log: function (message, type, fold) {
         type = type || "info";
+        // 非空校验：正文为空/纯空白时不渲染 DOM，杜绝「只有时间戳没有正文」的空行
+        if (message == null || (typeof message === "string" && message.trim() === "")) return;
         try {
             var box = this.$("log-box");
             if (!box) return;
@@ -545,10 +547,12 @@ GAME.UI = {
                 nx.style.display = "";
                 // 第七轮审查：目标横幅纯化为信息条，不再内嵌可点按钮（与下方动作网格重复）。
                 // 下一步只作文字提示，执行入口统一收口到动作网格。
-                var sp = document.createElement("span");
-                sp.className = "goal-next-static goal-next-" + (a.kind || "go");
-                sp.innerText = a.label;
-                nx.appendChild(sp);
+                if (a.label) {
+                    var sp = document.createElement("span");
+                    sp.className = "goal-next-static goal-next-" + (a.kind || "go");
+                    sp.innerText = a.label;
+                    nx.appendChild(sp);
+                }
                 if (a.why) {
                     var wy = document.createElement("span");
                     wy.className = "goal-next-why";
@@ -928,7 +932,8 @@ GAME.UI = {
             var gsAlert = (GAME.Garden && GAME.Garden.status) ? GAME.Garden.status() : null;
             var leakV = gsAlert ? (gsAlert.leak || 0) : 0;
             aw("alert-wrap-leak", leakV > 0);
-            if (leakV > 0) this.$("leak-text").innerText = leakV;
+            var leakCap = gsAlert ? (gsAlert.leakWarn || 80) : 80;
+            if (leakV > 0) this.$("leak-text").innerText = leakV + "/" + leakCap;
             // 重伤未愈：战败后气血停在残血值。**没有额外的清除入口**——
             // 过时间自然回血（core.js 每月 +10），只要涨过战败那一刻的值就自解。
             // 这样"打坐疗伤"是字面意义的解法，而不是靠某个按钮把标记抹掉。
@@ -986,8 +991,9 @@ GAME.UI = {
             badge("badge-fzone", !!(GAME.FZone && GAME.FZone.canEnter && GAME.FZone.canEnter()), 0);
             badge("badge-companion", GAME.State.countItem("chong_egg") > 0, 0);
             var _mksub = this.$("market-sub");
-            if (_mksub) _mksub.innerText = p.atMarket ? "已在坊市中" : "耗时 1 月";
-            else this.$("btn-market").innerText = p.atMarket ? "坊市中" : "前往坊市 (耗时1月)";
+            var _mkRt = (GAME.Market && GAME.Market.travelTime) ? GAME.Market.travelTime() : 1;
+            if (_mksub) _mksub.innerText = p.atMarket ? "已在坊市中" : ("往返 " + _mkRt + " 月");
+            else this.$("btn-market").innerText = p.atMarket ? "坊市中" : ("前往坊市 (往返" + _mkRt + "月)");
             // 存档按钮：交战之中无暇烙印轮回石（否则残血/必死回合存档，读档卡死战斗局）
             var bs = this.$("btn-save");
             if (bs) {

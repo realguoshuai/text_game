@@ -157,8 +157,8 @@ const r6 = G.DATA.REALMS[5];
 // 修为未满 → 劝闭关
 p6.currentExp = 0;
 let a = G.Goals.action(p6);
-assert('修为未满 → 建议闭关打坐', a && a.kind === 'heal' && /闭关打坐/.test(a.label));
-assert('闭关提示写明还差多少修为', a && /还差 \d+ 修为/.test(a.why));
+// 目标框底部不再重复「闭关打坐（X月·+1修为）」标签（动作网格已有此按钮），只留差距信息
+assert('修为未满 → 建议闭关（label 留空、why 给差距）', a && a.kind === 'heal' && a.label === '' && /还差 \d+ 修为/.test(a.why));
 assert('闭关行动可执行（run 为函数）', a && typeof a.run === 'function');
 assert('闭关提示含突破成功率', a && /成功率 \d+%/.test(a.why));
 
