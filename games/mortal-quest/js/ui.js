@@ -896,6 +896,8 @@ GAME.UI = {
                 var lackExp2 = Math.ceil(realm.needExp - p.currentExp);
                 this._why(bt, lock ? lockWhy : (lackExp2 > 0 ? "还差 " + lackExp2 + " 修为" : ""));
             }
+            // 修为已满且可突破 → 高亮按钮提醒（浅/深色各一套，见 style.css .bt-ready）
+            if (bt) bt.classList.toggle("bt-ready", realm.needExp !== null && !bt.disabled && p.currentExp >= realm.needExp);
             this.renderBreakPrep(btPlan);
             this.renderPlot();
 
@@ -939,6 +941,19 @@ GAME.UI = {
             if (hurtOn) {
                 var ht2 = this.$("hurt-text2");
                 if (ht2) ht2.innerText = p.currentHp;
+            }
+            // 燃寿暗伤：战后隐患状态，点击直达身家页服【玄元丹】消解
+            var hidOn = !!(p.hiddenInjury && !p.isDead);
+            aw("injury-alert-hidden", hidOn);
+            var hEl = this.$("injury-alert-hidden");
+            if (hEl) {
+                if (hidOn) {
+                    hEl.onclick = function () { GAME.UI.switchTab("bag"); };
+                    var ht = this.$("hidden-text");
+                    if (ht) ht.innerText = p.hiddenInjury.months;
+                } else {
+                    hEl.onclick = null;
+                }
             }
             var ddl = this.$("dd-liquid-text");
             if (ddl) ddl.innerText = p.liquid;
@@ -3518,6 +3533,7 @@ GAME.UI = {
         this.$("btn-talisman").onclick = function () { GAME.Combat.toggleTalismans(); };
         this.$("btn-coat").onclick = function () { GAME.Combat.coatPoison(); };
         this.$("btn-detonate").onclick = function () { GAME.Combat.detonate(); };
+        this.$("btn-desperate").onclick = function () { GAME.Combat.desperate(); };
         this.$("btn-flee").onclick = function () { GAME.Combat.flee(); };
         this.$("btn-luoyan").onclick = function () { GAME.Combat.luoyan(); };
         this.$("btn-blink").onclick = function () { GAME.Combat.useBlinkSword(); };

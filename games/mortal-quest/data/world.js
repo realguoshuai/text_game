@@ -83,6 +83,7 @@ GAME.DATA.MARKET = {
             { id:"skill_lianqi",      weight:3,  req:5 },   // 敛气术（练气六层起有售）
             { id:"skill_kongwu",      weight:3,  req:6 },   // 控物术（练气七层起有售）
             { id:"skill_tianyan",     weight:2,  req:7 },
+            { id:"pill_xuanyuan",     weight:6 },                  // 玄元丹：根除燃寿暗伤（燃寿搏命战后隐患）
             { id:"iron_ore",          weight:8, infinite:true },   // 天眼术（练气八层起有售）
         ],
     },
@@ -96,6 +97,7 @@ GAME.DATA.MARKET = {
         { id:"artifact_qingwen", weight:3,  req:3 },
         { id:"artifact_xuangui", weight:3,  req:5 },
         { id:"artifact_qingyuan",weight:2,  req:6 },
+        { id:"pill_xuanyuan",    weight:5 },
         { id:"iron_ore",         weight:8, infinite:true },
     ],
 };

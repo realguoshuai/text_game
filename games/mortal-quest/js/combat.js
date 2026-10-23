@@ -178,9 +178,13 @@ GAME.Combat = {
         // 《青冥剑诀》青元剑芒：法器攻击附带金木混合锐芒，无视敌方 30% 护甲/护盾
         var effDef = GAME.Cultivation ? GAME.Cultivation.effectiveDef(p.combat.def_) : p.combat.def_;
         var r = this.calcDamage(s.atk, effDef, s.spirit, p.combat.spirit, zimuCrit);
+        // 燃寿搏命：本场攻击附带额外暴击率
+        if (p.combat.lifespanBurst && !r.crit && Math.random() < p.combat.lifespanBurst.crit) r.crit = true;
         var dmg = r.dmg;
         // 大境界绝对压制：高打低增伤；低打高（越级）刮痧
         dmg = Math.round(dmg * this.realmDamageMul(p.combat.playerMajor, p.combat.monsterMajor));
+        // 燃寿搏命：本场攻击 ×倍率（战力爆发）
+        if (p.combat.lifespanBurst) dmg = Math.round(dmg * p.combat.lifespanBurst.mul);
         // 厚甲妖壳：物理/法器攻击免伤 50%
         if (p.combat.thickShell) dmg = Math.round(dmg * 0.5);
         // 机关傀儡齐射（大衍决神识驭器，高频连环集火；混编按各型 volley 汇总）
@@ -431,6 +435,24 @@ GAME.Combat = {
         p.combat.hp -= bonus;
         GAME.UI.log("你咬牙催动禁法，【" + name + "】轰然自爆！恐怖冲击波直贯【" + p.combat.name + "】，造成 " + bonus + " 点不可减免重创！", "danger");
         if (p.combat.hp <= 0) return this.victory();
+        this.enemyTurn();
+    },
+
+    // ---------- 玩家行动：燃寿搏命（烧寿元换本场战力爆发，战后留暗伤隐患） ----------
+    // 代价：永久消耗 BURN 年寿元（寿元不足则拒）；收益：本场剩余回合攻击 ×1.8、暴击率 +15%。
+    // 战后留下暗伤（p.hiddenInjury），须静养数载或服【玄元丹】根除，否则每月有概率隐患发作。
+    desperate: function () {
+        var p = GAME.State.p();
+        if (!p.combat || p.isDead) return;
+        if (p.combat.lifespanBurst) { GAME.UI.log("燃寿之炎已在你体内翻涌，无须再引！", "system"); return; }
+        var BURN = 10;   // 每次燃寿 10 年
+        var left = GAME.State.maxAge() - p.ageYears;
+        if (left <= BURN) { GAME.UI.log("寿元将尽，强行燃寿必死无疑——此举万万使不得。", "danger"); return; }
+        p.ageYears += BURN;
+        p.combat.burnedYears = (p.combat.burnedYears || 0) + BURN;
+        p.combat.lifespanBurst = { mul: 1.8, crit: 0.15 };
+        GAME.UI.log("你咬牙引动《燃寿秘术》——寿元如流水般消逝 " + BURN + " 年！这一战气血翻涌、攻势暴涨；然经脉受损，战后须静养数载，或服【玄元丹】根除暗伤，否则隐患发作反噬自身！", "danger");
+        GAME.UI.updateUI();
         this.enemyTurn();
     },
 
@@ -928,6 +950,10 @@ GAME.Combat = {
 
     end: function () {
         var p = GAME.State.p();
+        // 燃寿搏命：战后留下暗伤（修复期 + 隐患发作），服【玄元丹】可根除
+        if (p.combat && p.combat.burnedYears) {
+            p.hiddenInjury = { months: Math.max(6, Math.round(p.combat.burnedYears / 2)) };
+        }
         p.combat = null;
         GAME.UI.autoSave();
         GAME.UI.updateUI();

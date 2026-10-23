@@ -207,6 +207,12 @@ GAME.Time = {
         opts = opts || {};
         var t = this.tier(p, id || "short");
         if (!t) return false;
+        // 燃寿暗伤未愈：长关苦修恐致经脉崩裂，须先养伤或服【玄元丹】
+        if (p.hiddenInjury && (id || "short") === "epic") {
+            GAME.UI.log("燃寿暗伤未愈，经脉脆弱——长关苦修恐致崩裂。先服【玄元丹】或静养 " + p.hiddenInjury.months + " 月再入定。", "danger");
+            GAME.UI.updateUI();
+            return false;
+        }
         if (!t.ok) {
             GAME.UI.log("无法闭关——" + t.why + "。", "danger");
             GAME.UI.updateUI();

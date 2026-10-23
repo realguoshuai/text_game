@@ -133,6 +133,7 @@ GAME.DATA.ITEMS = {
     pill_xugu:       { id:"pill_xugu",       name:"续骨丹", quality:"上品", type:"pill", price:300, desc:"续筋接骨，根基愈牢。服之气血上限 +25（永久）。", use:{ maxHpBonus:25 } },
     pill_huasha:     { id:"pill_huasha",     name:"化煞丹", quality:"灵品", type:"pill", price:150, desc:"以清灵药力涤荡地脉煞气。服之煞气 -20（矿役/杀伐后最宜）。", use:{ shaQi:-20 } },
     pill_yanghun:    { id:"pill_yanghun",    name:"养魂丹", quality:"上品", type:"pill", price:320, desc:"温养神魂，识海渐扩。服之神识 +10（御物搜神更利）。", use:{ spiritBonus:10 } },
+    pill_xuanyuan:   { id:"pill_xuanyuan",   name:"玄元丹", quality:"上品", type:"pill", price:360, desc:"温养经脉、接续根本的疗伤圣品。服之可根除【燃寿暗伤】（燃寿搏命后的隐患），令受损经脉复常。", use:{ cureHiddenInjury:true } },
 
     // —— 丹方卷轴（type:recipe）：拾得/购入即研习化入识海，不入储物袋；对应丹药方可开炉 ——
     recipe_ningyuan: { id:"recipe_ningyuan", name:"凝元丹方", quality:"灵品", type:"recipe", price:150, learns:"pill_ningyuan", desc:"凝元丹炼制之法（灵药×2）。黑市/奇遇/副本可得。" },
@@ -141,6 +142,7 @@ GAME.DATA.ITEMS = {
     recipe_xugu:     { id:"recipe_xugu",     name:"续骨丹方", quality:"上品", type:"recipe", price:320, learns:"pill_xugu",     desc:"续骨丹炼制之法（千年灵药×2＋金砂）。黑市/奇遇/副本可得。" },
     recipe_huasha:   { id:"recipe_huasha",   name:"化煞丹方", quality:"灵品", type:"recipe", price:180, learns:"pill_huasha",   desc:"化煞丹炼制之法（天灵草＋玉魔花）。黑市/奇遇/副本可得。" },
     recipe_yanghun:  { id:"recipe_yanghun",  name:"养魂丹方", quality:"上品", type:"recipe", price:340, learns:"pill_yanghun",  desc:"养魂丹炼制之法（妖兽精魄＋天火晶）。黑市/奇遇/副本可得。" },
+    recipe_xuanyuan: { id:"recipe_xuanyuan", name:"玄元丹方", quality:"上品", type:"recipe", price:360, learns:"pill_xuanyuan", desc:"玄元丹炼制之法（千年灵药＋天火晶）。黑市/奇遇/副本可得。" },
 };
 
 /* —— 凡物清单：市集「批量出手凡物」只结算这些，绝不碰主材 ——
@@ -197,4 +199,5 @@ GAME.DATA.RECIPES = [
     { pill:"pill_huasha",    herbs:{ herb_tianling:1, herb_yumo:1 },   stones:60,  recipe:"recipe_huasha" },
     { pill:"pill_yanghun",   herbs:{ beast_soul:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_yanghun" },
     { pill:"pill_jiedan",    herbs:{ tianhuo_crystal:1, beast_soul:1, jinshi:1 }, stones:300 }, // 凝丹：天火晶＋妖兽精魄＋玄金石；无丹方门槛，集料即炼
+    { pill:"pill_xuanyuan",  herbs:{ herb_qiannian:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_xuanyuan" }, // 玄元丹：千年灵药＋天火晶；须先习【玄元丹方】。根除燃寿暗伤
 ];

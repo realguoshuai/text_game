@@ -92,6 +92,22 @@ GAME.Core = {
             }
         }
 
+        // 燃寿暗伤：修复期按月递减；每月约 12% 概率隐患发作（气血骤失），服【玄元丹】方可根除
+        if (p.hiddenInjury) {
+            p.hiddenInjury.months -= months;
+            for (var hi = 0; hi < months; hi++) {
+                if (Math.random() < 0.12) {
+                    var hd = Math.max(5, Math.round(p.maxHp * 0.08));
+                    p.currentHp = Math.max(1, p.currentHp - hd);
+                    GAME.UI.log("【暗伤发作】燃寿旧创复发，你一口逆血喷出，气血骤失 " + hd + " 点！（服【玄元丹】可根除暗伤）", "danger");
+                }
+            }
+            if (p.hiddenInjury.months <= 0) {
+                p.hiddenInjury = null;
+                GAME.UI.log("燃寿暗伤终于养愈，经脉复常。", "success");
+            }
+        }
+
         // 每月寄银回家（六幕剧情·幽篁谷日常解锁）：尽凡俗孝道，养修道心境
         if (p.homeSupport) {
             p.homeDue = (p.homeDue || 0) + months;
@@ -567,6 +583,15 @@ GAME.Core = {
                 GAME.UI.log("暖阳之气游走周身，体内阴毒尽除！你逃过一劫。", "success");
             } else {
                 GAME.UI.log("你体内并无阴毒，服之无益。", "system");
+            }
+        }
+        // 玄元丹：根除燃寿暗伤（燃寿搏命的战后隐患）
+        if (use.cureHiddenInjury) {
+            if (p.hiddenInjury) {
+                p.hiddenInjury = null;
+                GAME.UI.log("你服下【" + item.name + "】，一股温润药力游走周身，燃寿暗伤尽数根除，经脉复常！", "success");
+            } else {
+                GAME.UI.log("你体内并无暗伤，服之无益。", "system");
             }
         }
         // 疗伤丹散：直接回复气血（禁地之外的主要回血手段，坊市有售）

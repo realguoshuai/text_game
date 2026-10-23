@@ -3296,5 +3296,33 @@ body.theme-light .actions > button.act-seal em { color: #8A3428; }
 body.theme-light .boon-btn.boon-on { background: rgba(140,94,36,.14); border-color: #8C5E24; }
 body.theme-light .boon-btn em { color: #5C4B3A; }
 
+/* ================= 突破就绪高亮（修为满 → 尝试突破按钮呼吸提醒，深浅两套） ================= */
+.actions > button.bt-ready {
+    border-color: #c8a25a;
+    color: #fff3d6;
+    background: linear-gradient(180deg, #3d5c4c 0%, #24483a 45%, #16302a 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -10px 16px rgba(0,0,0,.28), 0 0 10px rgba(200,162,90,.35), 0 3px 8px rgba(0,0,0,.45);
+    animation: btReadyPulse 1.8s ease-in-out infinite;
+}
+.actions > button.bt-ready em { color: #ffe6a8; opacity: 1; }
+.actions > button.bt-ready:hover:not(:disabled) { border-color: #e2c68c; background: linear-gradient(180deg, #476b58 0%, #2b5546 45%, #1a3a31 100%); }
+@keyframes btReadyPulse {
+    0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -10px 16px rgba(0,0,0,.28), 0 0 6px rgba(200,162,90,.28), 0 3px 8px rgba(0,0,0,.45); }
+    50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -10px 16px rgba(0,0,0,.28), 0 0 14px rgba(226,198,140,.55), 0 3px 8px rgba(0,0,0,.45); }
+}
+body.theme-light .actions > button.bt-ready {
+    border-color: #B8766B;
+    color: #6E4A1E;
+    background: linear-gradient(180deg, #FDF3DC 0%, #F6E4C4 100%);
+    box-shadow: inset 0 0 0 1px rgba(140,94,36,.22), 0 0 8px rgba(140,94,36,.30), 0 1px 3px rgba(60,45,30,.08);
+    animation: btReadyPulseLight 1.8s ease-in-out infinite;
+}
+body.theme-light .actions > button.bt-ready em { color: #8C5E24; opacity: 1; }
+body.theme-light .actions > button.bt-ready:hover:not(:disabled) { border-color: #8C5E24; background: linear-gradient(180deg, #FFF8E8 0%, #F8EACF 100%); }
+@keyframes btReadyPulseLight {
+    0%, 100% { box-shadow: inset 0 0 0 1px rgba(140,94,36,.18), 0 0 4px rgba(140,94,36,.22), 0 1px 3px rgba(60,45,30,.08); }
+    50%      { box-shadow: inset 0 0 0 1px rgba(140,94,36,.26), 0 0 12px rgba(140,94,36,.45), 0 1px 3px rgba(60,45,30,.08); }
+}
+
 /* ================= 见闻录语义标签（突破自带【】不重复加；配色继承各 type） ================= */
 .log-tag { font-weight: 700; letter-spacing: .5px; }

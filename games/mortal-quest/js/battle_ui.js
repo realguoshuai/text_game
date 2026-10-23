@@ -30,7 +30,7 @@ GAME.BattleUI = {
     ],
     // 旁门手段：文案照抄真按钮
     EXTRAS: [
-        "btn-auto-combat", "btn-coat", "btn-detonate", "btn-fubao",
+        "btn-auto-combat", "btn-coat", "btn-detonate", "btn-fubao", "btn-desperate",
         "btn-luoyan", "btn-blink", "btn-companion-block", "btn-companion-smash",
         "btn-insect-cloud"
     ],
