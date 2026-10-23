@@ -3,12 +3,17 @@
  *
  * 定位：**只负责把已经结算完的数字摊开给玩家看**，不参与任何结算。
  *  - 灵石、修为、掉落、折寿、失财，全部由 combat.js 算完后塞进来；
- *    本模块一个 random 都不调，也不 addItem —— 否则就是第二套结算逻辑。
+ *    本模块一个 random 都不调 —— 否则就是第二套结算逻辑。
  *  - 掉落明细靠 Combat 的收集器（Combat._rec）边发边记：grantLoot 里
  *    真正 addItem 成功的才被记下，没 roll 中的不会凭空出现在格子里。
  *    这就是"按规则替换"的意思：格子里那张图背后是它真的进了行囊。
- *  - 只覆盖**野外遭遇**这一条通用路径。狩猎场 / 副本 / 血色禁地 / 玄机子 /
- *    杀放抉择各有自己的 afterCombat 与后续剧情，这里再接一层会打架。
+ *  - 覆盖范围：**所有"打赢了"的路径**——野外遭遇、血色禁地、血月试炼、
+ *    狩猎秘境、古修遗迹、擂台、千年灵药劫杀，一律经 Combat.handleCombatVictory
+ *    走到这里。只有剧情战（玄机子）与"杀/放抉择"不走：它们的下一步由剧情
+ *    面板负责，这里再插一层会把玩家夹在两层弹窗之间。
+ *  - 【收下战利品】= 账实核对 + 一条清算回执。真正的入袋在战斗收尾那一刻
+ *    就已原子完成并落了存档；这里只补记差额（幂等）。所以刷新页面、连点两次
+ *    都不会重复发放，也不会因为玩家忘了点而丢东西。
  *
  * 两层配色：胜利=鎏金竹青，战败=赤墨。与斗法页一致固定用暗底——
  * 它是一次"仪式"，不是页面，浅色模式下也不翻白。
@@ -42,7 +47,8 @@ GAME.BattleResult = {
         document.body.appendChild(w);
 
         var self = this;
-        document.getElementById("rg-act").onclick = function () { self.dismiss(); };
+        // 【收下战利品】：先对账再离开。战败页文案虽不同，同一个按钮也就够了
+        document.getElementById("rg-act").onclick = function () { self.claim(); };
     },
 
     /* ---------- 由 Combat 调用：结算已经落账，这里只摊开 ---------- */
@@ -64,14 +70,14 @@ GAME.BattleResult = {
         var act = document.getElementById("rg-act");
 
         if (rec.win) {
-            seal.innerHTML = "大获全胜";
-            lead.innerHTML = "<b>斗法获胜，境界稳固！</b>";
-            gains.innerHTML = this._gain("获得修为", "+" + rec.exp) +
-                              (rec.stones > 0 ? this._gain("获得灵石", rec.stones + " 枚") : "");
+            seal.innerHTML = "斗法大胜 · 斩妖凯旋";
+            lead.innerHTML = "<b>【" + this._esc(rec.foe) + "】已伏诛</b>，煞气渐敛，境界又稳固了一分。";
+            gains.innerHTML = this._gain("修为", "+" + (rec.exp || 0)) +
+                              (rec.stones > 0 ? this._gain("灵石", rec.stones + " 枚") : "");
             var lootHtml = this._lootBox(rec);
             loot.innerHTML = lootHtml.html;
             sum.innerText = this._sumText(rec);
-            act.innerHTML = "搜 刮 战 利 品 并 离 开";
+            act.innerHTML = "收 下 战 利 品";
         } else {
             seal.innerHTML = "力竭<span>战败</span>";
             lead.innerHTML = "【" + this._esc(rec.foe) + "】搜刮了你的储物袋，冷笑而去";
@@ -151,7 +157,33 @@ GAME.BattleResult = {
         return "战利品：" + parts.join("、");
     },
 
-    /* ---------- 离开：胜利回原探索点，战败回洞府 ---------- */
+    /* ---------- 【收下战利品】：账实核对（幂等），再离开 ----------
+     * 战斗收尾时就已经 addItem 入袋了，这里不重发，只补"账上有、包里没有"
+     * 的缺口（正常路径下恒为 0）。万一玩家在别处消耗了同 id 的同批物品，
+     * 差额会补回来——按钮上写着"收下"，就该真的收得下。 */
+    claim: function () {
+        var rec = this._d;
+        if (!rec) return;
+        if (rec.win && !rec._claimed) {
+            rec._claimed = true;
+            var back = 0, self = this;
+            (rec.items || []).forEach(function (it) {
+                var have = GAME.State.countItem(it.id);
+                if (have < it.qty) { GAME.State.addItem(it.id, it.qty - have); back += it.qty - have; }
+            });
+            var parts = [];
+            if (rec.stones > 0) parts.push("灵石 ×" + rec.stones);
+            (rec.items || []).forEach(function (it) {
+                var d = (GAME.DATA.ITEMS && GAME.DATA.ITEMS[it.id]) || {};
+                parts.push((d.name || it.id) + " ×" + it.qty);
+            });
+            GAME.UI.log("【清算入袋】" + (parts.length ? parts.join("、") : "尸身上别无长物，只余一身煞气") +
+                "。" + (back > 0 ? "（补记 " + back + " 件）" : ""), "loot");
+        }
+        this.dismiss();
+    },
+
+    /* ---------- 离开：胜利回原探索点（或留在副本里），战败回洞府 ---------- */
     dismiss: function () {
         var rec = this._d;
         var root = document.getElementById("result-page");
@@ -160,13 +192,18 @@ GAME.BattleResult = {
         this._d = null;
 
         if (!rec) return;
+        // 人还在秘境里（禁地/试炼/遗迹/狩猎）：switchTab 会被秘境总闸拦下，
+        // 还会多打一条"走不得"的红字——此刻本就不该走，留在副本面板等下一步即可。
+        var dg = (GAME.State.dungeonName ? GAME.State.dungeonName(GAME.State.p()) : "");
         if (rec.win) {
             var n = (rec.items || []).reduce(function (a, b) { return a + b.qty; }, 0) + (rec.stones > 0 ? 1 : 0);
             GAME.UI.log("【斩妖捷报】" + rec.foe + " 已伏诛，行囊里多了 " + n + " 样东西。", "success");
-            GAME.UI.switchTab("map");     // 回到遇袭的那片地，脚下还是原处
+            if (dg) GAME.UI.updateUI();     // 就在原地，副本面板接着用
+            else GAME.UI.switchTab("map");  // 回到遇袭的那片地，脚下还是原处
         } else {
             GAME.UI.log("你拖着残躯回到洞府。气血未复之前，不宜再外出历练——打坐调息可养回来。", "warning");
-            GAME.UI.switchTab("home");
+            if (dg) GAME.UI.updateUI();
+            else GAME.UI.switchTab("home");
         }
         GAME.UI.autoSave();
     },

@@ -2911,6 +2911,26 @@ body.result-on { overflow: hidden; }
 }
 .result-page.is-lose .rg-seal span { display: block; }
 
+/* 胜利匾额＝朱砂印：红底压双线古框（外圈是晕开的印泥，内圈是硬边）。
+   九个字（斗法大胜 · 斩妖凯旋），字距必须收，否则撑破 min(430px, 90%)。 */
+.result-page.is-win .rg-seal {
+    padding: 9px 12px 10px;
+    font-size: clamp(16px, 3.4vw, 24px);
+    letter-spacing: .14em; text-indent: .14em;
+    color: #FCEEDC;
+    background:
+        radial-gradient(120% 150% at 50% 6%, rgba(255, 226, 196, .16), transparent 58%),
+        linear-gradient(180deg, #B23A26 0%, #92281A 58%, #6E1911 100%);
+    border: 2px solid #D4714F;
+    border-radius: 3px;
+    text-shadow: 0 1px 3px rgba(62, 10, 5, .72);
+    box-shadow:
+        0 0 0 3px rgba(178, 58, 38, .18),
+        0 0 0 4px rgba(212, 113, 79, .45),
+        0 12px 28px rgba(0, 0, 0, .66),
+        inset 0 0 24px rgba(62, 10, 5, .38);
+}
+
 /* ---------- 正文 ---------- */
 .rg-lead {
     margin: 0 0 14px;

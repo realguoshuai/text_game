@@ -777,31 +777,25 @@ GAME.Combat = {
         var p = GAME.State.p();
         var def = p.combat.def;
         var ctx = p.combat.ctx;
+        var stones = this.rand(def.stones[0], def.stones[1]);
+        // ★ 本场明细账：从这一行起，grantLoot / materialDrops / pouchDrop 里的 _note
+        //   才有着落处。此后每一条"赢了"的分支都必须带着这本账去 handleCombatVictory，
+        //   不许再出现"东西入袋了、见闻录写了、玩家什么也没看见"的静默收场。
+        this._rec = { win: true, foe: this.shortName(def.name), exp: def.exp || 0, stones: stones, items: [] };
+
         GAME.UI.log("【" + p.combat.name + "】轰然倒地！", "success");
         if (GAME.Moments) GAME.Moments.fire("first_kill", p.combat.name);
         p.currentExp += def.exp;
         GAME.UI.log("斗法之余灵台清明，修为增加 " + def.exp + " 点。", "success");
-        var stones = this.rand(def.stones[0], def.stones[1]);
 
-        // 景阳城玄机世家主线 / 升仙大会擂台 / 血色禁地：直接入袋，交还对应模块继续剧情
-        // （不走"杀/放"抉择——此三者由剧情验收，不是随机遭遇）
+        // 景阳城玄机世家主线 / 升仙大会擂台 / 血色禁地 / 狩猎 / 遗迹 / 劫杀：
+        // 直接入袋，再交还对应模块续推剧情（不走"杀/放"抉择——这些由剧情验收）
         if (ctx && (ctx.type === "jiayuan" || ctx.type === "leitai" || ctx.type === "fzone" || ctx.type === "mansion" || ctx.type === "heisha" || ctx.type === "bonds" || ctx.type === "hunt" || ctx.type === "relic" || ctx.type === "herbalarm")) {
             p.spiritStones += stones;
             p.stats.kills += 1;
             this.grantLoot(def.loot, 1, def);
             this.pouchDrop(def, 1);   // 人形敌修（血侍/擂台敌/禁地守敌）：杀人夺袋
-            this.end();
-            if (ctx.type === "jiayuan") GAME.Jiayuan.afterCombat(true, ctx);
-            else if (ctx.type === "leitai") GAME.Tainan.afterCombat(true, ctx);
-            else if (ctx.type === "mansion") GAME.Mansion.afterCombat(true, ctx);
-            else if (ctx.type === "heisha") GAME.Heisha.afterCombat(true, ctx);
-            else if (ctx.type === "relic") GAME.Relic.afterCombat(true, ctx);
-            else if (ctx.type === "bonds") GAME.Bonds.nangongwanWin();
-            else if (ctx.type === "hunt") GAME.Hunt.afterCombat(true, ctx);
-            else if (ctx.type === "herbalarm") GAME.HerbAlarm.afterCombat(true, ctx);
-            else if (ctx.type === "war") GAME.Faction.warAfterCombat(true, ctx);
-            else GAME.FZone.afterCombat(true, ctx);
-            return;
+            return this.handleCombatVictory(this._rec, ctx);
         }
 
         // 试炼中的死斗：直接夺宝（不弹杀/放抉择），结算后交还试炼模块
@@ -811,14 +805,13 @@ GAME.Combat = {
             this.grantLoot(def.loot, 1, def);
             this.pouchDrop(def, 1);
             p.stats.kills += 1;
-            this.end();
-            GAME.Trial.afterCombat(true);
-            return;
+            return this.handleCombatVictory(this._rec, { type: "trial" });
         }
 
         // 玄机子之战：制服魔银手后交还关卡模块，不再走常规搜刮
         if (p.combat.moEvent) {
             p.stats.kills += 1;
+            this._rec = null;   // 剧情战不入"战利品清算"这本账
             this.end();
             GAME.MoEvent.afterStage2Win();
             return;
@@ -828,17 +821,57 @@ GAME.Combat = {
         if (def.human) {
             p.pendingMercy = { monsterId: def.id, stones: stones };
             GAME.UI.log("对方跪地求饶：「道友饶命……财物尽可取去，只求留条活路。」", "system");
+            this._rec = null;   // 赏罚未定，此刻还没有"已到手"的清单
             this.end();
             return;
         }
-        // 走到这里的才是"野外撞上的那一只"：把明细记下来，交给结算弹窗
-        this._rec = { win: true, foe: this.shortName(def.name), exp: def.exp, stones: stones, items: [] };
+
+        // 野外撞上的那一只：入袋后弹结算（ctx 这里一律不路由——两强争海之类
+        // 未在 routed 名单里的归属，贸然回调会改战局平衡，留给专门模块自己处理）
         p.spiritStones += stones;
         GAME.UI.log("你从尸身上搜出 " + stones + " 枚灵石。", "loot");
         this.grantLoot(def.loot, 1, def);
         p.stats.kills += 1;
+        return this.handleCombatVictory(this._rec, null);
+    },
+
+    /* ---------- 胜利统一出口：收战斗态 → 交还归属模块 → 摊开结算 ----------
+     * 顺序不能反：end() 先把斗法页收掉（body.battle-on），模块的 afterCombat 才有
+     * 干净的落脚处把"下一步"准备好；结算页再盖在最上层。等玩家点【收下战利品】时，
+     * 底下已经是他该看到的那一屏，不必再猜"该切去哪"。
+     * battleResult 允许外部传入（测试或剧情自定义明细），缺省取本场账本 _rec。 */
+    handleCombatVictory: function (battleResult, ctx) {
+        var rec = battleResult || this._rec;
+        this._rec = null;
+        if (!rec || !rec.win) return;
+        if (ctx === undefined) {
+            var pc = GAME.State.p().combat;
+            ctx = pc ? pc.ctx : null;
+        }
         this.end();
-        this._settle();
+        try {
+            this._routeVictory(ctx);
+        } catch (e) {
+            // 归属模块续推时抛错（例如 ctx 缺字段），结算页不能跟着一起没掉：
+            // 账已经落完，玩家至少要看得到自己赢了、拿了什么。
+            if (window.console && console.error) console.error("[Combat] afterCombat 续推失败：", e);
+        }
+        if (GAME.BattleResult && GAME.BattleResult.show) GAME.BattleResult.show(rec);
+    },
+
+    // 归属模块续推：只有这里知道"这一战是谁开的"
+    _routeVictory: function (ctx) {
+        if (!ctx) return;
+        if (ctx.type === "trial") { GAME.Trial.afterCombat(true); return; }
+        if (ctx.type === "jiayuan") GAME.Jiayuan.afterCombat(true, ctx);
+        else if (ctx.type === "leitai") GAME.Tainan.afterCombat(true, ctx);
+        else if (ctx.type === "mansion") GAME.Mansion.afterCombat(true, ctx);
+        else if (ctx.type === "heisha") GAME.Heisha.afterCombat(true, ctx);
+        else if (ctx.type === "relic") GAME.Relic.afterCombat(true, ctx);
+        else if (ctx.type === "bonds") GAME.Bonds.nangongwanWin();
+        else if (ctx.type === "hunt") GAME.Hunt.afterCombat(true, ctx);
+        else if (ctx.type === "herbalarm") GAME.HerbAlarm.afterCombat(true, ctx);
+        else if (ctx.type === "fzone") GAME.FZone.afterCombat(true, ctx);
     },
 
     // ---------- 战败：折寿 / 被抢 / 概率身陨 ----------
