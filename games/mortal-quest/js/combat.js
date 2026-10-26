@@ -161,7 +161,9 @@ GAME.Combat = {
     attack: function () {
         var p = GAME.State.p();
         if (!p.combat || p.isDead) return;
-        if (p.combat.exhausted) return this._consumeExhausted();   // 流烟步反噬：脱力跳过本回合
+        // 敌手留下的毒/寒毒：先结算再谈出手——否则「中毒」只是战报上一行装饰
+        if (this._tickPlayerDot(p)) return;
+        if (p.combat.exhausted) return this._consumeExhausted();   // 脱力（流烟步反噬 / 玄冰封脉）跳过本回合
         // 遮天钟【金钟庇护】：万法不侵，但自身无法出招
         if (p.combat.zhetian) {
             GAME.UI.log("你罩在遮天钟内，钟身嗡鸣——此状态下万法不侵，却也无法出招。", "system");
@@ -174,6 +176,11 @@ GAME.Combat = {
         var crossPen = this.realmCrossPenalty(p.combat.playerMajor, p.combat.monsterMajor);
         // 《青木功》命中判定：层数越高越准
         var hitRate = (0.85 + s.hit) * crossPen;
+        // 敌手【残影遁形】：身形虚实难辨，每次玩家出手消耗一层（命中率大减）
+        if (p.combat.foeDodge > 0) {
+            hitRate *= 0.55;
+            p.combat.foeDodge -= 1;
+        }
         if (Math.random() > hitRate) {
             GAME.UI.log("你斗法一击竟落了空，未能命中【" + p.combat.name + "】！", "system");
             return this.enemyTurn();
@@ -226,6 +233,12 @@ GAME.Combat = {
             var volley = per * (mh.multiHit - 1);
             dmg += volley;
             GAME.UI.log("金蚨子母刃齐出！母刃破甲，八口子刃自死角连绵穿透——又添 " + volley + " 点伤害！", "info");
+        }
+        // 敌手【铁壁横练】：横臂沉腰、皮肉如铁——这一击被硬生生卸去大半力道（一次即消）
+        if (p.combat.foeBrace > 0) {
+            dmg = Math.max(1, Math.round(dmg * (1 - p.combat.foeBrace)));
+            p.combat.foeBrace = 0;
+            GAME.UI.log("【" + p.combat.name + "】铁壁般的守势尚未散去，你这一击只落了个实在边缘。", "warning");
         }
         p.combat.hp -= dmg;
         GAME.UI.log(r.crit
@@ -464,8 +477,10 @@ GAME.Combat = {
     // ---------- 流烟步反噬：脱力跳过本回合 ----------
     _consumeExhausted: function () {
         var p = GAME.State.p();
+        var why = p.combat.exhaustedWhy || "流烟步反噬";
         p.combat.exhausted = false;
-        GAME.UI.log("流烟步反噬发作，你脱力难动，只能勉力招架！", "warning");
+        p.combat.exhaustedWhy = null;
+        GAME.UI.log("【" + why + "】发作，你动弹不得，只能勉力招架！", "warning");
         return this.enemyTurn();
     },
 
@@ -480,6 +495,7 @@ GAME.Combat = {
         if (p.currentHp <= 0) p.currentHp = 1;   // 流烟步不致自伤致死
         p.combat.evade = true;        // 本回合敌方攻击落空
         p.combat.exhausted = true;    // 下回合脱力
+        p.combat.exhaustedWhy = "流烟步反噬";
         p.combat.usedLuoyan = true;
         GAME.UI.log("你身形一晃使出《流烟步》，气血翻涌耗去三成（" + cost + "），换得本回合全身而退！然身法反噬，下回合脱力难动。", "info");
         this.enemyTurn();
@@ -552,12 +568,114 @@ GAME.Combat = {
         this.enemyTurn();
     },
 
+    // ================= 敌方招式（只有 def.moves 存在的怪才启用） =================
+    /* 为什么要有这一层：
+     * ① 旧的敌方回合只有一句「出手攻击」——玩家手上符箓/术法/符宝/傀儡/剑诀一整套，
+     *    对面从头到尾一招平砍，打起来就是刷木桩；
+     * ② 更要命的是伤害只按「攻 - 防」算：玩家把防御堆上去（筑基初期 def 36）之后，
+     *    血侍一刀只剩 2~3 点，二十回合打完像在拿刀背拍人。
+     * 所以招式可带 floorPct：**伤害下限 = 玩家气血上限 × 该比例**，堆防御堆不掉——
+     * 这是「强敌必须疼」的唯一保底，也是这一层存在的理由。
+     * 没有 moves 的怪完全不进这条分支，野外手感一律不变。
+     */
+    _tickMoveCd: function (c) {
+        if (!c || !c.moveCd) return;
+        for (var k in c.moveCd) if (c.moveCd[k] > 0) c.moveCd[k] -= 1;
+    },
+
+    // 抽招：按 weight 抽，跳过冷却中/血线不符的招；抽中即上冷却（打空也算出过招）
+    _pickMove: function (c) {
+        var list = c && c.def && c.def.moves;
+        if (!list || !list.length) return null;
+        if (!c.moveCd) c.moveCd = {};
+        var pool = [], total = 0, i, mv;
+        for (i = 0; i < list.length; i++) {
+            mv = list[i];
+            if ((c.moveCd[mv.id] || 0) > 0) continue;                          // 尚在冷却
+            if (mv.minHpPct != null && c.hp > c.maxHp * mv.minHpPct) continue;  // 残血才放的杀招
+            var w = (mv.weight == null) ? 1 : mv.weight;
+            if (w <= 0) continue;
+            pool.push({ mv: mv, w: w });
+            total += w;
+        }
+        if (!pool.length) return null;
+        var roll = Math.random() * total, pick = pool[pool.length - 1].mv;
+        for (i = 0; i < pool.length; i++) {
+            roll -= pool[i].w;
+            if (roll <= 0) { pick = pool[i].mv; break; }
+        }
+        if (pick.cd) c.moveCd[pick.id] = pick.cd;
+        return pick;
+    },
+
+    // 招式伤害：倍率 → 连击 → 气血比例下限（下限不看防御，看玩家血量）
+    _moveDamage: function (mv, c, p, base) {
+        var dmg = Math.round(base * (mv.mul == null ? 1 : mv.mul));
+        if (mv.times > 1) dmg = Math.round(dmg * mv.times);
+        // 下限取招式自带的 floorPct，没有就退到这只怪的 threatPct（平砍也得疼）
+        var fp = (mv.floorPct != null) ? mv.floorPct : (c.def.threatPct || 0);
+        if (fp > 0) {
+            // threatMul：血侍光环削弱 / 引魔入阵封印都写在这里——下限也得跟着降，
+            // 否则「布阵封了它五成属性」结果每回合照样掉 17 点，前置准备就白做了
+            var tf = (c.threatMul == null) ? 1 : c.threatMul;
+            var floor = Math.max(1, Math.round((p.maxHp || 1) * fp * tf));
+            if (dmg < floor) dmg = floor;
+        }
+        return Math.max(1, dmg);
+    },
+
+    _moveText: function (mv, dmg, c) {
+        var head = mv.text ? mv.text : ("一式【" + mv.name + "】迎面而来——");
+        return "【" + c.name + "】" + head + "你损失 " + dmg + " 点气血！";
+    },
+
+    // 招式附带效果：dot（持续失血）/ freeze（封脉停手一回合）/ brace（铁壁减伤）/ dodge（残影）
+    _moveEffects: function (mv, c, p) {
+        var nm = c.name;
+        if (mv.kind === "dot" && mv.dot) {
+            var d = mv.dot;
+            c.playerDot = {
+                turns: d.turns || 2,
+                dmg: d.pct ? Math.max(1, Math.round((p.maxHp || 1) * d.pct)) : (d.dmg || 1),
+                name: d.tag || mv.name
+            };
+            GAME.UI.log("【" + c.playerDot.name + "】侵入经脉——此后 " + c.playerDot.turns +
+                " 回合，你每回合失血 " + c.playerDot.dmg + " 点。", "warning");
+        } else if (mv.kind === "freeze") {
+            if (!c.exhausted) {
+                c.exhausted = true;
+                c.exhaustedWhy = mv.name;
+                GAME.UI.log("【" + nm + "】封住你周身经脉，气血一滞——下一回合你动弹不得！", "danger");
+            }
+        } else if (mv.kind === "brace") {
+            c.foeBrace = mv.cut || 0.5;
+            GAME.UI.log("【" + nm + "】横臂沉腰，周身皮肉如铁壁绷紧——下一击难奏全功。", "warning");
+        } else if (mv.kind === "dodge") {
+            c.foeDodge = mv.turns || 2;
+            GAME.UI.log("【" + nm + "】身化数道残影，虚实难辨——此后 " + c.foeDodge + " 次出手都要落空几分。", "warning");
+        }
+    },
+
+    // 敌方留在我方身上的持续失血：玩家回合开头结算（死在毒上也算战败）
+    _tickPlayerDot: function (p) {
+        var d = p.combat && p.combat.playerDot;
+        if (!d || d.turns <= 0) return false;
+        p.currentHp -= d.dmg;
+        d.turns -= 1;
+        GAME.UI.log("【" + d.name + "】发作——你流失 " + d.dmg + " 点气血（余 " + Math.max(0, p.currentHp) + "）。", "warning");
+        if (p.currentHp <= 0) { this.defeat(); return true; }
+        if (d.turns <= 0) p.combat.playerDot = null;
+        return false;
+    },
+
     // ---------- 敌方回合（毒发/流血 → 流烟步规避 → 罡气抵伤 → 法器耐久 → 玄傀抵挡 → 敌方出手） ----------
     enemyTurn: function () {
         var p = GAME.State.p();
         if (!p.combat || p.isDead) return;
         // 《青冥剑诀》护体剑盾：每过一个玩家回合，持续回合 -1
         if (GAME.Cultivation) GAME.Cultivation.tickShield();
+        // 招式冷却：放在最前，定身/闪避/落空这些早退分支也要走到，否则被控住时冷却永不清零
+        this._tickMoveCd(p.combat);
 
         // 1) 毒囊 / 淬毒筒 持续伤害（每回合结算，先于敌方行动）
         if (p.combat.poison && p.combat.poison.turns > 0) {
@@ -627,9 +745,12 @@ GAME.Combat = {
             GAME.UI.log("【" + p.combat.name + "】血色翻涌，魔化狂暴！攻击暴涨一倍！", "danger");
         }
         if (p.combat.berserk && p.combat.hp <= p.combat.maxHp * 0.3) atkCalc = Math.round(atkCalc * 2);
+        // 敌方出招：带 moves 的怪（幽冥教六只）抽招出手，其余一律仍走旧的单次攻击
+        var mv = this._pickMove(p.combat);
         var r = this.calcDamage(atkCalc, s.def, p.combat.spirit, s.spirit);
         // 境界绝对压制（守方视角）：玩家为高境界时，受练气等低境攻击触发 defSuppress 分层免伤
         var finalDmg = Math.round(r.dmg * this.realmDefSuppress(p.realmIndex));
+        if (mv) finalDmg = this._moveDamage(mv, p.combat, p, finalDmg);
         // 噬金虫云：无视目标护体灵光，每回合融毁敌方护盾与防御法器耐久（战斗协同）
         if (p.combat.insectCloud && GAME.Insect) {
             GAME.Insect.corrode(p.combat);
@@ -687,13 +808,19 @@ GAME.Combat = {
                     }
                 }
             }
-            GAME.UI.log(r.crit
-                ? "【" + p.combat.name + "】暴起发难，一击撕裂你的护体灵光！你损失 " + finalDmg + " 点气血！"
-                : "【" + p.combat.name + "】出手攻击，你损失 " + finalDmg + " 点气血。",
+            GAME.UI.log(mv
+                ? this._moveText(mv, finalDmg, p.combat)
+                : (r.crit
+                    ? "【" + p.combat.name + "】暴起发难，一击撕裂你的护体灵光！你损失 " + finalDmg + " 点气血！"
+                    : "【" + p.combat.name + "】出手攻击，你损失 " + finalDmg + " 点气血。"),
                 "danger");
         } else {
-            GAME.UI.log("【" + p.combat.name + "】的攻势被尽数挡下，未伤你分毫。", "info");
+            GAME.UI.log(mv
+                ? "【" + p.combat.name + "】的【" + mv.name + "】被你尽数挡下，未伤你分毫。"
+                : "【" + p.combat.name + "】的攻势被尽数挡下，未伤你分毫。", "info");
         }
+        // 招式附带效果（中毒/封脉/铁壁/残影）：伤害落定之后再挂，玩家才看得懂因果
+        if (mv) this._moveEffects(mv, p.combat, p);
 
         if (p.currentHp <= 0) return this.defeat();
         p.combat.round += 1;

@@ -249,9 +249,12 @@ console.log('==== 五、云京皇宫：血侍分破 + 双阶段 Boss + 引魔入
   const midBefore = count("mid_stone");   // 血侍已掉过若干中阶灵石，Boss 战前后差值应为 +3
   setRand(0.5);
   assert('决战越皇开启', G.Heisha.fightBoss() === true);
-  const baseAtk = G.DATA.HEISHA && 70;      // 越皇面板 atk
+  // 从数据表读 atk——别再写死 70（数值一调这条断言就误报）
+  const yhDef = G.DATA.MONSTERS.filter(function (m) { return m.id === 'heisha_yuehuang'; })[0];
   const atkAfterDebuff = p.combat.atk;
-  assert('血祭光环削弱：攻防各削 40%', Math.abs(atkAfterDebuff - Math.round(70 * 0.6)) <= 1);
+  assert('血祭光环削弱：攻防各削 40%（' + yhDef.atk + ' → ' + atkAfterDebuff + '）',
+      Math.abs(atkAfterDebuff - Math.round(yhDef.atk * 0.6)) <= 1);
+  assert('招式伤害下限同步削 40%（threatMul）', Math.abs(p.combat.threatMul - 0.6) <= 0.001);
 
   // 引魔入阵：封印 50% + 打断吸血
   const atkBeforeLure = p.combat.atk;

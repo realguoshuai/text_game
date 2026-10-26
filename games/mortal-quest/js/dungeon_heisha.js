@@ -147,6 +147,8 @@ GAME.Heisha = {
         p.combat.arraySealed = false;
         p.combat.atk = Math.round(p.combat.atk * (1 - debuff));
         p.combat.def_ = Math.round(p.combat.def_ * (1 - debuff));
+        // 招式伤害下限也按同一比例削弱（_moveDamage 读这个系数）
+        p.combat.threatMul = 1 - debuff;
         if (debuff > 0) {
             GAME.UI.log("四名血侍伏诛，越皇的血祭光环大减——其攻防皆削 " + Math.round(debuff * 100) + "%！", "success");
         }
@@ -178,6 +180,8 @@ GAME.Heisha = {
         p.combat.atk = Math.round(p.combat.atk * (1 - seal));
         p.combat.def_ = Math.round(p.combat.def_ * (1 - seal));
         p.combat.spirit = Math.round(p.combat.spirit * (1 - seal));
+        // 引魔入阵：招式下限同样封去五成——这才是「阵」值一件残阵灵石的理由
+        p.combat.threatMul = (p.combat.threatMul == null ? 1 : p.combat.threatMul) * (1 - seal);
         st.arrayUsed = true;
         GAME.UI.log("你踏动阵旗，五行倒转——【引魔入阵】！越皇身形一滞，被封去五成属性，混元血炼珠的吸血亦被阵势打断！", "success");
         GAME.UI.updateUI();
