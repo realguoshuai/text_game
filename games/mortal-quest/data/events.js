@@ -339,11 +339,14 @@ GAME.DATA.EVENTS = [
         ]
     },
     {
-        id:"nothing_road", weight:10,
-        text:"你在后山转了大半日，既无敌影也无药踪，悻悻而归。",
+        id:"nothing_road", weight:5,
+        text:"你于近郊山水间辗转寻访，搜奇探幽，虽无大机缘，却也不算空走一遭。",
         choices:null,
         outcomes:[
-            { chance:1.0, type:"nothing", text:"空手而归。" },
+            { chance:0.45, type:"exp",   text:"行路间偶有所得，吐纳竟添了几分火候。", amount:[1,4] },
+            { chance:0.20, type:"loot",  text:"岩缝草窠里采得一株野灵药，聊胜于无。", table:[ { id:"herb_bainian", chance:1.0, qty:[1,1] } ] },
+            { chance:0.20, type:"mind",  text:"途中遇樵夫渔翁闲谈，听闻几桩乡野旧闻，心境略开。", amount:[1,2] },
+            { chance:0.15, type:"nothing", text:"终究只得了几缕山风，空手而回。" },
         ]
     },
 

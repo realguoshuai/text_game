@@ -119,7 +119,7 @@ U.updateUI();
 /* ================= ① 核心道具禁售 ================= */
 section('① 出售杂物：核心战略道具一律不上货架');
 const PROTECTED = [
-    ['pill_zhuji', '筑基丹'], ['pill_zhengpin', '正品筑基丹'],
+    ['pill_zhuji', '筑基丹（常方）'], ['pill_zhengpin', '正品筑基丹（古方）'],
     ['herb_xuanbing', '五百年玄冰花'], ['herb_longlin', '千年龙鳞果'],
     ['pill_huichun', '回春散'], ['pill_huanglong', '黄龙丹'], ['pill_jinsui', '金髓丸'],
     ['talisman_huoqiu', '火球符'], ['artifact_qingyun', '下品法器'], ['skill_huoqiushu', '火球术秘籍'],

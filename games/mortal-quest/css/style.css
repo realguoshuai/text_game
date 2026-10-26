@@ -1787,9 +1787,8 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
 .actions > details#dd-meditate { display: flex; }
 .actions > details#dd-meditate > summary { flex: 1 1 auto; }
 
-/* 「未开启」朱印角标：只给"还没解锁"的两格，别乱盖在"修为不够"上 */
-.actions > #btn-alchemy:disabled::before,
-.actions > #btn-sect:disabled::before {
+/* 「未开启」朱印角标：只给"还没解锁"的丹炉（修为不够别盖），门派按钮交给 badge 类 */
+.actions > #btn-alchemy:disabled::before {
     content: "未开启";
     position: absolute; top: 0; right: 0;
     padding: 1px 6px;
@@ -1801,6 +1800,36 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
     border-bottom-left-radius: 3px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
 }
+/* 门派按钮的角标：未拜入门派->朱印「未开启」；已拜入但不在驻地->褐底「需回驻地」 */
+.actions > #btn-sect.badge-locked::before {
+    content: "未开启";
+    position: absolute; top: 0; right: 0;
+    padding: 1px 6px;
+    font-family: var(--font-serif);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #f7e8d2;
+    background: rgba(163, 52, 31, .88);
+    border-bottom-left-radius: 3px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+}
+.actions > #btn-sect.badge-away::before {
+    content: "需回驻地";
+    position: absolute; top: 0; right: 0;
+    padding: 1px 6px;
+    font-family: var(--font-serif);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #f3e6d2;
+    background: rgba(120, 72, 28, .88);
+    border-bottom-left-radius: 3px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+}
+/* 游历结算卡：场景描述 + 所得清单 */
+.explore-result { margin-top: 8px; }
+.explore-result .gain-line { padding: 2px 0; color: var(--text); border-bottom: 1px dashed rgba(161,98,7,.18); }
+.explore-result .gain-line:last-child { border-bottom: none; }
+#explore-actions { margin-top: 10px; }
 
 /* 封面：山要看得见，金标题的辉光别把框内糊成一块 */
 #origin-panel::before { filter: invert(1) hue-rotate(178deg) brightness(.62) contrast(1.12) saturate(.6); opacity: .95; }

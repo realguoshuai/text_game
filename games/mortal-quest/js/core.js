@@ -113,6 +113,10 @@ GAME.Core = {
             p.homeDue = (p.homeDue || 0) + months;
             while (p.homeDue >= 12) {
                 p.homeDue -= 12;
+                if (p.ageYears >= 60 || p.location === "qingniu_zhen") {
+                    GAME.UI.log("又是一年——你遥想青牛镇旧宅，父母音容已隔黄泉。便将银钱分予同族后辈，聊慰先人。", "info");
+                    continue;
+                }
                 if (p.silver >= 10) {
                     p.silver -= 10;
                     p.mind = (p.mind || 0) + 2;
@@ -483,7 +487,7 @@ GAME.Core = {
         var use = item && item.use;
         if (!use || !GAME.State.countItem(id)) return;
         if (use.zhuji) {
-            GAME.UI.log("【筑基丹】药力霸道，须待突破筑基关口时服下，不可轻用。", "system");
+            GAME.UI.log("【筑基丹（常方）】药力霸道，须待突破筑基关口时服下，不可轻用。", "system");
             GAME.UI.updateUI();
             return;
         }
@@ -1165,10 +1169,10 @@ GAME.Core = {
                 }
             } else if (isZhuji && zhujiPill === "pill_zhuji" && GAME.State.countItem("pill_zhuji") > 0) {
                 var next1 = Math.min(GAME.DATA.ZHUJI.pill.cap, GAME.DATA.ZHUJI.pill.chance + GAME.DATA.ZHUJI.pill.perPill * p.zhujiStreak + GAME.DATA.ZHUJI.pill.perExtra * (p.zhujiFails || 0));
-                GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_zhuji") + " 枚【筑基丹】——连服再冲，成功率累积至 " + Math.round(next1 * 100) + "%。", "warning");
+                GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_zhuji") + " 枚【筑基丹（常方）】——连服再冲，成功率累积至 " + Math.round(next1 * 100) + "%。", "warning");
             } else if (isZhuji && zhujiPill === "pill_zhengpin" && GAME.State.countItem("pill_zhengpin") > 0) {
                 var next2 = Math.min(GAME.DATA.ZHUJI.zhengpin.cap, GAME.DATA.ZHUJI.zhengpin.chance + GAME.DATA.ZHUJI.zhengpin.perPill * p.zhujiStreak + GAME.DATA.ZHUJI.zhengpin.perExtra * (p.zhujiFails || 0));
-                GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_zhengpin") + " 枚【正品筑基丹】——连服再冲，成功率累积至 " + Math.round(next2 * 100) + "%。", "warning");
+                GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_zhengpin") + " 枚【正品筑基丹（古方）】——连服再冲，成功率累积至 " + Math.round(next2 * 100) + "%。", "warning");
             } else if (isJiedan && jiedanPill === "pill_jiedan" && GAME.State.countItem("pill_jiedan") > 0) {
                 var next3 = Math.min(GAME.DATA.JIEDAN.pill.cap, GAME.DATA.JIEDAN.pill.chance + GAME.DATA.JIEDAN.pill.perPill * p.jiedanStreak + GAME.DATA.JIEDAN.pill.perExtra * (p.jiedanFails || 0));
                 GAME.UI.log("首冲不利，药力尚护住心脉。储物袋中还有 " + GAME.State.countItem("pill_jiedan") + " 枚【凝丹】——连服再冲，成功率累积至 " + Math.round(next3 * 100) + "%。", "warning");
@@ -1186,12 +1190,16 @@ GAME.Core = {
         var p = GAME.State.p();
         if (p.isDead || p.combat || p.pendingEvent) return;
         if (this._dungeonBlock()) return;
+        // 强制左栏切到「游历」专属视图（绝不留在丹炉/洞府/市集）
+        GAME.UI.tab = "explore";
         // 外出历练即离开坊市：清掉「在坊市中」标记，并让左栏从市集货架跟随回大地图。
         // （若随后触发事件/战斗，applyPanels 的紧急面板优先级会自行接管左栏）
         if (GAME.UI && GAME.UI.leaveMarketTo) GAME.UI.leaveMarketTo("map");
         var months = this.rand(1, 3);
         p.stats.explores += 1;
         GAME.UI.log("你背起储物袋外出历练，往返耗时 " + months + " 个月……", "system");
+        // 行程前后快照：结算卡据此算出本次所得（修为/心境/气血/灵石/物品变动）
+        var snap = this._exploreSnapshot(p);
         this.passTime(months);
         if (p.isDead) return;
 
@@ -1226,13 +1234,66 @@ GAME.Core = {
         // 动态遭遇（text 留空）的文案由 Encounter.meetText 现写 —— 别先打一条空的【历练】
         if (picked.text) GAME.UI.log("【历练】" + picked.text, "info");
         if (picked.choices && picked.choices.length) {
-            // 分支选项型：挂起等玩家点选
+            // 分支选项型：挂起等玩家点选；把快照与行程信息挂到玩家身上，待点选后结算
             p.pendingEvent = { eventId: picked.id };
+            p._exploreCtx = { months: months, snap: snap, scene: picked.text || "" };
             GAME.UI.updateUI();
         } else {
             // 自动结算型
             this.resolveEventOutcomes(picked.outcomes);
+            if (!p.isDead && !p.combat) this._showExploreResult(p, picked, snap, months);
         }
+    },
+
+    // 历练快照/结算：本次行程前后的状态差，渲染成左栏游历结算卡
+    _exploreSnapshot: function (p) {
+        var inv = {};
+        if (p.inventory) { for (var k in p.inventory) inv[k] = p.inventory[k]; }
+        return {
+            exp: p.currentExp || 0,
+            mind: p.mind || 0,
+            hp: p.currentHp || 0,
+            silver: p.silver || 0,
+            stones: p.spiritStones || 0,
+            inv: inv
+        };
+    },
+
+    // 行程前后差值 -> 人话清单（修为/心境/气血/白银/灵石/所得物品）
+    _exploreDiff: function (p, snap) {
+        var gains = [];
+        var dExp = (p.currentExp || 0) - (snap.exp || 0);
+        if (dExp) gains.push((dExp > 0 ? "修为 +" : "修为 ") + dExp);
+        var dMind = (p.mind || 0) - (snap.mind || 0);
+        if (dMind) gains.push((dMind > 0 ? "心境 +" : "心境 ") + dMind);
+        var dHp = (p.currentHp || 0) - (snap.hp || 0);
+        if (dHp) gains.push((dHp > 0 ? "气血 +" : "气血 ") + dHp);
+        var dSil = (p.silver || 0) - (snap.silver || 0);
+        if (dSil) gains.push((dSil > 0 ? "白银 +" : "白银 ") + dSil);
+        var dSt = (p.spiritStones || 0) - (snap.stones || 0);
+        if (dSt) gains.push((dSt > 0 ? "灵石 +" : "灵石 ") + dSt);
+        var inv = p.inventory || {}, keys = {};
+        Object.keys(snap.inv).forEach(function (k) { keys[k] = 1; });
+        Object.keys(inv).forEach(function (k) { keys[k] = 1; });
+        Object.keys(keys).forEach(function (k) {
+            var before = snap.inv[k] || 0, after = inv[k] || 0, d = after - before;
+            if (d === 0) return;
+            var nm = (GAME.DATA.ITEMS[k] && GAME.DATA.ITEMS[k].name) || k;
+            gains.push(d > 0 ? ("获得【" + nm + "】×" + d) : ("失去【" + nm + "】×" + (-d)));
+        });
+        return gains;
+    },
+
+    // 出结算卡：把本次所得写进 UI 状态，并强制停在游历专属视图
+    _showExploreResult: function (p, picked, snap, months, sceneText) {
+        var gains = this._exploreDiff(p, snap);
+        GAME.UI._exploreResult = {
+            months: months,
+            scene: sceneText || (picked && picked.text) || "",
+            gains: gains
+        };
+        GAME.UI.tab = "explore";
+        GAME.UI.updateUI();
     },
 
     // 玩家点选分支后结算
@@ -1240,6 +1301,7 @@ GAME.Core = {
         var p = GAME.State.p();
         if (!p.pendingEvent || p.isDead) return;
         var pe = p.pendingEvent;                        // 先捕获 resume 标记，再清 pending
+        var exCtx = p._exploreCtx; p._exploreCtx = null; // 历练分支：先捕获游历快照上下文
         var ev = this.findEvent(pe.eventId);
         p.pendingEvent = null;
         if (!ev || !ev.choices[optionIndex]) return;
@@ -1248,6 +1310,8 @@ GAME.Core = {
         this.resolveEventOutcomes(opt.outcomes);
         // 心魔劫等需要续破的流程：定心抉择生效后再正式冲击壁障
         if (!p.isDead && pe.resume === "breakthrough") this._resumeBreakthrough();
+        // 历练结算：仅当未死、未陷入战斗、且非续破流程时，弹出游历结算卡
+        if (exCtx && !p.isDead && !p.combat && pe.resume !== "breakthrough") this._showExploreResult(p, null, exCtx.snap, exCtx.months, exCtx.scene);
     },
 
     // 战后处置：0=灭口（全额财物+恶名，修士则落因果） 1=留活口（六成财物+善名）
@@ -1379,6 +1443,11 @@ GAME.Core = {
                 var exp = this.rand(o.amount[0], o.amount[1]);
                 p.currentExp += exp;
                 GAME.UI.log("修为 +" + exp + "。", "success");
+                break;
+            case "mind":
+                var _mind = this.rand(o.amount[0], o.amount[1]);
+                p.mind = (p.mind || 0) + _mind;
+                GAME.UI.log("心境 +" + _mind + "。", "info");
                 break;
             case "damage":
                 var dmg = this.rand(o.hp[0], o.hp[1]);

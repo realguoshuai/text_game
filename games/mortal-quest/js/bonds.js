@@ -188,8 +188,8 @@ GAME.Bonds = {
             b.dongxuaner = { done: true, choice: "plot" };
             GAME.State.addItem("pill_zhuji", 1);
             p.mind = Math.max(0, (p.mind || 0) - 8);
-            GAME.UI.log("你含笑应下，顺势讨得一物——柳蔓儿取出一枚【筑基丹】递来，眉眼间尽是算计。", "story");
-            GAME.UI.log("【获得】筑基丹 ×1；心境 -8（现 " + p.mind + "）——与虎谋皮，终究要付些代价。", "warning");
+            GAME.UI.log("你含笑应下，顺势讨得一物——柳蔓儿取出一枚【筑基丹（常方）】递来，眉眼间尽是算计。", "story");
+            GAME.UI.log("【获得】筑基丹（常方） ×1；心境 -8（现 " + p.mind + "）——与虎谋皮，终究要付些代价。", "warning");
         }
         GAME.UI.updateUI();
         return true;

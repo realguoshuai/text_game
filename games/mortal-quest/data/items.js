@@ -27,7 +27,7 @@ GAME.DATA.ITEMS = {
     // —— 丹药 ——
     pill_huanglong:{ id:"pill_huanglong", name:"黄龙丹", quality:"灵品", type:"pill", price:80,  desc:"药力浑厚，修为 +25。",   use:{ exp:25 } },
     pill_jinsui:   { id:"pill_jinsui",    name:"金髓丸", quality:"上品", type:"pill", price:220, desc:"易筋洗髓，修为 +80。",   use:{ exp:80 } },
-    pill_zhuji:    { id:"pill_zhuji",     name:"筑基丹", quality:"极品", type:"pill", price:800, desc:"冲关筑基之凭。突破筑基时自动消耗一枚。", use:{ zhuji:true } },
+    pill_zhuji:    { id:"pill_zhuji",     name:"筑基丹（常方）", quality:"极品", type:"pill", price:800, desc:"千年灵药与百年灵药于丹炉炼成，药力中正。突破筑基关口自动消耗一枚。", use:{ zhuji:true } },
     pill_jiedan:   { id:"pill_jiedan",    name:"凝丹",   quality:"极品", type:"pill", price:1500, realmBand:[15,18], desc:"凝丹之凭。突破结丹时自动消耗一枚（筑基后期圆满方可冲击）。", use:{ jiedan:true } },
     pill_jiedan_zhengpin: { id:"pill_jiedan_zhengpin", name:"正品凝丹", quality:"极品", type:"pill", price:2200, realmBand:[15,18], desc:"三味天材所炼，药效醇厚。冲击结丹成功率更高、反噬更轻。", use:{ jiedan:true } },
     fake_jiedan:   { id:"fake_jiedan",    name:"伪凝丹", quality:"上品", type:"pill", price:400,  realmBand:[15,18], desc:"药力虚浮的赝品，冲击结丹成功率低，且失败仍有身陨之危。", use:{ jiedan:true } },
@@ -68,7 +68,7 @@ GAME.DATA.ITEMS = {
     herb_tianling:    { id:"herb_tianling",    name:"天灵果", quality:"灵品", type:"herb", price:60, desc:"血月试炼中所采筑基主药之一。" },
     herb_yumo:        { id:"herb_yumo",        name:"玉髓芝", quality:"灵品", type:"herb", price:60, desc:"血月试炼中所采筑基主药之一。" },
     herb_zihou:       { id:"herb_zihou",        name:"紫猴花", quality:"灵品", type:"herb", price:60, desc:"血月试炼中所采筑基主药之一。" },
-    pill_zhengpin:    { id:"pill_zhengpin",    name:"正品筑基丹", quality:"极品", type:"pill", price:1000, desc:"三味主药于洞府炼成，药效醇厚。冲关筑基成功率 +50%、反噬伤害减免 80%。", use:{ zhengpin:true } },
+    pill_zhengpin:    { id:"pill_zhengpin",    name:"正品筑基丹（古方）", quality:"极品", type:"pill", price:1000, desc:"天灵果、玉髓芝、紫猴花三味主药于洞府炼成，药效醇厚。冲关筑基成功率 +50%、反噬伤害减免 80%。", use:{ zhengpin:true } },
 
     // —— 新增（苍梧门篇）：暗技与武学连携 ——
     mirror_short_sword:{ id:"mirror_short_sword", name:"反光短剑", quality:"灵品", type:"tool",      price:90,  desc:"眨眼剑法所耗之物。白日斗法中挥之折射日光，可令敌双目眩晕。" },
@@ -190,11 +190,11 @@ GAME.DATA.POUCH_LOOT = {
 //   ⛔ 别把「+80 修为」「25% 成功率」这类数字抄进 note：调平衡时它会变成假话。
 GAME.DATA.RECIPES = [
     { pill:"pill_zhengpin",  herbs:{ herb_tianling:1, herb_yumo:1, herb_zihou:1 }, stones:100,  // 血月试炼三药炼正品筑基丹（优先，避免被低阶丹抢走药材）
-      tag:"突破重宝", note:"筑基期必备，冲关成算远胜寻常筑基丹。" },
+      tag:"突破重宝", note:"古方正品：天灵果、玉髓芝、紫猴花三味主药所炼，冲关成算远胜常方筑基丹；炉火仅 100 灵石。" },
     { pill:"pill_yanshou",   herbs:{ herb_qiannian:1, herb_bainian:1 },         stones:300,
       tag:"延寿续命", note:"夺天地造化以续命，练气期唯一能推迟寿元大限的丹。" },
     { pill:"pill_zhuji",     herbs:{ herb_qiannian:1, herb_bainian:2 },         stones:200,
-      tag:"突破重宝", note:"冲关筑基之凭，突破关口自动消耗，平日不可轻用。" },
+      tag:"突破重宝", note:"常方筑基丹：千年灵药＋百年灵药所炼，药性稍逊古方正品，炉火 200 灵石；突破关口自动消耗。" },
     { pill:"pill_jinsui",    herbs:{ herb_bainian:3 },                          stones:50,
       tag:"精进修为", note:"药力浑厚，易筋洗髓，吞服即得修为，省下一段闭关光阴。" },
     { pill:"pill_huanglong", herbs:{ herb_bainian:1 },                          stones:20,

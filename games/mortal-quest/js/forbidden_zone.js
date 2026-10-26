@@ -132,7 +132,7 @@ GAME.FZone = {
             GAME.UI.log("守护兽伏诛！你摘下【" + GAME.DATA.ITEMS[ctx.herbId].name + "】收入囊中。", "loot");
             var all = this.cfg().herbs.every(function (id) { return f.herbs[id] > 0; });
             if (all) {
-                GAME.UI.log("三味主药已齐——往出口法阵走一趟，交与坐镇长老，便是正品筑基丹的份例。", "success");
+                GAME.UI.log("三味主药已齐——往出口法阵走一趟，交与坐镇长老，便是正品筑基丹（古方）的份例。", "success");
                 if (GAME.Codex) GAME.Codex.unlockLore("lore_xuese");   // 图鉴·秘闻
             }
         }
@@ -184,7 +184,7 @@ GAME.FZone = {
             if (full) {
                 GAME.State.addItem(r.fullSetPill, 1);
                 p.sectContrib += r.fullSetContrib;
-                GAME.UI.log("【出口法阵】你将三大主药尽数呈交坐镇长老——长老抚须惊叹：「三药俱全！此乃正品筑基丹的份例！」（正品筑基丹 ×1，贡献 +" + r.fullSetContrib + "）", "success");
+                GAME.UI.log("【出口法阵】你将三大主药尽数呈交坐镇长老——长老抚须惊叹：「三药俱全！此乃正品筑基丹（古方）的份例！」（正品筑基丹（古方） ×1，贡献 +" + r.fullSetContrib + "）", "success");
             } else {
                 var pr = r.partialReward[n];   // n 为 1 或 2：阶梯赏赐，不集齐三药也有回报
                 if (pr) {

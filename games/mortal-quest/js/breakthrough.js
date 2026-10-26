@@ -102,11 +102,11 @@ GAME.Breakthrough = {
             if (zhujiPill === "pill_zhengpin") {
                 baseChance = Math.min(zc.zhengpin.cap, zc.zhengpin.chance + zc.zhengpin.perPill * (p.zhujiStreak || 0) + zc.zhengpin.perExtra * (p.zhujiFails || 0));
                 dmgMul = zc.zhengpin.dmgMul; deathMul = zc.zhengpin.deathMul;
-                baseLabel = "正品筑基丹" + this._streakTxt(p.zhujiStreak);
+                baseLabel = "正品筑基丹（古方）" + this._streakTxt(p.zhujiStreak);
             } else if (zhujiPill === "pill_zhuji") {
                 baseChance = Math.min(zc.pill.cap, zc.pill.chance + zc.pill.perPill * (p.zhujiStreak || 0) + zc.pill.perExtra * (p.zhujiFails || 0));
                 dmgMul = zc.pill.dmgMul; deathMul = zc.pill.deathMul;
-                baseLabel = "筑基丹" + this._streakTxt(p.zhujiStreak);
+                baseLabel = "筑基丹（常方）" + this._streakTxt(p.zhujiStreak);
             } else if (zhujiPill === "fake_zhuji") {
                 baseChance = zc.fake.chance; dmgMul = zc.fake.dmgMul; deathMul = zc.fake.deathChance;
                 baseLabel = "伪·筑基丹"; fakeZhuji = true;
