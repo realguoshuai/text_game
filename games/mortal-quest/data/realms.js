@@ -84,8 +84,8 @@ GAME.DATA.majorRealm = function (idx) { return idx >= 19 ? 3 : (idx >= 16 ? 2 : 
  */
 GAME.DATA.ZHUJI = {
     bare:     { chance:0.05, deathChance:0.80, dmg:80 },   // 伪灵根裸冲：5% 成，失败 80% 身陨（玄傀护主可挡一次）
-    pill:     { chance:0.25, perPill:0.25, perExtra:0.20, cap:1.0 },  // 筑基丹：每多服一枚 +25%，失败保底每档 +20%
-    zhengpin: { chance:0.45, perPill:0.45, perExtra:0.20, cap:1.0 },  // 正品筑基丹：45% 起步同链
+    pill:     { chance:0.25, perPill:0.25, perExtra:0.20, cap:1.0, dmgMul:0.8, deathMul:0 },  // 筑基丹：每多服一枚 +25%，失败保底每档 +20%；护脉反噬 -20%，服丹免死
+    zhengpin: { chance:0.45, perPill:0.45, perExtra:0.20, cap:1.0, dmgMul:0.2, deathMul:0 },  // 正品筑基丹：45% 起步同链；反噬 -80%，服丹免死
     fake:     { chance:0.15, deathChance:0.40, dmgMul:1.3 }, // 伪丹：15%，失败 40% 身陨
 };
 

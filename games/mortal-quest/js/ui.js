@@ -1549,12 +1549,20 @@ GAME.UI = {
                 return GAME.DATA.ITEMS[h].name + "×" + r.herbs[h];
             }).join(" + ");
             var left = document.createElement("div");
+            // 药效行：标签 + 一句人话药理（RECIPES.note）+ 现算的准数（Alchemy.effectOf）。
+            // 未得丹方的卡片也照样写明药效——玩家总得先知道这炉丹值不值得去寻方子。
+            var eff = (GAME.Alchemy && GAME.Alchemy.effectOf) ? GAME.Alchemy.effectOf(r.pill) : { tag: "", gain: "" };
+            var effHtml = eff.gain
+                ? '<div class="recipe-effect"><b class="recipe-tag">【' + eff.tag + '】</b>' +
+                  (r.note ? r.note + " " : "") +
+                  '<span class="recipe-gain">' + eff.gain + '</span></div>'
+                : "";
             if (locked) {
                 left.innerHTML = '<span class="q-' + pill.quality + '">' + pill.name + '</span>' +
-                    '<div class="item-desc warning">未得丹方：须先习得「' + pill.name + '」丹方（黑市 / 秘境奇遇 / 副本可得）。</div>';
+                    '<div class="item-desc warning">未得丹方：须先习得「' + pill.name + '」丹方（黑市 / 秘境奇遇 / 副本可得）。</div>' + effHtml;
             } else {
                 left.innerHTML = '<span class="q-' + pill.quality + '">' + pill.name + '</span>' +
-                    '<div class="item-desc">' + herbs + '，炉火灵石 ' + r.stones + '</div>' +
+                    '<div class="item-desc">' + herbs + '，炉火灵石 ' + r.stones + '</div>' + effHtml +
                     (missing ? '<div class="item-desc warning">无法开炉：' + missing + '</div>' : '');
             }
             var right = document.createElement("div");

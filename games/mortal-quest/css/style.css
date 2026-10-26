@@ -3597,3 +3597,28 @@ body.theme-light #map-actions .item-row.is-main button { box-shadow: 0 0 0 1px #
 body.theme-light .herb-alarm-quote { color: #3B2C1B; border-left-color: #A2351F; }
 body.theme-light .herb-alarm-note { color: #6B5A44; }
 body.theme-light .herb-alarm-note .danger { color: #8C2B1E; }
+
+/* ================= 炼丹 · 丹方药效行（#recipe-list .recipe-effect） =================
+ * 位置：材料行下方、开炉按钮左侧。标签走 --gold、准数走 --accent、句读走 --text-mute，
+ * 全用既有主题变量——纸面皮肤重定义变量时自动跟着换墨，不必再写一套 body.theme-light。
+ * ⛔ 这里只管排版：数字由 Alchemy.effectOf() 现算，别把「+80 修为」写成静态文案。
+ * 手机窄屏靠 overflow-wrap:anywhere 换行（左列已有 min-width:0，不会塌成竖排）。 */
+#recipe-list .recipe-effect {
+    margin-top: 5px;
+    padding-left: 8px;
+    border-left: 2px solid var(--gold-bd);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-mute);
+    overflow-wrap: anywhere;
+}
+#recipe-list .recipe-effect .recipe-tag {
+    color: var(--gold);
+    font-weight: 600;
+    margin-right: 2px;
+    letter-spacing: .02em;
+}
+#recipe-list .recipe-effect .recipe-gain { color: var(--accent); font-weight: 600; }
+/* 浅色主题下 --gold-bd 偏亮，竖线改用与标签同色的深一档墨金 */
+body.theme-light #recipe-list .recipe-effect { border-left-color: #C08A3E; }
+body.theme-light #recipe-list .recipe-effect .recipe-gain { color: #1F5F45; }

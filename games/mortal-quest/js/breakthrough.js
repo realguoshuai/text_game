@@ -101,11 +101,11 @@ GAME.Breakthrough = {
             chainCap = 1.0;
             if (zhujiPill === "pill_zhengpin") {
                 baseChance = Math.min(zc.zhengpin.cap, zc.zhengpin.chance + zc.zhengpin.perPill * (p.zhujiStreak || 0) + zc.zhengpin.perExtra * (p.zhujiFails || 0));
-                dmgMul = 0.2; deathMul = 0;
+                dmgMul = zc.zhengpin.dmgMul; deathMul = zc.zhengpin.deathMul;
                 baseLabel = "正品筑基丹" + this._streakTxt(p.zhujiStreak);
             } else if (zhujiPill === "pill_zhuji") {
                 baseChance = Math.min(zc.pill.cap, zc.pill.chance + zc.pill.perPill * (p.zhujiStreak || 0) + zc.pill.perExtra * (p.zhujiFails || 0));
-                dmgMul = 0.8; deathMul = 0;
+                dmgMul = zc.pill.dmgMul; deathMul = zc.pill.deathMul;
                 baseLabel = "筑基丹" + this._streakTxt(p.zhujiStreak);
             } else if (zhujiPill === "fake_zhuji") {
                 baseChance = zc.fake.chance; dmgMul = zc.fake.dmgMul; deathMul = zc.fake.deathChance;

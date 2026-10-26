@@ -185,19 +185,35 @@ GAME.DATA.POUCH_LOOT = {
 
 /* —— 炼丹配方表：按优先级从高到低排列，炼丹时依次匹配 ——
  * （高阶丹优先消耗药材，避免攒筑基丹材料时被低阶丹抢走） */
+// ⚠ tag / note 是**人话药理**（定性），具体数值一律由 Alchemy.effectOf() 从
+//   ITEM.use 字段与 DATA.ZHUJI / DATA.JIEDAN 现算后拼在行尾——
+//   ⛔ 别把「+80 修为」「25% 成功率」这类数字抄进 note：调平衡时它会变成假话。
 GAME.DATA.RECIPES = [
-    { pill:"pill_zhengpin",  herbs:{ herb_tianling:1, herb_yumo:1, herb_zihou:1 }, stones:100 }, // 血月试炼三药炼正品筑基丹（优先，避免被低阶丹抢走药材）
-    { pill:"pill_yanshou",   herbs:{ herb_qiannian:1, herb_bainian:1 },         stones:300 },
-    { pill:"pill_zhuji",     herbs:{ herb_qiannian:1, herb_bainian:2 },         stones:200 },
-    { pill:"pill_jinsui",    herbs:{ herb_bainian:3 },                          stones:50  },
-    { pill:"pill_huanglong", herbs:{ herb_bainian:1 },                          stones:20  },
+    { pill:"pill_zhengpin",  herbs:{ herb_tianling:1, herb_yumo:1, herb_zihou:1 }, stones:100,  // 血月试炼三药炼正品筑基丹（优先，避免被低阶丹抢走药材）
+      tag:"突破重宝", note:"筑基期必备，冲关成算远胜寻常筑基丹。" },
+    { pill:"pill_yanshou",   herbs:{ herb_qiannian:1, herb_bainian:1 },         stones:300,
+      tag:"延寿续命", note:"夺天地造化以续命，练气期唯一能推迟寿元大限的丹。" },
+    { pill:"pill_zhuji",     herbs:{ herb_qiannian:1, herb_bainian:2 },         stones:200,
+      tag:"突破重宝", note:"冲关筑基之凭，突破关口自动消耗，平日不可轻用。" },
+    { pill:"pill_jinsui",    herbs:{ herb_bainian:3 },                          stones:50,
+      tag:"精进修为", note:"药力浑厚，易筋洗髓，吞服即得修为，省下一段闭关光阴。" },
+    { pill:"pill_huanglong", herbs:{ herb_bainian:1 },                          stones:20,
+      tag:"精进修为", note:"入门精进之丹，药力最薄，胜在药材易得、开炉不费。" },
     // —— 丹方激活系列：须先习得对应「丹方」方可开炉（黑市/奇遇/副本概率获得） ——
-    { pill:"pill_ningyuan",  herbs:{ herb_bainian:2 },                 stones:30,  recipe:"recipe_ningyuan" },
-    { pill:"pill_juling",    herbs:{ herb_bainian:2, herb_ecao:1 },    stones:30,  recipe:"recipe_juling" },
-    { pill:"pill_qingxin",   herbs:{ herb_qiannian:1, herb_bainian:1 }, stones:80, recipe:"recipe_qingxin" },
-    { pill:"pill_xugu",      herbs:{ herb_qiannian:2, jinshi:1 },      stones:120, recipe:"recipe_xugu" },
-    { pill:"pill_huasha",    herbs:{ herb_tianling:1, herb_yumo:1 },   stones:60,  recipe:"recipe_huasha" },
-    { pill:"pill_yanghun",   herbs:{ beast_soul:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_yanghun" },
-    { pill:"pill_jiedan",    herbs:{ tianhuo_crystal:1, beast_soul:1, jinshi:1 }, stones:300 }, // 凝丹：天火晶＋妖兽精魄＋玄金石；无丹方门槛，集料即炼
-    { pill:"pill_xuanyuan",  herbs:{ herb_qiannian:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_xuanyuan" }, // 玄元丹：千年灵药＋天火晶；须先习【玄元丹方】。根除燃寿暗伤
+    { pill:"pill_ningyuan",  herbs:{ herb_bainian:2 },                 stones:30,  recipe:"recipe_ningyuan",
+      tag:"精进修为", note:"筑基通用精进之丹，药力温和，不伤经脉。" },
+    { pill:"pill_juling",    herbs:{ herb_bainian:2, herb_ecao:1 },    stones:30,  recipe:"recipe_juling",
+      tag:"疗伤回元", note:"凝灵聚气，禁地之外重伤可恃，斗法前备一枚最稳。" },
+    { pill:"pill_qingxin",   herbs:{ herb_qiannian:1, herb_bainian:1 }, stones:80, recipe:"recipe_qingxin",
+      tag:"凝神定心", note:"清心宁神、稳守灵台，突破时手感更顺。" },
+    { pill:"pill_xugu",      herbs:{ herb_qiannian:2, jinshi:1 },      stones:120, recipe:"recipe_xugu",
+      tag:"易筋洗髓", note:"续筋接骨，永久增厚气血上限，强化肉身根基。" },
+    { pill:"pill_huasha",    herbs:{ herb_tianling:1, herb_yumo:1 },   stones:60,  recipe:"recipe_huasha",
+      tag:"化煞清灵", note:"涤荡地脉煞气，矿役或杀伐之后服之最宜。" },
+    { pill:"pill_yanghun",   herbs:{ beast_soul:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_yanghun",
+      tag:"温养神魂", note:"温养神魂、识海渐扩，御物搜神更利。" },
+    { pill:"pill_jiedan",    herbs:{ tianhuo_crystal:1, beast_soul:1, jinshi:1 }, stones:300,  // 凝丹：天火晶＋妖兽精魄＋玄金石；无丹方门槛，集料即炼
+      tag:"突破重宝", note:"结丹之凭，突破关口自动消耗。" },
+    { pill:"pill_xuanyuan",  herbs:{ herb_qiannian:1, tianhuo_crystal:1 }, stones:120, recipe:"recipe_xuanyuan",  // 玄元丹：千年灵药＋天火晶；须先习【玄元丹方】。根除燃寿暗伤
+      tag:"疗愈暗伤", note:"温养经脉、接续根本，根除燃寿留下的暗伤。" },
 ];
