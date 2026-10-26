@@ -41,7 +41,7 @@ GAME.Art = {
         artifact_xuangui: "shield",
         yinhun_zhong: "puppet",
         conceal_skill: "shadow",
-        spirit_stone: "orb",
+        spirit_stone: "spirit_stone",   // 专属图标：别再用 orb（青琉璃珠，缩到 46px 像只绿药瓶）
         liquid_green: "orb"
     },
 

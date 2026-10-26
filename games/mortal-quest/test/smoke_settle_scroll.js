@@ -130,7 +130,7 @@ ok('次按钮写着【继续历练】', /继 续 历 练/.test(els['rg-actions']
 ok('主按钮写着【收下机缘·返回】', /收 下 机 缘/.test(els['rg-actions'].children[0].innerHTML));
 ok('修为/心境/灵石 行都画了', /修为/.test(els['rg-gains'].innerHTML) && /心境/.test(els['rg-gains'].innerHTML) && /灵石/.test(els['rg-gains'].innerHTML));
 ok('战利品标题：机 缘 所 获', /机 缘 所 获/.test(els['rg-loot'].innerHTML));
-ok('战利品格数 ≥ 3（补齐空槽撑横幅）', slotCount('rg-loot') >= 3);
+ok('战利品格数 = 实际件数（1 件就 1 格，不再补空槽）', slotCount('rg-loot') === 1 && !/is-empty/.test(String(els['rg-loot'].innerHTML)));
 
 BR.dismiss();
 ok('收尾后 _d 归零（左栏回到正常页签逻辑）', BR._d === null);
@@ -161,7 +161,7 @@ BR.dismiss();   // 应消费 pending -> showScroll(试炼结算)
 ok('战斗收尾后试炼结算卷轴跟进', !!BR._d && BR._d._scroll === true);
 ok('试炼结算标题：秘境凯旋 · 满载而归', String(els['rg-seal'].innerHTML) === '秘境凯旋 · 满载而归');
 ok('试炼结算战利品标题：秘 境 收 获', /秘 境 收 获/.test(els['rg-loot'].innerHTML));
-ok('试炼结算含主药格', slotCount('rg-loot') >= 3);
+ok('试炼结算格数 = 实际件数（不补虚线空框）', slotCount('rg-loot') >= 1 && !/is-empty/.test(String(els['rg-loot'].innerHTML)));
 ok('试炼结算单按钮【笑纳收获·离开秘境】', els['rg-actions'].children.length === 1 && /笑 纳 收 获/.test(els['rg-actions'].children[0].innerHTML));
 BR.dismiss();
 ok('试炼结算收尾后 _d 归零', BR._d === null);
@@ -181,7 +181,7 @@ if (hid) {
     ok('狩猎撤离即弹结算', !!BR._d && BR._d._scroll === true);
     ok('狩猎结算标题：见好就收 · 狩猎结算', String(els['rg-seal'].innerHTML) === '见好就收 · 狩猎结算');
     ok('狩猎结算战利品标题：狩 猎 收 获', /狩 猎 收 获/.test(els['rg-loot'].innerHTML));
-    ok('狩猎结算含所得格', slotCount('rg-loot') >= 3);
+    ok('狩猎结算格数 = 实际件数（不补虚线空框）', slotCount('rg-loot') >= 1 && !/is-empty/.test(String(els['rg-loot'].innerHTML)));
     BR.dismiss();
     ok('狩猎结算收尾后 _d 归零', BR._d === null);
 } else {

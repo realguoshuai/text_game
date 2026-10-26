@@ -9,12 +9,14 @@ var GAME = window.GAME = window.GAME || {};
 GAME.Market = {
 
     // ---------- 各地至坊市的路程耗时（按距离差异化） ----------
-    // 城镇 / 仙家聚集地自带市集：抬脚就到，不耗年月（景阳城是岚州大城，说"山路迢迢"纯属穿帮）；
-    // 只有山野洞府（kind=cave）才要真跋涉。
+    // 真正"抬脚就是坊市"的只有这两处常设市面：景阳城（岚州大城·坊市）与苍南谷（散修坊市）。
+    // 青牛镇虽是凡俗镇集（kind=mortal），却没有常设坊市——赶集得走上一个月山路，
+    // 所以别再按 kind 一刀切判"就地入市"（凡俗镇集 ≠ 自带市面）。
+    TOWN_MARKET: { jiayuan_cheng: 1, tainan_gu: 1 },
+
     townMarket: function () {
-        var node = (GAME.Map && GAME.Map.cur) ? (GAME.Map.cur() || null) : null;
-        if (!node) return false;
-        return node.kind === "mortal" || node.kind === "immortal";
+        var p = GAME.State.p();
+        return !!(p && this.TOWN_MARKET[p.location]);
     },
 
     travelTime: function () {
@@ -272,7 +274,7 @@ GAME.Market = {
     //    千年灵药"挂得上价、卖不出去"——一出手即触发劫杀事件（js/herbalarm.js）。
     SELLABLE_TYPES: { junk: true },
     SELLABLE_IDS: { ore: true, junk_scrap: true, herb_bainian: true, herb_qiannian: true,
-                    beast_hide: true, beast_bone: true },
+                    beast_hide: true, beast_bone: true, herb_shancao: true },
 
     // 专属收货价：百年灵药是硬通货，不能按杂物五折算（40×0.5=20，等于白送）
     // 千年灵药也挂得上货架，但它根本卖不出去——见 canSell 下的注释

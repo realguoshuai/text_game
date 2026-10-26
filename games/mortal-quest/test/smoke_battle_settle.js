@@ -166,7 +166,13 @@ ok('灵石在掉落区间内', !!rec && rec.stones >= tian.stones[0] && rec.ston
 ok('灵石真的进了钱袋', p.spiritStones === st0 + (rec ? rec.stones : 0));
 ok('天灵果是真的进了行囊（不是画饼）', !!rec && rec.items.some(it => it.id === 'herb_tianling') &&
     S.countItem('herb_tianling') === herb0 + rec.items.filter(it => it.id === 'herb_tianling').reduce((a, b) => a + b.qty, 0));
-ok('战利品格数 ≥ 3（补齐空槽撑住横幅）', (String(els['rg-loot'].innerHTML).match(/rg-slot/g) || []).length >= 3);
+// 2026-10-26：不再补齐虚线空槽——格数 = 实际所得件数（灵石 1 + 掉落 N，封顶 MAX_SLOT）
+const ceil = Math.min((rec.items || []).length + (rec.stones > 0 ? 1 : 0), BR.MAX_SLOT);
+ok('战利品格数 = 实际件数（不补空槽）',
+    (String(els['rg-loot'].innerHTML).match(/rg-slot/g) || []).length === ceil &&
+    !/is-empty/.test(String(els['rg-loot'].innerHTML)));
+ok('灵石用专属图标', /spirit_stone\.jpg/.test(String(els['rg-loot'].innerHTML)));
+ok('底部不再重复打印"战利品：…"', String(els['rg-sum'].innerText) === '');
 ok('斗法页已收（p.combat 清空）', p.combat === null);
 ok('归属模块被回调（禁地续推）', callRoute.indexOf('fzone:true') >= 0);
 ok('人还在禁地（p.fzone 未被动过）', !!p.fzone);

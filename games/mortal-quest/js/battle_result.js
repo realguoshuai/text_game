@@ -23,8 +23,7 @@ var GAME = window.GAME = window.GAME || {};
 
 GAME.BattleResult = {
     _d: null,
-    MIN_SLOT: 3,      // 战利品横幅最少几格（不足补空槽，撑住卷轴宽度）
-    MAX_SLOT: 6,
+    MAX_SLOT: 6,      // 战利品最多摊几格（再多就"等 N 件"合并，免得横幅溢出卷轴）
 
     init: function () {
         if (document.getElementById("result-page")) return;
@@ -67,7 +66,11 @@ GAME.BattleResult = {
 
         if (rec.win) {
             seal.innerHTML = "斗法大胜 · 斩妖凯旋";
-            lead.innerHTML = "<b>【" + this._esc(rec.foe) + "】已伏诛</b>，煞气渐敛，境界又稳固了一分。";
+            // 副标题按"斩的是妖兽还是人"分开说：杀妖只会见血，并不消减煞气——
+            // 旧版一句"煞气渐敛"打在所有对手身上，等于骗玩家多杀怪。
+            lead.innerHTML = rec.beast
+                ? "<b>【" + this._esc(rec.foe) + "】已伏诛</b>，山林一时清静，你剖开兽身、收拾残局。"
+                : "<b>【" + this._esc(rec.foe) + "】已伏诛</b>，你收起法器，清点对方遗落之物。";
             gains.innerHTML = this._gain("修为", "+" + (rec.exp || 0)) +
                               (rec.stones > 0 ? this._gain("灵石", rec.stones + " 枚") : "");
             var lootHtml = this._lootBox(rec);
@@ -101,7 +104,7 @@ GAME.BattleResult = {
     _lootBox: function (rec) {
         var cells = [], self = this;
         if (rec.stones > 0) {
-            cells.push({ src: (GAME.Art ? GAME.Art.itemSrc("spirit_stone") : "assets/items/orb.jpg"), name: "灵石", qty: rec.stones, like: "q-fan" });
+            cells.push({ src: (GAME.Art ? GAME.Art.itemSrc("spirit_stone") : "assets/items/spirit_stone.jpg"), name: "灵石", qty: rec.stones, like: "q-fan" });
         }
         (rec.items || []).forEach(function (it) {
             var d = (GAME.DATA.ITEMS && GAME.DATA.ITEMS[it.id]) || {};
@@ -126,8 +129,8 @@ GAME.BattleResult = {
                 '<b>' + self._esc(c.name) + "</b>" +
                 '<em>×' + c.qty + "</em></div>");
         });
-        // 不到三格补空位：横幅太窄撑不住卷轴，也别让人以为"东西被吞了"（空槽是虚线的）
-        for (var i = show.length; i < this.MIN_SLOT; i++) html.push('<div class="rg-slot is-empty"></div>');
+        // ⛔ 不再补空槽：格子数=实际所得件数，右侧那些虚线空框只会让人以为"还有东西没显示"。
+        //    .rg-grid 已是 justify-content:center，件数少也居中，横幅不会歪。
         html.push("</div>");
         return { html: html.join("") };
     },
@@ -144,15 +147,10 @@ GAME.BattleResult = {
             "</div>";
     },
 
+    // 胜利时不再重复打印"战利品：灵石 ×32"——上面 .rg-gains 已写灵石、中部格子已摊开
+    // 每件物品的图标与数量，同一笔账说三遍只是噪音。战败的收尾话仍由 show() 直接给。
     _sumText: function (rec) {
-        var parts = [];
-        if (rec.stones > 0) parts.push("灵石 ×" + rec.stones);
-        (rec.items || []).forEach(function (it) {
-            var d = (GAME.DATA.ITEMS && GAME.DATA.ITEMS[it.id]) || {};
-            parts.push((d.name || it.id) + " ×" + it.qty);
-        });
-        if (!parts.length) return "此行空手，只余一身煞气。";
-        return "战利品：" + parts.join("、");
+        return "";
     },
 
     /* ---------- 【收下战利品】：账实核对（幂等），再离开 ----------
@@ -301,8 +299,7 @@ GAME.BattleResult = {
                 '<b>' + self._esc(c.name) + "</b>" +
                 '<em>×' + c.qty + "</em></div>");
         });
-        for (var i = show.length; i < this.MIN_SLOT; i++) html.push('<div class="rg-slot is-empty"></div>');
-        html.push("</div>");
+        html.push("</div>");   // 同上：只画真到手的，不补虚线空框
         return html.join("");
     },
 

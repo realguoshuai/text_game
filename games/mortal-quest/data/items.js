@@ -112,6 +112,7 @@ GAME.DATA.ITEMS = {
 
     // —— 新增（练气中后期）：暗器 / 灵药 / 符箓 ——
     zimu_ren:         { id:"zimu_ren",          name:"子母刃", quality:"上品", type:"dark_weapon", price:420, desc:"子刃藏于母刃，专走死角。战前装备，斗法中两成攻势直击死角，必成重创。", },
+    herb_shancao:     { id:"herb_shancao",      name:"山草药",   quality:"凡品", type:"herb",    price:8,  desc:"镇外坡地随手可采的寻常草药，煎汤敷伤都使得。凡俗地界历练的主要收成——卖不了几个钱，胜在出得稳。", use:{ eatExp:1, eatMonths:1 } },
     herb_ecao:        { id:"herb_ecao",         name:"恶臭草", quality:"凡品", type:"material", price:15, desc:"奇臭无比的杂草，臭气可盖住灵药药香。百草园暗田催熟时消耗一株，可掩去灵机波动，泄露值不增。" },
     talisman_chuansong:{ id:"talisman_chuansong", name:"传送符", quality:"上品", type:"talisman", price:260, desc:"上古逃命符。血气激发可瞬移百里——血色禁地中随时可用，保你连人带货全身而退。", use:{ teleport:true } },
 

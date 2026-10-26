@@ -114,7 +114,14 @@ GAME.Core = {
             while (p.homeDue >= 12) {
                 p.homeDue -= 12;
                 if (p.ageYears >= 60 || p.location === "qingniu_zhen") {
-                    GAME.UI.log("又是一年——你遥想青牛镇旧宅，父母音容已隔黄泉。便将银钱分予同族后辈，聊慰先人。", "info");
+                    // 周济同族后辈同样是一笔真开销：旧版只写一句日志、分文不出，
+                    // 等于凭空刷出一份"孝道"心境。银两不足这一年就不摆这个场面（静默跳过）。
+                    if ((p.silver || 0) < 10) continue;
+                    p.silver -= 10;
+                    p.mind = (p.mind || 0) + 2;
+                    GAME.UI.log((p.location === "qingniu_zhen")
+                        ? "又是一年——你行过青牛镇旧宅，父母音容已隔黄泉。你留下 10 两银子予同族后辈，聊慰先人。（心境 +2）"
+                        : "又是一年——你遥想青牛镇旧宅，父母音容已隔黄泉。便托人捎去 10 两银子分予同族后辈，聊慰先人。（心境 +2）", "info");
                     continue;
                 }
                 if (p.silver >= 10) {
@@ -1190,25 +1197,61 @@ GAME.Core = {
         var p = GAME.State.p();
         if (p.isDead || p.combat || p.pendingEvent) return;
         if (this._dungeonBlock()) return;
+        // ★ 一趟只结一次账（唯一闸门）：
+        //   ① 上一趟的结算卷轴还开着 —— 账没看完，不许再叠一趟；
+        //   ② 本次已在跑 —— 连点两下不能变成两趟行程、两份掉落。
+        //   旧版没有这道闸，连点就是"出发月结一次、抵达月再结一次"，见闻录里还会把
+        //   第二趟的「你背起储物袋……」插在第一趟的掉落之后，看着就像双重结算。
+        if (GAME.BattleResult && GAME.BattleResult.isOpen && GAME.BattleResult.isOpen()) return;
+        if (this._exploring) return;
+        this._exploring = true;
+        try {
+            this._exploreOnce(p);
+        } finally {
+            this._exploring = false;
+        }
+    },
+
+    // 此地是不是凡俗城郭（青牛镇 / 景阳城这类 kind=mortal 的镇集）：
+    // 历练产出分级与坊市路程都用这一把尺子，别各写一套。
+    _isMortalArea: function (p) {
+        p = p || GAME.State.p();
+        var node = (GAME.Map && GAME.Map.node) ? GAME.Map.node(p.location) : null;
+        return !!(node && node.kind === "mortal");
+    },
+
+    // 单趟行程：出发日志 -> 推进年月 -> 抵达后唯一一次事件抽取与结算
+    _exploreOnce: function (p) {
         // 外出历练即离开坊市：清掉「在坊市中」标记，并让左栏从市集货架跟随回大地图。
         // （若随后触发事件/战斗，applyPanels 的紧急面板优先级会自行接管左栏）
         if (GAME.UI && GAME.UI.leaveMarketTo) GAME.UI.leaveMarketTo("map");
+        p._exploreCtx = null;   // 上一趟残留的上下文（如选项型事件被战斗打断）一律作废
         var months = this.rand(1, 3);
         p.stats.explores += 1;
         GAME.UI.log("你背起储物袋外出历练，往返耗时 " + months + " 个月……", "system");
-        // 行程前后快照：结算卡据此算出本次所得（修为/心境/气血/灵石/物品变动）
-        var snap = this._exploreSnapshot(p);
         this.passTime(months);
         if (p.isDead) return;
+        // ★ 快照取在「抵达之后」：结算卷轴只摊这一趟事件给的收益。
+        //   旧版取在出发前，于是路上自动调息回的那点气血（每过一月 +10，封顶气血上限）
+        //   也被算进奖励——玩家满血时看见"气血 +13"却毫无收益，源头就在这里。
+        var snap = this._exploreSnapshot(p);
 
         // 按权重抽取事件：恶名越盛越易招来劫道散修；《敛气术》伪装境界让劫匪摸不清深浅
         // 境界门禁 + 双重战线：元婴后按所在战线（碎星海/云国陆地）只收对应事件
         var atSea = (GAME.Cave2 && GAME.Cave2.atStarSea) ? GAME.Cave2.atStarSea() : false;
-        var events = GAME.DATA.EVENTS.filter(function (ev) {
+        // 产出分级：凡俗城郭（青牛镇这般 kind=mortal 的镇集）只出凡俗遭际——低阶草药、
+        // 银两、少量修为，百年灵药是极小概率的意外之喜。山泽野岭才照旧走 EVENTS 那套灵药池。
+        // ⚠ 判据用「地图节点 kind」而不是 Encounter.zoneOf：ZONES 里青牛镇登记的是 wild
+        //   （那是野外遭遇池的口径，与"此地是否为凡俗城郭"是两回事）。
+        var pool = (this._isMortalArea(p) && GAME.DATA.MORTAL_EVENTS && GAME.DATA.MORTAL_EVENTS.length)
+            ? GAME.DATA.MORTAL_EVENTS
+            : GAME.DATA.EVENTS;
+        var events = pool.filter(function (ev) {
             if (ev.minRealm && p.realmIndex < ev.minRealm) return false;
             if (ev.maxRealm && p.realmIndex > ev.maxRealm) return false;
             return true;
         });
+        if (!events.length) events = GAME.DATA.EVENTS.slice();   // 兜底：别让空池抽出 undefined
         if (events.some(function (ev) { return ev.front; })) {
             var want = atSea ? "sea" : "land";
             events = events.filter(function (ev) { return !ev.front || ev.front === want; });
@@ -1283,13 +1326,18 @@ GAME.Core = {
     },
     // 出结算卷轴：把本次所得摊成全屏古风卷轴（复用斗法胜利弹窗）
     _showExploreResult: function (p, picked, snap, months, sceneText) {
+        // 卷轴模块缺席（精简测试沙箱 / 脚本未载入）时不硬崩：账照结，界面直刷
+        if (!GAME.BattleResult || !GAME.BattleResult.showScroll) { GAME.UI.updateUI(); return; }
         var diff = this._exploreDiff(p, snap);
         var hasItems = diff.items.length > 0;
         var hasMind = diff.nums.some(function (n) { return n.label === "修为" || n.label === "心境"; });
+        var hasSilver = diff.nums.some(function (n) { return n.label === "白银"; });
         var seal;
         if (hasItems && hasMind) seal = "游历归来 · 满载而归";
         else if (hasItems) seal = "山泽寻幽 · 偶得灵物";
         else if (hasMind) seal = "红尘炼心 · 大有所获";
+        // 只得了银钱（凡俗地界的常态）：别套"空手平安"，那对玩家是句假话
+        else if (hasSilver) seal = "凡尘奔走 · 小有进项";
         else seal = "游历归来 · 平安返程";
 
         GAME.BattleResult.showScroll({
@@ -1427,7 +1475,7 @@ GAME.Core = {
             // 剧情描述按"情境"定色，别一律当【获物】：
             // 得道具/灵石的分支，描述记【机缘】，具体战利品在下面合并成一行【获物】。
             var _lt = (o.type === "damage" || o.type === "combat") ? "danger"
-                : (o.type === "exp" || o.type === "loot" || o.type === "stones") ? "success"
+                : (o.type === "exp" || o.type === "loot" || o.type === "stones" || o.type === "silver" || o.type === "heal") ? "success"
                 : (o.type === "nothing") ? "venture"
                 : "info";
             GAME.UI.log(o.text, _lt);
@@ -1436,18 +1484,29 @@ GAME.Core = {
         switch (o.type) {
             case "loot":
                 // 同一次掉落的多个道具合并成一行，避免刷屏成「获得【A】」「获得【B】」碎片日志
-                var _got = [];
+                var _got = [], _hasHerb = false;
                 for (j = 0; j < o.table.length; j++) {
                     var g = o.table[j];
                     if (Math.random() < g.chance) {
                         var qty = this.rand(g.qty[0], g.qty[1]);
                         if (qty > 0) {
                             GAME.State.addItem(g.id, qty);
+                            if (g.id === "herb_bainian" || g.id === "herb_qiannian") _hasHerb = true;
                             _got.push("【" + GAME.DATA.ITEMS[g.id].name + "】×" + qty);
                         }
                     }
                 }
                 if (_got.length) GAME.UI.log("获得" + _got.join("、") + "。", "loot");
+                // 凡俗地界采到灵药：那股草木清气掩不住，必须同步记一笔药香泄露
+                if (_hasHerb && o.herbLeak) {
+                    var _lb = p.leak || 0;
+                    var _lc = (GAME.HerbAlarm && GAME.HerbAlarm.leakCap) ? GAME.HerbAlarm.leakCap() : 100;
+                    p.leak = Math.min(_lc, _lb + o.herbLeak);
+                    if (p.leak > _lb) {
+                        GAME.UI.log("【药香泄露 +" + (p.leak - _lb) + "（现 " + p.leak + "）】凡俗地界少有人识得灵药，" +
+                            "可那股清气还是散出去了——镇上的眼睛未必都是瞎的。", "warning");
+                    }
+                }
                 break;
             case "stones":
                 var stones = this.rand(o.amount[0], o.amount[1]);
@@ -1458,6 +1517,26 @@ GAME.Core = {
                 var exp = this.rand(o.amount[0], o.amount[1]);
                 p.currentExp += exp;
                 GAME.UI.log("修为 +" + exp + "。", "success");
+                break;
+            case "silver":
+                // 凡俗地界的收成：铜钱银两，不是灵石（镇民不认灵石）
+                var _sil = this.rand(o.amount[0], o.amount[1]);
+                p.silver = (p.silver || 0) + _sil;
+                GAME.UI.log("得白银 " + _sil + " 两。", "loot");
+                break;
+            case "heal":
+                // ★ 回血奖励先看能不能真回：气血已满时这份温养不能白扔，
+                //   折算成修为（旧版没有这一档，满血玩家看见"气血 +13"却毫无收益）。
+                var _want = this.rand(o.amount[0], o.amount[1]);
+                var _real = Math.max(0, Math.min(_want, (p.maxHp || 0) - (p.currentHp || 0)));
+                if (_real <= 0) {
+                    var _conv = 15;
+                    p.currentExp += _conv;
+                    GAME.UI.log("气血本已充盈，这一份温养无处可去，尽数化入经脉——修为 +" + _conv + "。", "success");
+                } else {
+                    p.currentHp += _real;
+                    GAME.UI.log("气血回复 " + _real + " 点（现 " + p.currentHp + "/" + p.maxHp + "）。", "success");
+                }
                 break;
             case "mind":
                 var _mind = this.rand(o.amount[0], o.amount[1]);

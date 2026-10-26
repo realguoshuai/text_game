@@ -3024,13 +3024,6 @@ body.result-on { overflow: hidden; }
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .rg-slot em { font-style: normal; font-size: 11px; color: #C9A24E; }
-/* 空槽是虚线的：一眼看出"这里本来就没东西"，不是被吞了 */
-.rg-slot.is-empty {
-    border: 1px dashed rgba(201, 162, 78, .22);
-    background: transparent;
-    min-height: 92px;
-    box-shadow: none;
-}
 .rg-empty {
     padding: 16px 8px;
     font-size: 13px; color: var(--rg-dim); line-height: 1.7;
@@ -3042,6 +3035,8 @@ body.result-on { overflow: hidden; }
     color: var(--rg-dim);
     letter-spacing: .03em;
 }
+/* 胜利卷轴已不再重复打印"战利品：…"，空段落不许留一段莫名空白 */
+.rg-sum:empty { display: none; }
 
 /* ---------- 战失统计卡 ---------- */
 .rg-lost {

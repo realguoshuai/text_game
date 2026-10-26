@@ -691,3 +691,77 @@ GAME.DATA.MANSION = {
         bad:"你仓促来见，胸中并无成算。颜氏望着你，神色淡了下去：「君若无所依凭，此事……再从长计议罢。」",
         bust:"府中锣声大作，火把四面合围——惊蛟会的人被惊动了。你夺路翻墙而出，所得线索有限。" },
 };
+
+/* =========================================================
+ * 【凡俗历练事件池】MORTAL_EVENTS
+ *
+ * 给青牛镇这类凡俗镇集（Encounter.zoneOf === "city"）专用：
+ *   · 主要产出：低阶草药（山草药/恶臭草）、白银、少量修为与心境
+ *   · 百年灵药是极小概率的意外之喜，且一旦到手必须同步【药香泄露 +5】
+ *     （outcome.herbLeak：resolveEventOutcomes 见它才扣泄露值）
+ *   · 不做成"山泽野岭的缩小版"：凡俗地界没有妖兽巢穴，也没有前辈遗府
+ * ========================================================= */
+GAME.DATA.MORTAL_EVENTS = [
+    {
+        id:"m_gather", weight:34,
+        text:"你在镇外的坡地上寻了几处草药苗，蹲下细细挑拣……",
+        choices:null,
+        outcomes:[
+            { chance:0.62, type:"loot", text:"几味寻常草药长得正好，够煎两副汤药。", table:[
+                { id:"herb_shancao", chance:1.0, qty:[1,2] },
+                { id:"herb_ecao",    chance:0.22, qty:[1,1] },
+            ]},
+            { chance:0.20, type:"loot", herbLeak:5, text:"草窠深处那一株竟透着些许灵气——凡俗地界也难得一见！", table:[
+                { id:"herb_bainian", chance:1.0, qty:[1,1] },
+            ]},
+            { chance:0.18, type:"nothing", text:"好苗子早被镇上药铺的伙计采光了，你空手而归。" },
+        ]
+    },
+    {
+        id:"m_oddjob", weight:22,
+        text:"你在镇上寻了份短工，替人挑水劈柴、看顾货栈……",
+        choices:null,
+        outcomes:[
+            { chance:0.55, type:"silver", text:"东家结了几钱银子，倒也不算白费这几日。", amount:[6,16] },
+            { chance:0.25, type:"exp",    text:"搬货间隙你仍不忘吐纳，倒也添了几分火候。", amount:[1,3] },
+            { chance:0.20, type:"heal",   text:"粗茶淡饭下肚，夜里睡得极沉，一身乏累都散了。", amount:[12,24] },
+        ]
+    },
+    {
+        id:"m_teahouse", weight:18,
+        text:"镇口的茶棚里坐满了人，说书先生醒木一拍，满座叫好。",
+        choices:null,
+        outcomes:[
+            { chance:0.60, type:"mind",   text:"凡人的悲欢听了一耳朵，你忽觉道心松快了些。", amount:[1,2] },
+            { chance:0.40, type:"silver", text:"你替茶博士理了半日账，掌柜塞来几钱碎银。", amount:[3,8] },
+        ]
+    },
+    {
+        id:"m_night_walk", weight:14,
+        text:"夜深了，你沿青石街走了一圈，老槐树的影子还在原处。",
+        choices:null,
+        outcomes:[
+            { chance:0.55, type:"mind", text:"旧景如昨，你竟觉心境澄明了一线。", amount:[1,2] },
+            { chance:0.45, type:"nothing", text:"街上空无一人，只有更夫的梆子声远远传来。" },
+        ]
+    },
+    {
+        id:"m_mugger", weight:6,
+        text:"巷口窜出两个泼皮，见你衣着朴素便横身拦了上来。",
+        choices:[
+            {
+                text:"随手打发（不伤人命）",
+                outcomes:[
+                    { chance:0.85, type:"silver", text:"两人讨了个没趣，丢下碎银告饶。", amount:[2,6] },
+                    { chance:0.15, type:"damage", text:"其中一个竟藏着短刀，你肩头被划了一道。", hp:[6,14] },
+                ]
+            },
+            {
+                text:"懒得理会，绕路走开",
+                outcomes:[
+                    { chance:1.0, type:"nothing", text:"你脚下一错便没了踪影，泼皮骂了几句也散了。" },
+                ]
+            },
+        ]
+    },
+];

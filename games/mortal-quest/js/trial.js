@@ -133,6 +133,9 @@ GAME.Trial = {
         var lootCfg = diff.length ? { title: "秘 境 收 获", items: diff, empty: "此番试炼重在磨砺道心，未携外物归来。" } : null;
         var actions = [{ id: "rg-act", label: "笑 纳 收 获 · 离 开 秘 境", onClick: function () { GAME.BattleResult.dismiss(); } }];
 
+        // 卷轴模块缺席（精简沙箱）时别排一条永远不会被消费的队
+        if (!GAME.BattleResult || !GAME.BattleResult.showScroll) { GAME.UI.updateUI(); return; }
+
         if (opts.fromCombat) {
             p._pendingSettle = {
                 variant: "win", seal: seal, lead: lead,

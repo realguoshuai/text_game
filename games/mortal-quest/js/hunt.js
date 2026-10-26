@@ -141,6 +141,7 @@ GAME.Hunt = {
         if (dSt > 0) gains.push({ label: "灵石", val: "+" + dSt + " 枚" });
 
         GAME.UI.autoSave();
+        if (!GAME.BattleResult || !GAME.BattleResult.showScroll) { GAME.UI.updateUI(); return true; }
         GAME.BattleResult.showScroll({
             variant: "win",
             seal: "见好就收 · 狩猎结算",

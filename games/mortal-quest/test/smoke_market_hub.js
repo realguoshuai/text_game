@@ -168,7 +168,8 @@ const m0 = month();
 let err = click(els['btn-market-go'], '[前往坊市]');
 ok('点击「前往坊市」不抛错', err === null);
 ok('跑商生效：已身处坊市', p.atMarket === true);
-ok('城镇自带市集：就近入市不耗年月（青牛镇）', month() === m0);
+// 2026-10-26 改口径：凡俗镇集（青牛镇）没有常设坊市，赶集须往返 1 月，不再"就地入市"
+ok('凡俗镇集（青牛镇）须赶集：往返 1 月', month() === m0 + 1);
 ok('山野洞府仍须赶路（幽篁谷 2 月）', (function () {
     const keep = p.location; p.location = 'shenshou_gu';
     const tt = G.Market.travelTime(); p.location = keep; return tt === 2;

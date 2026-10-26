@@ -792,7 +792,8 @@ GAME.Combat = {
         // ★ 本场明细账：从这一行起，grantLoot / materialDrops / pouchDrop 里的 _note
         //   才有着落处。此后每一条"赢了"的分支都必须带着这本账去 handleCombatVictory，
         //   不许再出现"东西入袋了、见闻录写了、玩家什么也没看见"的静默收场。
-        this._rec = { win: true, foe: this.shortName(def.name), exp: expGain, stones: stones, items: [] };
+        // beast 标记：卷轴副标题按"斩的是妖兽还是人"分别说话（杀妖并不减煞气，别写反了）
+        this._rec = { win: true, foe: this.shortName(def.name), beast: !!def.isBeast, exp: expGain, stones: stones, items: [] };
 
         GAME.UI.log("【" + p.combat.name + "】轰然倒地！", "success");
         if (GAME.Moments) GAME.Moments.fire("first_kill", p.combat.name);
