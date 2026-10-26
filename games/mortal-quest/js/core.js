@@ -642,26 +642,90 @@ GAME.Core = {
     },
 
     // ---------- 敌修储物袋：抹除禁制，开盲盒 ----------
-    // 神识够 → 直接震碎袋口烙印（1 个月收拾）；不够 → 水磨 sealMonths 个月慢慢化开。
-    // 代价是时间不是概率——磨开封口那一刻，袋里有什么全看天意（凡人流摸尸）。
-    openPouch: function (id) {
+    // 三个坑曾让玩家「点了没反应」：① 道陨/斗法/悬案未了时静默 return，界面一片死寂；
+    // ② 神识门槛只躺在数据表里（sealSpirit），界面上一个字不报，玩家不知道差多少；
+    // ③ 神识不足时直接把时间推过去，玩家一觉醒来少了一年半载，却不知发生过什么。
+    // 现在三件分开：pouchBlock 讲清此刻为何不能动手；pouchInfo 是「能不能开、差多少、
+    // 要磨几个月」的唯一判据（界面与逻辑同源）；tryOpenPouch 是界面唯一入口——
+    // 神识不足先把代价摊开让人自选，openPouch 才真正动手并返回本场明细账。
+    pouchBlock: function () {
         var p = GAME.State.p();
-        if (p.isDead || p.combat || p.pendingEvent || p.pendingMercy) return;
-        var item = GAME.DATA.ITEMS[id];
-        if (!item || item.type !== "pouch" || GAME.State.countItem(id) < 1) return;
+        if (p.isDead) return "你已道陨，肉身冰凉，再无人替你抹这袋口的禁制。";
+        if (p.combat) return "斗法未了，神识全在对手身上——此刻分心解禁制，与自寻死路无异。";
+        if (p.pendingEvent || p.pendingMercy) return "眼前这桩事还没了断，神识腾不出手来。";
+        return "";
+    },
 
-        var spirit = GAME.State.getStats().spirit;
-        var seal = item.sealSpirit || 10;
-        if (spirit < seal) {
-            var months = item.sealMonths || 2;
-            GAME.UI.log("袋口那缕神识烙印深沉，你神识不足以强行震碎——只能日复一日以灵力水磨。", "warning");
-            GAME.Core.passTime(months);
-            if (p.isDead) return;
-            GAME.UI.log("耗费 " + months + " 个月，袋口烙印终于淡去。", "system");
-        } else {
-            GAME.Core.passTime(1);
-            if (p.isDead) return;
+    pouchInfo: function (id) {
+        var p = GAME.State.p();
+        var item = GAME.DATA.ITEMS[id];
+        var out = { id: id, item: item, ok: false, need: 0, spirit: 0, months: 0, have: 0, block: "", lifeShort: false };
+        if (!item || item.type !== "pouch") { out.block = "这不是储物袋。"; return out; }
+        out.have = GAME.State.countItem(id);
+        out.need = item.sealSpirit || 10;
+        out.spirit = GAME.State.getStats().spirit;
+        out.months = item.sealMonths || 2;
+        out.ok = out.spirit >= out.need;
+        out.block = this.pouchBlock();
+        // 寿元撑不到磨开：水磨不是免费的，磨到一半坐化才是真笑话
+        var leftMonths = (GAME.State.maxAge() - (p.ageYears || 0)) * 12 - (p.ageMonths || 0);
+        out.lifeShort = !out.ok && leftMonths <= out.months + 6;
+        return out;
+    },
+
+    // 界面唯一入口：够就开，不够就把「差多少、代价几何、还能怎么办」一次说清
+    tryOpenPouch: function (id) {
+        var info = this.pouchInfo(id);
+        if (info.block) { GAME.UI.log(info.block, "danger"); GAME.UI.updateUI(); return; }
+        if (info.have < 1) { GAME.UI.log("行囊里已无此袋。", "system"); GAME.UI.updateUI(); return; }
+        if (info.ok) {
+            var res = this.openPouch(id);
+            if (res) GAME.UI.showPouchResult(res);
+            return;
         }
+        var tip = "此储物袋残留筑基神识烙印，强行抹除反噬自身（需神识达到 " + info.need +
+            " 方可强行破开，或闭关精进神识 / 服用特定神识丹药）。";
+        var rows = '<div class="sheet-quote">' + tip + '</div>' +
+            '<div class="sheet-note">你眼下神识 <b>' + info.spirit + '</b>，尚差 <b>' + (info.need - info.spirit) + '</b>。' +
+            '若肯以灵力日复一日水磨袋口，约需 <b>' + info.months + '</b> 个月方可将烙印化尽——袋中之物，届时自有分晓。</div>' +
+            '<div class="sheet-note">精进神识之路：服【养魂丹】神识 +10，习《控物术》神识 +4，境界每上一层神识亦有增益。</div>';
+        if (info.lifeShort) {
+            rows += '<div class="sheet-note sheet-warn">你余寿已薄，水磨 ' + info.months + ' 个月恐有坐化之虞——不如先寻神识丹药。</div>';
+        }
+        GAME.UI.showSheet({
+            title: "抹除禁制",
+            kicker: "禁 制 未 解 · 神 识 不 足",
+            body: rows,
+            danger: true,
+            okText: info.lifeShort ? "仍要水磨（险）" : "以水磨工夫化开（" + info.months + " 个月）",
+            cancelText: "暂且收着",
+            // 磨开之后必须把账摊开——静默入袋等于玩家白等半年
+            onOk: function () {
+                var r = GAME.Core.openPouch(id, { grind: true });
+                if (r && GAME.UI.showPouchResult) GAME.UI.showPouchResult(r);
+            }
+        });
+    },
+
+    // 真正动手。opts.grind = 明知神识不足仍以水磨工夫化开（弹窗确认后才会传）；
+    // 缺这个标记就一律不开——别让「界面没问过」变成「时间被偷走」。
+    // 返回本场明细账 { name, forced, months, stones, items:[{id,name,quality}] }，供结算面板摊开。
+    openPouch: function (id, opts) {
+        var p = GAME.State.p();
+        var info = this.pouchInfo(id);
+        if (info.block || info.have < 1) return null;
+        if (!info.ok && !(opts && opts.grind)) return null;
+        var item = info.item, months;
+        if (info.ok) {
+            GAME.UI.log("你指尖灵光吞吐，强行震碎袋口残留的神识烙印——禁制崩散，袋口应声而开。", "success");
+            months = 1;
+        } else {
+            months = info.months;
+            GAME.UI.log("袋口那缕神识烙印深沉，你神识不足以强行震碎——只能日复一日以灵力水磨。", "warning");
+        }
+        GAME.Core.passTime(months);
+        if (p.isDead) return null;
+        if (!info.ok) GAME.UI.log("耗费 " + months + " 个月，袋口烙印终于淡去。", "system");
 
         GAME.State.removeItem(id, 1);
         var pool = (GAME.DATA.POUCH_LOOT || {})[item.tier || 1] || [];
@@ -679,13 +743,14 @@ GAME.Core = {
                 var idef = GAME.DATA.ITEMS[l.id];
                 if (!idef) continue;
                 GAME.State.addItem(l.id, 1);
-                got.push("【" + idef.name + "】");
+                got.push({ id: l.id, name: idef.name, quality: idef.quality });
             }
         }
-        GAME.UI.log("你指尖灵光吞吐，强行震碎袋口残留的神识烙印，将内里珍藏尽数倒出——灵石 ×" + stones +
-            (got.length ? "，" + got.join("、") : "，此外别无长物") + "。", "loot");
+        var gotTxt = got.length ? got.map(function (x) { return "【" + x.name + "】"; }).join("、") : "此外别无长物";
+        GAME.UI.log("袋中珍藏尽数倒出——灵石 ×" + stones + "，" + gotTxt + "。", "loot");
         GAME.UI.autoSave();
         GAME.UI.updateUI();
+        return { id: id, name: item.name, forced: info.ok, months: months, stones: stones, items: got };
     },
 
     // 装备/更换法器（旧法器自动退回储物袋）
@@ -812,7 +877,8 @@ GAME.Core = {
     },
 
     // ================= 突破境界 =================
-    breakthrough: function () {
+    // opts.hpAck：残血二次确认后由弹窗回调传入，跳过气血拦阻（只跳一层，不记忆）。
+    breakthrough: function (opts) {
         var p = GAME.State.p();
         if (p.isDead || p.combat) return;
         // 心魔劫续破：上轮已定心，直接用缓存的破境参数正式冲击壁障
@@ -846,6 +912,26 @@ GAME.Core = {
             GAME.UI.log("破境推演模块未载入（js/breakthrough.js），无法冲击壁障。", "danger");
             GAME.UI.updateUI();
             return;
+        }
+        // 残血强冲拦阻：气血不足三成先问一句。破境失败的反噬按气血结算，
+        // 带着 40/329 去撞壁障，等于自己替天劫补了最后一刀。
+        if (!(opts && opts.hpAck)) {
+            var lowWhy = this.lowHpWarn(p);
+            if (lowWhy) {
+                GAME.UI.showSheet({
+                    title: "气血大损",
+                    kicker: "残 血 冲 关 · 慎 之",
+                    body: '<div class="sheet-quote">' + lowWhy + '</div>' +
+                        '<div class="sheet-note">破境不成，反噬按你此刻的气血结算：气血越薄，伤势越重，甚者当场道陨。' +
+                        '服【回春散】可回气血 60 点；回洞府打坐调息亦能缓缓回元。</div>',
+                    danger: true,
+                    okText: "仍要强行冲关",
+                    cancelText: "先调息疗伤",
+                    onOk: function () { GAME.Core.breakthrough({ hpAck: true }); }
+                });
+                GAME.UI.updateUI();
+                return;
+            }
         }
         // 元婴天堑：结丹后期 → 元婴。破境之前先问「碎丹成婴」铺路（借灵药/寻护法/静养/无备），
         // 择一写入 p.yuanyingPrep，随后 resume 续破——与心魔劫同一 resume 模式，不另开流程。
@@ -893,6 +979,18 @@ GAME.Core = {
             isYuanying: atYuanyingGate, bareYuanying: plan.bareYuanying,
             guardUsed: plan.guardUsed
         });
+    },
+
+    // 残血冲关判据（唯一）：气血不足三成即预警，返回空串＝无需劝。
+    // 按钮 title 与二次确认弹窗都读这一句，不再各写一套阈值。
+    lowHpWarn: function (p) {
+        p = p || GAME.State.p();
+        var max = p.maxHp || 0, cur = Math.max(0, p.currentHp || 0);
+        if (max <= 0 || cur >= max * 0.3) return "";
+        var target = GAME.DATA.REALMS[(p.realmIndex || 0) + 1];
+        var gname = target ? ("「" + target.name + "」") : "";
+        return "当前气血大损（" + cur + "/" + max + "），贸然冲击" + gname +
+            "瓶颈极易因气血亏空而功亏一篑，建议先调息疗伤（回春散）再行突破！";
     },
 
     // 心魔劫后由 chooseEventOption 调用：缓存已在 _btCtx，入口即走续破分支

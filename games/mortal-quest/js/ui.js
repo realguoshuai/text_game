@@ -1093,6 +1093,11 @@ GAME.UI = {
                 this._why(bt, lock ? lockWhyInline : (lackExp2 > 0 ? "还差 " + lackExp2 + " 修为" : ""));
                 bt.title = lock ? lockTitle : "";
             }
+            // 残血冲关：未锁定时把预警挂在悬停上（正文由 Core.lowHpWarn 唯一给出，与二次确认同一句）
+            if (bt && !lock && GAME.Core && GAME.Core.lowHpWarn) {
+                var _lowT = GAME.Core.lowHpWarn(p);
+                if (_lowT) bt.title = _lowT;
+            }
             // 修为已满且可突破 → 高亮按钮提醒（浅/深色各一套，见 style.css .bt-ready）
             if (bt) bt.classList.toggle("bt-ready", realm.needExp !== null && !bt.disabled && p.currentExp >= realm.needExp);
             this.renderBreakPrep(btPlan);
@@ -1453,9 +1458,17 @@ GAME.UI = {
                 var pot = GAME.Core.pillPotency(id);
                 potency = '<div class="item-desc">丹毒渐抗：已服 ' + pot.taken + ' 颗，现药效 ×' + pot.mult.toFixed(2) + '</div>';
             }
+            // 储物袋：门槛与现状直接写在卡面——玩家不必点一次才知道差多少神识
+            var pouchNote = "";
+            if (item.type === "pouch" && GAME.Core && GAME.Core.pouchInfo) {
+                var pinfo0 = GAME.Core.pouchInfo(id);
+                pouchNote = '<div class="item-desc pouch-seal ' + (pinfo0.ok ? "seal-ok" : "seal-short") + '">' +
+                    "禁制：需神识 " + pinfo0.need + " · 现有 " + pinfo0.spirit +
+                    (pinfo0.ok ? "——可强行抹除（耗 1 月）" : "——不足，可水磨 " + pinfo0.months + " 月化开") + "</div>";
+            }
             left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + qty +
                 ' <span class="item-desc">[' + item.quality + ']</span>' +
-                '<div class="item-desc">' + item.desc + '</div>' + potency;
+                '<div class="item-desc">' + item.desc + '</div>' + potency + pouchNote;
 
             var right = document.createElement("div");
             right.className = "item-right";
@@ -1475,11 +1488,17 @@ GAME.UI = {
                     right.appendChild(htip);
                 }
             } else if (item.type === "pouch") {
-                // 敌修储物袋：抹除禁制开盲盒——神识够直接震碎烙印，不够只能水磨数月
+                // 敌修储物袋：神识够直接震碎烙印；不够则弹窗把水磨代价说透。
+                // ⛔ 这里必须挂 tryOpenPouch（唯一入口），直接调 openPouch 会走成「点了没反应」。
                 var bp = document.createElement("button");
                 bp.className = "small-btn btn-gold";
                 bp.innerText = "抹除禁制开启";
-                bp.onclick = function () { GAME.Core.openPouch(id); };
+                var pinfo1 = GAME.Core.pouchInfo(id);
+                bp.title = pinfo1.ok
+                    ? ("神识 " + pinfo1.spirit + " ≥ 禁制 " + pinfo1.need + "：可强行抹除，耗时 1 月。")
+                    : ("此储物袋残留筑基神识烙印，强行抹除反噬自身（需神识达到 " + pinfo1.need +
+                       " 方可强行破开，或闭关精进神识 / 服用特定神识丹药）。现神识 " + pinfo1.spirit + "。");
+                bp.onclick = function () { GAME.Core.tryOpenPouch(id); };
                 right.appendChild(bp);
             } else if (item.use) {
                 // 丹药 / 功法 / 宝玉等：凡有"服用效果"者皆可服（takePill 内含逐类处理）
@@ -3695,6 +3714,89 @@ GAME.UI = {
         GAME.Storage.clearSlot(i);
         this.renderSaveSlots();
         this.updateUI();
+    },
+
+    // ---------- 通用两键弹层（古风，替代 window.confirm） ----------
+    // cfg: { title, kicker, body(html), okText, cancelText(null=单键), danger, onOk, onCancel }
+    // 为什么不用 window.confirm：系统弹框与古风界面完全脱节，手机端样式不可控，
+    // 更承载不了「差多少神识、要磨几个月、入袋了些什么」这类需要排版的账。
+    showSheet: function (cfg) {
+        cfg = cfg || {};
+        var modal = this.$("sheet-modal");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "sheet-modal";
+            modal.className = "modal-mask";
+            modal.style.display = "none";
+            modal.innerHTML = '<div class="modal-box sheet-box">' +
+                '<div class="modal-head"><span id="sheet-title">确认</span></div>' +
+                '<div class="sheet-body">' +
+                '<div id="sheet-kicker" class="sheet-kicker"></div>' +
+                '<div id="sheet-main" class="sheet-main"></div>' +
+                '<div class="event-choices sheet-acts">' +
+                '<button id="btn-sheet-ok" class="btn-gold">确 定</button>' +
+                '<button id="btn-sheet-cancel" class="small-btn">取 消</button>' +
+                '</div></div>';
+            document.body.appendChild(modal);
+        }
+        var t = this.$("sheet-title"); if (t) t.innerText = cfg.title || "确认";
+        var k = this.$("sheet-kicker");
+        if (k) { k.innerText = cfg.kicker || ""; k.style.display = cfg.kicker ? "" : "none"; }
+        var m = this.$("sheet-main"); if (m) m.innerHTML = cfg.body || "";
+        var box = this.$("sheet-box") || modal.querySelector(".sheet-box");
+        if (box) box.className = "modal-box sheet-box" + (cfg.danger ? " sheet-danger" : "");
+        var okBtn = this.$("btn-sheet-ok"), noBtn = this.$("btn-sheet-cancel");
+        var self = this;
+        if (okBtn) {
+            okBtn.innerText = cfg.okText || "确定";
+            okBtn.className = cfg.danger ? "btn-danger" : "btn-gold";
+            okBtn.onclick = function () { self.closeSheet(); if (cfg.onOk) cfg.onOk(); };
+        }
+        if (noBtn) {
+            if (cfg.cancelText === null) { noBtn.style.display = "none"; }
+            else {
+                noBtn.style.display = "";
+                noBtn.innerText = cfg.cancelText || "取消";
+                noBtn.onclick = function () { self.closeSheet(); if (cfg.onCancel) cfg.onCancel(); };
+            }
+        }
+        modal.style.display = "flex";
+        return modal;
+    },
+
+    closeSheet: function () {
+        var m = this.$("sheet-modal");
+        if (m) m.style.display = "none";
+    },
+
+    // 储物袋解禁结算：把 openPouch 返回的明细账摊开（灵石单列，物品按品质着色）
+    showPouchResult: function (res) {
+        if (!res) return;
+        // 灵石为 0 不占用一行：报个「× 0」只是噪声，空袋子另有说明
+        var rows = res.stones > 0
+            ? '<div class="sheet-row sheet-row-stone"><span>灵石</span><b>× ' + res.stones + '</b></div>'
+            : "";
+        var list = res.items || [];
+        for (var i = 0; i < list.length; i++) {
+            rows += '<div class="sheet-row"><span class="q-' + list[i].quality + '">【' + list[i].name + '】</span>' +
+                '<b>' + list[i].quality + '</b></div>';
+        }
+        if (!list.length) rows += '<div class="sheet-note">袋中除灵石外别无长物。</div>';
+        var body = '<div class="sheet-quote">' + (res.forced
+            ? "神识如刃，一触之下袋口烙印应声崩散——" + res.name + "的封印，就此了结。"
+            : "水磨 " + res.months + " 个月，袋口烙印终于淡去——" + res.name + "的底细，尽在眼前。") + '</div>' +
+            '<div class="sheet-loot">' + rows + '</div>';
+        this.showSheet({
+            title: "禁制已破",
+            kicker: res.forced ? "强 行 抹 除 · 一 击 而 破" : "水 磨 功 夫 · 历 时 " + res.months + " 月",
+            body: body,
+            okText: "收 入 囊 中",
+            cancelText: null
+        });
+        // 破除的一缕灵光（纯 CSS 动画；prefers-reduced-motion 下自动静止）
+        var mb = this.$("sheet-modal");
+        var box = mb && mb.querySelector ? mb.querySelector(".sheet-box") : null;
+        if (box) { box.classList.remove("sheet-crack"); void box.offsetWidth; box.classList.add("sheet-crack"); }
     },
 
     // ---------- 渡劫破境天道诏书弹窗 ----------

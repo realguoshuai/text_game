@@ -3622,3 +3622,49 @@ body.theme-light .herb-alarm-note .danger { color: #8C2B1E; }
 /* 浅色主题下 --gold-bd 偏亮，竖线改用与标签同色的深一档墨金 */
 body.theme-light #recipe-list .recipe-effect { border-left-color: #C08A3E; }
 body.theme-light #recipe-list .recipe-effect .recipe-gain { color: #1F5F45; }
+
+/* ================= 通用两键弹层 · 储物袋解禁（#sheet-modal） =================
+ * 位置：js/ui.js UI.showSheet() 运行时建（与渡劫诏书同一套做法，DOM 由脚本持有）。
+ * 文案与数字全部由 Core.pouchInfo()/openPouch() 现算，这里只管排版与「破除」那一瞬的光。
+ * 全用既有主题变量——纸面皮肤重定义变量时自动换墨，不必再写一套 body.theme-light。 */
+#sheet-modal { z-index: 60; }
+.sheet-box { max-width: 470px; }
+.sheet-body { padding: 14px 16px 16px; }
+.sheet-kicker { font-size: 12px; letter-spacing: .14em; color: var(--gold-tx); margin-bottom: 8px; }
+.sheet-main { font-size: 13.5px; line-height: 1.75; color: var(--text); }
+.sheet-quote {
+    padding-left: 9px;
+    border-left: 2px solid var(--gold-bd);
+    color: var(--text-strong);
+    margin-bottom: 8px;
+}
+.sheet-note { font-size: 12.5px; line-height: 1.7; color: var(--text-mute); margin-top: 6px; }
+.sheet-note b { color: var(--gold-tx); font-weight: 600; }
+.sheet-note.sheet-warn { color: var(--danger-tx); }
+.sheet-loot { margin-top: 4px; display: flex; flex-direction: column; gap: 4px; }
+.sheet-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding: 5px 9px;
+    border: 1px solid var(--panel-border); border-radius: 6px;
+    background: var(--panel-bg);
+    font-size: 13px; color: var(--text);
+}
+.sheet-row b { color: var(--text-mute); font-weight: 500; font-size: 12px; flex-shrink: 0; }
+.sheet-row-stone b { color: var(--gold-tx); }
+.sheet-acts { margin-top: 12px; }
+.sheet-danger .sheet-quote { border-left-color: var(--danger-bd); }
+/* 破除余韵：一圈金光自边框荡开。纯装饰，prefers-reduced-motion 下不动。 */
+.sheet-crack { animation: sheetCrack .62s ease-out; }
+@keyframes sheetCrack {
+    0%   { box-shadow: 0 0 0 0 rgba(214, 180, 110, 0), 0 8px 30px rgba(0, 0, 0, .5); }
+    22%  { box-shadow: 0 0 0 3px rgba(214, 180, 110, .5), 0 0 40px rgba(214, 180, 110, .3); }
+    100% { box-shadow: 0 0 0 0 rgba(214, 180, 110, 0), 0 8px 30px rgba(0, 0, 0, .5); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sheet-crack { animation: none; }
+}
+
+/* 背包卡面的禁制行：门槛没到就换成警示色，别让玩家点一次才知道差多少 */
+.item-desc.pouch-seal { margin-top: 2px; }
+.item-desc.pouch-seal.seal-ok { color: var(--accent); }
+.item-desc.pouch-seal.seal-short { color: var(--danger-tx); }

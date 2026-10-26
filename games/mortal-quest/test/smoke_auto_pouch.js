@@ -203,24 +203,34 @@ p3.realmIndex = 13; p3.spiritBonus = 100;      // 神识碾压 seal=45
 p3.yindu = null; p3.wounded = null;
 setInv('pouch_jiedan', 1);
 var tm0 = p3.totalMonths || 0, st0 = p3.spiritStones;
-G.Core.openPouch('pouch_jiedan');
+var resOk = G.Core.openPouch('pouch_jiedan');
 ok('神识够：袋子消耗掉', G.State.countItem('pouch_jiedan') === 0);
+ok('神识够：返回明细账（forced=true / 1 月）', !!resOk && resOk.forced === true && resOk.months === 1);
 ok('神识够：只耗 1 个月', (p3.totalMonths || 0) === tm0 + 1);
 ok('开袋日志是凡人风摸尸', hasLog(/尽数倒出/));
 ok('开袋有实物入账（灵石或物品）', p3.spiritStones > st0 ||
     Object.keys(p3.inventory).some(function (k) { return k !== 'pouch_jiedan' && p3.inventory[k] > 0; }));
 
-// openPouch：神识不够 → 水磨数月（用 seal=45 的结丹袋，练气神识绝无可能够）
+// openPouch：神识不够 → 没有玩家确认就绝不动手（时间不能被界面偷走）
 clearLogs();
 var p4 = G.State.createNewPlayer('j');
 p4.realmIndex = 5; p4.spiritBonus = 0;         // 练气神识 < seal=45
 p4.yindu = null; p4.wounded = null;
 setInv('pouch_jiedan', 1);
 var tm1 = p4.totalMonths || 0;
-G.Core.openPouch('pouch_jiedan');
-ok('神识不够：水磨 6 个月（pouch_jiedan.sealMonths）', (p4.totalMonths || 0) === tm1 + 6);
+var info4 = G.Core.pouchInfo('pouch_jiedan');
+ok('pouchInfo 报不足（神识 ' + info4.spirit + ' < 禁制 ' + info4.need + '）', info4.ok === false && info4.need === 45);
+ok('pouchInfo 给出水磨月数', info4.months === 6);
+ok('神识不足且未确认 → 拒绝动手（返回 null）', G.Core.openPouch('pouch_jiedan') === null);
+ok('神识不足且未确认 → 一个月都不走', (p4.totalMonths || 0) === tm1);
+ok('神识不足且未确认 → 袋子还在', G.State.countItem('pouch_jiedan') === 1);
+
+// 玩家在弹窗里选了「水磨」之后（opts.grind）才真推时间
+var resGrind = G.Core.openPouch('pouch_jiedan', { grind: true });
+ok('确认水磨：耗 6 个月（pouch_jiedan.sealMonths）', (p4.totalMonths || 0) === tm1 + 6);
 ok('水磨有提示日志', hasLog(/水磨/));
 ok('磨开封口后袋子照样消耗', G.State.countItem('pouch_jiedan') === 0);
+ok('水磨返回明细账（forced=false / 6 月）', !!resGrind && resGrind.forced === false && resGrind.months === 6);
 
 // 盲池只出真实物品（扫全部池子，防手滑打错 id）
 var poolBad = [];

@@ -46,6 +46,9 @@ function reset() { setRand(0.5); G.State.createNewPlayer("wanderer"); return G.S
 // 筑基关（realmIndex >= ZHUJI_GATE_INDEX）后加了「心魔劫」：突破会先弹待决事件，
 // 须定心抉择后才由 core._resumeBreakthrough 正式冲击壁障。测试要走完这一步。
 function breach() {
+  // 残血（<30%）点突破现在会先弹二次确认（Core.lowHpWarn / opts.hpAck）——
+  // 本组验的是破境机制本身，先把气血补满，免得卡在确认弹窗上；那条拦阻另有 smoke_pouch_gate 专测。
+  var prep = G.State.p(); prep.currentHp = prep.maxHp;
   G.Core.breakthrough();
   var pp = G.State.p();
   if (pp.pendingEvent && pp.pendingEvent.eventId === "heart_demon") G.Core.chooseEventOption(0);
