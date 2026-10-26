@@ -102,7 +102,7 @@ GAME.Art = {
     // （.bp-ava{border-radius:50%; overflow:hidden}），所以图里四角的纸底色会被裁掉，
     // 切图时只需把角色圆环摆正、让圆本身顶满方形的内切圆。
     //
-    // 解析三级优先：① 精确名 → ② 词根 → ③ 类别兜底。两个顺序都是命门：
+    // 解析四级优先：⓿ 怪物 id → ① 精确名 → ② 词根 → ③ 类别兜底。三个顺序都是命门：
     //   · 「铁齿狼 · 一阶妖兽」只取 · 之前的主名——副名里全是「妖兽 / 练气后期」
     //     这类注脚，留着就会把「兽」当成裂风巨猿，于是天下妖兽全顶着巨猿脸；
     //   · 机构词（会 / 帮 / 盟 / 阙 / 门 / 修士 / 弟子）必须排在物种词之前，
@@ -118,7 +118,26 @@ GAME.Art = {
         "炼尸": "lianshi", "鬼王": "guiwang",
         "机关傀儡": "jiguan_kuilei", "噬金虫群": "shijin_chongqun",
         "剪径蠢贼": "jianjing_chunzei", "黑市劫修": "heishi_jiexiu",
-        "魔道邪修": "modao_xiexiu", "玄机子": "xuanjizi_monster"
+        "魔道邪修": "modao_xiexiu", "玄机子": "xuanjizi_monster",
+        /* 云京皇宫·夜战幽冥教（筑基期主线）：六张专属立绘，按怪物 id 查询（见 MON_ID_AVATAR） */
+        "血侍·铁罗": "heisha_tieluo", "血侍·苍岚": "heisha_qingwen",
+        "血侍·叶泓": "heisha_yehong", "血侍·冰妖": "heisha_bingyao",
+        "血玉蜘蛛": "heisha_zhizhu", "幽冥教主·越皇": "heisha_yuehuang"
+    },
+
+    /* 第 0 级：怪物 id → 立绘键名（最稳的一级，先于任何名字匹配）
+     * 为什么非要这一级：
+     *   · 四大血侍的名字带「·」——mainNameOf 只取到「血侍」，
+     *     四人若按名字走，会全部落到同一张通用魔修像上；
+     *   · 越皇濒死会改名「黑煞妖魔化·越皇」，改名后按名字匹配就掉回通用像。
+     * 有 id 就只认 id，名字怎么变都不影响立绘。 */
+    MON_ID_AVATAR: {
+        heisha_tieluo: "血侍·铁罗",
+        heisha_qingwen: "血侍·苍岚",
+        heisha_yehong: "血侍·叶泓",
+        heisha_bingyao: "血侍·冰妖",
+        heisha_zhizhu: "血玉蜘蛛",
+        heisha_yuehuang: "幽冥教主·越皇"
     },
 
     // 第一级：精确名（含原著别名与同义写法）
@@ -132,7 +151,9 @@ GAME.Art = {
         "鬼王": "鬼王", "机关傀儡": "机关傀儡", "噬金虫群": "噬金虫群",
         "剪径蠢贼": "剪径蠢贼", "剪径蟊贼": "剪径蠢贼", "世家护卫": "剪径蠢贼",
         "黑市劫修": "黑市劫修", "魔道邪修": "魔道邪修",
-        "玄机子": "玄机子", "墨居仁": "玄机子", "墨大夫": "玄机子", "余子童": "玄机子"
+        "玄机子": "玄机子", "墨居仁": "玄机子", "墨大夫": "玄机子", "余子童": "玄机子",
+        // 幽冥教：没有 id 时（只传名字的旧调用点）也要落到专属立绘，而不是共用通用像
+        "血玉蜘蛛": "血玉蜘蛛", "幽冥教主": "幽冥教主·越皇", "黑煞妖魔化": "幽冥教主·越皇"
     },
 
     // 第二级：词根表（顺序即优先级，改之前先读上面那段注释）
@@ -167,6 +188,10 @@ GAME.Art = {
     },
 
     avatarKeyOf: function (enemy) {
+        // 第 0 级：有怪物 id 就只认 id（血侍四人同词根、越皇会改名，名字不可靠）
+        var d0 = (enemy && enemy.def) || enemy || {};
+        var mid = d0 && d0.id;
+        if (mid && this.MON_ID_AVATAR[mid]) return this.MON_ID_AVATAR[mid];
         var nm = this.mainNameOf(enemy);
         if (nm && this.MON_EXACT[nm]) return this.MON_EXACT[nm];
         for (var i = 0; i < this.MON_RULES.length; i++) {

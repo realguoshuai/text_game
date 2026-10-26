@@ -6,7 +6,7 @@
  *   ① 「铁齿狼 · 一阶妖兽」不再顶巨猿脸——副名（妖兽/练气后期）一律不参与匹配
  *   ② 机构词压在物种词之前但排在「魔 / 鬼灵」之后：
  *      惊蛟会帮众 → 剪径蠢贼（不是墨蛟）、魔焰门修士 → 魔道邪修（不是劫修）
- *   ③ 16 类标准键名 ↔ 16 张切图一一对应，53 只怪无一落空
+ *   ③ 22 类标准键名 ↔ 22 张切图一一对应，59 只怪无一落空
  *   ④ 人形立绘的注脚写「修士」而不是「妖兽
  * 运行： node test/smoke_enemy_avatar.js
  * ========================================================= */
@@ -75,16 +75,18 @@ const A = G.Art;
 const key = (n) => A.avatarKeyOf({ name: n });
 const url = (n) => A.resolveEnemyAvatar({ name: n });
 
-console.log('\n--- 一、16 类标准键名与切图资源 ---');
+console.log('\n--- 一、22 类标准键名与切图资源 ---');
 const WANT = ['铁齿狼', '赤练妖蛇', '百目毒蛛', '双头火鸦', '墨蛟', '裂风巨猿', '婴鲤兽', '玄岩龟',
-    '炼尸', '鬼王', '机关傀儡', '噬金虫群', '剪径蠢贼', '黑市劫修', '魔道邪修', '玄机子'];
-ok('标准键名共 16 类', Object.keys(A.MON_AVATAR_FILE).length === 16);
-ok('16 类键名逐一对上（无缺无多）', WANT.every(k => A.MON_AVATAR_FILE[k]) &&
+    '炼尸', '鬼王', '机关傀儡', '噬金虫群', '剪径蠢贼', '黑市劫修', '魔道邪修', '玄机子',
+    // 云京皇宫·夜战幽冥教（6 张专属立绘）
+    '血侍·铁罗', '血侍·苍岚', '血侍·叶泓', '血侍·冰妖', '血玉蜘蛛', '幽冥教主·越皇'];
+ok('标准键名共 22 类', Object.keys(A.MON_AVATAR_FILE).length === 22);
+ok('22 类键名逐一对上（无缺无多）', WANT.every(k => A.MON_AVATAR_FILE[k]) &&
     Object.keys(A.MON_AVATAR_FILE).every(k => WANT.indexOf(k) >= 0));
-ok('文件名互不重复', new Set(Object.keys(A.MON_AVATAR_FILE).map(k => A.MON_AVATAR_FILE[k])).size === 16);
+ok('文件名互不重复', new Set(Object.keys(A.MON_AVATAR_FILE).map(k => A.MON_AVATAR_FILE[k])).size === 22);
 const dir = path.join(BASE, 'assets/monsters');
 const disk = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
-ok('切图目录存在且有 16 张', disk.filter(f => /\.jpg$/i.test(f)).length === 16);
+ok('切图目录存在且有 22 张', disk.filter(f => /\.jpg$/i.test(f)).length === 22);
 ok('每张图都非空（> 5KB）', WANT.every(k => {
     const p = path.join(dir, A.MON_AVATAR_FILE[k] + '.jpg');
     return fs.existsSync(p) && fs.statSync(p).size > 5120;
@@ -107,8 +109,10 @@ ok('惊蛟会帮众 → 剪径蠢贼（机构词在先，别被「蛟」拽去�
 ok('赤鳞蛟 → 墨蛟（真妖兽不受机构规则影响）', key('赤鳞蛟') === '墨蛟');
 ok('魔焰门修士 → 魔道邪修（「魔」在「门」之前）', key('魔焰门修士 · 筑基期') === '魔道邪修');
 ok('鬼灵门修士 → 魔道邪修（鬼灵 ≠ 鬼王）', key('鬼灵门修士') === '魔道邪修');
-ok('幽冥教主·越皇 → 鬼王（标题「教主」不含机构词）', key('幽冥教主·越皇') === '鬼王');
-ok('血侍·铁罗 → 魔道邪修', key('血侍·铁罗') === '魔道邪修');
+ok('幽冥教主·越皇 → 专属立绘（不再是通用鬼王）', key('幽冥教主·越皇') === '幽冥教主·越皇');
+// 只给名字时 mainNameOf 只能取到「血侍」（四人同词根），必然共用通用魔修像——
+// 这正是第 0 级「按 id 认脸」存在的理由（见第七节）
+ok('只给名字：四人同词根 → 通用魔修（故必须靠 id 认脸）', key('血侍·铁罗') === '魔道邪修');
 ok('古修残魂 → 鬼王', key('古修残魂') === '鬼王');
 ok('心魔·凝形 → 魔道邪修', key('心魔·凝形') === '魔道邪修');
 ok('赤焰火蟒 / 碧毒蟒 → 赤练妖蛇', key('赤焰火蟒 · 二阶妖兽') === '赤练妖蛇' && key('碧毒蟒') === '赤练妖蛇');
@@ -155,6 +159,22 @@ ok('isHumanAvatar：人族立绘判真', A.isHumanAvatar({ name: '劫道散修' 
     A.isHumanAvatar({ name: '魔道凶徒' }) === true && A.isHumanAvatar({ name: '玄机子' }) === true);
 ok('isHumanAvatar：妖兽立绘判假', A.isHumanAvatar({ name: '铁齿狼' }) === false &&
     A.isHumanAvatar({ name: '古修残魂' }) === false);
+
+console.log('\n--- 七、第 0 级：怪物 id 优先（改名/同词根都不掉图） ---');
+ok('id 精确：血侍四人各拿各的图', (function () {
+    const ids = ['heisha_tieluo', 'heisha_qingwen', 'heisha_yehong', 'heisha_bingyao'];
+    const files = ids.map(id => A.resolveEnemyAvatar({ def: { id: id, name: '血侍' } }));
+    return new Set(files).size === 4 &&
+        files[0] === 'assets/monsters/heisha_tieluo.jpg' &&
+        files[3] === 'assets/monsters/heisha_bingyao.jpg';
+})());
+ok('id 精确：血玉蜘蛛', A.resolveEnemyAvatar({ def: { id: 'heisha_zhizhu', name: '血玉蜘蛛' } }) ===
+    'assets/monsters/heisha_zhizhu.jpg');
+ok('越皇二阶段改名「黑煞妖魔化·越皇」仍用同一张脸',
+    A.avatarKeyOf({ def: { id: 'heisha_yuehuang' }, name: '黑煞妖魔化·越皇' }) === '幽冥教主·越皇');
+ok('无 id 时按名字也能命中（旧调用点兜底）', key('血玉蜘蛛') === '血玉蜘蛛' &&
+    key('黑煞妖魔化·越皇') === '幽冥教主·越皇');
+ok('没有 id 的普通怪不受影响', key('铁齿狼 · 一阶妖兽') === '铁齿狼');
 
 console.log('\n=========================================');
 console.log((fail === 0 ? 'ALL PASS' : 'FAILED') + '  ' + pass + ' passed, ' + fail + ' failed');
