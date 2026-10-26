@@ -541,9 +541,25 @@ GAME.Goals = {
         routes.forEach(function (r) { if (r.targetId === wt.node) route = r; });
         var gate = (p.realmIndex < need) ? ("（需" + needName + "）") : "";
         if (!route) {
+            // 不直接相邻：尝试多跳寻路（BFS 过全部道路），能到就一键动身并提示途经中转
+            var path = (M && M.findPath) ? M.findPath(p.location, wt.node) : null;
+            if (path && path.length) {
+                var cities = [p.location], totM = 0, totS = 0;
+                path.forEach(function (r) {
+                    var nx = (r.from === cities[cities.length - 1]) ? r.to : r.from;
+                    cities.push(nx); totM += r.months; totS += r.silver;
+                });
+                var transit = cities.slice(1, -1).map(function (id) { var n = M.node(id); return n ? n.name : id; });
+                plan.state = "ok";
+                plan.routePath = path.map(function (r) { return r.id; });
+                plan.label = "前往：" + node.name + gate + " ›";
+                plan.why = "途经" + (transit.length ? transit.join("、") + " " : "") + "中转，全程约 " +
+                    totM + " 个月" + (totS > 0 ? "、盘缠 " + totS + " 两" : "") + "——点击即一路动身。";
+                return plan;
+            }
             plan.state = "blocked";
             plan.label = "前往：" + node.name + gate + " ›";
-            plan.why = "此地尚在路途之外——先回到与【" + node.name + "】相通的那座城镇，才好动身。";
+            plan.why = "此地尚在路途之外——先至与【" + node.name + "】相通的城镇，才好动身。";
             return plan;
         }
         plan.route = route.id;

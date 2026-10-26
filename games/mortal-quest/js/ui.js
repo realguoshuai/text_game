@@ -150,9 +150,12 @@ GAME.UI = {
     // 子面板：标签页(bag/alchemy/market/sect/black/ach/companion) + 紧急面板(combat/track/trial/event/mercy/mo)
     applyPanels: function () {
         var p = GAME.State.p();
-        // 紧急面板优先级最高：斗法 > 血色禁地 > 神识尾随 > 血月试炼 > 历练事件 > 战后处置 > 玄机子
+        // 紧急面板优先级最高：斗法 > 幽冥地宫 > 墨府探查 > 苍梧门 > 血色禁地 > 神识尾随 > 血月试炼 > 历练事件 > 战后处置 > 玄机子
         var urgent = null;
         if (p.combat) urgent = "combat-panel";
+        // 云京皇宫·幽冥地宫：踏入即常驻为紧急面板（与斗法互斥，斗法中由 combat-panel 接管）；
+        // p.heisha.left 为真表示玩家主动暂离，此时回落到地图/秘境页签，进度保留
+        else if (p.heisha && !p.heisha.bossDone && !p.heisha.left) urgent = "heisha-panel";
         else if (p.mansion) urgent = "mansion-panel";   // 墨府探查（玄机世家主线子玩法）
         else if (GAME.Qixuan && GAME.Qixuan.active()) urgent = "qixuan-panel";   // 苍梧门六幕剧情
         else if (p.fzone) urgent = "fz-panel";
@@ -180,7 +183,7 @@ GAME.UI = {
         var self = this;
         ["map-panel", "bag-panel", "alchemy-panel", "market-panel", "home-panel", "sect-panel", "companion-panel",
          "jiayuan-panel", "skill-panel", "dungeon-panel", "fz-panel", "qixuan-panel",
-         "combat-panel", "track-panel", "trial-panel", "event-panel", "mercy-panel", "mo-panel", "mansion-panel", "secret-panel", "codex-panel"]
+         "combat-panel", "track-panel", "trial-panel", "event-panel", "mercy-panel", "mo-panel", "mansion-panel", "secret-panel", "heisha-panel", "codex-panel"]
             .forEach(function (id) { self.show(id, id === visible); });
 
         // 页签按钮：仅紧急面板期间禁用切换（市集常驻可开，不再按 atMarket 禁用）
@@ -664,9 +667,16 @@ GAME.UI = {
         if (plan.kind === "map") {
             // 已在当地：按钮本已置灰，这里再兜一道，免得程序内调用把地图翻来翻去还报一句废话
             if (plan.disabled || plan.state === "here") return;
-            if (plan.state === "ok" && plan.route && GAME.Map && GAME.Map.travel) {
-                GAME.Map.travel(plan.route);
-                return;
+            if (plan.state === "ok") {
+                if (plan.routePath && GAME.Map && GAME.Map.travelMulti) {
+                    if (plan.why) GAME.UI.log(plan.why, "system");
+                    GAME.Map.travelMulti(plan.routePath);
+                    return;
+                }
+                if (plan.route && GAME.Map && GAME.Map.travel) {
+                    GAME.Map.travel(plan.route);
+                    return;
+                }
             }
             this.switchTab("map");
             this.scrollToMapNode(plan.node);
@@ -1252,6 +1262,7 @@ GAME.UI = {
             this.renderCombat();
             this.renderTrial();
             this.renderFzone();
+            this.renderHeisha();
             this.renderQixuan();
             this.renderTrack();
             this.renderMo();
@@ -2796,6 +2807,77 @@ GAME.UI = {
         this.$("btn-trial-abandon").disabled = false;
     },
 
+    // ---------- 云京皇宫·幽冥地宫讨伐面板（紧急覆盖） ----------
+    renderHeisha: function () {
+        var p = GAME.State.p();
+        // 仅当「探索中且未主动暂离」时显示；可见性由 applyPanels 统一控制
+        var st = (p.heisha && !p.heisha.bossDone && !p.heisha.left) ? p.heisha : null;
+        if (!st) return;
+        var H = GAME.Heisha, cfg = H.cfg();
+        var tx = this.$("heisha-text");
+        if (tx) tx.innerHTML = "夜探皇宫，须先分破四大血侍、削弱越皇血祭光环，方可直入地宫决战。斩此魔头，可得血玉蛛卵 ×1。";
+        var gp = this.$("heisha-progress");
+        if (gp) {
+            var n = H.guardsDown();
+            gp.innerHTML = "已破血侍 <b class=\"" + (n >= cfg.guards.length ? "highlight" : "warning") + "\">" +
+                n + "/" + cfg.guards.length + "</b>" + (n >= cfg.guards.length ? "　·　血侍尽诛，可决战越皇" : "");
+        }
+        // 四大血侍分据点挑战
+        var gb = this.$("heisha-guards");
+        if (gb) {
+            gb.innerHTML = "";
+            cfg.guards.forEach(function (g) {
+                var down = !!st.guards[g.id];
+                var b = document.createElement("button");
+                b.className = down ? "small-btn" : "btn-danger";
+                b.innerText = down ? (g.name + "（已伏诛）") : ("讨伐·" + g.name);
+                b.disabled = down || !!p.combat;
+                b.title = down ? "此地只余一地狼藉" : g.hint;
+                b.onclick = function () { H.challenge(g.id); };
+                gb.appendChild(b);
+            });
+        }
+        // 颠倒五行阵残阵（战前布置）＋ 决战越皇
+        var bb = this.$("heisha-boss");
+        if (bb) {
+            bb.innerHTML = "";
+            var allDown = H.allGuardsDown();
+            if (!st.array) {
+                var hasArray = GAME.State.countItem(cfg.array.item) > 0;
+                var ba = document.createElement("button");
+                ba.className = hasArray ? "btn-gold" : "small-btn";
+                ba.innerText = "布置·颠倒五行阵残阵";
+                ba.disabled = !hasArray || !!p.combat;
+                ba.title = hasArray ? "战前布阵，斗法中可【引魔入阵】封印越皇五成属性" : "需先持有【颠倒五行阵残阵】";
+                ba.onclick = function () { H.setArray(); };
+                bb.appendChild(ba);
+            } else {
+                var sa = document.createElement("button");
+                sa.className = "small-btn";
+                sa.innerText = "颠倒五行阵已布（斗法中可引魔入阵）";
+                sa.disabled = true;
+                bb.appendChild(sa);
+            }
+            var bf = document.createElement("button");
+            bf.className = "btn-danger";
+            bf.innerText = "决战·幽冥教主越皇（血玉蛛巢之主）";
+            bf.disabled = !allDown || !!p.combat;
+            bf.title = allDown ? "直入地宫，与越皇决一死战" : "四血侍未除，越皇血祭光环正盛——十死无生";
+            bf.onclick = function () { H.fightBoss(); };
+            bb.appendChild(bf);
+        }
+        // 暂离（保留进度，回到地图/秘境页签）
+        var fb = this.$("heisha-foot");
+        if (fb) {
+            fb.innerHTML = "";
+            var bl = document.createElement("button");
+            bl.className = "small-btn";
+            bl.innerText = "暂离皇宫（保留讨伐进度）";
+            bl.onclick = function () { st.left = true; GAME.UI.updateUI(); };
+            fb.appendChild(bl);
+        }
+    },
+
     // ---------- 血色禁地面板（5×5 网格，紧急覆盖） ----------
     renderFzone: function () {
         var p = GAME.State.p();
@@ -2855,14 +2937,14 @@ GAME.UI = {
         var entries = [
             {
                 id: "trial", name: "血月试炼", cdKey: "trial",
-                req: GAME.DATA.CONTENT.TRIAL.enterRealm,
+                req: GAME.DATA.CONTENT.TRIAL.enterRealm, realmMax: 12,
                 desc: "古修遗境的入门试炼——二十步生死，集齐三味主药者，回洞府可炼正品筑基丹。出入一次后，禁制须候数月方复原。",
                 ongoing: !!p.trial,
                 enter: function () { GAME.Trial.start(); },
             },
             {
                 id: "fzone", name: "血色禁地", cdKey: "fzone",
-                req: GAME.DATA.CONTENT.FZONE.enterRealm,
+                req: GAME.DATA.CONTENT.FZONE.enterRealm, realmMax: 12,
                 desc: "禁地三处药田，各有守护妖兽盘踞——闯入即战，胜则夺药。夺齐三药上交，方是正品筑基丹的份例。",
                 ongoing: !!p.fzone,
                 enter: function () { GAME.FZone.start(); },
@@ -2871,7 +2953,8 @@ GAME.UI = {
 
         entries.forEach(function (d) {
             var realmLocked = d.req !== null && p.realmIndex < d.req;
-            var cdLeft = d.cdKey ? GAME.State.cdLeft(d.cdKey) : 0;   // 副本冷却（日常化）
+            var overRealm = d.realmMax != null && p.realmIndex > d.realmMax;
+            var cdLeft = d.cdKey ? GAME.State.cdLeft(d.cdKey) : 0;
             var row = document.createElement("div");
             row.className = "item-row";
             var left = document.createElement("div");
@@ -2879,6 +2962,7 @@ GAME.UI = {
                 '<div class="item-desc">' + d.desc + '</div>' +
                 '<div class="item-desc">' +
                 (realmLocked ? '<span class="danger">【需练气' + (d.req + 1) + '层】</span>'
+                    : overRealm ? '<span class="danger">【境界已超·禁制排斥（仅限练气期）】</span>'
                     : d.lockedStory ? '<span class="warning">' + d.lockStoryHint + '</span>'
                     : cdLeft > 0 ? '<span class="warning">【休整中 · 尚需 ' + cdLeft + ' 月复原】</span>'
                     : '<span class="highlight">已可进入</span>') +
@@ -2889,7 +2973,9 @@ GAME.UI = {
             var b = document.createElement("button");
             b.className = "small-btn btn-gold";
             b.innerText = "进入";
-            b.disabled = realmLocked || d.lockedStory || d.ongoing || cdLeft > 0;
+            b.disabled = realmLocked || overRealm || d.lockedStory || d.ongoing || cdLeft > 0;
+            if (realmLocked) b.title = "境界不足";
+            else if (overRealm) b.title = "筑基之后禁制排斥，此秘境仅练气期可入";
             b.onclick = d.enter;
             right.appendChild(b);
             row.appendChild(left);
@@ -2923,14 +3009,14 @@ GAME.UI = {
                 ongoing: function (p) { return !!p.hunt && p.hunt.id === "hunt_shashen"; }
             },
             {
-                id: "fzone", name: "血色禁地", req: null, cdKey: "fzone",
+                id: "fzone", name: "血色禁地", req: null, realmMax: 12, cdKey: "fzone",
                 desc: "三处药田各有守护妖兽，闯入即战，胜则夺药——筑基三药之源。休整 12 月方可再入。",
                 enter: function () { GAME.FZone.start(); },
                 done: function () { return false; },
                 ongoing: function (p) { return !!p.fzone; }
             },
             {
-                id: "trial", name: "血月遗境", req: null, cdKey: "trial",
+                id: "trial", name: "血月遗境", req: null, realmMax: 12, cdKey: "trial",
                 desc: "古修遗境二十步生死，集齐三味主药可炼正品筑基丹。休整 6 月方可再入。",
                 enter: function () { GAME.Trial.start(); },
                 done: function () { return false; },
@@ -2946,6 +3032,7 @@ GAME.UI = {
         ];
         REALMS.forEach(function (d) {
             var realmLocked = d.req != null && p.realmIndex < d.req;
+            var overRealm = d.realmMax != null && p.realmIndex > d.realmMax;
             var cdLeft = d.cdKey ? GAME.State.cdLeft(d.cdKey) : 0;
             var done = d.done(p), ongoing = d.ongoing(p);
             var row = document.createElement("div");
@@ -2953,9 +3040,12 @@ GAME.UI = {
             var left = document.createElement("div");
             var status;
             if (realmLocked) status = '<span class="danger">【需筑基 ' + (d.req - 12) + ' 层】</span>';
+            else if (overRealm) status = '<span class="danger">【境界已超·禁制排斥（仅限练气期）】</span>';
             else if (done) status = '<span class="warning">【已通】</span>';
             else if (cdLeft > 0) status = '<span class="warning">【休整中 · 尚需 ' + cdLeft + ' 月】</span>';
-            else if (ongoing) status = '<span class="warning">（探索中——请从紧急面板继续）</span>';
+            else if (ongoing) status = (d.id === "heisha")
+                ? '<span class="warning">（探索中——点击下方【继续讨伐】展开讨伐面板）</span>'
+                : '<span class="warning">（探索中——请从紧急面板继续）</span>';
             else status = '<span class="highlight">可前往</span>';
             left.innerHTML = '<span class="q-灵品">' + d.name + '</span>' +
                 '<div class="item-desc">' + d.desc + '</div>' +
@@ -2964,10 +3054,14 @@ GAME.UI = {
             right.className = "item-right";
             var b = document.createElement("button");
             b.className = "small-btn btn-gold";
-            b.innerText = "前往";
-            b.disabled = realmLocked || done || cdLeft > 0 || ongoing || !!p.combat;
+            var isHeishaOngoing = d.id === "heisha" && ongoing;
+            b.innerText = isHeishaOngoing ? "【继续讨伐】" : "前往";
+            b.disabled = realmLocked || overRealm || done || cdLeft > 0 || !!p.combat;
             if (realmLocked) b.title = "境界不足";
-            b.onclick = d.enter;
+            else if (overRealm) b.title = "筑基之后禁制排斥，此秘境仅练气期可入";
+            b.onclick = isHeishaOngoing
+                ? function () { if (p.heisha) p.heisha.left = false; GAME.UI.updateUI(); }
+                : d.enter;
             right.appendChild(b);
             row.appendChild(left); row.appendChild(right);
             box.appendChild(row);

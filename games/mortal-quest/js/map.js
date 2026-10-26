@@ -244,6 +244,39 @@ GAME.Map = {
         return true;
     },
 
+    // ---------- 多跳寻路：BFS 过全部双向道路，返回路由序列（供跨城一键动身） ----------
+    // 只算拓扑连通，不先验境界门槛——调用方（travelMulti / travel）逐跳再校验，
+    // 卡在哪一城会在该跳的 canTravel 报错，不会把人传送到去不了的地方
+    findPath: function (fromId, toId) {
+        var routes = this.cfg().routes, adj = {};
+        routes.forEach(function (r) {
+            (adj[r.from] = adj[r.from] || []).push(r);
+            (adj[r.to] = adj[r.to] || []).push(r);
+        });
+        var q = [[fromId, []]], seen = {}; seen[fromId] = true;
+        while (q.length) {
+            var cur = q.shift(), id = cur[0], path = cur[1];
+            if (id === toId) return path;
+            (adj[id] || []).forEach(function (r) {
+                var nx = (r.from === id) ? r.to : r.from;
+                if (!seen[nx]) { seen[nx] = true; q.push([nx, path.concat(r)]); }
+            });
+        }
+        return null;
+    },
+
+    // ---------- 多跳动身：逐跳 travel，遇斗法/身死即止（见闻录自然记录途经中转） ----------
+    travelMulti: function (routeIds) {
+        var p = GAME.State.p();
+        routeIds = routeIds || [];
+        for (var i = 0; i < routeIds.length; i++) {
+            if (p.isDead || p.combat) break;
+            this.travel(routeIds[i]);
+            if (p.isDead || p.combat) break;
+        }
+        return true;
+    },
+
     // ---------- 地点专属行动 ----------
     // 节点自带的 actions 只写"这地方永久有啥"，写不了"你手上有某物时才有的门"。
     // 苍南谷原先 actions 为空 —— 持升仙令的人站在谷里，读到的却是「此地无事可做」，
@@ -253,6 +286,18 @@ GAME.Map = {
         var node = this.cur();
         var out = (node.actions || []).slice();
         p = p || GAME.State.p();
+        // 云京·皇城：筑基期主线副本「幽冥地宫」——探索中在「此地可为」同步铺出四大血侍与越皇的讨伐入口，
+        // 不让玩家到了皇城还找不到人（探索进度存于 p.heisha，未起则走静态 heisha_raid 夜探皇宫）
+        if (node.id === "yuejing_cheng" && GAME.Heisha) {
+            if (p.heisha && !p.heisha.bossDone) {
+                out = out.filter(function (a) { return a.id !== "heisha_raid"; });
+                out.push({ id: "heisha_resume", label: "返回云京皇宫·继续讨伐", hint: "四大血侍与越皇仍在宫中，讨伐进度未失。", main: true });
+                GAME.Heisha.cfg().guards.forEach(function (g) {
+                    out.push({ id: "heisha_guard_" + g.id, label: "讨伐·" + g.name, hint: g.hint, guardId: g.id });
+                });
+                out.push({ id: "heisha_boss", label: "决战·幽冥教主越皇（血玉蛛巢之主）", hint: "四血侍尽诛后方可直入地宫。", guardId: null });
+            }
+        }
         if (node.id === "tainan_gu" && !p.sectId && GAME.State.countItem("shengxian_ling") > 0) {
             out.push({
                 id: "join_sect",
@@ -270,6 +315,25 @@ GAME.Map = {
         var act = null;
         this.nodeActions(p).forEach(function (a) { if (a.id === actionId) act = a; });
         if (!act) return { ok: false, msg: "此地并无此事可做。" };
+        // 云京皇宫讨伐：resume / 分破血侍 / 决战越皇 的入口校验
+        if (actionId === "heisha_resume") {
+            return { ok: !!(p.heisha && !p.heisha.bossDone), msg: "当前并无进行中的皇宫讨伐。" };
+        }
+        if (actionId.indexOf("heisha_guard_") === 0) {
+            var gid = actionId.slice("heisha_guard_".length);
+            if (!GAME.Heisha || !GAME.Heisha.canEnter()) return { ok: false, msg: "非筑基修士，涉足不得。" };
+            var hs = GAME.Heisha.state();
+            if (hs.guards[gid]) {
+                var gn = (GAME.Heisha.cfg().guards.filter(function (g) { return g.id === gid; })[0] || {}).name || "该血侍";
+                return { ok: false, msg: "【" + gn + "】已然伏诛。" };
+            }
+            return { ok: true, act: act };
+        }
+        if (actionId === "heisha_boss") {
+            if (!GAME.Heisha || !GAME.Heisha.canEnter()) return { ok: false, msg: "非筑基修士，涉足不得。" };
+            if (!GAME.Heisha.allGuardsDown()) return { ok: false, msg: "四名血侍未除，越皇血祭光环正盛——十死无生。" };
+            return { ok: true, act: act };
+        }
         // 苍南谷拜山：令牌是唯一凭证（擂台三场只换筑基丹，不换门籍）
         if (actionId === "join_sect") {
             if (p.sectId) return { ok: false, msg: "你已有山门可归。" };
@@ -321,6 +385,16 @@ GAME.Map = {
             // 云京·夜探皇宫：交由幽冥教副本模块接管
             if (GAME.Heisha) { GAME.Heisha.start(); return true; }
             GAME.UI.log("皇城的方向夜云低垂，时机未至。", "system");
+        } else if (actionId.indexOf("heisha_guard_") === 0) {
+            if (GAME.Heisha) GAME.Heisha.challenge(actionId.slice("heisha_guard_".length));
+            return true;
+        } else if (actionId === "heisha_boss") {
+            if (GAME.Heisha) GAME.Heisha.fightBoss();
+            return true;
+        } else if (actionId === "heisha_resume") {
+            if (p.heisha) p.heisha.left = false;
+            GAME.UI.updateUI();
+            return true;
         } else if (actionId === "mo_house") {
             // 交由景阳城玄机世家主线模块接管
             GAME.Jiayuan.start();
