@@ -106,6 +106,7 @@ GAME.DATA.CONTENT = {
     TRIAL: {
         steps: 20,            // 固定 20 步探索倒计时
         enterRealm: 9,        // 进入条件：练气十层（index 9）及以上、寿元未尽
+        realmMax: 12,         // 练气期专属：筑基初期（index 13）起天地禁制排斥，不得再入
         cooldownMonths: 6,    // 出入一次后，须候 6 月方可再入（副本日常化：形成节奏）
         herbs: ["herb_tianling","herb_yumo","herb_zihou"],  // 三味主药（集齐可在洞府炼正品筑基丹）
         events: [
@@ -165,6 +166,7 @@ GAME.DATA.CONTENT = {
      * 由 js/forbidden_zone.js 驱动；战斗经 ctx.type="fzone" 回路由 afterCombat 结算。 */
     FZONE: {
         enterRealm: 9,          // 练气十层（index 9）
+        realmMax: 12,           // 练气期专属：筑基初期起禁制排斥（上界唯一出处，canEnter 与 UI 同读）
         cooldownMonths: 12,     // 三处药田被惊动后须候 12 月才复旧（副本日常化）
         herbs: ["herb_tianling","herb_yumo","herb_zihou"],
         // 三处药田：各由一头守护兽看守，闯入即战，胜则夺药（无迷雾、无步数、纯对战）

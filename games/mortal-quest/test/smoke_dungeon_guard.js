@@ -223,7 +223,8 @@ ok('页签恢复可切', U.tab === 'home');
 
 /* ================= ⑤ 入秘境即收功：定时闭关的钟不能带进去 ================= */
 section('⑤ 入秘境自动收功（否则 600ms 一次空回执刷屏）');
-p.realmIndex = 13; p.fzone = null; p.cd = null; p.totalMonths = 0;
+p.realmIndex = 9;                      // 血色禁地是练气期专属：筑基后「境界超限·天地禁制排斥」，这里用练气十层验「入秘境即收功」
+p.fzone = null; p.cd = null; p.totalMonths = 0;
 p.currentExp = 0;
 G.Core._autoTimer = 4321;             // 假 DOM 的 setInterval 返回 0，这里手挂一个假句柄
 ok('前置：持续闭关正在运行', G.Core.autoCultRunning() === true);

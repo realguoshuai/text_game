@@ -295,7 +295,11 @@ GAME.Map = {
                 GAME.Heisha.cfg().guards.forEach(function (g) {
                     out.push({ id: "heisha_guard_" + g.id, label: "讨伐·" + g.name, hint: g.hint, guardId: g.id });
                 });
-                out.push({ id: "heisha_boss", label: "决战·幽冥教主越皇（血玉蛛巢之主）", hint: "四血侍尽诛后方可直入地宫。", guardId: null });
+                out.push({
+                    id: "heisha_spider", label: "深入甬道·迎战血玉蜘蛛",
+                    hint: "赤色蛛网封死寝殿甬道——不斩此蛛，入不得地宫。", guardId: null
+                });
+                out.push({ id: "heisha_boss", label: "决战·幽冥教主越皇", hint: "血侍与血玉蜘蛛尽除后，方可直入寝殿。", guardId: null });
             }
         }
         if (node.id === "tainan_gu" && !p.sectId && GAME.State.countItem("shengxian_ling") > 0) {
@@ -329,9 +333,16 @@ GAME.Map = {
             }
             return { ok: true, act: act };
         }
+        if (actionId === "heisha_spider") {
+            if (!GAME.Heisha || !GAME.Heisha.canEnter()) return { ok: false, msg: "非筑基修士，涉足不得。" };
+            if (!GAME.Heisha.allGuardsDown()) return { ok: false, msg: "四名血侍未除，甬道入口未现。" };
+            if (GAME.Heisha.spiderDown()) return { ok: false, msg: "甬道里只剩一堆碎壳与枯丝。" };
+            return { ok: true, act: act };
+        }
         if (actionId === "heisha_boss") {
             if (!GAME.Heisha || !GAME.Heisha.canEnter()) return { ok: false, msg: "非筑基修士，涉足不得。" };
             if (!GAME.Heisha.allGuardsDown()) return { ok: false, msg: "四名血侍未除，越皇血祭光环正盛——十死无生。" };
+            if (!GAME.Heisha.spiderDown()) return { ok: false, msg: "寝殿甬道仍被血玉蜘蛛的赤丝封死。" };
             return { ok: true, act: act };
         }
         // 苍南谷拜山：令牌是唯一凭证（擂台三场只换筑基丹，不换门籍）
@@ -387,6 +398,9 @@ GAME.Map = {
             GAME.UI.log("皇城的方向夜云低垂，时机未至。", "system");
         } else if (actionId.indexOf("heisha_guard_") === 0) {
             if (GAME.Heisha) GAME.Heisha.challenge(actionId.slice("heisha_guard_".length));
+            return true;
+        } else if (actionId === "heisha_spider") {
+            if (GAME.Heisha) GAME.Heisha.fightSpider();
             return true;
         } else if (actionId === "heisha_boss") {
             if (GAME.Heisha) GAME.Heisha.fightBoss();

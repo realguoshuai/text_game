@@ -2,7 +2,8 @@
  * js/dungeon_heisha.js —— 云京皇宫 · 夜战幽冥教（阶段性推进副本）
  *
  * 阶段一：分破四大血侍（每破一人削弱 Boss 增益光环）
- * 阶段二：决战幽冥教主（越皇）——双阶段状态机 + 颠倒五行阵引魔入阵
+ * 阶段二：斩血玉蜘蛛，破地宫甬道的蛛网封印（不斩此蛛，寝殿无路可入）
+ * 阶段三：决战幽冥教主（越皇）——双阶段状态机 + 颠倒五行阵引魔入阵
  * 战斗回调：Combat.victory 依据 ctx.type === "heisha" 路由至本模块 afterCombat
  * ========================================================= */
 
@@ -16,9 +17,11 @@ GAME.Heisha = {
     state: function () {
         var p = GAME.State.p();
         if (!p.heisha) {
-            p.heisha = { stage: 1, guards: {}, bossDone: false, array: false, arrayUsed: false };
+            p.heisha = { stage: 1, guards: {}, spiderDone: false, bossDone: false, array: false, arrayUsed: false };
         }
         if (p.heisha.guards == null) p.heisha.guards = {};
+        // 旧档补字段：血玉蜘蛛阶段是后加的，没有这个键就当"未破"（存档不写死版本号）
+        if (p.heisha.spiderDone == null) p.heisha.spiderDone = false;
         return p.heisha;
     },
 
@@ -71,6 +74,31 @@ GAME.Heisha = {
         return true;
     },
 
+    // ---------- 阶段二：血玉蜘蛛（地宫甬道·蛛网封印） ----------
+    spiderDown: function () { return !!this.state().spiderDone; },
+
+    fightSpider: function () {
+        var p = GAME.State.p();
+        var st = this.state();
+        if (!this.canEnter()) return false;
+        if (!this.allGuardsDown()) {
+            GAME.UI.log("四大血侍尚在宫中横行——甬道入口未现。（已破 " +
+                this.guardsDown() + "/" + this.cfg().guards.length + "）", "danger");
+            GAME.UI.updateUI();
+            return false;
+        }
+        if (st.spiderDone) {
+            GAME.UI.log("甬道里只剩一堆碎壳与枯丝，再无阻拦。", "system");
+            GAME.UI.updateUI();
+            return false;
+        }
+        GAME.UI.log("你转过寝殿外的石阶，甬道顶垂下一片赤色蛛网——" + this.cfg().spider.name +
+            "自暗处落下来，八足碾碎石屑。", "warning");
+        p.combatRoute = { type: "heisha", kind: "spider" };
+        GAME.Combat.start(this.cfg().spider.id);
+        return true;
+    },
+
     // ---------- 战前布置：颠倒五行阵残阵 ----------
     setArray: function () {
         var p = GAME.State.p();
@@ -101,6 +129,11 @@ GAME.Heisha = {
         if (!this.allGuardsDown()) {
             GAME.UI.log("四名血侍未除，越皇血祭光环正盛——此时闯宫，十死无生。（已破 " +
                 this.guardsDown() + "/" + this.cfg().guards.length + "）", "danger");
+            GAME.UI.updateUI();
+            return false;
+        }
+        if (!st.spiderDone) {
+            GAME.UI.log("寝殿甬道仍被血玉蜘蛛的赤丝封死——不斩此蛛，入不得地宫。", "danger");
             GAME.UI.updateUI();
             return false;
         }
@@ -178,6 +211,13 @@ GAME.Heisha = {
             if (this.allGuardsDown()) {
                 GAME.UI.log("四大血侍尽数伏诛——地宫石门轰然洞开，越皇已无处可退！", "danger");
             }
+            GAME.UI.updateUI();
+            return;
+        }
+        if (ctx.kind === "spider") {
+            st.spiderDone = true;
+            GAME.UI.log("血玉蜘蛛腹甲崩裂，赤色蛛网寸寸枯断——通往寝殿的甬道终于敞开。", "success");
+            GAME.UI.log("地宫最深处，那股压了整座皇城的血气，第一次显出了裂缝。", "danger");
             GAME.UI.updateUI();
             return;
         }

@@ -3,7 +3,8 @@
  *
  * 字段说明：
  *   needExp      突破本层所需修为（圆满线）
- *   breakChance  突破成功率
+ *   breakChance  突破成功率（无 expRamp 时即固定底子；有 expRamp 时＝修为圆满那一刻的底子）
+ *   expRamp      [起手, 圆满]：底子随「当前修为 / needExp」线性攀升——刚到这一境只有起手那点数
  *   failDamage   失败反噬气血
  *   failExpLoss  失败溃散修为比例 (0~1)
  *   deathChance  失败当场道消身陨概率
@@ -37,8 +38,8 @@ GAME.DATA.REALMS = [
     { name:"练气十三层",needExp:920, breakChance:0.15, failDamage:105,failExpLoss:0.35, deathChance:0.07, maxAge:100, atk:35, def:20, speed:12, spirit:17, meditateMonths:6 },
     /* —— 筑基期（index 13~15）：初期 / 中期 / 后期 三块（仅练气分 1~13 层）——
      * 练气十三层(index12)→筑基初期仍走 ZHUJI 筑基丹链；筑基三层为常规修为突破，寿元统一 200 岁。 */
-    { name:"筑基初期",  needExp:3900, breakChance:0.60, failDamage:110, failExpLoss:0.30, deathChance:0.02, maxAge:200, atk:40,  def:25,  speed:14, spirit:25,  meditateMonths:8 },
-    { name:"筑基中期",  needExp:6050, breakChance:0.45, failDamage:145, failExpLoss:0.35, deathChance:0.04, maxAge:200, atk:58,  def:37,  speed:16, spirit:31,  meditateMonths:9 },
+    { name:"筑基初期",  needExp:3900, breakChance:0.50, expRamp:[0.10,0.50], failDamage:110, failExpLoss:0.30, deathChance:0.02, maxAge:200, atk:40,  def:25,  speed:14, spirit:25,  meditateMonths:8 },
+    { name:"筑基中期",  needExp:6050, breakChance:0.42, expRamp:[0.12,0.42], failDamage:145, failExpLoss:0.35, deathChance:0.04, maxAge:200, atk:58,  def:37,  speed:16, spirit:31,  meditateMonths:9 },
     { name:"筑基后期",  needExp:null, breakChance:null, failDamage:400, failExpLoss:0.20, deathChance:0,    maxAge:200, atk:76,  def:49,  speed:17, spirit:37,  meditateMonths:10 },
 
     /* —— 结丹期（index 16~18）：初期 / 中期 / 后期 三块；筑基后期(index15) 经「结丹天堑」凝丹而成。

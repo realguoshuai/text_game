@@ -6,6 +6,7 @@
  * 玩家可以自己凑组合把骰子做重：
  *
  *   金丹之基（丹药/裸冲）  底子——坊市购入、丹房炼制
+ *   修为进度（筑基段）     刚入此境只有一成把握，修为填满才爬到五成（realms.expRamp）
  *   灵脉（所处灵峰）      +0% / +3% / +6%——灵石租金
  *   护法（玄傀在侧）      +4%——须玄傀气血 ≥50%，护法后气血减半，灵石温养复原
  *   心境                 每 10 点 +2%，另减反噬 3%/10 点（下限 ×0.7）
@@ -158,6 +159,20 @@ GAME.Breakthrough = {
             }
         }
 
+        // —— 修为进度底子（筑基段）：破境看的是「经脉里蓄了多少真元」，不是一个凭空的定值。
+        // 刚到筑基初期（修为 0）只有一成把握，修为填满才回到五成；面板与掷骰同读这一份，
+        // 于是玩家看见的百分比是"现在这一把有多险"，而不是一成不变的 80%。
+        var baseFull = baseChance, ramp = null;
+        if (!isZhuji && !isJiedan && !isYuanying && realm.expRamp) {
+            ramp = realm.expRamp;
+            var rampNeed = realm.needExp || 0;
+            var rampRatio = rampNeed > 0
+                ? Math.max(0, Math.min(1, (p.currentExp || 0) / rampNeed)) : 1;
+            baseChance = ramp[0] + (ramp[1] - ramp[0]) * rampRatio;
+            baseFull = ramp[1];
+            baseLabel = "修为淬炼（" + Math.floor(Math.min(p.currentExp || 0, rampNeed)) + "/" + rampNeed + "）";
+        }
+
         var parts = [];
 
         // —— 灵脉：灵峰灵气（灵石租金的回报）——
@@ -213,6 +228,13 @@ GAME.Breakthrough = {
             mindTotalAdd = coreChance - before;
         }
         var successChance = coreChance;
+        // 修为圆满时的合计：目标栏写「届时成功率」要读这一份，别把当下的低值报成"届时"
+        var chanceFull = successChance;
+        if (ramp) {
+            var cf = Math.min(chainCap, baseFull + addSum);
+            if (mindSteps > 0 && cf < cfg.cap) cf = Math.min(cfg.cap, cf + mindSteps * mc.per10);
+            chanceFull = cf;
+        }
 
         // —— 反噬估算：伤害与身陨（面板要让玩家看见"这一把可能死"）——
         var failP = 1 - successChance;
@@ -238,7 +260,8 @@ GAME.Breakthrough = {
             bareZhuji: bareZhuji, bareJiedan: bareJiedan, fakeJiedan: fakeJiedan, fakeZhuji: fakeZhuji, bareYuanying: bareYuanying,
             baseLabel: baseLabel, baseChance: baseChance,
             parts: parts, addSum: addSum + mindTotalAdd, guardUsed: guardOn, guardReady: guard.ok,
-            successChance: successChance, dmgMul: dmgMul, deathMul: deathMul,
+            successChance: successChance, chanceFull: chanceFull, expRamp: !!ramp,
+            dmgMul: dmgMul, deathMul: deathMul,
             failDmg: failDmg, deathP: deathP,
             failExpLoss: realm.failExpLoss || 0,
             // 玄傀可代死一次（tryRescue）——比展示的身陨率更低，但会耗掉整具玄傀

@@ -12,15 +12,28 @@ GAME.Trial = {
 
     cfg: function () { return GAME.DATA.CONTENT.TRIAL; },
 
+    // ---------- 境界上界：练气期专属，筑基之后再无门可入 ----------
+    // 与 FZone.overRealm 同一套写法：上界只认 cfg().realmMax
+    overRealm: function () {
+        var p = GAME.State.p();
+        var max = (this.cfg().realmMax != null) ? this.cfg().realmMax : 12;
+        return p.realmIndex > max;
+    },
+
     // ---------- 进入条件 ----------
     canEnter: function () {
         var p = GAME.State.p();
         return !p.isDead && !p.combat && !p.pendingEvent && !p.pendingMercy && !p.trial &&
-               p.realmIndex >= this.cfg().enterRealm;
+               p.realmIndex >= this.cfg().enterRealm && !this.overRealm();
     },
 
     start: function () {
         var p = GAME.State.p();
+        if (this.overRealm()) {
+            GAME.UI.log("古修禁制一触即明灭——【境界超限·天地禁制排斥】：此处只容练气期修士行走。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
         if (p.realmIndex < this.cfg().enterRealm) { GAME.UI.log("需练气十层以上方可入血月试炼。", "system"); GAME.UI.updateUI(); return; }
         if (!this.canEnter()) { GAME.UI.updateUI(); return; }
         var cdTrial = GAME.State.cdLeft("trial");

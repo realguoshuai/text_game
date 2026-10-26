@@ -231,6 +231,15 @@ console.log('==== 五、云京皇宫：血侍分破 + 双阶段 Boss + 引魔入
   assert('四大血侍尽数伏诛', G.Heisha.allGuardsDown() === true);
   assert('血侍掉落煞丹碎片入袋', count("shadan_suipian") >= 4);
 
+  // 阶段二：血玉蜘蛛封死寝殿甬道——不斩此蛛，越皇不可战
+  assert('蛛网未破时不可决战越皇', G.Heisha.fightBoss() === false);
+  setRand(0.5);
+  assert('迎战血玉蜘蛛', G.Heisha.fightSpider() === true && !!p.combat);
+  assert('血玉蜘蛛为独立战斗对象', p.combat.name === '血玉蜘蛛');
+  p.combat.hp = 1;
+  G.Combat.attack();
+  assert('斩蛛后甬道洞开（spiderDone）', G.Heisha.state().spiderDone === true);
+
   // 战前布置颠倒五行阵
   add("array_wuxing", 1);
   assert('布下颠倒五行阵残阵', G.Heisha.setArray() === true);

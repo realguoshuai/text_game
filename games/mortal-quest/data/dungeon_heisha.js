@@ -3,7 +3,8 @@
  *
  * 第一阶段【皇城夜探与分破血侍】：逐个击破四大血侍（铁罗/苍岚/叶泓/冰妖），
  *   每破一人削弱最终 Boss 的增益光环，并掉落煞丹碎片与高阶灵石。
- * 第二阶段【决战幽冥教主（越皇）】：双阶段战斗状态机
+ * 第二阶段【地宫甬道·血玉蜘蛛】：赤色蛛网封死寝殿甬道，不斩此蛛入不得地宫。
+ * 第三阶段【决战幽冥教主（越皇）】：双阶段战斗状态机
  *   · Phase 1 越皇真身：周期性【混元血炼珠】，造成伤害 100% 转化为自身生命恢复
  *   · Phase 2 黑煞妖魔化：生命降至 30% 触发血祭狂暴，攻击翻倍，获得 80% 全法术抗性
  *   · 战术克制：战前布置【颠倒五行阵残阵】，斗法中可【引魔入阵】，
@@ -49,6 +50,13 @@ GAME.DATA.MONSTERS.push(
         desc: "玄冰之气裹身，中招者气血凝滞、身法迟滞。",
     },
     {
+        id: "heisha_zhizhu", name: "血玉蜘蛛", human: false, majorRealm: 1,
+        hp: 1200, atk: 56, def: 26, speed: 11, spirit: 30, exp: 260,
+        stones: [120, 240], killChance: 0, loseAge: [0, 0], loseStonePct: [0.2, 0.35],
+        loot: [{ id: "shadan_suipian", chance: 1, qty: [1, 2] }, { id: "mid_stone", chance: 0.7, qty: [1, 2] }],
+        desc: "盘踞地宫甬道的赤玉巨蛛，蛛丝缠骨、愈挣愈紧——不破此关，越皇寝殿无路可入。",
+    },
+    {
         id: "heisha_yuehuang", name: "幽冥教主·越皇", human: true, majorRealm: 1,
         hp: 3000, atk: 70, def: 40, speed: 12, spirit: 70, exp: 600,
         stones: [400, 800], killChance: 0, loseAge: [0, 0], loseStonePct: [0.3, 0.5],
@@ -75,6 +83,8 @@ GAME.DATA.HEISHA = {
         { id: "heisha_yehong",  name: "血侍·叶泓", hint: "身法极快，出手如电。" },
         { id: "heisha_bingyao", name: "血侍·冰妖", hint: "玄冰凝滞，中招者身法大减。" },
     ],
+    // 阶段二：地宫甬道·血玉蜘蛛（蛛网封印，须斩之方能入寝殿）
+    spider: { id: "heisha_zhizhu", name: "血玉蜘蛛", hint: "甬道狭窄、蛛丝缠身——速杀为上。" },
     boss: "heisha_yuehuang",
     // Boss 双阶段
     phase2: { hpPct: 0.30, atkMul: 2, magicResist: 0.80 },

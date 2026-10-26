@@ -255,7 +255,9 @@ GAME.Goals = {
                 if (!p.heisha) return "尚未踏足云京皇宫";
                 var g = 0, k;
                 for (k in p.heisha.guards) if (p.heisha.guards[k]) g++;
-                return "已破血仆 " + g + "/4，血玉蜘蛛未除";
+                if (g < 4) return "已破血侍 " + g + "/4，血玉蜘蛛仍在甬道深处";
+                if (!p.heisha.spiderDone) return "四大血侍已除，血玉蜘蛛封死寝殿甬道";
+                return "蛛巢已破，可直入寝殿决战越皇";
             },
             where: "云京",
             whereTo: { kind: "map", node: "yuejing_cheng" }
@@ -421,7 +423,8 @@ GAME.Goals = {
         // 于是同一时刻出现"58% 对 64%"打架（用户实测）。
         var chPlan = null;
         try { chPlan = (GAME.Breakthrough && GAME.Breakthrough.plan) ? GAME.Breakthrough.plan(p) : null; } catch (e) { chPlan = null; }
-        var chNow = (chPlan && chPlan.ok) ? chPlan.successChance
+        // 「届时」＝修为填满那一刻，故读 chanceFull（修为进度驱动的境界当下这一把更低）
+        var chNow = (chPlan && chPlan.ok) ? (chPlan.chanceFull || chPlan.successChance)
             : ((typeof r.breakChance === "number") ? r.breakChance : null);
         return {
             kind: "heal",

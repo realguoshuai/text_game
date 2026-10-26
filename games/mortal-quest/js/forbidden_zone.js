@@ -15,16 +15,29 @@ GAME.FZone = {
 
     cfg: function () { return GAME.DATA.CONTENT.FZONE; },
 
+    // ---------- 境界上界：练气期专属，筑基之后再无门可入 ----------
+    // 上界只从 cfg().realmMax 读一次，UI 置灰 / 徽标 / canEnter 三处共用同一把尺子
+    overRealm: function () {
+        var p = GAME.State.p();
+        var max = (this.cfg().realmMax != null) ? this.cfg().realmMax : 12;
+        return p.realmIndex > max;
+    },
+
     // ---------- 进入条件 ----------
     canEnter: function () {
         var p = GAME.State.p();
         return !p.isDead && !p.combat && !p.pendingEvent && !p.pendingMercy &&
-               !p.trial && !p.fzone && p.realmIndex >= this.cfg().enterRealm;
+               !p.trial && !p.fzone && p.realmIndex >= this.cfg().enterRealm && !this.overRealm();
     },
 
     // ---------- 入禁地：三处药田待闯 ----------
     start: function () {
         var p = GAME.State.p();
+        if (this.overRealm()) {
+            GAME.UI.log("赤雾一触即散——【境界超限·天地禁制排斥】：此处只容练气期修士行走。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
         if (p.realmIndex < this.cfg().enterRealm) {
             GAME.UI.log("需练气十层以上方有本钱踏入血色禁地。", "system");
             GAME.UI.updateUI();
