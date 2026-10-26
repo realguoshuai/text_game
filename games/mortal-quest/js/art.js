@@ -41,7 +41,7 @@ GAME.Art = {
         artifact_xuangui: "shield",
         yinhun_zhong: "puppet",
         conceal_skill: "shadow",
-        spirit_stone: "token",
+        spirit_stone: "orb",
         liquid_green: "orb"
     },
 

@@ -50,6 +50,7 @@ GAME.Hunt = {
         if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
             GAME.Core.stopAutoCult("已入" + d.name + "秘境，凶物在侧——洞府里的功课只能先搁下。");
         p.hunt = { id: d.id, wave: 0 };
+        p._huntSnap = this._snap(p);
         GAME.UI.log("你循着兽皮舆图摸到【" + d.name + "】——" + d.teaser, "info");
         return this.startWave(d, 0);
     },
@@ -79,7 +80,7 @@ GAME.Hunt = {
             return;
         }
 
-        // —— 全清结算 ——
+        // —— 全清结算：弹通关卷轴（战斗胜利弹窗之后排队） ——
         p.hunt = null;
         var rw = d.reward;
         var stones = rw.stones[0] + Math.floor(Math.random() * (rw.stones[1] - rw.stones[0] + 1));
@@ -91,8 +92,24 @@ GAME.Hunt = {
         GAME.UI.log("【狩猎完胜】得灵石 " + stones + " 枚、【" +
             (GAME.DATA.ITEMS[eq] ? GAME.DATA.ITEMS[eq].name : eq) + "】×1" +
             (rw.materials && rw.materials.length ? "、另有物资入袋" : "") + "。", "success");
+
+        var snap = p._huntSnap; p._huntSnap = null;
+        var diff = snap ? this._diff(p, snap) : [];
+        var dSt = (p.spiritStones || 0) - ((snap && snap.stones) || 0);
+        var gains = [];
+        if (dSt > 0) gains.push({ label: "灵石", val: "+" + dSt + " 枚" });
+
+        p._pendingSettle = {
+            variant: "win",
+            seal: "狩猎功成 · 满载而归",
+            lead: "【" + d.name + "】狩猎已毕，你清点此行所获——",
+            gains: gains,
+            loot: diff.length ? { title: "狩 猎 收 获", items: diff, empty: "此番狩猎重在磨砺技艺，未携外物归来。" } : null,
+            sum: "兽皮舆图已褪去血光，你收势立于猎场之外。",
+            actions: [{ id: "rg-act", label: "笑 纳 收 获 · 离 开 狩 场", onClick: function () { GAME.BattleResult.dismiss(); } }],
+            onDismiss: function () { GAME.UI.updateUI(); }
+        };
         GAME.UI.autoSave();
-        GAME.UI.updateUI();
     },
 
     // ---------- 波间继续下一波 ----------
@@ -114,9 +131,41 @@ GAME.Hunt = {
         var p = GAME.State.p();
         if (!this.canLeave()) return false;
         var d = GAME.DATA.HUNTS.byId(p.hunt.id);
+        var snap = p._huntSnap; p._huntSnap = null;
         p.hunt = null;
         GAME.UI.log("你在【" + (d ? d.name : "狩猎之地") + "】收势而退——所获俱在囊中，见好就收。", "system");
-        GAME.UI.updateUI();
+
+        var diff = snap ? this._diff(p, snap) : [];
+        var dSt = (p.spiritStones || 0) - ((snap && snap.stones) || 0);
+        var gains = [];
+        if (dSt > 0) gains.push({ label: "灵石", val: "+" + dSt + " 枚" });
+
+        GAME.UI.autoSave();
+        GAME.BattleResult.showScroll({
+            variant: "win",
+            seal: "见好就收 · 狩猎结算",
+            lead: "【" + (d ? d.name : "狩猎之地") + "】你收势而退，清点此行所获——",
+            gains: gains,
+            loot: diff.length ? { title: "狩 猎 收 获", items: diff, empty: "此番狩猎重在磨砺技艺，未携外物归来。" } : null,
+            sum: "见好就收，已得之物俱在囊中。",
+            actions: [{ id: "rg-act", label: "笑 纳 收 获 · 离 开 狩 场", onClick: function () { GAME.BattleResult.dismiss(); } }],
+            onDismiss: function () { GAME.UI.updateUI(); }
+        });
         return true;
+    },
+    // 进狩猎场时的状态快照（用于结算时算差额）
+    _snap: function (p) {
+        var inv = {}; if (p.inventory) for (var k in p.inventory) inv[k] = p.inventory[k];
+        return { inv: inv, stones: p.spiritStones || 0 };
+    },
+    _diff: function (p, snap) {
+        var inv = p.inventory || {}, keys = {}, items = [];
+        if (snap) { Object.keys(snap.inv).forEach(function (k) { keys[k] = 1; }); }
+        Object.keys(inv).forEach(function (k) { keys[k] = 1; });
+        Object.keys(keys).forEach(function (k) {
+            var before = (snap && snap.inv[k]) || 0, after = inv[k] || 0, d = after - before;
+            if (d > 0) { var d0 = (GAME.DATA.ITEMS && GAME.DATA.ITEMS[k]) || {}; items.push({ id: k, qty: d, name: d0.name || k }); }
+        });
+        return items;
     },
 };

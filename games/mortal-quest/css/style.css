@@ -2839,7 +2839,7 @@ body.result-on { overflow: hidden; }
 }
 .result-page.on { display: flex; }
 .result-page.on .rg-scroll { animation: rgIn .32s cubic-bezier(.2, .8, .3, 1) both; }
-.result-page.on .rg-act    { animation: rgIn .32s .06s cubic-bezier(.2, .8, .3, 1) both; }
+.result-page.on .rg-actions .rg-act { animation: rgIn .32s .06s cubic-bezier(.2, .8, .3, 1) both; }
 @keyframes rgIn { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
 
 /* ---------- 两套配色 ---------- */
@@ -3071,8 +3071,12 @@ body.result-on { overflow: hidden; }
 .rg-hp i { display: block; height: 100%; background: linear-gradient(90deg, #7C1F12, #C4442C); }
 
 /* ---------- 按钮 ---------- */
+.rg-actions {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+    gap: 14px; margin-top: 22px;
+}
 .rg-act {
-    margin-top: 20px; margin-bottom: auto;
+    margin: 0;
     flex: 0 0 auto;
     min-width: min(340px, 86vw);
     max-width: 92vw;
@@ -3108,6 +3112,20 @@ body.result-on { overflow: hidden; }
 }
 .rg-act:active { transform: translateY(1px); }
 
+/* 次要按钮（如「继续历练」）：幽灵描边款，从属于主按钮 */
+.result-page.is-win .rg-act.rg-act-alt {
+    color: #D9BE7C;
+    background: rgba(201, 162, 78, .06);
+    border: 1px solid rgba(201, 162, 78, .46);
+    box-shadow: none;
+    text-shadow: none;
+}
+.result-page.is-win .rg-act.rg-act-alt:hover {
+    background: rgba(201, 162, 78, .14);
+    border-color: #E8C877;
+    box-shadow: 0 0 0 3px rgba(201, 162, 78, .16);
+}
+
 /* ---------- 窄屏 ---------- */
 @media (max-width: 560px) {
     .result-page { padding: 52px 10px 24px; }
@@ -3119,6 +3137,7 @@ body.result-on { overflow: hidden; }
     .rg-slot { width: 64px; }
     .rg-ico { width: 40px; height: 40px; }
     .rg-lost { padding: 12px 14px 14px; }
+    .rg-actions { flex-direction: column; gap: 10px; }
     .rg-act { min-width: 88vw; padding: 12px 16px; letter-spacing: .1em; text-indent: .1em; }
 }
 

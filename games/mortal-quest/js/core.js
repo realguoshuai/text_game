@@ -1190,8 +1190,6 @@ GAME.Core = {
         var p = GAME.State.p();
         if (p.isDead || p.combat || p.pendingEvent) return;
         if (this._dungeonBlock()) return;
-        // 强制左栏切到「游历」专属视图（绝不留在丹炉/洞府/市集）
-        GAME.UI.tab = "explore";
         // 外出历练即离开坊市：清掉「在坊市中」标记，并让左栏从市集货架跟随回大地图。
         // （若随后触发事件/战斗，applyPanels 的紧急面板优先级会自行接管左栏）
         if (GAME.UI && GAME.UI.leaveMarketTo) GAME.UI.leaveMarketTo("map");
@@ -1259,41 +1257,58 @@ GAME.Core = {
         };
     },
 
-    // 行程前后差值 -> 人话清单（修为/心境/气血/白银/灵石/所得物品）
+    // 行程前后差值 -> 结构化清单（修为/心境/气血/白银/灵石 + 所得物品），供卷轴渲染
     _exploreDiff: function (p, snap) {
-        var gains = [];
+        var nums = [], items = [];
         var dExp = (p.currentExp || 0) - (snap.exp || 0);
-        if (dExp) gains.push((dExp > 0 ? "修为 +" : "修为 ") + dExp);
+        if (dExp) nums.push({ label: "修为", val: (dExp > 0 ? "+" : "") + dExp });
         var dMind = (p.mind || 0) - (snap.mind || 0);
-        if (dMind) gains.push((dMind > 0 ? "心境 +" : "心境 ") + dMind);
+        if (dMind) nums.push({ label: "心境", val: (dMind > 0 ? "+" : "") + dMind });
         var dHp = (p.currentHp || 0) - (snap.hp || 0);
-        if (dHp) gains.push((dHp > 0 ? "气血 +" : "气血 ") + dHp);
+        if (dHp) nums.push({ label: "气血", val: (dHp > 0 ? "+" : "") + dHp });
         var dSil = (p.silver || 0) - (snap.silver || 0);
-        if (dSil) gains.push((dSil > 0 ? "白银 +" : "白银 ") + dSil);
+        if (dSil) nums.push({ label: "白银", val: (dSil > 0 ? "+" : "") + dSil });
         var dSt = (p.spiritStones || 0) - (snap.stones || 0);
-        if (dSt) gains.push((dSt > 0 ? "灵石 +" : "灵石 ") + dSt);
+        if (dSt) nums.push({ label: "灵石", val: (dSt > 0 ? "+" : "") + dSt + " 枚" });
         var inv = p.inventory || {}, keys = {};
         Object.keys(snap.inv).forEach(function (k) { keys[k] = 1; });
         Object.keys(inv).forEach(function (k) { keys[k] = 1; });
         Object.keys(keys).forEach(function (k) {
-            var before = snap.inv[k] || 0, after = inv[k] || 0, d = after - before;
-            if (d === 0) return;
+            var d = (inv[k] || 0) - (snap.inv[k] || 0);
+            if (d <= 0) return;
             var nm = (GAME.DATA.ITEMS[k] && GAME.DATA.ITEMS[k].name) || k;
-            gains.push(d > 0 ? ("获得【" + nm + "】×" + d) : ("失去【" + nm + "】×" + (-d)));
+            items.push({ id: k, qty: d, name: nm });
         });
-        return gains;
+        return { nums: nums, items: items };
     },
-
-    // 出结算卡：把本次所得写进 UI 状态，并强制停在游历专属视图
+    // 出结算卷轴：把本次所得摊成全屏古风卷轴（复用斗法胜利弹窗）
     _showExploreResult: function (p, picked, snap, months, sceneText) {
-        var gains = this._exploreDiff(p, snap);
-        GAME.UI._exploreResult = {
-            months: months,
-            scene: sceneText || (picked && picked.text) || "",
-            gains: gains
-        };
-        GAME.UI.tab = "explore";
-        GAME.UI.updateUI();
+        var diff = this._exploreDiff(p, snap);
+        var hasItems = diff.items.length > 0;
+        var hasMind = diff.nums.some(function (n) { return n.label === "修为" || n.label === "心境"; });
+        var seal;
+        if (hasItems && hasMind) seal = "游历归来 · 满载而归";
+        else if (hasItems) seal = "山泽寻幽 · 偶得灵物";
+        else if (hasMind) seal = "红尘炼心 · 大有所获";
+        else seal = "游历归来 · 平安返程";
+
+        GAME.BattleResult.showScroll({
+            variant: "win",
+            seal: seal,
+            lead: "【往返 " + months + " 月】" + (sceneText || (picked && picked.text) || ""),
+            gains: diff.nums,
+            loot: hasItems ? {
+                title: "机 缘 所 获",
+                items: diff.items,
+                empty: "此番游历重在磨砺心境，未携外物归来。"
+            } : null,
+            sum: "",
+            actions: [
+                { id: "rg-act-return", label: "收 下 机 缘 · 返 回", onClick: function () { GAME.BattleResult.dismiss(); } },
+                { id: "rg-act-again", label: "继 续 历 练", cls: "rg-act-alt", onClick: function () { GAME.BattleResult.dismiss(); GAME.Core.explore(); } }
+            ],
+            onDismiss: function () { GAME.UI.updateUI(); }
+        });
     },
 
     // 玩家点选分支后结算

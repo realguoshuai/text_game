@@ -32,6 +32,7 @@ GAME.Trial = {
         if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
             GAME.Core.stopAutoCult("已入血月试炼，二十步生死——洞府里的功课只能先搁下。");
         p.trial = { stepsLeft: this.cfg().steps, active: true };
+        p._trialSnap = this._snap(p);
         GAME.State.setCd("trial", this.cfg().cooldownMonths || 6);
         p.stats.trialsEntered += 1;
         GAME.UI.log("你踏入血月试炼之境——二十步生死，唯有走完全程、自出口脱离，方能保住战利品。", "danger");
@@ -102,22 +103,70 @@ GAME.Trial = {
         if (!p.trial) return;
         if (win) { p.shaQi += 3; GAME.UI.log("试炼死斗得胜，煞气 +3。", "warning"); }
         if (p.isDead) return;                       // 道消身陨，试炼随之终结
-        if (p.trial.stepsLeft <= 0) this.exit();
+        if (p.trial.stepsLeft <= 0) this.exit({ fromCombat: true });
         else GAME.UI.updateUI();
     },
 
-    // ---------- 走完 20 步，脱离结算 ----------
-    exit: function () {
+    // ---------- 走完 20 步 / 主动撤离，出结算卷轴 ----------
+    exit: function (opts) {
+        opts = opts || {};
         var p = GAME.State.p();
+        var snap = p._trialSnap; p._trialSnap = null;
         p.trial = null;
+
+        var diff = snap ? this._diff(p, snap) : [];
+        var dSt = (p.spiritStones || 0) - ((snap && snap.stones) || 0);
+        var gains = [];
+        if (dSt > 0) gains.push({ label: "灵石", val: "+" + dSt + " 枚" });
+
         var herbs = this.cfg().herbs;
         var got = herbs.filter(function (h) { return GAME.State.countItem(h) > 0; });
-        if (got.length >= 3) GAME.UI.log("你走完二十步，自试炼出口安然脱离！三味主药已齐，可于丹炉炼【正品筑基丹】（突破筑基 +50%、反噬 -80%）。", "success");
-        else GAME.UI.log("你走完二十步，自试炼出口脱离，战利品尽数保住。（主药 " + got.length + "/3，尚不齐）", "info");
+        var completed = opts.completed !== false;
+
+        var seal = completed ? "秘境凯旋 · 满载而归" : "全身而退 · 秘境结算";
+        var lead = "血月试炼已毕，你自重重杀机中安然脱身，清点行囊所获。";
+        var sum = completed
+            ? (got.length >= 3 ? "三味主药已齐，可于丹炉炼【正品筑基丹】（突破筑基 +50%、反噬 -80%）。"
+                               : "主药 " + got.length + "/3，尚不齐——战利品尽数保住。")
+            : "见好就收，已得之物俱在囊中。";
+
+        var lootCfg = diff.length ? { title: "秘 境 收 获", items: diff, empty: "此番试炼重在磨砺道心，未携外物归来。" } : null;
+        var actions = [{ id: "rg-act", label: "笑 纳 收 获 · 离 开 秘 境", onClick: function () { GAME.BattleResult.dismiss(); } }];
+
+        if (opts.fromCombat) {
+            p._pendingSettle = {
+                variant: "win", seal: seal, lead: lead,
+                gains: gains, loot: lootCfg, sum: sum,
+                actions: actions, onDismiss: function () { GAME.UI.updateUI(); }
+            };
+            GAME.UI.autoSave();
+            return;
+        }
+
         GAME.UI.autoSave();
-        GAME.UI.updateUI();
+        GAME.BattleResult.showScroll({
+            variant: "win", seal: seal, lead: lead,
+            gains: gains, loot: lootCfg, sum: sum,
+            actions: actions, onDismiss: function () { GAME.UI.updateUI(); }
+        });
     },
 
     // 主动撤离（保住当前战利品，无额外奖励）
-    abandon: function () { if (GAME.State.p().trial) this.exit(); },
+    abandon: function () { if (GAME.State.p().trial) this.exit({ completed: false }); },
+
+    // 进试炼时的状态快照（用于结算时算差额）
+    _snap: function (p) {
+        var inv = {}; if (p.inventory) for (var k in p.inventory) inv[k] = p.inventory[k];
+        return { inv: inv, stones: p.spiritStones || 0 };
+    },
+    _diff: function (p, snap) {
+        var inv = p.inventory || {}, keys = {}, items = [];
+        if (snap) { Object.keys(snap.inv).forEach(function (k) { keys[k] = 1; }); }
+        Object.keys(inv).forEach(function (k) { keys[k] = 1; });
+        Object.keys(keys).forEach(function (k) {
+            var before = (snap && snap.inv[k]) || 0, after = inv[k] || 0, d = after - before;
+            if (d > 0) { var d0 = (GAME.DATA.ITEMS && GAME.DATA.ITEMS[k]) || {}; items.push({ id: k, qty: d, name: d0.name || k }); }
+        });
+        return items;
+    },
 };

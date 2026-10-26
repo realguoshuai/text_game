@@ -47,7 +47,7 @@ GAME.UI = {
     // 常驻可开、不再要求 atMarket；原独立 black-panel 已并入其中。
     TAB_MAP: {
         map: "map-panel", bag: "bag-panel", alchemy: "alchemy-panel", market: "market-panel", home: "home-panel",
-        codex: "codex-panel", explore: "explore-panel",
+        codex: "codex-panel",
         sect: "sect-panel", companion: "companion-panel",
         skill: "skill-panel", dungeon: "dungeon-panel", secret: "secret-panel"
     },
@@ -180,7 +180,7 @@ GAME.UI = {
         var self = this;
         ["map-panel", "bag-panel", "alchemy-panel", "market-panel", "home-panel", "sect-panel", "companion-panel",
          "jiayuan-panel", "skill-panel", "dungeon-panel", "fz-panel", "qixuan-panel",
-         "combat-panel", "track-panel", "trial-panel", "event-panel", "explore-panel", "mercy-panel", "mo-panel", "mansion-panel", "secret-panel", "codex-panel"]
+         "combat-panel", "track-panel", "trial-panel", "event-panel", "mercy-panel", "mo-panel", "mansion-panel", "secret-panel", "codex-panel"]
             .forEach(function (id) { self.show(id, id === visible); });
 
         // 页签按钮：仅紧急面板期间禁用切换（市集常驻可开，不再按 atMarket 禁用）
@@ -1248,7 +1248,6 @@ GAME.UI = {
             this.renderTainan();
             this.renderSkill();
             this.renderEvent();
-            this.renderExplore();
             this.renderMercy();
             this.renderCombat();
             this.renderTrial();
@@ -2781,44 +2780,6 @@ GAME.UI = {
         this.$("btn-mercy-burn").title = canBurn ? "" : "需【火球符】或习得《火球术》";
     },
 
-    // ---------- 外出历练结算面板（专属左栏视图） ----------
-    renderExplore: function () {
-        var p = GAME.State.p();
-        var res = this._exploreResult;
-        var scene = this.$("explore-scene");
-        var box = this.$("explore-result");
-        if (!res) {
-            // 无结算数据：玩家主动停在游历页时给一句引导，不露空板
-            if (scene) scene.innerText = "你曾外出历练，归来后再点【外出历练】可查看沿途所得。";
-            if (box) box.innerHTML = "";
-            return;
-        }
-        if (scene) scene.innerText = "【往返 " + res.months + " 月】" + (res.scene || "");
-        if (box) {
-            box.innerHTML = "";
-            if (!res.gains || !res.gains.length) {
-                var empty = document.createElement("div");
-                empty.className = "gain-line";
-                empty.innerText = "此行未得机缘，空手而回。";
-                box.appendChild(empty);
-            } else {
-                res.gains.forEach(function (g) {
-                    var line = document.createElement("div");
-                    line.className = "gain-line";
-                    line.innerText = g;
-                    box.appendChild(line);
-                });
-            }
-        }
-        // 「继续历练 / 返回」按钮：只绑一次，避免每次 updateUI 重复挂 onclick
-        if (!this._exBound) {
-            this._exBound = true;
-            var again = this.$("btn-explore-again");
-            var back = this.$("btn-explore-back");
-            if (again) again.onclick = function () { GAME.UI._exploreResult = null; GAME.Core.explore(); };
-            if (back) back.onclick = function () { GAME.UI._exploreResult = null; GAME.UI.switchTab("map"); };
-        }
-    },
 
     // ---------- 血月试炼面板（紧急覆盖） ----------
     renderTrial: function () {
@@ -3999,7 +3960,7 @@ GAME.UI = {
         this.$("btn-alchemy").onclick = function () { self.toggleAlchemy(); };
         this.$("btn-close-alchemy").onclick = function () { self.switchTab("home"); };
         this.$("btn-breakthrough").onclick = function () { GAME.Core.breakthrough(); };
-        this.$("btn-explore").onclick = function () { GAME.UI._exploreResult = null; GAME.Core.explore(); };
+        this.$("btn-explore").onclick = function () { GAME.Core.explore(); };
         this.$("btn-market").onclick = function () { GAME.Market.toggle(); };
         this.$("btn-leave-market").onclick = function () { GAME.Market.toggle(); };
         // 市集页签内「本坊市」未开市时的入口，与洞府按钮同走一条跑商动作

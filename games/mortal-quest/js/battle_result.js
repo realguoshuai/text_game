@@ -43,12 +43,8 @@ GAME.BattleResult = {
                 '</div>' +
                 '<span class="rg-pole rg-r"></span>' +
             '</div>' +
-            '<button class="rg-act" id="rg-act">离开</button>';
+            '<div class="rg-actions" id="rg-actions"></div>';
         document.body.appendChild(w);
-
-        var self = this;
-        // 【收下战利品】：先对账再离开。战败页文案虽不同，同一个按钮也就够了
-        document.getElementById("rg-act").onclick = function () { self.claim(); };
     },
 
     /* ---------- 由 Combat 调用：结算已经落账，这里只摊开 ---------- */
@@ -57,6 +53,7 @@ GAME.BattleResult = {
         this.init();
         this._d = rec;
 
+        var self = this;
         var p = GAME.State.p();
         var root = document.getElementById("result-page");
         root.classList.remove("is-win", "is-lose");
@@ -67,7 +64,6 @@ GAME.BattleResult = {
         var gains = document.getElementById("rg-gains");
         var loot = document.getElementById("rg-loot");
         var sum = document.getElementById("rg-sum");
-        var act = document.getElementById("rg-act");
 
         if (rec.win) {
             seal.innerHTML = "斗法大胜 · 斩妖凯旋";
@@ -77,14 +73,14 @@ GAME.BattleResult = {
             var lootHtml = this._lootBox(rec);
             loot.innerHTML = lootHtml.html;
             sum.innerText = this._sumText(rec);
-            act.innerHTML = "收 下 战 利 品";
+            this._renderActions([{ id: "rg-act", label: "收 下 战 利 品", onClick: function () { self.claim(); } }]);
         } else {
             seal.innerHTML = "力竭<span>战败</span>";
             lead.innerHTML = "【" + this._esc(rec.foe) + "】搜刮了你的储物袋，冷笑而去";
             gains.innerHTML = "";
             loot.innerHTML = this._lossBox(rec, p);
             sum.innerText = "此战伤了根基。回洞府打坐，气血方能慢慢养回来。";
-            act.innerHTML = "拖 残 躯 回 洞 府 疗 伤";
+            this._renderActions([{ id: "rg-act", label: "拖 残 躯 回 洞 府 疗 伤", onClick: function () { self.claim(); } }]);
         }
 
         // 重播一次入场动画（连续两场时第二场也要有"滑出"）
@@ -92,7 +88,9 @@ GAME.BattleResult = {
         void root.offsetWidth;
         root.classList.add("on");
         document.body.classList.add("result-on");
-        if (act.focus) act.focus({ preventScroll: true });
+        var af0 = document.getElementById("rg-actions");
+        af0 = af0 && af0.children && af0.children[0];
+        if (af0 && af0.focus) af0.focus({ preventScroll: true });
     },
 
     _gain: function (label, val) {
@@ -103,7 +101,7 @@ GAME.BattleResult = {
     _lootBox: function (rec) {
         var cells = [], self = this;
         if (rec.stones > 0) {
-            cells.push({ src: "assets/items/token.jpg", name: "灵石", qty: rec.stones, like: "q-fan" });
+            cells.push({ src: (GAME.Art ? GAME.Art.itemSrc("spirit_stone") : "assets/items/orb.jpg"), name: "灵石", qty: rec.stones, like: "q-fan" });
         }
         (rec.items || []).forEach(function (it) {
             var d = (GAME.DATA.ITEMS && GAME.DATA.ITEMS[it.id]) || {};
@@ -191,6 +189,16 @@ GAME.BattleResult = {
         document.body.classList.remove("result-on");
         this._d = null;
 
+        var pp = GAME.State.p();
+
+        // 非战斗卷轴（游历 / 秘境结算）：交给调用方自己的收尾逻辑
+        if (rec && rec._scroll) {
+            if (rec.onDismiss) rec.onDismiss();
+            GAME.UI.autoSave();
+            if (pp && pp._pendingSettle) { var ps = pp._pendingSettle; pp._pendingSettle = null; this.showScroll(ps); }
+            return;
+        }
+
         if (!rec) return;
         // 人还在秘境里（禁地/试炼/遗迹/狩猎）：switchTab 会被秘境总闸拦下，
         // 还会多打一条"走不得"的红字——此刻本就不该走，留在副本面板等下一步即可。
@@ -206,6 +214,101 @@ GAME.BattleResult = {
             else GAME.UI.switchTab("home");
         }
         GAME.UI.autoSave();
+
+        // 斗法胜利之后，若秘境/试炼/狩猎另有结算卷轴排队（如通关结算），补放出来
+        if (pp && pp._pendingSettle) {
+            var ps = pp._pendingSettle;
+            pp._pendingSettle = null;
+            this.showScroll(ps);
+        }
+    },
+
+    /* ---------- 通用卷轴：游历结算 / 秘境通关 等非战斗场景复用同一套皮 ---------- */
+    showScroll: function (cfg) {
+        if (!cfg) return;
+        this.init();
+        var root = document.getElementById("result-page");
+        root.classList.remove("is-win", "is-lose");
+        root.classList.add(cfg.variant === "lose" ? "is-lose" : "is-win");
+
+        var seal = document.getElementById("rg-seal");
+        var lead = document.getElementById("rg-lead");
+        var gains = document.getElementById("rg-gains");
+        var loot = document.getElementById("rg-loot");
+        var sum = document.getElementById("rg-sum");
+
+        seal.innerHTML = this._esc(cfg.seal || "");
+        lead.innerHTML = cfg.lead ? this._esc(cfg.lead) : "";
+
+        var g = "";
+        (cfg.gains || []).forEach(function (r) {
+            g += '<div class="rg-gain"><em>' + GAME.BattleResult._esc(r.label) + '</em><b>' + GAME.BattleResult._esc(r.val) + "</b></div>";
+        });
+        gains.innerHTML = g;
+
+        loot.innerHTML = this._lootHtml(cfg.loot);
+
+        sum.innerText = cfg.sum || "";
+
+        this._renderActions(cfg.actions || []);
+
+        root.classList.remove("on");
+        void root.offsetWidth;
+        root.classList.add("on");
+        document.body.classList.add("result-on");
+
+        this._d = { _scroll: true, onDismiss: cfg.onDismiss || null };
+    },
+
+    _renderActions: function (arr) {
+        var box = document.getElementById("rg-actions");
+        if (!box) return;
+        box.innerHTML = "";
+        (arr || []).forEach(function (a) {
+            var b = document.getElementById(a.id || "rg-act");
+            if (!b) { b = document.createElement("button"); b.id = a.id || "rg-act"; }
+            b.className = "rg-act" + (a.cls ? " " + a.cls : "");
+            b.innerHTML = a.label;
+            b.onclick = a.onClick || function () {};
+            box.appendChild(b);
+        });
+        var first = box.children && box.children[0];
+        if (first && first.focus) first.focus({ preventScroll: true });
+    },
+
+    _lootHtml: function (loot) {
+        if (!loot) return "";
+        var items = loot.items || [];
+        if (!items.length) {
+            return '<div class="rg-loot-hd">' + this._esc(loot.title || "所 获") + "</div>" +
+                '<div class="rg-empty">' + this._esc(loot.empty || "此行空手而回。") + "</div>";
+        }
+        var cells = [], self = this;
+        items.forEach(function (it) {
+            var d = (GAME.DATA.ITEMS && GAME.DATA.ITEMS[it.id]) || {};
+            cells.push({
+                src: (GAME.Art ? GAME.Art.itemSrc(it.id, d) : ""),
+                name: it.name || d.name || it.id,
+                qty: it.qty,
+                like: GAME.Art ? GAME.Art.qualityClass(d.quality || it.quality).replace("iq-", "q-") : "q-fan"
+            });
+        });
+        var show = cells.slice(0, this.MAX_SLOT);
+        var html = ['<div class="rg-loot-hd">' + this._esc(loot.title || "所 获") + "</div>", '<div class="rg-grid">'];
+        show.forEach(function (c) {
+            html.push('<div class="rg-slot ' + c.like + '">' +
+                '<span class="rg-ico"><img src="' + c.src + '" alt="" onerror="this.style.display=\'none\'"></span>' +
+                '<b>' + self._esc(c.name) + "</b>" +
+                '<em>×' + c.qty + "</em></div>");
+        });
+        for (var i = show.length; i < this.MIN_SLOT; i++) html.push('<div class="rg-slot is-empty"></div>');
+        html.push("</div>");
+        return html.join("");
+    },
+
+    isOpen: function () {
+        var root = document.getElementById("result-page");
+        return !!(root && root.classList.contains("on"));
     },
 
     _esc: function (s) {
