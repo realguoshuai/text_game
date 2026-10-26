@@ -1435,14 +1435,87 @@ GAME.UI = {
         }
     },
 
+    // ---------- 背包：分类页签 ----------
+    // 一个物品只归一组。BAG_GROUP_OF 是「类型 → 组」的唯一映射；
+    // 表里没有的类型（treasure / pouch / skill / recipe / 日后新加的）一律落「秘宝/特殊」——
+    // 宁可多一个去处，也绝不让新物品在某个页签里人间蒸发。
+    BAG_TABS: [
+        { id: "all",  name: "全部" },
+        { id: "pill", name: "丹药/灵物" },
+        { id: "gear", name: "符箓/法器" },
+        { id: "mat",  name: "材料/杂物" },
+        { id: "rare", name: "秘宝/特殊" }
+    ],
+    BAG_GROUP_OF: {
+        pill: "pill", herb: "pill", poison: "pill",
+        talisman: "gear", artifact: "gear", armor: "gear", dark_weapon: "gear", fubao: "gear", tool: "gear",
+        material: "mat", junk: "mat", currency: "mat"
+    },
+    bagGroupOf: function (item) {
+        if (!item) return "rare";
+        return this.BAG_GROUP_OF[item.type] || "rare";
+    },
+    bagMatch: function (item, tab) {
+        tab = tab || "all";
+        if (tab === "all") return true;
+        return this.bagGroupOf(item) === tab;
+    },
+    // 置顶排序：新收进来的（练出的丹、摸来的货）排前面，其余保持原顺序。
+    // 单独成函数是为了渲染与测试读同一份口径——排序规则散进渲染循环里迟早两处不一致。
+    bagSort: function (ids, fresh) {
+        fresh = fresh || {};
+        return ids.slice().sort(function (a, b) { return (fresh[b] ? 1 : 0) - (fresh[a] ? 1 : 0); });
+    },
+    // 页签按钮：名字 + 该组件数。0 件也照常显示（不隐藏），点了给「此分类暂无物品」，
+    // 这样五个页签的位置永远固定，不会因为物品增减而跳来跳去。
+    renderBagTabs: function (ids) {
+        var self = this;
+        var box = this.$("bag-tabs");
+        if (!box) return;
+        var tab = this._bagTab || "all";
+        var known = false, i;
+        for (i = 0; i < this.BAG_TABS.length; i++) if (this.BAG_TABS[i].id === tab) known = true;
+        if (!known) { tab = "all"; this._bagTab = "all"; }     // 旧状态/手改过的值不许把面板点成空白
+        // 只有「选中项 + 各组件数」变了才重建按钮：updateUI 每帧都会走到这里，
+        // 若每次都重建，鼠标正悬着的页签会被换成新节点，hover 高亮一闪一闪。
+        var sig = tab + "|" + ids.join(",");
+        if (this._bagTabsSig === sig && box.children && box.children.length === this.BAG_TABS.length) return;
+        this._bagTabsSig = sig;
+        box.innerHTML = "";
+        for (i = 0; i < this.BAG_TABS.length; i++) {
+            var t = this.BAG_TABS[i], n = 0;
+            for (var k = 0; k < ids.length; k++) {
+                if (this.bagMatch(GAME.DATA.ITEMS[ids[k]], t.id)) n++;
+            }
+            var btn = document.createElement("button");
+            btn.className = "bag-tab" + (t.id === tab ? " is-on" : "");
+            btn.setAttribute("data-bag-tab", t.id);
+            btn.innerText = t.name;
+            var cnt = document.createElement("i");
+            cnt.innerText = String(n);
+            btn.appendChild(cnt);
+            btn.title = "只看" + t.name + "（" + n + " 种）";
+            btn.onclick = (function (id) {
+                return function () { self._bagTab = id; self.renderBag(); };
+            })(t.id);
+            box.appendChild(btn);
+        }
+    },
+
     // ---------- 背包 ----------
     renderBag: function () {
         var self = this;
         var p = GAME.State.p();
         var box = this.$("bag-list");
         box.innerHTML = "";
-        var ids = Object.keys(p.inventory);
-        if (!ids.length) { box.innerHTML = '<div class="empty-tip">储物袋空空如也。</div>'; return; }
+        var allIds = Object.keys(p.inventory);
+        this.renderBagTabs(allIds);
+        var tab = this._bagTab || "all";
+        var fresh = p.newItems || {};
+        var ids = allIds.filter(function (id) { return self.bagMatch(GAME.DATA.ITEMS[id], tab); });
+        ids = this.bagSort(ids, fresh);
+        if (!allIds.length) { box.innerHTML = '<div class="empty-tip">储物袋空空如也。</div>'; return; }
+        if (!ids.length) { box.innerHTML = '<div class="empty-tip">此分类下暂无物品。</div>'; return; }
 
         ids.forEach(function (id) {
             var item = GAME.DATA.ITEMS[id];
@@ -1466,7 +1539,9 @@ GAME.UI = {
                     "禁制：需神识 " + pinfo0.need + " · 现有 " + pinfo0.spirit +
                     (pinfo0.ok ? "——可强行抹除（耗 1 月）" : "——不足，可水磨 " + pinfo0.months + " 月化开") + "</div>";
             }
-            left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span> ×' + qty +
+            // 新收进袋子的东西挂朱砂【新】：这是「防沉底」的第二道保险（第一道是置顶排序）
+            var newTag = fresh[id] ? ' <span class="bag-new">【新】</span>' : "";
+            left.innerHTML = '<span class="q-' + item.quality + '">' + item.name + '</span>' + newTag + ' ×' + qty +
                 ' <span class="item-desc">[' + item.quality + ']</span>' +
                 '<div class="item-desc">' + item.desc + '</div>' + potency + pouchNote;
 
@@ -1540,6 +1615,14 @@ GAME.UI = {
                     : (item.type === "dark_weapon" ? "战斗首回合触发" : "炼丹原料 / 战斗暗器");
                 right.appendChild(tip);
             }
+            // 点一下（看描述或点按钮用掉）就算「已看过」：角标消失、也不再置顶。
+            // 挂在行上而不是按钮上——玩家盯着说明看同样算看过。
+            row.onclick = function () {
+                if (p.newItems && p.newItems[id]) {
+                    delete p.newItems[id];
+                    GAME.UI.renderBag();
+                }
+            };
             row.appendChild(left);
             row.appendChild(right);
             box.appendChild(row);

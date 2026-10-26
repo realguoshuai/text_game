@@ -38,6 +38,7 @@ GAME.State = {
             liquidCharge: 0,        // 绿液充能进度（月）
             spiritStones: st.spiritStones || 30,
             inventory: {},          // { 物品ID: 数量 }
+            newItems: {},           // { 物品ID: 1 } 新入袋未看过——置顶 + 朱砂【新】，点过即销
             karma: 0,               // 善恶值：负为恶，正为善（-100 ~ 100）
             sectContrib: 0,         // 宗门贡献度（杂役累积，可兑换）
             recipes: {},            // 已习得丹方 { recipeId: true }（拾得/购入丹方卷轴自动研习）
@@ -252,6 +253,10 @@ GAME.State = {
             return;
         }
         p.inventory[id] = (p.inventory[id] || 0) + qty;
+        // 新收进袋子的东西打【新】标（置顶 + 朱砂角标），玩家点过一次或用掉才消。
+        // 落存档而非现算：读档后「哪些是我上次还没看的」只有存档自己知道。
+        p.newItems = p.newItems || {};
+        p.newItems[id] = 1;
         if (GAME.Codex) GAME.Codex.unlockItem(id);   // 图鉴·器物：首次入袋即录
     },
 
@@ -260,7 +265,10 @@ GAME.State = {
         var p = this.p();
         if (!p.inventory[id]) return false;
         p.inventory[id] -= qty;
-        if (p.inventory[id] <= 0) delete p.inventory[id];
+        if (p.inventory[id] <= 0) {
+            delete p.inventory[id];
+            if (p.newItems) delete p.newItems[id];   // 用光了，角标跟着走
+        }
         return true;
     },
 

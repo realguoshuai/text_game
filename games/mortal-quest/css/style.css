@@ -3668,3 +3668,52 @@ body.theme-light #recipe-list .recipe-effect .recipe-gain { color: #1F5F45; }
 .item-desc.pouch-seal { margin-top: 2px; }
 .item-desc.pouch-seal.seal-ok { color: var(--accent); }
 .item-desc.pouch-seal.seal-short { color: var(--danger-tx); }
+
+/* ================= 行囊 · 分类页签 + 【新】角标 =================
+ * 位置：index.html #bag-tabs（储物袋标题下方），按钮由 UI.renderBagTabs() 生成，
+ * 过滤与置顶口径在 UI.bagGroupOf / bagMatch / bagSort。
+ * 全用既有主题变量（--btn-bg / --btn-border / --gold-tx / --gold-bd / --ach-bg / --danger-tx），
+ * 纸面皮肤重定义变量时自动换墨。 */
+.bag-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 10px;
+}
+/* ⚠ 必须带 #panel-area #bag-tabs 前缀：全仓有 `#panel-area button`（暗/浅各一套）
+ * 统一管着面板内所有按钮的底色与描边，单类名 .bag-tab 的优先级压不住它，
+ * 会被刷成「一排没框的平字」。这里不加 !important，只把选择器写实。 */
+#panel-area #bag-tabs .bag-tab {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 3px 9px;
+    font-family: var(--font-kai);
+    font-size: 12.5px;
+    letter-spacing: .04em;
+    line-height: 1.5;
+    color: var(--text-mute);
+    border-radius: 3px;
+    transition: color .15s, border-color .15s, background .15s;
+}
+#panel-area #bag-tabs .bag-tab i {
+    font-style: normal;
+    font-size: 11px;
+    opacity: .72;
+    letter-spacing: 0;
+}
+#panel-area #bag-tabs .bag-tab:hover { color: var(--gold-tx); border-color: var(--gold-bd); }
+#panel-area #bag-tabs .bag-tab.is-on {
+    color: var(--gold-tx);
+    border-color: var(--gold-bd);
+    background: var(--ach-bg);
+    font-weight: 600;
+}
+#panel-area #bag-tabs .bag-tab.is-on i { opacity: .95; }
+/* 【新】：朱砂红，与破境印章同一族色，只做小角标不抢物品名 */
+.bag-new {
+    color: var(--danger-tx);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
