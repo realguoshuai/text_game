@@ -12,7 +12,7 @@ GAME.Market = {
     // 真正"抬脚就是坊市"的只有这两处常设市面：景阳城（岚州大城·坊市）与苍南谷（散修坊市）。
     // 青牛镇虽是凡俗镇集（kind=mortal），却没有常设坊市——赶集得走上一个月山路，
     // 所以别再按 kind 一刀切判"就地入市"（凡俗镇集 ≠ 自带市面）。
-    TOWN_MARKET: { jiayuan_cheng: 1, tainan_gu: 1 },
+    TOWN_MARKET: { jiayuan_cheng: 1, tainan_gu: 1, yuejing_cheng: 1 },
 
     townMarket: function () {
         var p = GAME.State.p();
@@ -99,6 +99,12 @@ GAME.Market = {
                     price: GAME.DATA.ITEMS[src[k].id].price,
                 });
             }
+        }
+        // 灵药种子为药圃刚需，各地坊市刷新必在架（避免"有田无种"之窘）
+        var _seed = "seed_lingyao", _hasSeed = false, _gi;
+        for (_gi = 0; _gi < goods.length; _gi++) if (goods[_gi].id === _seed) { _hasSeed = true; break; }
+        if (!_hasSeed) {
+            goods.push({ id: _seed, qty: 99, infinite: true, req: 0, price: (GAME.DATA.ITEMS[_seed] || { price: 18 }).price });
         }
         GAME.State.p().marketGoods = goods;
         return goods;

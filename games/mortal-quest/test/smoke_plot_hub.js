@@ -199,22 +199,38 @@ ok('玄冰花项写清元灵丹主材/拜师礼', /元灵丹主材/.test(T('cata
 ok('龙鳞果项写清结丹级灵珍', /结丹级/.test(T('cata-longlin-sub')));
 ok('三项灵液灵珍皆带「现有 N 株/根」', ['cata-wood-sub', 'cata-xuanbing-sub', 'cata-longlin-sub']
     .every(id => /现有 \d+ (株|根)/.test(T(id) || '')));
-// 药圃田垄面板：section ④ 已移栽一株百年灵药（100 年 = 已满百年，可收百年灵药）
+// 药圃田垄面板：section ④ 已移栽一株百年灵药（移栽苗 target=1000，不算百年可收）
 U.updateUI();
 ok('药圃列表渲染出田垄行', els['plot-list'] && els['plot-list'].children.length >= 1);
 ok('批量区有一键下种与一键采收', els['plot-batch'] && els['plot-batch'].children.length === 2);
-// 收成·百年灵药 出现在某垄（遍历子节点取 innerText）
+// 遍历子节点取 innerText（mock DOM 的 _text 即 innerText）
 function dumpText(node, acc) {
     if (!node) return acc;
     if (node._text) acc.push(node._text);
     (node.children || []).forEach(function (c) { dumpText(c, acc); });
     return acc;
 }
-ok('已满百年的垄显示「收成·百年灵药」', dumpText(els['plot-list'], []).some(function (t) { return /收成·百年灵药/.test(t); }));
-// 采收确实产出百年灵药（双轨：田垄长出，非灵液凭空变）
-ok('采收已满百年的垄得百年灵药', (function () {
+// 移栽苗满 100 年：显示「催熟 +250年」「直催千年」「起出幼苗（退回百年药）」，不显示「收成·百年灵药」
+ok('移栽苗不显示「收成·百年灵药」', !dumpText(els['plot-list'], []).some(function (t) { return /收成·百年灵药/.test(t); }));
+ok('移栽苗显示「催熟 +250年」', dumpText(els['plot-list'], []).some(function (t) { return /催熟 \+250年/.test(t); }));
+ok('移栽苗显示「直催千年」', dumpText(els['plot-list'], []).some(function (t) { return /直催千年/.test(t); }));
+ok('移栽苗显示「起出幼苗（退回百年药）」', dumpText(els['plot-list'], []).some(function (t) { return /起出幼苗（退回百年药）/.test(t); }));
+// 移栽苗此刻收不动（不误拔），且 harvest 不产出百年灵药（#1 破除死循环）
+ok('移栽苗此刻收不动、不误产百年药', (function () {
     var n = G.State.countItem('herb_bainian');
-    G.Plot.harvest(0);
+    var r = G.Plot.harvest(0);
+    return r === false && G.State.countItem('herb_bainian') === n;
+})());
+// 下种苗满百年 → 显示「收成·百年灵药」且采收得百年灵药（双轨：田垄长出，非灵液凭空变）
+G.State.addItem('seed_lingyao', 2);
+G.State.p().liquid = 10;
+G.Plot.plantSeed(1);
+G.Plot.catalyzeToHundred(1);
+U.updateUI();
+ok('下种苗满百年显示「收成·百年灵药」', dumpText(els['plot-list'], []).some(function (t) { return /收成·百年灵药/.test(t); }));
+ok('采收满百年的下种苗得百年灵药', (function () {
+    var n = G.State.countItem('herb_bainian');
+    G.Plot.harvest(1);
     return G.State.countItem('herb_bainian') === n + 1;
 })());
 // 现存数字会随背包走

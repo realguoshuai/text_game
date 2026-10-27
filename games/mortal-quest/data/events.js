@@ -257,11 +257,11 @@ GAME.DATA.EVENTS = [
             { chance:0.50, type:"loot", text:"竟有一株灵药汲取了山泽灵气，药香扑鼻！", table:[
                 { id:"herb_bainian", chance:0.55, qty:[1,2] },
                 { id:"herb_bainian", chance:0.20, qty:[1,1] },
-                { id:"seed_lingyao", chance:0.6, qty:[2,4] },
+                { id:"seed_lingyao", chance:1.0, qty:[2,3] },
             ]},
             { chance:0.30, type:"loot", text:"收获零零散散，几株半灵性的药草聊胜于无。", table:[
                 { id:"herb_bainian", chance:1.0, qty:[1,1] },
-                { id:"seed_lingyao", chance:0.5, qty:[2,3] },
+                { id:"seed_lingyao", chance:1.0, qty:[2,3] },
             ]},
             { chance:0.20, type:"nothing", text:"药苗早被人采去，你空手而归。" },
         ]
@@ -346,7 +346,7 @@ GAME.DATA.EVENTS = [
         choices:null,
         outcomes:[
             { chance:0.45, type:"exp",   text:"行路间偶有所得，吐纳竟添了几分火候。", amount:[1,4] },
-            { chance:0.20, type:"loot",  text:"岩缝草窠里采得一株野灵药，聊胜于无。", table:[ { id:"herb_bainian", chance:1.0, qty:[1,1] }, { id:"seed_lingyao", chance:0.4, qty:[1,2] } ] },
+            { chance:0.20, type:"loot",  text:"岩缝草窠里采得一株野灵药，聊胜于无。", table:[ { id:"herb_bainian", chance:1.0, qty:[1,1] }, { id:"seed_lingyao", chance:1.0, qty:[2,3] } ] },
             { chance:0.20, type:"mind",  text:"途中遇樵夫渔翁闲谈，听闻几桩乡野旧闻，心境略开。", amount:[1,2] },
             { chance:0.15, type:"nothing", text:"终究只得了几缕山风，空手而回。" },
         ]

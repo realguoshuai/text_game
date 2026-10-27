@@ -584,6 +584,12 @@ GAME.UI = {
                     here.className = "goal-here";
                     here.innerText = "（你已身处当地）";
                     w.appendChild(here);
+                } else if (plan && plan.kind === "tab" && this.tab === plan.tab) {
+                    // 已在目标功能页签（如 修行→洞府）：不必再提示「前往」，换成浅色夹注（#5）
+                    var hereTab = document.createElement("span");
+                    hereTab.className = "goal-here";
+                    hereTab.innerText = "（已在" + (g.where || "此地") + "中）";
+                    w.appendChild(hereTab);
                 } else if (plan && plan.kind !== "text") {
                     var goBtn = document.createElement("button");
                     goBtn.id = "goal-go";
@@ -862,6 +868,35 @@ GAME.UI = {
             sum.innerHTML = t;
         }
 
+        // 灵田阶数信息 + 扩建入口（#2：面板顶部补【扩建灵田】，解决找不到升级按钮）
+        var tierBox = this.$("plot-tier");
+        if (tierBox) {
+            var _lv = (GAME.Home && GAME.Home.level) ? GAME.Home.level("lingtian") : 0;
+            var _t = GAME.Plot.tier();
+            var _next = (GAME.Home && GAME.Home.next) ? GAME.Home.next("lingtian") : null;
+            tierBox.innerHTML = "";
+            var _info = document.createElement("span");
+            _info.className = "plot-tier-info";
+            _info.innerText = "当前：" + (_lv > 0 ? ("灵田 " + _lv + " 阶") : "凡土药畦") +
+                "（共 " + _t.plots + " 垄 · 每月长 " + _t.ypm + " 年）";
+            tierBox.appendChild(_info);
+            if (_next) {
+                var _up = document.createElement("button");
+                _up.className = "small-btn plot-btn";
+                _up.innerText = "【扩建灵田 → " + (_lv + 1) + " 阶（" + _next.plots + " 垄 · 耗 " + _next.stones + " 灵石）】";
+                var _whyUp = (GAME.Home && GAME.Home.canUpgrade) ? GAME.Home.canUpgrade("lingtian") : null;
+                _up.disabled = !!_whyUp;
+                _up.title = _whyUp || "扩建灵田，增药垄、快药龄";
+                _up.onclick = function () { GAME.Home.upgrade("lingtian"); };
+                tierBox.appendChild(_up);
+            } else {
+                var _max = document.createElement("span");
+                _max.className = "plot-tier-max";
+                _max.innerText = "灵田已达最高阶";
+                tierBox.appendChild(_max);
+            }
+        }
+
         // 批量操作：一键下种（灵药种子）/ 一键采收（满百年）
         var batch = this.$("plot-batch");
         if (batch) {
@@ -911,13 +946,13 @@ GAME.UI = {
                     bS.className = "small-btn plot-btn";
                     bS.innerText = "下种";
                     bS.disabled = seedN2 < 1;
-                    self._why(bS, seedN2 < 1 ? "需【灵药种子】" : "");
+                    bS.title = seedN2 < 1 ? "需【灵药种子】" : "";
                     bS.onclick = function () { GAME.Plot.plantSeed(s.i); };
                     var bT = document.createElement("button");
                     bT.className = "small-btn plot-btn";
-                    bT.innerText = "移栽";
+                    bT.innerText = "移栽百年药";
                     bT.disabled = baiN < 1;
-                    self._why(bT, baiN < 1 ? "需【百年灵药】" : "");
+                    bT.title = baiN < 1 ? "需【百年灵药】" : "";
                     bT.onclick = function () { GAME.Plot.plantTransplant(s.i); };
                     acts.appendChild(bS);
                     acts.appendChild(bT);
@@ -929,6 +964,7 @@ GAME.UI = {
                     bH.onclick = function () { GAME.Plot.harvest(s.i); };
                     acts.appendChild(bH);
                 } else if (s.mature) {
+                    // 下种苗满百年 → 可收百年药；继续催熟则转入千年培育
                     desc.innerText = s.years + " 年 · 已满百年（差 " + GAME.Plot._fmtMonths(s.left) + "满千年）";
                     var bHb = document.createElement("button");
                     bHb.className = "small-btn plot-btn";
@@ -936,33 +972,60 @@ GAME.UI = {
                     bHb.onclick = function () { GAME.Plot.harvest(s.i); };
                     var bA = document.createElement("button");
                     bA.className = "small-btn plot-btn";
-                    bA.innerText = "催熟+250";
+                    bA.innerText = "催熟 +250年 (1滴)";
                     bA.disabled = liq < 1;
-                    self._why(bA, liq < 1 ? "灵液不足（需 1 滴）" : "");
+                    bA.title = liq < 1 ? "灵液不足（需 1 滴）" : "";
                     bA.onclick = function () { GAME.Plot.catalyzeAdd(s.i); };
                     var bD = document.createElement("button");
                     bD.className = "small-btn plot-btn";
                     var dropsD = Math.ceil((capYears - s.years) / stepAdd);
-                    bD.innerText = "直催千年(" + dropsD + "滴)";
+                    bD.innerText = "直催千年 (需" + dropsD + "滴)";
                     bD.disabled = liq < dropsD;
-                    self._why(bD, liq < dropsD ? "灵液不足（需 " + dropsD + " 滴）" : "");
+                    bD.title = liq < dropsD ? "灵液不足（需 " + dropsD + " 滴）" : "";
                     bD.onclick = function () { GAME.Plot.catalyzeDirect(s.i); };
                     acts.appendChild(bHb);
                     acts.appendChild(bA);
                     acts.appendChild(bD);
+                } else if (s.target === capYears) {
+                    // 千年培育中（移栽苗 / 下种苗已转千年）：催熟在左，移栽苗可起出在右
+                    desc.innerText = s.years + " 年 · 千年培育中";
+                    var bA2 = document.createElement("button");
+                    bA2.className = "small-btn plot-btn";
+                    bA2.innerText = "催熟 +250年 (1滴)";
+                    bA2.disabled = liq < 1;
+                    bA2.title = liq < 1 ? "灵液不足（需 1 滴）" : "";
+                    bA2.onclick = function () { GAME.Plot.catalyzeAdd(s.i); };
+                    var bD2 = document.createElement("button");
+                    bD2.className = "small-btn plot-btn";
+                    var dropsD2 = Math.ceil((capYears - s.years) / stepAdd);
+                    bD2.innerText = "直催千年 (需" + dropsD2 + "滴)";
+                    bD2.disabled = liq < dropsD2;
+                    bD2.title = liq < dropsD2 ? "灵液不足（需 " + dropsD2 + " 滴）" : "";
+                    bD2.onclick = function () { GAME.Plot.catalyzeDirect(s.i); };
+                    acts.appendChild(bA2);
+                    acts.appendChild(bD2);
+                    if (s.isTransplant) {
+                        var bPull = document.createElement("button");
+                        bPull.className = "small-btn plot-btn plot-btn-weak";
+                        bPull.innerText = "起出幼苗（退回百年药）";
+                        bPull.title = "起出移栽苗，退回一株百年灵药";
+                        bPull.onclick = function () { GAME.Plot.pullOut(s.i); };
+                        acts.appendChild(bPull);
+                    }
                 } else {
+                    // 幼苗（下种苗 <100 年）
                     desc.innerText = s.years + " 年 · 幼苗（差 " + GAME.Plot._fmtMonths(s.hundredLeft) + "满百年）";
                     var bC = document.createElement("button");
                     bC.className = "small-btn plot-btn";
                     bC.innerText = "催熟→百年";
                     bC.disabled = liq < 1;
-                    self._why(bC, liq < 1 ? "灵液不足（需 1 滴）" : "");
+                    bC.title = liq < 1 ? "灵液不足（需 1 滴）" : "";
                     bC.onclick = function () { GAME.Plot.catalyzeToHundred(s.i); };
                     var bHx = document.createElement("button");
                     bHx.className = "small-btn plot-btn";
                     bHx.innerText = "收成";
                     bHx.disabled = true;
-                    self._why(bHx, "未满百年，起出白糟蹋一株好药");
+                    bHx.title = "未满百年，起出白糟蹋一株好药";
                     acts.appendChild(bC);
                     acts.appendChild(bHx);
                 }
@@ -1853,7 +1916,7 @@ GAME.UI = {
         this.show("market-local", !!p.atMarket);
         this.show("market-away", !p.atMarket);
         if (p.atMarket) {
-            var locNames = { shenshou_gu: "山间小集", qingniu_zhen: "青牛镇集", jiayuan_cheng: "岚州大城 · 坊市", tainan_gu: "苍南谷坊市" };
+            var locNames = { shenshou_gu: "山间小集", qingniu_zhen: "青牛镇集", jiayuan_cheng: "岚州大城 · 坊市", tainan_gu: "苍南谷坊市", yuejing_cheng: "云京·皇城 · 坊市" };
             this.$("market-tip").innerText = "【" + (locNames[p.location] || "坊市") + "】 每逢 " + GAME.DATA.MARKET.refreshMonths +
                 " 个月换货；" + (p.karma < -20 ? "你恶名在外，商贾坐地起价" : p.karma > 20 ? "你乐善好施，商贾愿予折扣" : "童叟无欺");
 

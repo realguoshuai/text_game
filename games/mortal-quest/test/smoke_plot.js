@@ -174,26 +174,23 @@ p = fresh({ seed: 1 });
 G.Plot.plantSeed(0);
 ok('幼苗 1 年收不动', G.Plot.harvest(0) === false);
 ok('失败不消耗那株药（仍为 1 年）', G.Plot.yearsOf(p, 0) === 1);
-ok('失败有原因日志', logs.some(x => /才 1 年/.test(x)));
+ok('失败有原因日志', logs.some(x => /白糟蹋一株好药/.test(x)));
 
-// 移栽 100 年 = 已满百年 → 收成得百年灵药
+// 移栽 100 年百年药 = 千年培育起点（target 1000）→ 不算「百年可收」，破除死循环（#1）
 p = fresh({ bainian: 1 });
 G.Plot.plant(0);
 const sl = G.Plot.slot(p, 0);
-ok('slot 报 mature(百年) 而非 ready(千年)', sl.mature === true && sl.ready === false);
-ok('满百年收成成功', G.Plot.harvest(0) === true);
-ok('得百年灵药 ×1', G.State.countItem('herb_bainian') === 1);
-ok('收完变空垄', p.plots[0] === null);
-
-// 长到千年 → 千年灵药（沿用旧 1000 年路径）
-p = fresh({ bainian: 1 });
-G.Plot.plant(0);
+ok('移栽苗标记为 transplant、target=1000', sl.isTransplant === true && sl.target === 1000);
+ok('移栽苗满 100 年仍不算「百年可收」（mature=false）', sl.mature === false && sl.ready === false);
+ok('移栽苗此刻收不动（不触发误收死循环）', G.Plot.harvest(0) === false);
+ok('收不动不消耗那株苗（仍为 100 年）', G.Plot.yearsOf(p, 0) === 100);
+ok('一键采收不会拔出未满千年的移栽苗', G.Plot.oneKeyHarvest() === false && G.State.countItem('herb_bainian') === 0);
+// 移栽苗长到千年 → 收千年灵药（非百年）
 G.Plot.tick(300);   // 100 + 900 = 1000
-ok('刚好满千年', G.Plot.yearsOf(p, 0) === 1000);
-const st2 = G.Plot.slot(p, 0);
-ok('slot 报 ready', st2.ready === true && st2.left === 0);
-ok('满千年收成成功', G.Plot.harvest(0) === true);
-ok('得千年灵药 ×1', G.State.countItem('herb_qiannian') === 1);
+ok('移栽苗刚好满千年', G.Plot.yearsOf(p, 0) === 1000);
+ok('千年满 slot.ready', G.Plot.slot(p, 0).ready === true);
+ok('千年满收成成功', G.Plot.harvest(0) === true);
+ok('得千年灵药 ×1（非百年）', G.State.countItem('herb_qiannian') === 1 && G.State.countItem('herb_bainian') === 0);
 ok('收完变空垄', p.plots[0] === null);
 
 // 灵田加成
@@ -288,21 +285,26 @@ setTier(0);
 /* ================= ⑩ 摘要 ================= */
 section('⑩ 摘要');
 setTier(0);
-p = fresh({ bainian: 3 });
-G.Plot.plant(0);
-G.Plot.tick(320);                 // 第 1 垄满千年
+p = fresh({ bainian: 2, seed: 1, liquid: 50 });
+G.Plot.plant(0);                 // 移栽苗：100 年起点，target 1000
+G.Plot.plantSeed(1);             // 下种苗：1 年起点
+G.Plot.catalyzeToHundred(1);     // 下种苗 → 100 年（mature）
+G.Plot.tick(320);                // 第0垄(transplant) 100+960→封顶1000 ready；第1垄(seed) 100+960→封顶1000 ready
 st = G.Plot.status(p);
-ok('growing 只数有药的垄', st.growing === 1);
-ok('mature/ready：千年那垄双双计入', st.mature === 1 && st.ready === 1);
-ok('nextLeft 为 null（没有在长但未成的）', st.nextLeft === null);
+ok('growing 只数有药的垄', st.growing === 2);
+ok('移栽苗不计入 mature（千年培育）；两垄皆千年可收', st.mature === 0 && st.ready === 2);
+ok('nextLeft 为 null（都满了）', st.nextLeft === null);
 
-G.Plot.plant(1);
-G.Plot.tick(12);                  // 第 2 垄 136 年（mature 未满千年）
+p = fresh({ bainian: 1, seed: 1, liquid: 50 });
+G.Plot.plant(0);                 // 移栽苗 100
+G.Plot.plantSeed(1);             // 下种苗 1
+G.Plot.catalyzeToHundred(1);     // 下种苗 100（mature）
+G.Plot.tick(12);                 // 第0垄 transplant 100+36=136（千年培育中）；第1垄 seed 100+36=136（mature）
 st = G.Plot.status(p);
-ok('两垄在长、一垄千年可收、一垄百年可收', st.growing === 2 && st.ready === 1 && st.mature === 2);
-ok('nextLeft 报未成那垄的余月', st.nextLeft === G.Plot.monthsLeft(p, 1));
-ok('list 长度 = 垄数', st.list.length === 3);
-ok('第 3 垄仍是空地', st.list[2].empty === true);
+ok('移栽苗千年培育中不计入百年可收、下种苗计入', st.growing === 2 && st.ready === 0 && st.mature === 1);
+ok('list 第三项为空地', st.list.length === 3 && st.list[2].empty === true);
+ok('移栽苗 slot.isTransplant 为真、target=1000', st.list[0].isTransplant === true && st.list[0].target === 1000);
+ok('下种苗 slot.target=100（可收百年）', st.list[1].target === 100 && st.list[1].mature === true);
 
 console.log('\n==== 结果：' + pass + ' 通过 / ' + fail + ' 失败 ====');
 if (fail) { console.log('失败项：' + fails.join(' | ')); process.exit(1); }

@@ -100,11 +100,17 @@ GAME.Plot = {
     slot: function (p, i) {
         this._ensure(p);
         var y = this.yearsOf(p, i), cfg = this.cfg();
-        if (!p.plots[i]) return { i: i, empty: true, years: 0, mature: false, ready: false, left: 0, hundredLeft: 0 };
+        if (!p.plots[i]) return { i: i, empty: true, years: 0, mature: false, ready: false, left: 0, hundredLeft: 0, isTransplant: false, target: 0 };
+        // 旧存档没有 pt/target：按栽种物 h 推断（移栽苗=h=百年灵药 → 千年培育；否则下种苗）
+        var _h = p.plots[i].h;
+        var _isTr = (p.plots[i].pt === "transplant") || (p.plots[i].pt == null && _h === cfg.transplantItem);
+        var _target = p.plots[i].target || (_isTr ? cfg.capYears : cfg.hundred);
         return {
             i: i, empty: false, years: Math.floor(y),
-            mature: y >= cfg.hundred,           // 已达百年 → 可收百年药
-            ready:  y >= cfg.capYears,         // 千年满 → 可收千年药
+            isTransplant: _isTr,
+            target: _target,
+            mature: (_target === cfg.hundred) && y >= cfg.hundred && y < cfg.capYears,   // 仅下种苗、转千年前可收百年药
+            ready:  y >= cfg.capYears,         // 千年满 → 可收千年药（移栽苗达此亦收千年）
             left: this.monthsLeft(p, i),
             hundredLeft: y < cfg.hundred ? this.monthsLeft(p, i) : 0
         };
@@ -155,7 +161,7 @@ GAME.Plot = {
             GAME.UI.updateUI(); return false;
         }
         GAME.State.removeItem(cfg.seedItem, 1);
-        p.plots[i] = { y: cfg.startYearsSeed, h: cfg.seedItem };
+        p.plots[i] = { y: cfg.startYearsSeed, h: cfg.seedItem, pt: "seed", target: cfg.hundred };
         GAME.UI.log("你把一粒【" + GAME.DATA.ITEMS[cfg.seedItem].name + "】埋进第 " + (i + 1) + " 垄，浇了捧灵泉——只待岁月。每月长 " + (Math.round(this.rate(p) * 10) / 10) + " 年份。", "info");
         GAME.UI.autoSave(); GAME.UI.updateUI();
         return true;
@@ -177,7 +183,7 @@ GAME.Plot = {
             GAME.UI.updateUI(); return false;
         }
         GAME.State.removeItem(cfg.transplantItem, 1);
-        p.plots[i] = { y: cfg.startYearsTransplant, h: cfg.transplantItem };
+        p.plots[i] = { y: cfg.startYearsTransplant, h: cfg.transplantItem, pt: "transplant", target: cfg.capYears };
         GAME.UI.log("你把一株【" + GAME.DATA.ITEMS[cfg.transplantItem].name + "】移栽进第 " + (i + 1) + " 垄（" + cfg.startYearsTransplant + " 年苗），每月长 " + (Math.round(this.rate(p) * 10) / 10) + " 年份。", "info");
         GAME.UI.autoSave(); GAME.UI.updateUI();
         return true;
@@ -230,6 +236,10 @@ GAME.Plot = {
         if (!this._needLiquid(p, cfg.liquidPerCatalyze)) return false;
         p.liquid -= cfg.liquidPerCatalyze;
         p.plots[i].y = Math.min(cfg.capYears, p.plots[i].y + cfg.stepAdd);
+        // 下种苗在满百年后继续催熟 → 转入「千年培育」态（满千年前不再提示采收百年药）
+        if (p.plots[i].pt === "seed" && (p.plots[i].target || cfg.hundred) === cfg.hundred && p.plots[i].y >= cfg.hundred) {
+            p.plots[i].target = cfg.capYears;
+        }
         this._leak(p, cfg.liquidPerCatalyze);
         GAME.UI.log("一滴绿液灌下，第 " + (i + 1) + " 垄灵药又长 " + cfg.stepAdd + " 年（现 " + p.plots[i].y + " 年）。", "success");
         GAME.UI.autoSave(); GAME.UI.updateUI();
@@ -249,6 +259,9 @@ GAME.Plot = {
         if (!this._needLiquid(p, drops)) return false;
         p.liquid -= drops;
         p.plots[i].y = cfg.capYears;
+        if (p.plots[i].pt === "seed" && (p.plots[i].target || cfg.hundred) === cfg.hundred) {
+            p.plots[i].target = cfg.capYears;
+        }
         this._leak(p, drops);
         GAME.UI.log("连灌 " + drops + " 滴绿液，第 " + (i + 1) + " 垄灵药轰然满千年！", "success");
         GAME.UI.autoSave(); GAME.UI.updateUI();
@@ -261,8 +274,11 @@ GAME.Plot = {
         if (p.isDead || p.combat) return false;
         var cfg = this.cfg(), s = this.slot(p, i);
         if (s.empty) { GAME.UI.log("第 " + (i + 1) + " 垄是空的。", "system"); GAME.UI.updateUI(); return false; }
-        if (!s.mature) {
-            GAME.UI.log("第 " + (i + 1) + " 垄的灵药才 " + s.years + " 年，差 " + this._fmtMonths(s.hundredLeft) + "才满百年——此时起出，只是白糟蹋一株好药。", "system");
+        if (!(s.mature || s.ready)) {
+            var _hm = (s.target === cfg.capYears && !s.ready)
+                ? ("差 " + this._fmtMonths(s.left) + "才满千年")
+                : (s.years < cfg.hundred ? ("差 " + this._fmtMonths(s.hundredLeft) + "才满百年") : "还未到采收火候");
+            GAME.UI.log("第 " + (i + 1) + " 垄的灵药" + s.years + " 年，" + _hm + "——此时起出，只是白糟蹋一株好药。", "system");
             GAME.UI.updateUI(); return false;
         }
         var isQian = s.ready;
@@ -273,6 +289,25 @@ GAME.Plot = {
         p.plots[i] = null;
         GAME.UI.log("你小心起出第 " + (i + 1) + " 垄的药，得【" + GAME.DATA.ITEMS[item].name + "】×" + n +
             (bonus ? "（灵田 +" + bonus + "）" : "") + "。", "loot");
+        GAME.UI.autoSave(); GAME.UI.updateUI();
+        return true;
+    },
+
+    /* ================= 起出移栽苗（退回百年灵药） ================= */
+    pullOut: function (i) {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return false;
+        var cfg = this.cfg();
+        this._ensure(p);
+        var s = this.slot(p, i);
+        if (s.empty) { GAME.UI.log("第 " + (i + 1) + " 垄是空的。", "system"); GAME.UI.updateUI(); return false; }
+        if (!s.isTransplant) {
+            GAME.UI.log("第 " + (i + 1) + " 垄是自个儿下种的灵药，没有可退的百年苗。", "system");
+            GAME.UI.updateUI(); return false;
+        }
+        GAME.State.addItem(cfg.transplantItem, 1);   // 退回一株百年灵药
+        p.plots[i] = null;
+        GAME.UI.log("你起出第 " + (i + 1) + " 垄的移栽苗，退回一株【" + GAME.DATA.ITEMS[cfg.transplantItem].name + "】。", "info");
         GAME.UI.autoSave(); GAME.UI.updateUI();
         return true;
     },
@@ -305,7 +340,7 @@ GAME.Plot = {
         var done = 0, i;
         for (i = 0; i < p.plots.length; i++) {
             var s = this.slot(p, i);
-            if (!s.empty && s.mature) { if (this.harvest(i)) done++; }
+            if (!s.empty && (s.mature || s.ready)) { if (this.harvest(i)) done++; }
         }
         if (done === 0) {
             GAME.UI.log("没有可采收的灵药（须满百年）。", "system");
