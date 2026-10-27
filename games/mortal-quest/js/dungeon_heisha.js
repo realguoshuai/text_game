@@ -33,6 +33,14 @@ GAME.Heisha = {
 
     start: function () {
         var p = GAME.State.p();
+        // 已平定：地宫封了。旧版没有这道闸，通关后再点一次「夜探皇宫」
+        // 就会把开场那两句「夜色如墨……四名血侍分守京城四处据点」原样重念一遍，
+        // 于是见闻录末尾凭空多出一段"故事倒带"。
+        if (p.heisha && p.heisha.bossDone) {
+            GAME.UI.log("地宫石门已被镇封，皇城重归安宁——那一战，你已了结。", "system");
+            GAME.UI.updateUI();
+            return false;
+        }
         if (!this.canEnter()) {
             GAME.UI.log("血气未足、境界尚浅——云京皇宫那一战，非筑基修士不可涉足。", "system");
             GAME.UI.updateUI();

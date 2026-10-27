@@ -179,6 +179,20 @@ GAME.BattleResult = {
         this.dismiss();
     },
 
+    /* 斩妖捷报：只记一次（rec.briefed 去重）。
+     * 正常流程由 Combat.handleCombatVictory 在归属模块清算之前调用——
+     * 旧写法把这句挂在"卷轴关闭"那一下，于是通关战报末尾成了
+     * 「先读完越皇倒下与战役掉落，玩家点收下，才补一句已伏诛」，顺序是反的。
+     * rec.campaign：战役类另赏（不在 rec 这本账上）不报件数，免得与下面那行战役掉落实不上。 */
+    brief: function (rec) {
+        if (!rec || !rec.win || rec.briefed) return;
+        rec.briefed = true;
+        var n = (rec.items || []).reduce(function (a, b) { return a + (b.qty || 0); }, 0) +
+            (rec.stones > 0 ? 1 : 0);
+        GAME.UI.log("【斩妖捷报】" + rec.foe + " 已伏诛" +
+            (rec.campaign ? "" : "，行囊里多了 " + n + " 样东西") + "。", "success");
+    },
+
     /* ---------- 离开：胜利回原探索点（或留在副本里），战败回洞府 ---------- */
     dismiss: function () {
         var rec = this._d;
@@ -202,8 +216,9 @@ GAME.BattleResult = {
         // 还会多打一条"走不得"的红字——此刻本就不该走，留在副本面板等下一步即可。
         var dg = (GAME.State.dungeonName ? GAME.State.dungeonName(GAME.State.p()) : "");
         if (rec.win) {
-            var n = (rec.items || []).reduce(function (a, b) { return a + b.qty; }, 0) + (rec.stones > 0 ? 1 : 0);
-            GAME.UI.log("【斩妖捷报】" + rec.foe + " 已伏诛，行囊里多了 " + n + " 样东西。", "success");
+            // 捷报正常已在 handleCombatVictory 里落过（必须落在剧情/掉落之前）；
+            // brief 自带去重，这里兜底"有人直接把 rec 交给卷轴"的调用点，不会记两条。
+            this.brief(rec);
             if (dg) GAME.UI.updateUI();     // 就在原地，副本面板接着用
             else GAME.UI.switchTab("map");  // 回到遇袭的那片地，脚下还是原处
         } else {

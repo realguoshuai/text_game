@@ -277,6 +277,18 @@ GAME.Map = {
         return true;
     },
 
+    // ---------- 地点描述（唯一出口） ----------
+    // 有些地点在主线了结后该换一种说法。数据里写 descPacified，这里按状态挑；
+    // 渲染不再就地拼字符串，免得"地图一句话、见闻录另一句话"。
+    nodeDesc: function (node, p) {
+        node = node || this.cur();
+        p = p || GAME.State.p();
+        if (!node) return "";
+        if (node.id === "yuejing_cheng" && node.descPacified &&
+            p.heisha && p.heisha.bossDone) return node.descPacified;
+        return node.desc || "";
+    },
+
     // ---------- 地点专属行动 ----------
     // 节点自带的 actions 只写"这地方永久有啥"，写不了"你手上有某物时才有的门"。
     // 苍南谷原先 actions 为空 —— 持升仙令的人站在谷里，读到的却是「此地无事可做」，
@@ -300,6 +312,14 @@ GAME.Map = {
                     hint: "赤色蛛网封死寝殿甬道——不斩此蛛，入不得地宫。", guardId: null
                 });
                 out.push({ id: "heisha_boss", label: "决战·幽冥教主越皇", hint: "血侍与血玉蜘蛛尽除后，方可直入寝殿。", guardId: null });
+            } else if (p.heisha && p.heisha.bossDone) {
+                // 已平定：把「夜探皇宫」这条入口换掉。留着一个能点的按钮，就是留给玩家重念开场白的口子。
+                out = out.filter(function (a) { return a.id !== "heisha_raid"; });
+                out.push({
+                    id: "heisha_pacified",
+                    label: "【已平定】幽冥教覆灭，皇城地宫已封",
+                    hint: "地宫石门由镇魔司以铁汁浇死，余党或散或伏——云京的夜，总算又有了灯火气。"
+                });
             }
         }
         if (node.id === "tainan_gu" && !p.sectId && GAME.State.countItem("shengxian_ling") > 0) {
@@ -322,6 +342,10 @@ GAME.Map = {
         // 云京皇宫讨伐：resume / 分破血侍 / 决战越皇 的入口校验
         if (actionId === "heisha_resume") {
             return { ok: !!(p.heisha && !p.heisha.bossDone), msg: "当前并无进行中的皇宫讨伐。" };
+        }
+        // 已平定：只报"封了"，不给可点入口
+        if (actionId === "heisha_pacified") {
+            return { ok: false, msg: "地宫已封——此处再无事可做。" };
         }
         if (actionId.indexOf("heisha_guard_") === 0) {
             var gid = actionId.slice("heisha_guard_".length);

@@ -317,6 +317,52 @@ section('⑤ 中栏【前往：云京·皇城】跨城自动赶路');
     ok('真的推进了年月', p.totalMonths > m0);
 }
 
+/* ================= ⑥ 通关之后：不重念开场白 / 皇城改口 / 目标不跳终局 ================= */
+section('⑥ 越皇伏诛之后（开场白不再重念、皇城已平定、目标接得上）');
+{
+    // 上一节把玩家挪到了云京、副本已通关
+    p.location = 'yuejing_cheng';
+    p.heisha.bossDone = true;
+    p.secretDone = null;
+    const n0 = logs.length;
+    const again = G.Heisha.start();          // 手滑再点一次「夜探皇宫」
+    ok('通关后再点 start() 被拒', again === false);
+    ok('不再重念开场白（夜色如墨 / 四名血侍分守）',
+        !/夜色如墨/.test(joined(n0)) && !/四名血侍分守/.test(joined(n0)));
+    ok('给了一句「已了结」，不是静默', /已了结/.test(joined(n0)));
+
+    const acts = G.Map.nodeActions(p).map(a => a.id);
+    ok('「此地可为」不再挂夜探皇宫', acts.indexOf('heisha_raid') < 0);
+    ok('换成【已平定】条目', acts.indexOf('heisha_pacified') >= 0);
+    ok('【已平定】点不动', G.Map.canDoAction('heisha_pacified').ok === false);
+
+    const nd = G.Map.node('yuejing_cheng');
+    ok('节点数据里有战后文案', !!nd.descPacified);
+    ok('nodeDesc 战后切到「血气已经散了」', /血气已经散了/.test(G.Map.nodeDesc(nd, p)));
+    ok('未通关时仍是原描述（不误切）', (function () {
+        const keep = p.heisha.bossDone;
+        p.heisha.bossDone = false;
+        const t = G.Map.nodeDesc(nd, p);
+        p.heisha.bossDone = keep;
+        return /蛰伏着一头择人而噬的血魔/.test(t);
+    })());
+
+    // 目标：不能一步跳到结丹终局，也不能露出 18/18
+    p.qixuan = { act: 7, step: 0 };     // 苍梧门六幕已完结，否则目标栏会停在那条上
+    p.sectId = 'huangfenggu';           // 已拜入青梧谷，否则目标会停在"苍南小会拜山"上
+    p.realmIndex = 13; p.currentExp = 3523;
+    const g = G.Goals.current();
+    ok('筑基初期目标 = 精进修为 / 筑基中期（实为 ' + (g && g.id) + '）',
+        g && g.id === 'zhuji_next' && /突破至筑基中期/.test(g.text));
+    ok('目标里没有 18/18 这类底层公式', !/18\s*\/\s*18/.test((g.text || '') + (g.hint || '')));
+    p.realmIndex = 15;
+    const g15 = G.Goals.current();
+    ok('筑基后期目标 = 冲结丹天堑（实为 ' + (g15 && g15.id) + '）', g15 && g15.id === 'zhuji_jiedan');
+    p.realmIndex = 16;
+    const g16 = G.Goals.current();
+    ok('结丹初期目标 = 结丹三阶', g16 && g16.id === 'jiedan' && !/18\s*\/\s*18/.test((g16.text || '') + (g16.hint || '')));
+}
+
 /* ================= 收尾 ================= */
 if (errors.length) {
     console.log('\n运行时错误：');

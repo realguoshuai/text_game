@@ -126,6 +126,11 @@ h3 { margin: 0 0 8px 0; color: var(--text-dim); font-size: 14px; border-left: 3p
     border-radius: 8px;
 }
 
+/* 岚州舆图：最底部是「狩猎之地」与碎星海那条红字限制，贴着底边框会被切得只剩半行。
+   注意 `#panel-area > .panel{padding:0}` 的优先级 (1,1,0) 高于单写 `#map-panel`(1,0,0)，
+   所以选择器要写实成 `#panel-area > #map-panel`（(2,1,0)）——靠权重取胜，不靠强制覆盖。 */
+#panel-area > #map-panel { padding-bottom: 28px; }
+
 /* ---------- 状态栏：紧凑自适应网格，两行放完 ---------- */
 #main-panel { flex-shrink: 0; padding: 8px 12px; }
 .stats-grid {
@@ -3228,8 +3233,12 @@ body.theme-light .btm-stats { color: #2F6B45; }
     animation: pulse-glow 2s infinite ease-in-out;
 }
 .injury-alert:hover { background: rgba(140, 30, 30, .34); }
+/* 「暗」字要落在圆圈正中：靠 line-height 对齐在楷体上会偏下，
+   改成 flex 居中（宽度/高度固定，边框算在内，行高归 1 免得再叠一次偏移） */
 .injury-alert .ia-mark {
-    flex: 0 0 auto; width: 22px; height: 22px; line-height: 20px; text-align: center;
+    flex: 0 0 auto; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; box-sizing: border-box; line-height: 1;
     border: 1px solid #c0392b; border-radius: 50%;
     color: #ffb3ae; font-size: 13px; font-family: var(--font-kai);
 }

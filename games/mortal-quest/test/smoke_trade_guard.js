@@ -171,7 +171,7 @@ G.Market.sell('ore');
 ok('单件出售日志类型 = trade', lastLog().type === 'trade');
 
 /* ================= ③ 突破成功率同源 ================= */
-section('③ 「届时成功率」与「尝试突破」按钮读同一份推演');
+section('③ 目标框成功率 与「尝试突破」按钮读同一份推演的同一个字段');
 p.location = G.DATA.MAP.start;
 p.combat = null; p.yindu = null; p.pendingEvent = null; p.pendingMercy = null;
 p.moEvent = null; p.qixuan = { act: 7 }; p.realmIndex = 3; p.currentExp = 0;
@@ -179,7 +179,7 @@ p.marketRiskValue = 0;
 U.updateUI();
 const planP = G.Breakthrough.plan(p);
 const act0 = G.Goals.action(p);
-const mGoal = /届时成功率 (\d+)%/.exec(act0.why || '');
+const mGoal = /筹备后成功率 (\d+)%/.exec(act0.why || '');
 ok('目标框报出了成功率', !!mGoal);
 ok('目标框百分比 == plan.successChance（逐字同源）',
     !!mGoal && Number(mGoal[1]) === Math.round(planP.successChance * 100));
@@ -187,7 +187,7 @@ ok('目标框百分比 == plan.successChance（逐字同源）',
 p.mind = 40;
 U.updateUI();
 const planP2 = G.Breakthrough.plan(p);
-const mGoal2 = /届时成功率 (\d+)%/.exec(G.Goals.action(p).why || '');
+const mGoal2 = /筹备后成功率 (\d+)%/.exec(G.Goals.action(p).why || '');
 ok('心境变化后两处仍一致', !!mGoal2 && Number(mGoal2[1]) === Math.round(planP2.successChance * 100));
 ok('确实读到了新的数值（非同值巧合）', Math.round(planP2.successChance * 100) !== Math.round(planP.successChance * 100));
 // 旧实现读 realm.breakChance 静态底子（心境/灵脉一概不算）；与 plan 的差正好被这条抓住
@@ -195,6 +195,18 @@ const basePct = Math.round((G.DATA.REALMS[p.realmIndex].breakChance || 0) * 100)
 ok('心境加成后 plan 值已偏离静态底子（证明读的是推演而非底子）',
     Math.round(planP2.successChance * 100) !== basePct);
 p.mind = 0;
+
+// 筑基段（底子由修为进度驱动）：这里"当下档"与"修为圆满档"天然不等——
+// 正是旧版目标框报 70%、按钮报 66% 的现场。两处必须都读 successChance。
+p.realmIndex = 13; p.currentExp = 2340; p.currentHp = p.maxHp; p.mind = 0;
+U.updateUI();
+const planB = G.Breakthrough.plan(p);
+const mB = /筹备后成功率 (\d+)%/.exec(G.Goals.action(p).why || '');
+ok('筑基段：目标框 == plan.successChance（不是圆满档 chanceFull）',
+    !!mB && Number(mB[1]) === Math.round(planB.successChance * 100));
+ok('该样本"当下档 ≠ 圆满档"（否则这条拦不住 70/66 那种错位）',
+    Math.round(planB.chanceFull * 100) !== Math.round(planB.successChance * 100));
+p.realmIndex = 3; p.currentExp = 0;
 U.updateUI();
 
 /* ================= ④ 坊市进出：耗年与文案 ================= */

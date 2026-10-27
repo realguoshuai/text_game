@@ -262,13 +262,46 @@ GAME.Goals = {
             where: "云京",
             whereTo: { kind: "map", node: "yuejing_cheng" }
         },
+        // 筑基期三段引导：越皇打完不该一步跳到「结丹后期圆满」——
+        // 那是终局文案，还会把「= 18/18」这种底层索引公式直接摊给玩家看。
+        {
+            id: "zhuji_next",
+            when: function (p) { return p.realmIndex === 13 || p.realmIndex === 14; },
+            done: function (p) { return p.realmIndex >= 15; },
+            text: function (p) {
+                var nx = GAME.DATA.REALMS[p.realmIndex + 1] || {};
+                return "精进修为 · 突破至" + (nx.name || "筑基后期") + "（为远赴碎星海做准备）";
+            },
+            hint: function (p) {
+                var r = GAME.DATA.REALMS[p.realmIndex] || {};
+                var need = r.needExp || 0;
+                var left = Math.max(0, Math.ceil(need - (p.currentExp || 0)));
+                return "当前 " + GAME.Goals._realmName(p.realmIndex) + "，修为 " +
+                    Math.floor(p.currentExp || 0) + "/" + need +
+                    (left > 0 ? "（还差 " + left + "）" : "，已可冲关") +
+                    "——打坐、服丹、历练皆可精进；筑基后期方有跨海之力";
+            },
+            where: "洞府",
+            whereTo: { kind: "tab", tab: "home" }
+        },
+        {
+            id: "zhuji_jiedan",
+            when: function (p) { return p.realmIndex === 15; },
+            done: function (p) { return p.realmIndex >= 16; },
+            text: "冲击结丹天堑 · 凝金丹",
+            hint: function () {
+                return "筑基后期，修为已至圆满边缘——无丹硬冲九成五身陨，宜先备一枚凝丹；魔修弃营、碎星海皆有结丹机缘";
+            },
+            where: "洞府",
+            whereTo: { kind: "tab", tab: "home" }
+        },
         {
             id: "jiedan",
-            when: function (p) { return p.realmIndex >= 13; },
+            when: function (p) { return p.realmIndex >= 16; },
             done: function (p) { return p.realmIndex >= 18; },
-            text: "凝丹功成，结丹后期圆满",
+            text: "凝丹三重 · 结丹后期圆满",
             hint: function (p) {
-                return "当前 " + GAME.Goals._realmName(p.realmIndex) + "（结丹后期圆满 = 18/18）";
+                return "当前 " + GAME.Goals._realmName(p.realmIndex) + "——结丹三阶：初期 → 中期 → 后期，逐步凝炼";
             },
             where: "洞府 / 历练",
             whereTo: { kind: "tab", tab: "home" }
@@ -374,10 +407,19 @@ GAME.Goals = {
                     run: function () { GAME.Core.meditate(); }
                 };
             }
+            // needExp=null 的顶境有两种：筑基后期→结丹（凝金丹）、结丹后期→元婴（碎丹成婴）。
+            // 旧版一律写成「碎丹成婴」，筑基后期的人看着这句会以为要碎一颗自己还没有的金丹。
+            // 破境模块缺席（单测/裁剪包）时也要说对：能走到这一支的顶境只有
+            // 「筑基后期 → 结丹」与「结丹后期 → 元婴」两种
+            var _isYuan = (p.realmIndex === (GAME.DATA.YUANING_GATE_SOURCE || 18));
+            var _gate = (GAME.Breakthrough && GAME.Breakthrough.gate)
+                ? GAME.Breakthrough.gate(p) : (_isYuan ? "yuanying" : "jiedan");
             return {
                 kind: "go",
-                label: "尝试突破（碎丹成婴）",
-                why: "已至结丹后期圆满，下一步是元婴天堑——碎丹前可先备千年灵药或 3000 灵石护法更稳" + lastChance,
+                label: "尝试突破（" + (_gate === "yuanying" ? "碎丹成婴" : "凝金丹") + "）",
+                why: (_gate === "yuanying"
+                    ? "已至结丹后期圆满，下一步是元婴天堑——碎丹前可先备千年灵药或 3000 灵石护法更稳"
+                    : "已至筑基后期圆满，下一步是结丹天堑——先备一枚凝丹，别拿九成五的身陨去赌") + lastChance,
                 run: function () { GAME.Core.breakthrough(); }
             };
         }
@@ -423,14 +465,15 @@ GAME.Goals = {
         // 于是同一时刻出现"58% 对 64%"打架（用户实测）。
         var chPlan = null;
         try { chPlan = (GAME.Breakthrough && GAME.Breakthrough.plan) ? GAME.Breakthrough.plan(p) : null; } catch (e) { chPlan = null; }
-        // 「届时」＝修为填满那一刻，故读 chanceFull（修为进度驱动的境界当下这一把更低）
-        var chNow = (chPlan && chPlan.ok) ? (chPlan.chanceFull || chPlan.successChance)
+        // 与「尝试突破」按钮读同一份 plan 的**同一个字段**（successChance）。
+        // 旧版这里读 chanceFull（修为圆满档），按钮读当下档，于是同一屏出现 70% 与 66% 打架。
+        var chNow = (chPlan && chPlan.ok) ? chPlan.successChance
             : ((typeof r.breakChance === "number") ? r.breakChance : null);
         return {
             kind: "heal",
             label: "",   // 目标框底部不重复"闭关打坐（X月·+1修为）"——动作网格已有此按钮，此处只留差距信息
             why: "还差 " + need + " 修为可尝试突破" +
-                 (chNow !== null ? "（届时成功率 " + Math.round(chNow * 100) + "%）" : "") +
+                 (chNow !== null ? "（筹备后成功率 " + Math.round(chNow * 100) + "%）" : "") +
                  plotHint + leftTxt,
             run: function () { GAME.Core.meditate(); }
         };

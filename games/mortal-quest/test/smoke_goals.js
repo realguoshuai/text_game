@@ -123,10 +123,13 @@ g = G.Goals.current();
 assert('副本提示含已破血仆数', !!g && /2\/4/.test(g.hint));
 P().heisha.bossDone = true;
 g = G.Goals.current();
-assert('副本通关 → 冲击结丹', g && g.id === 'jiedan');
+assert('副本通关 → 精进修为（不再一步跳到结丹终局）',
+    g && g.id === 'zhuji_next' && /突破至筑基中期/.test(g.text));
 P().realmIndex = 15;
 g = G.Goals.current();
-assert('筑基后期 → 冲击结丹（未圆满，目标仍为 jiedan）', g && g.id === 'jiedan');
+assert('筑基后期 → 冲结丹天堑（zhuji_jiedan）', g && g.id === 'zhuji_jiedan');
+assert('筑基后期目标文案不再出现 18/18 这类底层公式',
+    !/18\s*\/\s*18/.test((g.text || '') + (g.hint || '')));
 P().realmIndex = 18;
 g = G.Goals.current();
 assert('结丹后期 → 碎丹成婴目标', g && g.id === 'yuanying');

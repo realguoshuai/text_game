@@ -988,6 +988,15 @@ GAME.Combat = {
             ctx = pc ? pc.ctx : null;
         }
         this.end();
+        /* 战报顺序：斩妖捷报 →（归属模块清算：剧情 / 战役掉落）→ 结算卷轴。
+         * 旧版这句捷报挂在「卷轴关闭」那一下，于是通关战报的末尾成了
+         * 「先读完越皇倒下与战役掉落，玩家点了收下，才补一句已伏诛」——顺序是反的。 */
+        if (rec.win && GAME.BattleResult && GAME.BattleResult.brief) {
+            // 战役类的另行赏赐（赤玉蛛卵那一路）是在 afterCombat 里才入袋的，不在 rec 这本账上：
+            // 记成 campaign，brief 就不再报"多了 N 样"，免得紧接着列出三样战役掉落时打自己的脸。
+            rec.campaign = !!(ctx && ctx.type === "heisha");
+            GAME.BattleResult.brief(rec);
+        }
         try {
             this._routeVictory(ctx);
         } catch (e) {

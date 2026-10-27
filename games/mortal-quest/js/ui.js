@@ -1018,17 +1018,25 @@ GAME.UI = {
             var tAlch = this.$("tab-alchemy");
             if (tAlch) tAlch.disabled = !GAME.Core.canAlchemy();
             // 杂役堂只在幽篁谷且有宗门身份时可用；血色禁地副本入口同理（旧试炼入口已撤）
+            // 杂役堂：幽篁谷（洞府所在）与青梧谷（宗门山门）两处都算"回了家"。
+            // 旧版只认幽篁谷，可从云京回来先落在青梧谷，门派按钮就点不开；
+            // 而且文案把幽篁谷叫成「宗门驻地」——驻地是青梧谷，幽篁谷是你那孔石洞。
             var atHome = p.location === GAME.DATA.MAP.start;
+            var sectNode = null;
+            (GAME.DATA.MAP.nodes || []).forEach(function (n) {
+                if (n.reqSect && n.reqSect === p.sectId) sectNode = n;
+            });
+            var atSect = !!sectNode && p.location === sectNode.id;
             var _sectBtn = this.$("btn-sect");
-            _sectBtn.disabled = lock || !atHome || !p.sectId;
+            _sectBtn.disabled = lock || !(atHome || atSect) || !p.sectId;
             this._why(_sectBtn, lock ? lockWhyInline
                 : !p.sectId ? "尚未拜入宗门"
-                : !atHome ? "须回幽篁谷（宗门驻地）" : "");
+                : !(atHome || atSect) ? "须回青梧谷山门或幽篁谷" : "");
             _sectBtn.title = lock ? lockTitle : "";
             // 「未开启」朱印角标：未拜入门派才盖；已拜入但不在驻地->「需回驻地」褐底
             _sectBtn.classList.remove("badge-locked", "badge-away");
             if (!p.sectId) _sectBtn.classList.add("badge-locked");
-            else if (!atHome) _sectBtn.classList.add("badge-away");
+            else if (!(atHome || atSect)) _sectBtn.classList.add("badge-away");
 
             var _ssub = this.$("sect-sub");
             if (_ssub) _ssub.innerText = p.sectId ? "杂役堂 · 贡献 " + p.sectContrib : "";
@@ -3168,7 +3176,7 @@ GAME.UI = {
         var node = GAME.Map.cur();
         this.$("map-info").innerHTML =
             '<span class="highlight">' + node.name + '</span>　｜　盘缠 <span class="gold">' + (p.silver || 0) +
-            ' 两</span>　｜　灵石 <span class="gold">' + p.spiritStones + '</span><br>' + node.desc;
+            ' 两</span>　｜　灵石 <span class="gold">' + p.spiritStones + '</span><br>' + GAME.Map.nodeDesc(node, p);
 
         // 道路按钮：修为不足 / 盘缠不足 / 幻阵未破时禁用，并在文案里写明原因
         var box = this.$("map-routes");
@@ -3399,7 +3407,8 @@ GAME.UI = {
             b2.className = "small-btn btn-gold";
             // 玄机世家是一次性主线：了结之后入口只报"已了结"，不再给一个点了刷日志的按钮
             b2.innerText = (a.id === "mo_house" && p.jiayuanDone) ? "已了结"
-                : (a.id === "join_sect" ? "拜入山门" : "行事");
+                : (a.id === "heisha_pacified" ? "已平定"
+                : (a.id === "join_sect" ? "拜入山门" : "行事"));
             b2.disabled = !chk2.ok;
             if (!chk2.ok) b2.title = chk2.msg;
             b2.onclick = function () { GAME.Map.doAction(a.id); };
