@@ -835,7 +835,8 @@ GAME.UI = {
         box.style.display = "";
 
         var head = this.$("plot-head-text");
-        if (head) head.innerText = st.growing + " / " + st.plots + " 垄在长" + (st.ready > 0 ? " · " + st.ready + " 株可收" : "");
+        if (head) head.innerText = st.growing + " / " + st.plots + " 垄在长" +
+            (st.ready > 0 ? " · " + st.ready + " 株千年可收" : (st.mature > 0 ? " · " + st.mature + " 株百年可收" : ""));
 
         // 状态条右侧：灵田等阶 ＋ 手上存药。空垄时改成一句"点击打理药圃 ›"——
         // 光挂一个 0/3 的死数字，玩家既不知道点得动，也不知道该拿什么去种。
@@ -844,24 +845,52 @@ GAME.UI = {
             var _lv = (GAME.Home && GAME.Home.level) ? GAME.Home.level("lingtian") : 0;
             var _lt = _lv > 0 ? ("灵田 " + _lv + " 阶") : "凡土药畦";
             var _qian = GAME.State.countItem("herb_qiannian");
+            var _bai = GAME.State.countItem("herb_bainian");
             if (st.growing === 0) {
                 more.innerText = _lt + " · 点击打理药圃 ›";
             } else {
-                more.innerText = _lt + " · 存药 百年×" + st.seed + (_qian > 0 ? " 千年×" + _qian : "");
+                more.innerText = _lt + " · 存药 百年×" + _bai + (_qian > 0 ? " 千年×" + _qian : "");
             }
         }
 
         var sum = this.$("plot-sum");
         if (sum) {
             var t = "药圃 · " + st.growing + "/" + st.plots + " 垄在长";
-            if (st.ready > 0) t += ' · <b class="bt-plus">' + st.ready + " 株可收</b>";
+            if (st.ready > 0) t += ' · <b class="bt-plus">' + st.ready + " 株千年可收</b>";
+            else if (st.mature > 0) t += ' · <b class="bt-plus">' + st.mature + " 株百年可收</b>";
             else if (st.nextLeft != null) t += " · 最近 " + GAME.Plot._fmtMonths(st.nextLeft) + "后成";
             sum.innerHTML = t;
+        }
+
+        // 批量操作：一键下种（灵药种子）/ 一键采收（满百年）
+        var batch = this.$("plot-batch");
+        if (batch) {
+            batch.innerHTML = "";
+            var seedN = GAME.State.countItem("seed_lingyao");
+            var bSeed = document.createElement("button");
+            bSeed.className = "small-btn plot-btn";
+            bSeed.innerText = "一键下种（灵药种子×" + seedN + "）";
+            bSeed.disabled = seedN < 1;
+            this._why(bSeed, seedN < 1 ? "需【灵药种子】" : "");
+            bSeed.onclick = function () { GAME.Plot.oneKeySeed(); };
+            var bHarv = document.createElement("button");
+            bHarv.className = "small-btn plot-btn";
+            bHarv.innerText = "一键采收" + (st.mature > 0 ? "（" + st.mature + " 株）" : "");
+            bHarv.disabled = st.mature < 1;
+            this._why(bHarv, st.mature < 1 ? "无满百年灵药可收" : "");
+            bHarv.onclick = function () { GAME.Plot.oneKeyHarvest(); };
+            batch.appendChild(bSeed);
+            batch.appendChild(bHarv);
         }
 
         var list = this.$("plot-list"), self = this;
         if (list) {
             list.innerHTML = "";
+            var seedN2 = GAME.State.countItem("seed_lingyao");
+            var baiN = GAME.State.countItem("herb_bainian");
+            var liq = p.liquid || 0;
+            var stepAdd = GAME.DATA.PLOT.stepAdd;
+            var capYears = GAME.DATA.PLOT.capYears;
             st.list.forEach(function (s) {
                 var row = document.createElement("div");
                 row.className = "bt-row plot-row";
@@ -873,26 +902,73 @@ GAME.UI = {
                 var desc = document.createElement("span");
                 desc.className = "bt-rn";
 
-                var btn = document.createElement("button");
-                btn.className = "small-btn plot-btn";
+                var acts = document.createElement("span");
+                acts.className = "plot-acts";
 
                 if (s.empty) {
                     desc.innerText = "空地";
-                    btn.innerText = "移栽";
-                    btn.disabled = st.seed < 1;
-                    self._why(btn, st.seed < 1 ? "需【百年灵药】×1（现有 0）" : "");
-                    btn.onclick = function () { GAME.Plot.plant(s.i); };
+                    var bS = document.createElement("button");
+                    bS.className = "small-btn plot-btn";
+                    bS.innerText = "下种";
+                    bS.disabled = seedN2 < 1;
+                    self._why(bS, seedN2 < 1 ? "需【灵药种子】" : "");
+                    bS.onclick = function () { GAME.Plot.plantSeed(s.i); };
+                    var bT = document.createElement("button");
+                    bT.className = "small-btn plot-btn";
+                    bT.innerText = "移栽";
+                    bT.disabled = baiN < 1;
+                    self._why(bT, baiN < 1 ? "需【百年灵药】" : "");
+                    bT.onclick = function () { GAME.Plot.plantTransplant(s.i); };
+                    acts.appendChild(bS);
+                    acts.appendChild(bT);
                 } else if (s.ready) {
                     desc.innerText = s.years + " 年 · 已满千年";
-                    btn.innerText = "收成";
-                    btn.onclick = function () { GAME.Plot.harvest(s.i); };
+                    var bH = document.createElement("button");
+                    bH.className = "small-btn plot-btn";
+                    bH.innerText = "收成·千年灵药";
+                    bH.onclick = function () { GAME.Plot.harvest(s.i); };
+                    acts.appendChild(bH);
+                } else if (s.mature) {
+                    desc.innerText = s.years + " 年 · 已满百年（差 " + GAME.Plot._fmtMonths(s.left) + "满千年）";
+                    var bHb = document.createElement("button");
+                    bHb.className = "small-btn plot-btn";
+                    bHb.innerText = "收成·百年灵药";
+                    bHb.onclick = function () { GAME.Plot.harvest(s.i); };
+                    var bA = document.createElement("button");
+                    bA.className = "small-btn plot-btn";
+                    bA.innerText = "催熟+250";
+                    bA.disabled = liq < 1;
+                    self._why(bA, liq < 1 ? "灵液不足（需 1 滴）" : "");
+                    bA.onclick = function () { GAME.Plot.catalyzeAdd(s.i); };
+                    var bD = document.createElement("button");
+                    bD.className = "small-btn plot-btn";
+                    var dropsD = Math.ceil((capYears - s.years) / stepAdd);
+                    bD.innerText = "直催千年(" + dropsD + "滴)";
+                    bD.disabled = liq < dropsD;
+                    self._why(bD, liq < dropsD ? "灵液不足（需 " + dropsD + " 滴）" : "");
+                    bD.onclick = function () { GAME.Plot.catalyzeDirect(s.i); };
+                    acts.appendChild(bHb);
+                    acts.appendChild(bA);
+                    acts.appendChild(bD);
                 } else {
-                    desc.innerText = s.years + "/1000 年（还需 " + GAME.Plot._fmtMonths(s.left) + "）";
-                    btn.innerText = "收成";
-                    btn.disabled = true;
-                    self._why(btn, "年份不足，此时起出白糟蹋一株好药");
+                    desc.innerText = s.years + " 年 · 幼苗（差 " + GAME.Plot._fmtMonths(s.hundredLeft) + "满百年）";
+                    var bC = document.createElement("button");
+                    bC.className = "small-btn plot-btn";
+                    bC.innerText = "催熟→百年";
+                    bC.disabled = liq < 1;
+                    self._why(bC, liq < 1 ? "灵液不足（需 1 滴）" : "");
+                    bC.onclick = function () { GAME.Plot.catalyzeToHundred(s.i); };
+                    var bHx = document.createElement("button");
+                    bHx.className = "small-btn plot-btn";
+                    bHx.innerText = "收成";
+                    bHx.disabled = true;
+                    self._why(bHx, "未满百年，起出白糟蹋一株好药");
+                    acts.appendChild(bC);
+                    acts.appendChild(bHx);
                 }
-                row.appendChild(name); row.appendChild(desc); row.appendChild(btn);
+                row.appendChild(name);
+                row.appendChild(desc);
+                row.appendChild(acts);
                 list.appendChild(row);
             });
         }
@@ -900,7 +976,7 @@ GAME.UI = {
         var hint = this.$("plot-hint");
         if (hint) {
             hint.innerText = "每月长 " + (Math.round(GAME.Plot.rate(p) * 10) / 10) + " 年份（灵峰加成已计入）" +
-                "　｜　百年灵药 " + st.seed + " 株";
+                "　｜　灵药种子 " + GAME.State.countItem("seed_lingyao") + " · 百年灵药 " + GAME.State.countItem("herb_bainian");
         }
     },
 
@@ -919,6 +995,9 @@ GAME.UI = {
         if (!st) { if (btn) btn.classList.remove("bt-ready"); return; }
         if (st.ready > 0) {
             sub.innerText = "\u2605 灵药已熟 · 点击采收";
+            if (btn) btn.classList.add("bt-ready");
+        } else if (st.mature > 0) {
+            sub.innerText = "\u2605 百年灵药可收 · 点击采收";
             if (btn) btn.classList.add("bt-ready");
         } else if (st.growing < st.plots) {
             sub.innerText = st.growing + " / " + st.plots + " 垄 · 灵田空置（宜下种）";
@@ -1019,7 +1098,7 @@ GAME.UI = {
             var inDungeon = !!dgName;
             var lock = dead || busy || waiting || inStory || inDungeon;
             var ids = ["btn-meditate","btn-meditate-5","btn-meditate-10","btn-meditate-full",
-                       "btn-catalyze-bainian","btn-catalyze-qiannian","btn-breakthrough","btn-explore","btn-market","btn-sect"];
+                       "btn-breakthrough","btn-explore","btn-market","btn-sect"];
             var lockWhy = inDungeon ? GAME.State.dungeonWhy(p)
                 : inStory ? "剧情进行中" : busy ? "战斗/事件未了" : waiting ? "有待决事件" : dead ? "已身陨" : "";
             // 秘境里闭关/催熟/炼丹/历练/突破/坊市六七个按钮同因：按钮内小字只写短句（照旧例
@@ -1168,20 +1247,24 @@ GAME.UI = {
                     ? "灵液不足：需 " + need + " 滴（现有 " + (p.liquid || 0) + "）" : ""));
                 b.title = lock ? lockTitle : "";
             }.bind(this);
-            _liq(this.$("btn-catalyze-bainian"), 1);
-            _liq(this.$("btn-catalyze-qiannian"), 5);
             _liq(this.$("btn-catalyze-wood"), 1);
             _liq(this.$("btn-catalyze-xuanbing"), 5);
             _liq(this.$("btn-catalyze-longlin"), 10);
             // 催熟菜单的副标题：产出来是干什么用的 ＋ 手上现有几份。
-            // 原来只有一句"得灵木×3"，玩家对着它根本猜不出灵木为何物。
             var _cn = function (id) { return GAME.State.countItem(id); };
             var _catSub = function (elId, txt) { var el = this.$(elId); if (el) el.innerText = txt; }.bind(this);
-            _catSub("cata-bainian-sub", "1 滴 → 百年灵药×1 · 药圃移栽苗 / 炼丹主材 · 现有 " + _cn("herb_bainian") + " 株");
-            _catSub("cata-qiannian-sub", "5 滴 → 千年灵药×1 · 筑基丹主药 · 现有 " + _cn("herb_qiannian") + " 株");
             _catSub("cata-wood-sub", "1 滴 → 百年灵木×3 · 傀儡骨架主材 · 现有 " + _cn("spirit_wood") + " 根");
             _catSub("cata-xuanbing-sub", "5 滴 → 五百年玄冰花×1 · 元灵丹主材 / 拜师礼 · 现有 " + _cn("herb_xuanbing") + " 株");
             _catSub("cata-longlin-sub", "10 滴 → 千年龙鳞果×1 · 结丹级天地灵珍（老怪见之动心）· 现有 " + _cn("herb_longlin") + " 株");
+            // 服丹炼化：显示囊中可服修炼丹总数（一键取最高 exp 一枚）
+            var _pillN = 0, _pid;
+            for (_pid in GAME.DATA.ITEMS) {
+                if (!Object.prototype.hasOwnProperty.call(GAME.DATA.ITEMS, _pid)) continue;
+                var _pi = GAME.DATA.ITEMS[_pid];
+                if (_pi.type === "pill" && _pi.use && _pi.use.exp) _pillN += GAME.State.countItem(_pid);
+            }
+            var _fuSub = this.$("fu-dan-sub");
+            if (_fuSub) _fuSub.innerText = "丹药 " + _pillN;
 
             // —— 异常警示行：有异常才亮（煞气/阴毒/觊觎度/药香泄露） ——
             var aw = function (id, on) { var el = this.$(id); if (el) el.style.display = on ? "" : "none"; }.bind(this);
@@ -4158,8 +4241,8 @@ GAME.UI = {
         this.$("btn-start").onclick = function () { self.startGame(self.selectedOrigin); };
         this.$("btn-plot").onclick = function () { GAME.UI.openPlot(); };
         this.$("btn-meditate-1").onclick = function () { GAME.Core.meditate(); };
-        this.$("btn-catalyze-bainian").onclick = function () { GAME.Core.catalyze(1, "herb_bainian"); };
-        this.$("btn-catalyze-qiannian").onclick = function () { GAME.Core.catalyze(5, "herb_qiannian"); };
+        var bFu = this.$("btn-fu-dan");
+        if (bFu) bFu.onclick = function () { GAME.Core.takeOptimalPill(); };
         var bWood = this.$("btn-catalyze-wood");
         if (bWood) bWood.onclick = function () { GAME.Cave2.catalyzeWood(); };
         var bXb = this.$("btn-catalyze-xuanbing");

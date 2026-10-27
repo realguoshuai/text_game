@@ -1,13 +1,16 @@
 'use strict';
 /* =========================================================
- * test/smoke_plot.js —— 药圃（灵药年份）回归测试
- *   ① 模块与配置：GAME.Plot / GAME.DATA.PLOT 落位
- *   ② 空地：三垄默认空，status 摘要为 0
- *   ③ 移栽：耗 1 株百年灵药、起点 100 年；缺苗不动、占垄不叠
- *   ④ 生长：每月 3 年份，灵峰 gardenMul 加倍；上限 1000 年
- *   ⑤ 收成：不足千年收不动（且不消耗）；满千年得千年灵药，收完变空垄
- *   ⑥ 唯一出口：core.passTime / Time.seclude 都会推药圃年月
- *   ⑦ 摘要：growing / ready / nextLeft 与逐垄一致
+ * test/smoke_plot.js —— 药圃（多阶灵田 + 灵药年份）回归测试
+ *   ① 配置/模块：GAME.Plot、GAME.DATA.PLOT 落位，灵田阶数与月增表
+ *   ② 空地：按灵田阶数懒初始化
+ *   ③ 移栽：耗百年灵药、起点 100 年；缺苗不动、占垄不叠
+ *   ④ 生长：每月按阶 ypm × 灵峰 gardenMul；上限 1000 年
+ *   ⑤ 收成：mature(≥100)→百年灵药；ready(≥1000)→千年灵药；幼苗(<100)收不动且不消耗
+ *   ⑥ 催熟：catalyzeToHundred 幼苗→百年；catalyzeAdd +250；catalyzeDirect 拉满千年（按缺口算滴数）
+ *   ⑦ 唯一出口：core.passTime / Time.seclude 推药圃年月
+ *   ⑧ 一键：oneKeySeed 批量下种；oneKeyHarvest 批量采收 mature
+ *   ⑨ 灵田阶数：tier 越高垄越多、月增越快
+ *   ⑩ 摘要：growing / mature / ready / nextLeft 与逐垄一致
  * 运行： node test/smoke_plot.js
  * ========================================================= */
 
@@ -47,6 +50,14 @@ G.DATA.LINGFENG = [
   { id: 'low', gardenMul: 1 }, { id: 'mid', gardenMul: 1.5 }, { id: 'high', gardenMul: 2 }
 ];
 
+// 灵田阶数桩（plot.level() 读 GAME.Home.level("lingtian")；yieldBonus 供收成加成）
+let TIER = 0, YB = 0;
+G.Home = {
+  level: function () { return TIER; },
+  yieldBonus: function () { return YB; }
+};
+function setTier(n, yb) { TIER = n; YB = (yb == null ? 0 : yb); }
+
 let pass = 0, fail = 0; const fails = [];
 function ok(name, cond) {
   if (cond) { pass++; console.log('  \u2713 ' + name); }
@@ -63,47 +74,62 @@ function fresh(opts) {
   p.inventory = {};
   p.plots = null;
   if (opts && opts.bainian) p.inventory.herb_bainian = opts.bainian;
+  if (opts && opts.seed) p.inventory.seed_lingyao = opts.seed;
+  if (opts && typeof opts.liquid === 'number') p.liquid = opts.liquid;
   return p;
 }
 
-/* ================= ① 模块与配置 ================= */
-section('① 模块与配置');
+/* ================= ① 配置/模块 ================= */
+section('① 配置/模块');
 ok('GAME.Plot 已挂载', !!G.Plot);
-ok('方法齐备', ['cfg', 'rate', 'yearsOf', 'monthsLeft', 'slot', 'slots', 'tick',
-  'plant', 'harvest', 'status'].every(k => typeof G.Plot[k] === 'function'));
+ok('方法齐备', ['cfg', 'rate', 'yearsOf', 'monthsLeft', 'slot', 'slots', 'tick', 'level', 'tier',
+  'plots', 'ypm', 'plantSeed', 'plantTransplant', 'plant', 'catalyzeToHundred', 'catalyzeAdd',
+  'catalyzeDirect', 'harvest', 'oneKeySeed', 'oneKeyHarvest', 'status']
+  .every(k => typeof G.Plot[k] === 'function'));
 const CFG = G.DATA.PLOT;
-ok('三垄地', CFG.plots === 3);
-ok('下地即百年', CFG.startYears === 100);
-ok('每月长 3 年份', CFG.yearsPerMonth === 3);
-ok('药力上限 1000 年', CFG.capYears === 1000 && CFG.harvest.years === 1000);
-ok('收成是千年灵药', CFG.harvest.id === 'herb_qiannian');
-ok('种苗是百年灵药', CFG.seed === 'herb_bainian');
+ok('向后兼容：三垄别名', CFG.plots === 3);
+ok('向后兼容：千年收成药 id', CFG.harvest.id === 'herb_qiannian' && CFG.capYears === 1000);
+ok('向后兼容：移栽苗别名', CFG.seed === 'herb_bainian');
+ok('新：下种起点 1 年、移栽起点 100 年', CFG.startYearsSeed === 1 && CFG.startYearsTransplant === 100);
+ok('新：百年门槛 100 / 步增 250', CFG.hundred === 100 && CFG.stepAdd === 250);
+ok('新：种子=灵药种子、移栽=百年灵药', CFG.seedItem === 'seed_lingyao' && CFG.transplantItem === 'herb_bainian');
+ok('新：灵田阶数表 6 档（0 凡土 ~ 5 洞天）', CFG.tiers.length === 6);
+ok('阶表：0 阶 3 垄/月3、1 阶 4 垄/月4、3 阶 8 垄/月10、5 阶 12 垄/月20',
+  CFG.tiers[0].plots === 3 && CFG.tiers[0].ypm === 3 &&
+  CFG.tiers[1].plots === 4 && CFG.tiers[1].ypm === 4 &&
+  CFG.tiers[3].plots === 8 && CFG.tiers[3].ypm === 10 &&
+  CFG.tiers[5].plots === 12 && CFG.tiers[5].ypm === 20);
 
-/* ================= ② 空地 ================= */
+/* ================= ② 空地（按阶懒初始化） ================= */
 section('② 空地');
+setTier(0);
 let p = fresh({ bainian: 0 });
 let st = G.Plot.status(p);
-ok('懒初始化出 3 垄', Array.isArray(p.plots) && p.plots.length === 3);
+ok('0 阶默认出 3 垄', Array.isArray(p.plots) && p.plots.length === 3);
 ok('三垄全空', p.plots.every(x => x === null));
-ok('摘要：0 垄在长', st.growing === 0 && st.ready === 0);
+ok('摘要：0 垄在长 / 0 mature / 0 ready', st.growing === 0 && st.mature === 0 && st.ready === 0);
 ok('摘要：无最近可收（nextLeft 为 null）', st.nextLeft === null);
-ok('摘要带种苗数', st.seed === 0);
+ok('摘要带种子数', st.seed === 0);
+
+setTier(3);
+p = fresh({ bainian: 0 });
+st = G.Plot.status(p);   // 触发 _ensure → 按 3 阶建 8 垄
+ok('3 阶按 8 垄懒初始化', st.plots === 8 && p.plots.length === 8);
+setTier(0);
 
 /* ================= ③ 移栽 ================= */
-section('③ 移栽');
+section('③ 移栽（plant = plantTransplant 别名）');
 p = fresh({ bainian: 1 });
 ok('移栽成功', G.Plot.plant(0) === true);
 ok('耗掉 1 株百年灵药', G.State.countItem('herb_bainian') === 0);
 ok('起点 100 年', G.Plot.yearsOf(p, 0) === 100);
 ok('日志写明移栽与每月生长', logs.some(x => /移栽进第 1 垄/.test(x) && /每月长 3 年份/.test(x)));
 
-// 缺苗：不动任何状态
 p = fresh({ bainian: 0 });
 ok('无苗时移栽失败', G.Plot.plant(1) === false);
 ok('失败后仍是空地', p.plots[1] === null);
-ok('失败有原因日志', logs.some(x => /没有可移栽的药苗/.test(x)));
+ok('失败有原因日志', logs.some(x => /没有可移栽的/.test(x)));
 
-// 已占：不叠加
 p = fresh({ bainian: 2 });
 G.Plot.plant(0);
 ok('同一垄不能种第二株', G.Plot.plant(0) === false);
@@ -112,9 +138,10 @@ ok('年份没被重置', G.Plot.yearsOf(p, 0) === 100);
 
 /* ================= ④ 生长 ================= */
 section('④ 生长');
+setTier(0);
 p = fresh({ bainian: 1 });
 G.Plot.plant(0);
-ok('杂役旧洞：每月 3 年份', G.Plot.rate(p) === 3);
+ok('0 阶：每月 3 年份', G.Plot.rate(p) === 3);
 G.Plot.tick(12);
 ok('12 月后 100 → 136 年', G.Plot.yearsOf(p, 0) === 136);
 ok('还差 (1000-136)/3 = 288 月', G.Plot.monthsLeft(p, 0) === 288);
@@ -130,27 +157,37 @@ G.Plot.plant(0);
 G.Plot.tick(10);
 ok('中品灵峰：10 月 ×4.5 = +45', near(G.Plot.yearsOf(p, 0), 145));
 
-// 上限
 p = fresh({ bainian: 1 });
 G.Plot.plant(0);
 G.Plot.tick(1000);
 ok('年份封顶 1000（再长也不成药王）', G.Plot.yearsOf(p, 0) === 1000);
 
-// 空垄不参与
 p = fresh({ bainian: 1 });
 G.Plot.plant(2);
 G.Plot.tick(12);
 ok('只长有种的那一垄', G.Plot.yearsOf(p, 2) === 136 && G.Plot.yearsOf(p, 0) === 0);
 
-/* ================= ⑤ 收成 ================= */
+/* ================= ⑤ 收成（mature→百年 / ready→千年） ================= */
 section('⑤ 收成');
+// 幼苗（<100 年）收不动且不消耗
+p = fresh({ seed: 1 });
+G.Plot.plantSeed(0);
+ok('幼苗 1 年收不动', G.Plot.harvest(0) === false);
+ok('失败不消耗那株药（仍为 1 年）', G.Plot.yearsOf(p, 0) === 1);
+ok('失败有原因日志', logs.some(x => /才 1 年/.test(x)));
+
+// 移栽 100 年 = 已满百年 → 收成得百年灵药
 p = fresh({ bainian: 1 });
 G.Plot.plant(0);
-ok('空垄收不动', G.Plot.harvest(1) === false);
-ok('年份不足收不动', G.Plot.harvest(0) === false);
-ok('失败的收成不消耗那株药', G.Plot.yearsOf(p, 0) === 100);
-ok('失败有原因日志', logs.some(x => /才 100 年/.test(x)));
+const sl = G.Plot.slot(p, 0);
+ok('slot 报 mature(百年) 而非 ready(千年)', sl.mature === true && sl.ready === false);
+ok('满百年收成成功', G.Plot.harvest(0) === true);
+ok('得百年灵药 ×1', G.State.countItem('herb_bainian') === 1);
+ok('收完变空垄', p.plots[0] === null);
 
+// 长到千年 → 千年灵药（沿用旧 1000 年路径）
+p = fresh({ bainian: 1 });
+G.Plot.plant(0);
 G.Plot.tick(300);   // 100 + 900 = 1000
 ok('刚好满千年', G.Plot.yearsOf(p, 0) === 1000);
 const st2 = G.Plot.slot(p, 0);
@@ -161,45 +198,108 @@ ok('收完变空垄', p.plots[0] === null);
 
 // 灵田加成
 p = fresh({ bainian: 1 });
-G.Home = { yieldBonus: function () { return 2; } };
+setTier(0, 2);   // yieldBonus 2
 G.Plot.plant(0);
 G.Plot.tick(300);
 G.Plot.harvest(0);
-ok('灵田 yieldBonus 2 → 收 3 株', G.State.countItem('herb_qiannian') === 3);
+ok('灵田 yieldBonus 2 → 千年灵药收 3 株', G.State.countItem('herb_qiannian') === 3);
 ok('日志标出灵田加成', logs.some(x => /灵田 \+2/.test(x)));
-G.Home = undefined;
+setTier(0, 0);
 
-/* ================= ⑥ 唯一出口：时间推进 ================= */
-section('⑥ 唯一出口：时间推进');
+/* ================= ⑥ 催熟（绿液） ================= */
+section('⑥ 催熟（绿液）');
+p = fresh({ seed: 1, liquid: 10 });
+G.Plot.plantSeed(0);
+ok('幼苗 1 年', G.Plot.yearsOf(p, 0) === 1);
+ok('催熟→百年（耗 1 滴绿液）', G.Plot.catalyzeToHundred(0) === true);
+ok('跳到 100 年且 mature', G.Plot.yearsOf(p, 0) === 100 && G.Plot.slot(p, 0).mature === true);
+ok('绿液被扣 1 滴', p.liquid === 9);
+ok('日志：幼苗拔节', logs.some(x => /拔节/.test(x)));
+
+p = fresh({ seed: 1, liquid: 10 });
+G.Plot.plantSeed(0);
+G.Plot.catalyzeToHundred(0);
+ok('catalyzeAdd 前 100 年、绿液 9', G.Plot.yearsOf(p, 0) === 100 && p.liquid === 9);
+ok('catalyzeAdd +250 年', G.Plot.catalyzeAdd(0) === true && G.Plot.yearsOf(p, 0) === 350);
+ok('绿液再扣 1 滴 → 8', p.liquid === 8);
+
+p = fresh({ seed: 1, liquid: 50 });
+G.Plot.plantSeed(0);
+G.Plot.catalyzeToHundred(0);          // 100，绿液 49
+G.Plot.catalyzeAdd(0);                // 350，绿液 48
+const before = G.Plot.yearsOf(p, 0);
+ok('catalyzeDirect 拉满千年', G.Plot.catalyzeDirect(0) === true && G.Plot.yearsOf(p, 0) === 1000);
+ok('直催按缺口算滴数（(1000-350)/250=3 滴，余 45）', p.liquid === 45);
+ok('千年后 slot.ready', G.Plot.slot(p, 0).ready === true);
+
+// 绿液不足
+p = fresh({ seed: 1, liquid: 0 });
+G.Plot.plantSeed(0);
+ok('无绿液催熟失败', G.Plot.catalyzeToHundred(0) === false && G.Plot.yearsOf(p, 0) === 1);
+ok('失败有原因日志', logs.some(x => /绿液不足/.test(x)));
+
+/* ================= ⑦ 时间唯一出口 ================= */
+section('⑦ 唯一出口：时间推进');
+setTier(0);
 p = fresh({ bainian: 1 });
 G.Plot.plant(0);
 const y0 = G.Plot.yearsOf(p, 0);
-G.Core.meditate();                 // 练气一层：3 月
+G.Core.meditate();
 ok('打坐 3 月 → 药长 9 年份', G.Plot.yearsOf(p, 0) === y0 + 9);
 ok('seclude 的分档同样推药（长关 36 月 → +108）', (function () {
   G.Time.seclude('epic');
   return G.Plot.yearsOf(p, 0) === y0 + 9 + 108;
 })());
-ok('passTime 之外的入口不改年份（plant 不耗时）', (function () {
-  const before = G.Plot.yearsOf(p, 0), m = p.totalMonths;
-  G.Plot.plant(1);                 // 无苗 → 失败，也不可能推进时间
-  return G.Plot.yearsOf(p, 0) === before && p.totalMonths === m;
+ok('plant 不耗时', (function () {
+  const beforeY = G.Plot.yearsOf(p, 0), m = p.totalMonths;
+  G.Plot.plant(1);
+  return G.Plot.yearsOf(p, 0) === beforeY && p.totalMonths === m;
 })());
 
-/* ================= ⑦ 摘要 ================= */
-section('⑦ 摘要');
+/* ================= ⑧ 一键批量 ================= */
+section('⑧ 一键批量');
+p = fresh({ seed: 3, liquid: 0 });
+ok('一键下种：3 粒种子填满 3 垄', G.Plot.oneKeySeed() === true && p.plots.filter(x => x).length === 3);
+ok('种子被扣光', G.State.countItem('seed_lingyao') === 0);
+ok('每垄起点 1 年', p.plots.every(x => x && x.y === 1));
+ok('一键采收（无 mature）失败', G.Plot.oneKeyHarvest() === false);
+
+p = fresh({ seed: 3, liquid: 20 });
+G.Plot.oneKeySeed();
+G.Plot.catalyzeToHundred(0); G.Plot.catalyzeToHundred(1); G.Plot.catalyzeToHundred(2);
+ok('三垄皆 mature', p.plots.every((x, i) => x && G.Plot.slot(p, i).mature));
+ok('一键采收得百年灵药 ×3', G.Plot.oneKeyHarvest() === true && G.State.countItem('herb_bainian') === 3);
+ok('采收后全空', p.plots.every(x => x === null));
+
+/* ================= ⑨ 灵田阶数 ================= */
+section('⑨ 灵田阶数');
+setTier(3);
+p = fresh({ bainian: 1 });
+ok('3 阶：8 垄', G.Plot.plots() === 8);
+G.Plot.plant(0);
+ok('3 阶：每月 10 年份', G.Plot.rate(p) === 10);
+setTier(5);
+p = fresh({ bainian: 1 });
+ok('5 阶：12 垄', G.Plot.plots() === 12);
+G.Plot.plant(0);
+ok('5 阶：每月 20 年份', G.Plot.rate(p) === 20);
+setTier(0);
+
+/* ================= ⑩ 摘要 ================= */
+section('⑩ 摘要');
+setTier(0);
 p = fresh({ bainian: 3 });
 G.Plot.plant(0);
 G.Plot.tick(320);                 // 第 1 垄满千年
 st = G.Plot.status(p);
 ok('growing 只数有药的垄', st.growing === 1);
-ok('ready 数满千年的垄', st.ready === 1);
+ok('mature/ready：千年那垄双双计入', st.mature === 1 && st.ready === 1);
 ok('nextLeft 为 null（没有在长但未成的）', st.nextLeft === null);
 
 G.Plot.plant(1);
-G.Plot.tick(12);
+G.Plot.tick(12);                  // 第 2 垄 136 年（mature 未满千年）
 st = G.Plot.status(p);
-ok('两垄在长、一垄可收', st.growing === 2 && st.ready === 1);
+ok('两垄在长、一垄千年可收、一垄百年可收', st.growing === 2 && st.ready === 1 && st.mature === 2);
 ok('nextLeft 报未成那垄的余月', st.nextLeft === G.Plot.monthsLeft(p, 1));
 ok('list 长度 = 垄数', st.list.length === 3);
 ok('第 3 垄仍是空地', st.list[2].empty === true);

@@ -631,6 +631,28 @@ GAME.Core = {
         this.passTime(1);
     },
 
+    // 一键服最优丹：在行囊中挑「修炼增益最高（use.exp 最大）」的可服丹一枚走 takePill。
+    // 规则：只认 type:"pill" 且含 use.exp 的修炼丹（筑基丹/玄元丹/疗伤丹等非 exp 丹不在此列）；
+    // 有多枚同种时取单颗 exp 最高者，让有限的抗药性档位用在刀刃上。无则提示。
+    takeOptimalPill: function () {
+        var p = GAME.State.p();
+        if (p.isDead || p.combat) return;
+        var best = null, bestExp = -1, id;
+        for (id in GAME.DATA.ITEMS) {
+            if (!Object.prototype.hasOwnProperty.call(GAME.DATA.ITEMS, id)) continue;
+            var it = GAME.DATA.ITEMS[id];
+            if (it.type === "pill" && it.use && it.use.exp && GAME.State.countItem(id) > 0) {
+                if (it.use.exp > bestExp) { bestExp = it.use.exp; best = id; }
+            }
+        }
+        if (!best) {
+            GAME.UI.log("囊中没有可服的修炼丹（仅认带修为增益的丹药）。", "system");
+            GAME.UI.updateUI();
+            return;
+        }
+        this.takePill(best);
+    },
+
     // 生服灵药：草木清气直灌丹田，小幅增修为（沈牧也生嚼药材进补——凡人流本色）。
     // 效率远低于丹药（百年灵药+5 / 千年+15，黄龙丹+25 / 金髓丸+80），且【连服渐抗】：
     // 每多生服一次收益 -5%，最低 30%——对应原著"连服同药功效大减"，也避免无限嗑药。

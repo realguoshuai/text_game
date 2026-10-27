@@ -57,6 +57,7 @@ GAME.DATA.MARKET = {
             { id:"pill_huichun",    weight:8  },
             { id:"talisman_huoshe", weight:6  },
             { id:"iron_ore",        weight:8, infinite:true },   // 铁匠铺常驻：玄铁矿石无限量
+            { id:"seed_lingyao",   weight:10 },
         ],
         qingniu_zhen: [    // 凡俗镇集：添疗伤丹与护身符
             { id:"herb_bainian",    weight:14 },
@@ -67,6 +68,7 @@ GAME.DATA.MARKET = {
             { id:"pill_jinsui",     weight:3  },
             { id:"mirror_short_sword", weight:3 },
             { id:"iron_ore",        weight:8, infinite:true },
+            { id:"seed_lingyao",   weight:10 },
         ],
         jiayuan_cheng: [   // 岚州大城：符箓法器齐备，高阶货按修为解锁
             { id:"herb_bainian",      weight:10 },
@@ -88,6 +90,7 @@ GAME.DATA.MARKET = {
             { id:"skill_tianyan",     weight:2,  req:7 },
             { id:"pill_xuanyuan",     weight:6 },                  // 玄元丹：根除燃寿暗伤（燃寿搏命战后隐患）
             { id:"iron_ore",          weight:8, infinite:true },   // 天眼术（练气八层起有售）
+            { id:"seed_lingyao",   weight:10 },
         ],
     },
     pool: [                // 兜底货源（未列入 pools 的地点）
@@ -102,6 +105,7 @@ GAME.DATA.MARKET = {
         { id:"artifact_qingyuan",weight:2,  req:6 },
         { id:"pill_xuanyuan",    weight:5 },
         { id:"iron_ore",         weight:8, infinite:true },
+        { id:"seed_lingyao",   weight:10 },
     ],
 };
 

@@ -51,6 +51,8 @@ GAME.DATA.MONSTERS.push(
             { id: "beast_hide", chance: 0.55, qty: [1, 1] },
             { id: "beast_bone", chance: 0.35, qty: [1, 2] },
             { id: "ore",        chance: 0.12, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "谷中狼群本就不少，这两年越发肥了，见人便红着眼睛扑上来。",
     },
@@ -64,6 +66,8 @@ GAME.DATA.MONSTERS.push(
             { id: "pill_huichun",    chance: 0.18, qty: [1, 1] },
             { id: "beast_hide",      chance: 0.25, qty: [1, 1] },
             { id: "ore",             chance: 0.15, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "山道旁的蟊贼，手里那柄卷刃柴刀倒还拿得稳——只是道行浅得很。",
     },
@@ -76,6 +80,8 @@ GAME.DATA.MONSTERS.push(
             { id: "poison_mortal", chance: 0.30, qty: [1, 1] },
             { id: "beast_hide",    chance: 0.35, qty: [1, 1] },
             { id: "beast_bone",    chance: 0.30, qty: [1, 2] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "石缝里爬出一只八足毒蛛，足尖泛着青黑——被它螫上一口，先麻后疼。",
     },
@@ -90,6 +96,8 @@ GAME.DATA.MONSTERS.push(
             { id: "talisman_huoqiu", chance: 0.26, qty: [1, 1] },
             { id: "pill_huanglong",  chance: 0.18, qty: [1, 1] },
             { id: "artifact_frag",   chance: 0.14, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "巷口转出一名黑袍修士，指尖扣着符纸：「这条街的规矩，道友怕是还不懂。」",
     },
@@ -102,6 +110,8 @@ GAME.DATA.MONSTERS.push(
             { id: "talisman_hushen", chance: 0.22, qty: [1, 1] },
             { id: "pill_huichun",    chance: 0.24, qty: [1, 1] },
             { id: "artifact_frag",   chance: 0.12, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "门阀府邸的护院，甲叶铮亮，长刀横在街心——世家的人，可不管你是哪家修士。",
     },
@@ -114,6 +124,8 @@ GAME.DATA.MONSTERS.push(
             { id: "poison_mortal", chance: 0.30, qty: [1, 1] },
             { id: "artifact_frag", chance: 0.16, qty: [1, 1] },
             { id: "beast_bone",    chance: 0.40, qty: [1, 2] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "乱葬岗般的腥甜气里立着一具「东西」：指甲发黑，喉间漏出风箱般的声响。",
     },
@@ -128,6 +140,8 @@ GAME.DATA.MONSTERS.push(
             { id: "beast_hide", chance: 0.70, qty: [1, 2] },
             { id: "beast_bone", chance: 0.60, qty: [1, 2] },
             { id: "talisman_huoqiu", chance: 0.22, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "潭水无风自起浪，一条丈许墨蛟破水而出，鳞甲上还挂着别家的法器碎片。",
     },
@@ -140,6 +154,8 @@ GAME.DATA.MONSTERS.push(
             { id: "beast_bone", chance: 0.60, qty: [1, 2] },
             { id: "ore",        chance: 0.35, qty: [1, 2] },
             { id: "talisman_hushen", chance: 0.20, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "溪面漾开一圈涟漪，婴鲤兽化作一线白影贴水而来，快得叫人眼花。",
     },
@@ -152,6 +168,8 @@ GAME.DATA.MONSTERS.push(
             { id: "talisman_dici",   chance: 0.30, qty: [1, 1] },
             { id: "pill_huanglong",  chance: 0.24, qty: [1, 1] },
             { id: "artifact_frag",   chance: 0.18, qty: [1, 2] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "一名修士自树影里踱出，唇色乌青、眼底泛红：「道友这身气血，倒是难得的成色。」",
     },
@@ -164,6 +182,8 @@ GAME.DATA.MONSTERS.push(
             { id: "talisman_jingang", chance: 0.26, qty: [1, 1] },
             { id: "pill_jinsui",      chance: 0.20, qty: [1, 1] },
             { id: "artifact_frag",    chance: 0.25, qty: [1, 2] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "对方一身青袍洗得发白，剑穗却系得齐整——筑基独修，不肯与宗门为伍的那一类。",
     },
@@ -179,6 +199,8 @@ GAME.DATA.MONSTERS.push(
             { id: "pill_jinsui",      chance: 0.30, qty: [1, 1] },
             { id: "artifact_frag",    chance: 0.30, qty: [1, 2] },
             { id: "tianhuo_crystal",  chance: 0.18, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "血魔宗的长老自云端落下，一袭黑袍无风自鼓：「散修也敢在苍南伸手？」",
     },
@@ -191,6 +213,8 @@ GAME.DATA.MONSTERS.push(
             { id: "talisman_dici",   chance: 0.30, qty: [1, 1] },
             { id: "pill_jinsui",     chance: 0.26, qty: [1, 1] },
             { id: "artifact_frag",   chance: 0.28, qty: [1, 2] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "皇城夜禁之后，一个执事模样的黑袍人拦住去路，袖口绣着幽冥教的血纹。",
     },
@@ -204,6 +228,8 @@ GAME.DATA.MONSTERS.push(
             { id: "pill_xugu",         chance: 0.26, qty: [1, 1] },
             { id: "artifact_frag",    chance: 0.35, qty: [1, 3] },
             { id: "tianhuo_crystal",  chance: 0.30, qty: [1, 2] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "一名海外散修踩着元气长虹掠过，见你在此，眼中贪婪一闪——「同道，让开」是不必说了。",
     },
@@ -219,6 +245,8 @@ GAME.DATA.MONSTERS.push(
             { id: "artifact_frag", chance: 0.35, qty: [1, 2] },
             { id: "pill_jinsui",   chance: 0.22, qty: [1, 1] },
             { id: "talisman_jingang", chance: 0.25, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "半条街忽然静了。一件血衣悬在半空，衣下无人——血衣魔修的名头，就是这么来的。",
     },
@@ -231,6 +259,8 @@ GAME.DATA.MONSTERS.push(
             { id: "herb_bainian",  chance: 0.32, qty: [1, 1] },
             { id: "artifact_frag", chance: 0.40, qty: [1, 2] },
             { id: "pill_jinsui",   chance: 0.20, qty: [1, 1] },
+        
+            { id:"seed_lingyao", chance:0.18, qty:[1,3] },
         ],
         desc: "水泽深处妖气翻涌，一头血鳞巨蛟昂首出水——它不是来觅食的，是来收过路钱的。",
     }

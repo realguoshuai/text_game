@@ -189,19 +189,36 @@ ok('移栽成功：1 / 3 垄在长', /1 \/ 3 垄在长/.test(T('plot-head-text')
 ok('有药在长时右侧报存药', /存药 百年×\d+/.test(T('plot-head-more')));
 ok('不再显示「点击打理药圃」', !/点击打理药圃/.test(T('plot-head-more')));
 
-// ---------- ⑤ 催熟菜单：用途 + 现存 ----------
-section('⑤ 灵液催熟的用途说明');
+// ---------- ⑤ 药圃面板（下种/催熟/采收）+ 灵液催熟（仅存灵木/玄冰/龙鳞） ----------
+section('⑤ 药圃面板：下种/催熟/采收 与 灵液催熟');
+// 灵液催熟菜单（plot-catalyze）仅剩三项灵液灵珍——百年/千年灵药改由田垄长出
 ok('灵木项写清是傀儡骨架主材', /傀儡骨架主材/.test(T('cata-wood-sub')));
 ok('灵木项带「现有 N 根」', /现有 \d+ 根/.test(T('cata-wood-sub')));
 ok('灵木项写明产出数量', /百年灵木×3/.test(T('cata-wood-sub')));
 ok('玄冰花项写清元灵丹主材/拜师礼', /元灵丹主材/.test(T('cata-xuanbing-sub')) && /拜师礼/.test(T('cata-xuanbing-sub')));
 ok('龙鳞果项写清结丹级灵珍', /结丹级/.test(T('cata-longlin-sub')));
-ok('百年灵药项写清药圃移栽苗', /药圃移栽苗/.test(T('cata-bainian-sub')));
-ok('千年灵药项写清筑基丹主药', /筑基丹主药/.test(T('cata-qiannian-sub')));
-ok('每一项都带「现有 N 株/根」', ['cata-bainian-sub', 'cata-qiannian-sub', 'cata-wood-sub', 'cata-xuanbing-sub', 'cata-longlin-sub']
+ok('三项灵液灵珍皆带「现有 N 株/根」', ['cata-wood-sub', 'cata-xuanbing-sub', 'cata-longlin-sub']
     .every(id => /现有 \d+ (株|根)/.test(T(id) || '')));
+// 药圃田垄面板：section ④ 已移栽一株百年灵药（100 年 = 已满百年，可收百年灵药）
+U.updateUI();
+ok('药圃列表渲染出田垄行', els['plot-list'] && els['plot-list'].children.length >= 1);
+ok('批量区有一键下种与一键采收', els['plot-batch'] && els['plot-batch'].children.length === 2);
+// 收成·百年灵药 出现在某垄（遍历子节点取 innerText）
+function dumpText(node, acc) {
+    if (!node) return acc;
+    if (node._text) acc.push(node._text);
+    (node.children || []).forEach(function (c) { dumpText(c, acc); });
+    return acc;
+}
+ok('已满百年的垄显示「收成·百年灵药」', dumpText(els['plot-list'], []).some(function (t) { return /收成·百年灵药/.test(t); }));
+// 采收确实产出百年灵药（双轨：田垄长出，非灵液凭空变）
+ok('采收已满百年的垄得百年灵药', (function () {
+    var n = G.State.countItem('herb_bainian');
+    G.Plot.harvest(0);
+    return G.State.countItem('herb_bainian') === n + 1;
+})());
 // 现存数字会随背包走
-const woodN = G.State.countItem('spirit_wood');
+var woodN = G.State.countItem('spirit_wood');
 G.State.addItem('spirit_wood', 4);
 U.updateUI();
 ok('现存数量随背包实时变化', new RegExp('现有 ' + (woodN + 4) + ' 根').test(T('cata-wood-sub')));

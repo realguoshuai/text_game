@@ -191,11 +191,13 @@ GAME.DATA.CONTENT = {
     HOME: {
         intro: "洞府乃修士安身立命之本。灵田供药、丹房成丹、藏经阁悟道、大阵御敌——四者皆须灵石与光阴，一寸寸攒起来。",
         facilities: [
-            { id:"lingtian", name:"灵田", desc:"园中辟灵田，凡所种植皆能多收几株。",
+            { id:"lingtian", name:"灵田", desc:"园中辟灵田，阶数越高垄数越多、药草长得越快，凡所种植皆能多收几株。",
               levels:[
-                { stones:120,  months:2, effect:"种植收获 +1 株", yieldBonus:1 },
-                { stones:360,  months:3, items:{ herb_ecao:3 }, effect:"种植收获 +2 株", yieldBonus:2 },
-                { stones:900,  months:4, items:{ herb_qiannian:1, herb_ecao:5 }, effect:"种植收获 +3 株", yieldBonus:3 },
+                { stones:120,  months:2, effect:"灵田 1 阶 · 4 垄 · 每月 +4 年药龄（种植收获 +1 株）", yieldBonus:1, plots:4,  ypm:4,  tierName:"灵田 1 阶" },
+                { stones:360,  months:3, items:{ herb_ecao:3 },     effect:"灵田 2 阶 · 6 垄 · 每月 +6 年药龄（种植收获 +2 株）", yieldBonus:2, plots:6,  ypm:6,  tierName:"灵田 2 阶" },
+                { stones:800,  months:4, items:{ herb_ecao:5 },     effect:"地脉灵田 3 阶 · 8 垄 · 每月 +10 年药龄（种植收获 +3 株）", yieldBonus:3, plots:8,  ypm:10, tierName:"地脉灵田" },
+                { stones:2000, months:5, items:{ herb_qiannian:1 }, effect:"玉髓药园 4 阶 · 10 垄 · 每月 +15 年药龄（种植收获 +4 株）", yieldBonus:4, plots:10, ypm:15, tierName:"玉髓药园" },
+                { stones:4500, months:6, items:{ herb_qiannian:2 }, effect:"洞天药圃 5 阶 · 12 垄 · 每月 +20 年药龄（种植收获 +5 株）", yieldBonus:5, plots:12, ypm:20, tierName:"洞天药圃" },
               ] },
             { id:"danfang", name:"丹房", desc:"炉火渐稳，成丹更省灵石，偶得双丹之喜。",
               levels:[
