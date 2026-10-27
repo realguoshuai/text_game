@@ -1465,8 +1465,8 @@ body::after {
     color: #9aa79c;
 }
 .actions > .act-hero-btn, .actions > details#dd-meditate { grid-column: span 3; }
-.actions > .act-hero-btn { font-size: 21px; letter-spacing: 7px; padding: 18px 6px; }
-.actions > .act-hero-btn em { font-size: 11.5px; letter-spacing: 2px; }
+.actions > .act-hero-btn, .actions > details#dd-meditate > summary.act-hero-btn { font-size: 21px; letter-spacing: 7px; padding: 18px 6px; }
+.actions > .act-hero-btn em, .actions > details#dd-meditate > summary.act-hero-btn em { font-size: 11.5px; letter-spacing: 2px; }
 .actions > .act-tile, .actions > details#dd-catalyze { grid-column: span 2; }
 .actions > button.act-seal {
     border: 2px solid #8d3324;
@@ -1728,7 +1728,7 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
     .actions { grid-template-columns: repeat(2, 1fr); }
     .actions > .act-hero-btn, .actions > details#dd-meditate { grid-column: span 1; }
     .actions > .act-tile, .actions > details#dd-catalyze { grid-column: span 1; }
-    .actions > .act-hero-btn { font-size: 17px; letter-spacing: 4px; padding: 14px 4px; }
+    .actions > .act-hero-btn, .actions > details#dd-meditate > summary.act-hero-btn { font-size: 17px; letter-spacing: 4px; padding: 14px 4px; }
     .actions > button, .actions > details > summary { font-size: 14px; min-height: 54px; }
     #panel-area { padding: 11px 11px 13px; }
     .id-cell { padding: 2px 9px; font-size: 12.5px; }
@@ -3295,8 +3295,8 @@ body.theme-light .injury-alert:hover { background: rgba(163, 52, 31, .2); }
     padding: 0 10px;
     display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px;
 }
-.actions > .act-hero-btn { font-size: 16px; letter-spacing: 3px; min-height: 70px; padding: 0 10px; }
-.actions > .act-hero-btn em { font-size: 11.5px; letter-spacing: 1px; }
+.actions > .act-hero-btn, .actions > details#dd-meditate > summary.act-hero-btn { font-size: 16px; letter-spacing: 3px; min-height: 70px; padding: 0 10px; }
+.actions > .act-hero-btn em, .actions > details#dd-meditate > summary.act-hero-btn em { font-size: 11.5px; letter-spacing: 1px; }
 /* 目标横幅：纯信息条，紧凑化。flex 改块级流：标签/标题/去向/下一步自然成 2~3 行 */
 .goal-banner { display: block; padding: 6px 12px; line-height: 1.45; }
 .goal-banner .goal-tag { display: inline-block; margin-right: 7px; vertical-align: 1px; }

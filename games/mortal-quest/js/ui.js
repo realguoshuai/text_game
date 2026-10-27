@@ -904,6 +904,32 @@ GAME.UI = {
         }
     },
 
+    // 中栏「药圃灵田」快捷按钮副标题：实时反映灵田/药垄状态
+    _renderPlotSub: function (p) {
+        var sub = this.$("plot-sub");
+        if (!sub) return;
+        var btn = this.$("btn-plot");
+        var lv = (GAME.Home && GAME.Home.level) ? GAME.Home.level("lingtian") : 0;
+        if (lv <= 0) {
+            sub.innerText = "尚未开辟 · 须回洞府扩建";
+            if (btn) btn.classList.remove("bt-ready");
+            return;
+        }
+        var st = (GAME.Plot && GAME.Plot.status) ? GAME.Plot.status(p) : null;
+        if (!st) { if (btn) btn.classList.remove("bt-ready"); return; }
+        if (st.ready > 0) {
+            sub.innerText = "\u2605 灵药已熟 · 点击采收";
+            if (btn) btn.classList.add("bt-ready");
+        } else if (st.growing < st.plots) {
+            sub.innerText = st.growing + " / " + st.plots + " 垄 · 灵田空置（宜下种）";
+            if (btn) btn.classList.remove("bt-ready");
+        } else {
+            var nx = GAME.Plot._fmtMonths(st.nextLeft);
+            sub.innerText = st.plots + " / " + st.plots + " 垄在长 · 最近 " + (nx || "\u2014") + "熟";
+            if (btn) btn.classList.remove("bt-ready");
+        }
+    },
+
     updateUI: function () {
         try {
             if (GAME.scene) GAME.scene.render();   // 重绘像素场景横幅（新增）
@@ -1132,6 +1158,7 @@ GAME.UI = {
             if (bt) bt.classList.toggle("bt-ready", realm.needExp !== null && !bt.disabled && p.currentExp >= realm.needExp);
             this.renderBreakPrep(btPlan);
             this.renderPlot();
+            this._renderPlotSub(p);
 
             // 催化按钮：禁用原因写明白（灵液差多少滴）
             var _liq = function (b, need) {
@@ -1224,18 +1251,35 @@ GAME.UI = {
             badge("badge-bag", buildable > 0, buildable);
             badge("badge-fzone", !!(GAME.FZone && GAME.FZone.canEnter && GAME.FZone.canEnter()), 0);
             badge("badge-companion", GAME.State.countItem("chong_egg") > 0, 0);
-            var _mksub = this.$("market-sub");
-            var _mkRt = (GAME.Market && GAME.Market.travelTime) ? GAME.Market.travelTime() : 1;
-            var _mkTxt = _mkRt > 0 ? ("往返 " + _mkRt + " 月") : "就地入市";
-            if (_mksub) _mksub.innerText = p.atMarket ? "已在坊市中" : _mkTxt;
-            else this.$("btn-market").innerText = p.atMarket ? "坊市中" : ("前往坊市 (" + _mkTxt + ")");
-            // 已在市中 → 此按钮必须置灰：否则连点会「离市→再入市」反复刷日志。
-            // 真要离市走市集页的「离开坊市，返回洞府」。
+            // 「前往坊市」三态副标题与置灰逻辑
+            // ① 当前正停在市集页 → 显「已在坊市中」并置灰（避免连点离市）
+            // ② 身在坊市但停在他页（丹炉/洞府/储物袋…）→ 显「就地入市」可点切回
+            // ③ 不在坊市城镇 → 显往返耗时，按 lock 决定可点性
+            // 关键：只用 market-sub 一行文字，_why 传空串（不挂 .btn-why），
+            // 杜绝旧逻辑「已在坊市中」在副标题与 annotateWhy 小字叠成两行。
             var _mkBtn = this.$("btn-market");
+            var _mksub = this.$("market-sub");
+            var _atPanel = (this.tab === "market");
             if (_mkBtn) {
-                _mkBtn.disabled = lock || dead || !!p.atMarket;
-                this._why(_mkBtn, p.atMarket ? "已在坊市中" : (lock ? lockWhyInline : ""));
-                _mkBtn.title = (lock && !p.atMarket) ? lockTitle : "";
+                if (_atPanel) {
+                    if (_mksub) _mksub.innerText = "已在坊市中";
+                    _mkBtn.disabled = true;   // 已停在市集页：按钮无意义，置灰
+                    this._why(_mkBtn, "");
+                    _mkBtn.title = "当前正在坊市 · 切换其它页签即可离市";
+                } else if (p.atMarket) {
+                    if (_mksub) _mksub.innerText = "就地入市";
+                    _mkBtn.disabled = lock || dead;
+                    this._why(_mkBtn, "");
+                    _mkBtn.title = "你身在坊市中，点此切回市集页";
+                } else {
+                    var _mkRt = (GAME.Market && GAME.Market.travelTime) ? GAME.Market.travelTime() : 1;
+                    var _mkTxt = _mkRt > 0 ? ("往返 " + _mkRt + " 月") : "就地入市";
+                    if (_mksub) _mksub.innerText = _mkTxt;
+                    else _mkBtn.innerText = "前往坊市 (" + _mkTxt + ")";
+                    _mkBtn.disabled = lock || dead;
+                    this._why(_mkBtn, lock ? lockWhyInline : "");
+                    _mkBtn.title = lock ? lockTitle : "";
+                }
             }
             // 存档按钮：交战之中无暇烙印轮回石（否则残血/必死回合存档，读档卡死战斗局）
             var bs = this.$("btn-save");
@@ -4112,7 +4156,8 @@ GAME.UI = {
     bindEvents: function () {
         var self = this;
         this.$("btn-start").onclick = function () { self.startGame(self.selectedOrigin); };
-        this.$("btn-meditate").onclick = function () { GAME.Core.meditate(); };
+        this.$("btn-plot").onclick = function () { GAME.UI.openPlot(); };
+        this.$("btn-meditate-1").onclick = function () { GAME.Core.meditate(); };
         this.$("btn-catalyze-bainian").onclick = function () { GAME.Core.catalyze(1, "herb_bainian"); };
         this.$("btn-catalyze-qiannian").onclick = function () { GAME.Core.catalyze(5, "herb_qiannian"); };
         var bWood = this.$("btn-catalyze-wood");
@@ -4125,7 +4170,11 @@ GAME.UI = {
         this.$("btn-close-alchemy").onclick = function () { self.switchTab("home"); };
         this.$("btn-breakthrough").onclick = function () { GAME.Core.breakthrough(); };
         this.$("btn-explore").onclick = function () { GAME.Core.explore(); };
-        this.$("btn-market").onclick = function () { GAME.Market.toggle(); };
+        this.$("btn-market").onclick = function () {
+            var pp = GAME.State.p();
+            if (pp.atMarket && GAME.UI.tab !== "market") GAME.UI.switchTab("market");   // 身在市集·停在他页：切回市集页
+            else GAME.Market.toggle();   // 未入市则入市；正停市集页则离市
+        };
         this.$("btn-leave-market").onclick = function () { GAME.Market.toggle(); };
         // 市集页签内「本坊市」未开市时的入口，与洞府按钮同走一条跑商动作
         var bMktGo = this.$("btn-market-go"); if (bMktGo) bMktGo.onclick = function () { GAME.Market.toggle(); };
@@ -4297,7 +4346,7 @@ GAME.UI = {
                 var hideTimer = null;
                 // 阻止点击 summary 触发原生 toggle，避免与 hover 逻辑打架
                 var sum = dd.querySelector("summary");
-                if (sum) sum.addEventListener("click", function (e) { e.preventDefault(); });
+                if (sum) sum.addEventListener("click", function (e) { e.preventDefault(); dd.open = !dd.open; });
                 dd.addEventListener("mouseenter", function () {
                     if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
                     dd.open = true;   // 展开
@@ -4320,6 +4369,7 @@ GAME.UI = {
 
     bindBatch: function () {
         var bind = function (id, fn) { var el = document.getElementById(id); if (el) el.onclick = fn; };
+        bind("btn-meditate-1", function () { GAME.Core.meditate(); });
         if (!GAME.Core || !GAME.Core.meditateTimes) return;
         if (GAME.Time && GAME.Time.seclude) {
         bind("btn-sec-mid", function () { GAME.Time.seclude("mid"); });
