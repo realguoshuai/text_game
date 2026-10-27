@@ -143,7 +143,22 @@ const snap2 = G.Core._exploreSnapshot(p);
 G.Core._showExploreResult(p, { text: '平淡一行' }, snap2, 1, '平淡一行');
 ok('标题：游历归来 · 平安返程', String(els['rg-seal'].innerHTML) === '游历归来 · 平安返程');
 ok('无所得则不画战利品格', slotCount('rg-loot') === 0);
+ok('无所得 → 左按钮写【敛息归返】', /敛 息 归 返/.test(els['rg-actions'].children[0].innerHTML));
+ok('无所得 → 战利品区改修心小字（rg-mood-wrap，不描空黑框）', /rg-mood-wrap/.test(els['rg-loot'].className));
 ok('仍有两枚按钮', els['rg-actions'].children.length === 2);
+BR.dismiss();
+
+/* ================= ②b 遇险平手（无物 · 气血受损 · 带完整结果文案） ================= */
+section('②b 遇险：无物品·气血受损 → 空黑框隐藏 + 结果文案入卷轴 + 按钮敛息归返');
+p.mind = 30; p.currentExp = 300; p.spiritStones = 80; p.currentHp = 200;
+const snapB = G.Core._exploreSnapshot(p);
+p.currentHp = 185;  // 损 15 气血
+G.Core._showExploreResult(p, null, snapB, 2, '山间忽起瘴雾，你神识昏沉，辨不清方向……', '你强提真元硬闯，瘴毒入体，你在林中咳血半日！');
+ok('标题：游历归来 · 平安返程', String(els['rg-seal'].innerHTML) === '游历归来 · 平安返程');
+ok('卷轴含完整结果文案（起因+应对+结局）', /强提真元硬闯/.test(els['rg-lead'].innerHTML) && /瘴毒入体/.test(els['rg-lead'].innerHTML));
+ok('气血损耗出现在数值区（气血 -15）', /气血/.test(els['rg-gains'].innerHTML) && /-15/.test(els['rg-gains'].innerHTML));
+ok('无物品 → 战利品外框 display:none（不再留空黑条）', els['rg-loot'].style.display === 'none');
+ok('左按钮写【敛息归返】（而非收下机缘）', /敛 息 归 返/.test(els['rg-actions'].children[0].innerHTML));
 BR.dismiss();
 
 /* ================= ③ 血月试炼通关（经战斗胜利出口排队） ================= */

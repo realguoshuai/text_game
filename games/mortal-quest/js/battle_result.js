@@ -259,7 +259,24 @@ GAME.BattleResult = {
         });
         gains.innerHTML = g;
 
-        loot.innerHTML = this._lootHtml(cfg.loot);
+        // 战利品区：有实物才画格；无物但尚有其他收获（修为 / 气血+ / 灵石 …）则彻底隐藏
+        // 外框，避免卷轴正中出现一条突兀的空黑框；既无物亦无得时，以一句修心小字充实画面。
+        var _items = (cfg.loot && cfg.loot.items) ? cfg.loot.items : [];
+        var _hasOtherGain = !!(cfg.gains && cfg.gains.length);
+        if (_items.length) {
+            loot.className = "rg-loot";
+            loot.style.display = "";
+            loot.innerHTML = this._lootHtml(cfg.loot);
+        } else if (_hasOtherGain) {
+            loot.className = "rg-loot";
+            loot.style.display = "none";
+            loot.innerHTML = "";
+        } else {
+            loot.className = "rg-mood-wrap";
+            loot.style.display = "";
+            loot.innerHTML = '<p class="rg-mood">' +
+                this._esc(cfg.mood || "此番游历虽无外物入袋，然行路观心，道心亦有所磨砺。") + "</p>";
+        }
 
         sum.innerText = cfg.sum || "";
 

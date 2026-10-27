@@ -2834,8 +2834,9 @@ body.result-on { overflow: hidden; }
 .result-page {
     position: fixed; inset: 0; z-index: 72;
     display: none;
-    flex-direction: column; align-items: center; justify-content: flex-start;
-    padding: 64px 14px 30px;
+    flex-direction: column; align-items: center; justify-content: center;
+    justify-content: safe center;
+    padding: 44px 14px 32px;
     overflow-y: auto;
     background:
         radial-gradient(64% 54% at 50% 38%, rgba(10, 14, 12, .70), rgba(3, 5, 4, .93) 78%),
@@ -2867,7 +2868,6 @@ body.result-on { overflow: hidden; }
 .rg-scroll {
     position: relative;
     width: min(720px, 92vw);
-    margin-top: auto;
     flex: 0 0 auto;
 }
 .rg-pole {
@@ -2881,6 +2881,7 @@ body.result-on { overflow: hidden; }
 
 .rg-paper {
     position: relative; z-index: 1;
+    min-height: 220px;
     padding: clamp(20px, 4vw, 32px) clamp(16px, 3.4vw, 36px) clamp(16px, 3vw, 24px);
     background: linear-gradient(180deg, var(--rg-p1), var(--rg-p2));
     border: 1px solid var(--rg-line);
@@ -3032,6 +3033,14 @@ body.result-on { overflow: hidden; }
 .rg-empty {
     padding: 16px 8px;
     font-size: 13px; color: var(--rg-dim); line-height: 1.7;
+}
+
+/* 无所得时替代空黑框的修心小字：不描边、不压深底，只留一行淡雅批注充实画卷 */
+.rg-mood-wrap { max-width: 520px; margin: 2px auto 0; }
+.rg-mood {
+    margin: 0; padding: 0;
+    font-size: 13px; line-height: 1.9; font-style: italic;
+    color: var(--rg-dim); letter-spacing: .06em;
 }
 
 .rg-sum {

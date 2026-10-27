@@ -1281,8 +1281,8 @@ GAME.Core = {
             GAME.UI.updateUI();
         } else {
             // 自动结算型
-            this.resolveEventOutcomes(picked.outcomes);
-            if (!p.isDead && !p.combat) this._showExploreResult(p, picked, snap, months);
+            var o0 = this.resolveEventOutcomes(picked.outcomes);
+            if (!p.isDead && !p.combat) this._showExploreResult(p, picked, snap, months, null, (o0 && o0.text) ? o0.text : "");
         }
     },
 
@@ -1325,13 +1325,16 @@ GAME.Core = {
         return { nums: nums, items: items };
     },
     // 出结算卷轴：把本次所得摊成全屏古风卷轴（复用斗法胜利弹窗）
-    _showExploreResult: function (p, picked, snap, months, sceneText) {
+    _showExploreResult: function (p, picked, snap, months, sceneText, resultText) {
         // 卷轴模块缺席（精简测试沙箱 / 脚本未载入）时不硬崩：账照结，界面直刷
         if (!GAME.BattleResult || !GAME.BattleResult.showScroll) { GAME.UI.updateUI(); return; }
         var diff = this._exploreDiff(p, snap);
         var hasItems = diff.items.length > 0;
         var hasMind = diff.nums.some(function (n) { return n.label === "修为" || n.label === "心境"; });
         var hasSilver = diff.nums.some(function (n) { return n.label === "白银"; });
+        // 「有收获」= 得实物，或任一数值为正是增益（修为 / 心境 / 气血+ / 灵石 / 白银 …）。
+        // 气血受损（负值）不计入，否则「瘴雾受创」也会写成「收下机缘」，与画面矛盾。
+        var hasReward = hasItems || diff.nums.some(function (n) { return String(n.val).charAt(0) === "+"; });
         var seal;
         if (hasItems && hasMind) seal = "游历归来 · 满载而归";
         else if (hasItems) seal = "山泽寻幽 · 偶得灵物";
@@ -1340,10 +1343,14 @@ GAME.Core = {
         else if (hasSilver) seal = "凡尘奔走 · 小有进项";
         else seal = "游历归来 · 平安返程";
 
+        var leadText = "【往返 " + months + " 月】" + (sceneText || (picked && picked.text) || "");
+        // 分支事件的「你的抉择 + 结局文案」拼进卷轴副标题，避免只说半句话（起因）
+        if (resultText) leadText += resultText;
+
         GAME.BattleResult.showScroll({
             variant: "win",
             seal: seal,
-            lead: "【往返 " + months + " 月】" + (sceneText || (picked && picked.text) || ""),
+            lead: leadText,
             gains: diff.nums,
             loot: hasItems ? {
                 title: "机 缘 所 获",
@@ -1352,7 +1359,7 @@ GAME.Core = {
             } : null,
             sum: "",
             actions: [
-                { id: "rg-act-return", label: "收 下 机 缘 · 返 回", onClick: function () { GAME.BattleResult.dismiss(); } },
+                { id: "rg-act-return", label: hasReward ? "收 下 机 缘 · 返 回" : "敛 息 归 返", onClick: function () { GAME.BattleResult.dismiss(); } },
                 { id: "rg-act-again", label: "继 续 历 练", cls: "rg-act-alt", onClick: function () { GAME.BattleResult.dismiss(); GAME.Core.explore(); } }
             ],
             onDismiss: function () { GAME.UI.updateUI(); }
@@ -1370,11 +1377,15 @@ GAME.Core = {
         if (!ev || !ev.choices[optionIndex]) return;
         var opt = ev.choices[optionIndex];
         GAME.UI.log("你心念一定：" + opt.text + "。", "info");
-        this.resolveEventOutcomes(opt.outcomes);
+        var o = this.resolveEventOutcomes(opt.outcomes);
         // 心魔劫等需要续破的流程：定心抉择生效后再正式冲击壁障
         if (!p.isDead && pe.resume === "breakthrough") this._resumeBreakthrough();
         // 历练结算：仅当未死、未陷入战斗、且非续破流程时，弹出游历结算卡
-        if (exCtx && !p.isDead && !p.combat && pe.resume !== "breakthrough") this._showExploreResult(p, null, exCtx.snap, exCtx.months, exCtx.scene);
+        if (exCtx && !p.isDead && !p.combat && pe.resume !== "breakthrough") {
+            // 把「你的抉择 + 事件结局」拼进卷轴副标题，别只留起因半句话
+            var resultText = (opt.text ? "你" + opt.text + "，" : "") + ((o && o.text) ? o.text : "");
+            this._showExploreResult(p, null, exCtx.snap, exCtx.months, exCtx.scene, resultText);
+        }
     },
 
     // 战后处置：0=灭口（全额财物+恶名，修士则落因果） 1=留活口（六成财物+善名）
@@ -1604,5 +1615,6 @@ GAME.Core = {
         this.checkDeath();
         GAME.UI.autoSave();
         GAME.UI.updateUI();
+        return o;
     },
 };
