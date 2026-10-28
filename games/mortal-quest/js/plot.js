@@ -112,6 +112,7 @@ GAME.Plot = {
             mature: (_target === cfg.hundred) && y >= cfg.hundred && y < cfg.capYears,   // 仅下种苗、转千年前可收百年药
             ready:  y >= cfg.capYears,         // 千年满 → 可收千年药（移栽苗达此亦收千年）
             left: this.monthsLeft(p, i, _target),
+            leftToQian: this.monthsLeft(p, i, cfg.capYears),   // 距千年满收（独立于本垄 target，供「差X满千年」文本）
             hundredLeft: y < cfg.hundred ? this.monthsLeft(p, i) : 0
         };
     },

@@ -460,7 +460,9 @@ GAME.Goals = {
         if (GAME.Plot && GAME.Plot.status) {
             var ps = GAME.Plot.status(p);
             if (ps && ps.ready > 0) plotHint = "；药圃有 " + ps.ready + " 株满千年可收";
-            else if (ps && ps.nextLeft != null) plotHint = "；药圃 " + ps.growing + " 株在长，最近 " + GAME.Plot._fmtMonths(ps.nextLeft) + "后可收";
+            else if (ps && ps.mature > 0) plotHint = "；药圃有 " + ps.mature + " 株百年灵药可收";
+            else if (ps && ps.nextLeft != null && ps.nextLeft > 0) plotHint = "；药圃 " + ps.growing + " 株在长，最近 " + GAME.Plot._fmtMonths(ps.nextLeft) + "后可收";
+            else if (ps && ps.growing > 0) plotHint = "；药圃 " + ps.growing + " 株在长";
         }
         // 与「尝试突破」按钮读同一份推演（Breakthrough.plan）：两处百分比必须同源。
         // 旧写法读 realm.breakChance 静态底子，按钮读 plan.successChance（已计入灵脉/护法/心境/丹道），

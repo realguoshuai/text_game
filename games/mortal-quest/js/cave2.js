@@ -41,7 +41,7 @@ GAME.DATA.ALCHEMY.recipes2 = [
     { id: "pill_jiangchen", name: "降尘丹", realmNeed: 13, herbs: { herb_bainian: 2, tianhuo_crystal: 1 }, months: 2 },
 ];
 
-/* —— 灵峰租赁档位：meditMul 修为转化倍率，gardenMul 药田产出倍率 —— */
+/* —— 灵峰租赁档位：meditMul 修为转化倍率，gardenMul 药田生长倍率（乘每月药龄，不乘收获株数） —— */
 GAME.DATA.LINGFENG = [
     { id: "low",  name: "杂役旧洞", rent: 0,    meditMul: 1.0, gardenMul: 1.0 },
     { id: "mid",  name: "中品灵峰", rent: 200,  meditMul: 1.5, gardenMul: 1.5 },
@@ -157,9 +157,16 @@ GAME.Cave2 = {
             GAME.UI.log("租赁" + peak.name + "需 " + peak.rent + " 枚灵石，囊中羞涩。", "system");
             return;
         }
+        // 杂役旧洞（low）是起始默认态，迁往它不算「开辟」事件，不刷日志（避免与高阶灵峰日志连刷）
+        if (peakId === "low") {
+            p.peak = peakId;
+            GAME.UI.updateUI();
+            return;
+        }
         p.spiritStones -= peak.rent;
         p.peak = peakId;
-        GAME.UI.log("你掷下灵石，独辟" + peak.name + "——灵气如雾，打坐修为转化 ×" + peak.meditMul + "，药田产出 ×" + peak.gardenMul + "。", "success");
+        // 口径：gardenMul 只乘「每月药龄」（长得快），不乘单垄收获株数——单垄恒定 ×1，故写「药田生长」
+        GAME.UI.log("你掷下灵石，独辟" + peak.name + "——灵气如雾，打坐修为转化 ×" + peak.meditMul + "，药田生长 ×" + peak.gardenMul + "。", "success");
         GAME.UI.updateUI();
     },
 

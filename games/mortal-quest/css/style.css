@@ -539,7 +539,7 @@ body.theme-light .ach-on { background-color: rgba(217,119,6,0.12); }
         gap: 10px;
     }
     #left-col { min-height: 0; }
-    #panel-area { overflow-y: visible; max-height: none; padding: 8px; }
+    #panel-area { overflow-y: visible; max-height: none; padding: 12px 8px 28px; }
     #right-col { min-height: 0; }
     #log-box { height: 200px; flex: none; }
 
@@ -875,7 +875,7 @@ button .btn-why {
     .stats-grid { gap: 2px 8px; }
     .actions { gap: 6px; }
     #tabs { gap: 4px; }
-    #panel-area { padding: 8px 8px 28px; }   /* 矮窗下也保底 28px 底部缓冲，第 3 个催熟按钮不被截断 */
+    #panel-area { padding: 12px 8px 28px; }   /* 上 12 / 下 28：矮窗也不切首排按钮、不截第 3 个催熟按钮 */
 }
 
 /* ---------- 章节地图（Increment 2：章节为皮） ---------- */
@@ -3578,6 +3578,8 @@ body.theme-light #plot-head:hover #plot-head-more, body.theme-light #plot-head:f
  * 于是"第 1 垄 / 空地 / 移栽（需百年灵药×1）"挤成一团、文字互相压住。
  * 这两块是折叠数据面板，不是按钮，本该各占一整行。 */
 #bt-prep, #plot-box { grid-column: 1 / -1; }
+/* 地火丹房折叠条已在 .combat-actions 网格之外，只需拉开与上方区块的间距 */
+#danfang-box { margin-top: 10px; }
 /* 药圃行的窄宽自适应：名字与年份可缩，按钮不抢位 */
 .plot-row { flex-wrap: wrap; row-gap: 2px; }
 .plot-row .bt-rn { flex: 1 1 auto; }

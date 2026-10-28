@@ -255,9 +255,17 @@
                     <div id="home-facilities"></div>
                     <div id="cave2-block" style="margin-top:12px;"></div>
                     <div id="endgame-block" style="margin-top:12px;"></div>
-                    <h3 style="margin-top:14px;">地火丹房</h3>
+                    <!-- 地火丹房：折叠摘要条（与 破境筹备/药圃 同款 .bt-prep），默认收起，让 8 垄药圃更早进首屏 -->
+                    <details id="danfang-box" class="bt-prep">
+                        <summary><span id="danfang-sum">地火丹房</span></summary>
+                        <div class="bt-prep-body">
+                            <div class="combat-actions">
+                                <button id="btn-home-alchemy" class="small-btn">开炉炼丹（地火丹房）</button>
+                            </div>
+                            <div class="item-desc" id="danfang-desc"></div>
+                        </div>
+                    </details>
                     <div class="combat-actions">
-                        <button id="btn-home-alchemy" class="small-btn">开炉炼丹（地火丹房）</button>
                                         <!-- 破境筹备 / 药圃：从中间栏收进洞府页，中栏只留高频即操作，不再堆折叠数据 -->
                     <details id="bt-prep" class="bt-prep" style="display:none;">
                         <summary><span id="bt-prep-sum">破境筹备</span></summary>

@@ -206,6 +206,10 @@ GAME.Bonds = {
         var chk = this.canChenqiaoqian();
         if (!chk.ok) { GAME.UI.log(chk.msg, "system"); GAME.UI.updateUI(); return false; }
         if (GAME.State.countItem("dingyan_dan") <= 0) {
+            // 整局只提示一次「想赠却无」，避免同月多重触发钩子反复刷屏；日后真拿到定颜丹仍可正常赠出
+            if (!p.flags) p.flags = {};
+            if (p.flags.dingYanDanFarewellTriggered) { GAME.UI.updateUI(); return false; }
+            p.flags.dingYanDanFarewellTriggered = true;
             GAME.UI.log("你本想赠她一物以作诀别，却想起囊中并无【定颜丹】。", "system");
             GAME.UI.updateUI();
             return false;

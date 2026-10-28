@@ -129,6 +129,9 @@ GAME.UI = {
         if (!this._tabByGroup) this._tabByGroup = {};
         this._tabByGroup[this.groupOf(name)] = name;
         this.updateUI();
+        // 切页签回到顶部：否则沿用上一页的 scrollTop，新页面首排按钮会被滚动容器上沿切掉半截
+        var _pa = this.$("panel-area");
+        if (_pa) _pa.scrollTop = 0;
     },
 
     /* 中栏核心行动（历练/闭关）与左栏视图联动：
@@ -843,12 +846,11 @@ GAME.UI = {
 
         var head = this.$("plot-head-text");
         if (head) {
-            var _suf = "";
             var _parts = [];
-            if (st.ready > 0) _parts.push(st.ready + " 株育千年");
-            if (st.mature > 0) _parts.push(st.mature + " 株育百年");
-            if (_parts.length) _suf = " · " + _parts.join(" · ");
-            else if (st.growingQian > 0) _suf = "（培育千年药中）";
+            if (st.ready > 0) _parts.push(st.ready + " 株千年可收");
+            if (st.mature > 0) _parts.push(st.mature + " 株百年可收");
+            if (st.growingQian > 0) _parts.push(st.growingQian + " 株育千年");
+            var _suf = _parts.length ? " · " + _parts.join(" · ") : "";
             head.innerText = st.growing + " / " + st.plots + " 垄在长" + _suf;
         }
 
@@ -872,7 +874,7 @@ GAME.UI = {
             var t = "药圃 · " + st.growing + "/" + st.plots + " 垄在长";
             if (st.ready > 0) t += ' · <b class="bt-plus">' + st.ready + " 株千年可收</b>";
             else if (st.mature > 0) t += ' · <b class="bt-plus">' + st.mature + " 株百年可收</b>";
-            else if (st.nextLeft != null) t += " · 最近 " + GAME.Plot._fmtMonths(st.nextLeft) + (st.growingQian > 0 ? "后成（培育千年药中）" : "后成");
+            else if (st.nextLeft != null && st.nextLeft > 0) t += " · 最近 " + GAME.Plot._fmtMonths(st.nextLeft) + (st.growingQian > 0 ? "后成（培育千年药中）" : "后成");
             sum.innerHTML = t;
         }
 
@@ -918,9 +920,11 @@ GAME.UI = {
             bSeed.onclick = function () { GAME.Plot.oneKeySeed(); };
             var bHarv = document.createElement("button");
             bHarv.className = "small-btn plot-btn";
-            bHarv.innerText = "一键采收 (" + st.mature + " 株可收)";
-            bHarv.disabled = st.mature < 1;
-            bHarv.title = st.mature < 1 ? "无满百年灵药可收" : "";
+            // 一键采收覆盖「满百年 + 满千年」两种（与 Plot.oneKeyHarvest 同一把尺子），数目与置灰都按合计
+            var canHarvN = st.mature + st.ready;
+            bHarv.innerText = "一键采收 (" + canHarvN + " 株可收)";
+            bHarv.disabled = canHarvN < 1;
+            bHarv.title = canHarvN < 1 ? "无满百年灵药可收" : "";
             bHarv.onclick = function () { GAME.Plot.oneKeyHarvest(); };
             batch.appendChild(bSeed);
             batch.appendChild(bHarv);
@@ -973,7 +977,7 @@ GAME.UI = {
                     acts.appendChild(bH);
                 } else if (s.mature) {
                     // 下种苗满百年 → 可收百年药；继续催熟则转入千年培育
-                    desc.innerText = s.years + " 年 · 已满百年（差 " + GAME.Plot._fmtMonths(s.left) + "满千年）";
+                    desc.innerText = s.years + " 年 · 已满百年（差 " + GAME.Plot._fmtMonths(s.leftToQian) + "满千年）";
                     var bHb = document.createElement("button");
                     bHb.className = "small-btn plot-btn";
                     bHb.innerText = "收成·百年灵药";
@@ -1226,7 +1230,7 @@ GAME.UI = {
             else if (!(atHome || atSect)) _sectBtn.classList.add("badge-away");
 
             var _ssub = this.$("sect-sub");
-            if (_ssub) _ssub.innerText = p.sectId ? "杂役堂 · 贡献 " + p.sectContrib : "";
+            if (_ssub) _ssub.innerText = p.sectId ? (p.innerSect ? "内门主峰（师叔） · 贡献 " : "杂役堂 · 贡献 ") + p.sectContrib : "";
 
             // 打坐耗时随境界递增（按钮文案动态）；重伤未愈时主按钮改为「静坐疗伤」
             var mm = realm.meditateMonths || 3;
@@ -2113,7 +2117,7 @@ GAME.UI = {
         var self = this;
         this.$("home-intro").innerText = c.intro;
         this.showGuide("home-guide", "home", "洞府怎么起手",
-            "洞府是你在这乱世安身的根，四样设施逐级而建。建议先点【灵田】和【丹房】：灵田每次打理多收几株灵药，丹房炼丹打折、还有几率一次出两枚。等灵石攒够了，再补【藏经阁】（打坐多给修为）和【护山大阵】（降低黑市失手率）。升级都要灵石＋材料＋耗时数月，慢慢来，别一次性把家底掏空。");
+            "洞府是你在这乱世安身的根，四样设施逐级而建。建议先点【灵田】和【丹房】：灵田让药草长得更快、垄数更多，丹房炼丹打折、还有几率一次出两枚。等灵石攒够了，再补【藏经阁】（打坐多给修为）和【护山大阵】（降低黑市失手率）。升级都要灵石＋材料＋耗时数月，慢慢来，别一次性把家底掏空。");
         var html = "";
         c.facilities.forEach(function (f, i) {
             var lv = GAME.Home.level(f.id);
@@ -2152,6 +2156,15 @@ GAME.UI = {
             var btn = self.$("btn-home-up" + i);
             if (btn) btn.onclick = function () { GAME.Home.upgrade(f.id); };
         });
+        // 地火丹房摘要条：与设施等级同源（未辟 / 已辟第 N 阶），折叠态也要能看出能不能开炉
+        var dfSum = this.$("danfang-sum"), dfDesc = this.$("danfang-desc");
+        var dfLv = GAME.Home.level("danfang");
+        if (dfSum) dfSum.innerText = "地火丹房" + (dfLv > 0
+            ? "（已辟 · 第 " + dfLv + " 阶 · 可直跳开炉）"
+            : "（未辟 · 先营建丹房）");
+        if (dfDesc) dfDesc.innerText = dfLv > 0
+            ? "炉火常燃，点上方按钮直跳开炉炼丹。丹房阶数越高，炼丹越省灵石、越易一次双丹。"
+            : "丹房未辟——先在「丹房」设施上营建；练气三层开启丹炉后方能成丹。";
     },
 
     // ---------- 洞府 2.0：灵峰选址 / 护山大阵 / 终局传送阵（筑基篇） ----------
@@ -2178,7 +2191,7 @@ GAME.UI = {
                     (cur || p.spiritStones < f.rent ? " disabled" : "") + ' style="margin:3px 4px 0 0;">' +
                     f.name + (f.rent ? "（" + f.rent + " 灵石）" : "") + (cur ? " ✓" : "") + '</button>';
             });
-            html += '<div class="item-desc">灵峰提升打坐修为转化与药田产出（中品 ×1.5 / 上品 ×2.0）。</div>';
+            html += '<div class="item-desc">灵峰提升打坐修为转化与药田生长速度（中品 ×1.5 / 上品 ×2.0）。</div>';
             if (p.peak && p.peak !== "low") {
                 var vp = p.peak === "mid"
                     ? "中品灵峰：每月 15 灵石 + 百年灵药 ×1"
@@ -2209,7 +2222,14 @@ GAME.UI = {
                 html += '</div>';
             }
             // 护山大阵
-            html += '<div style="padding:6px 0;"><div><span class="gold">护山大阵</span></div>';
+            // 护山大阵（可折叠：默认收起，点开才列阵法按钮，避免顶部截断、腾出首屏给药圃）
+            var actForm = GAME.Cave2.activeFormation();
+            var _repel = Math.round((GAME.Cave2.effectiveRepel ? GAME.Cave2.effectiveRepel() : 0) * 100);
+            html += '<details class="bt-prep"><summary>护山大阵' +
+                (actForm ? '（已启：' + actForm.name + ' · 反制 ' + _repel + '%）' : '（未启 · 阵旗未插）') +
+                '</summary>';
+            html += '<div class="bt-prep-body" style="padding:6px 0;">';
+            html += '<div><span class="gold">护山大阵</span></div>';
             GAME.DATA.FORMATIONS.forEach(function (f, i) {
                 if (f.id === "none") return;
                 var cur = p.formation === f.id;
@@ -2220,14 +2240,13 @@ GAME.UI = {
                     (locked ? ' title="' + can.why + '"' : "") + '>' +
                     f.name + "（" + f.cost + " 灵石）" + (cur ? " ✓" : "") + '</button>';
             });
-            var actForm = GAME.Cave2.activeFormation();
             if (actForm && actForm.upkeep) {
                 html += '<div class="item-desc">【' + actForm.name + '】月耗 ' + actForm.upkeep +
                     ' 灵石——阵法持续耗养，撑不住便自行崩散。长关可入阵而修：心境增速翻快，闭关期间外敌不得扰。</div>';
             } else {
                 html += '<div class="item-desc">阵法被动御敌：魔修潜入自动反制并缴获其储物袋。</div>';
             }
-            html += '</div>';
+            html += '</div></details>';
 
             // 寰尘岛：碎星海深处的隐秘灵岛（周天星斗大阵的所在）
             if (GAME.Cave2.atStarSea()) {
