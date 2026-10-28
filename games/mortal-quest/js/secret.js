@@ -25,6 +25,15 @@ GAME.Secret = {
     roam: function () {
         var p = GAME.State.p();
         if (p.isDead || p.combat) { GAME.UI.updateUI(); return; }
+        // 深度秘境互斥（最顶拦截）：人在古修遗迹/禁地/试炼/狩猎副本里时，外围游历一概不许。
+        // 否则被困深处也能靠这个按钮无限耗月刷奇遇。判据用 State.dungeonName（与页签锁同一把尺子），
+        // 不新增状态位——副本状态一清，游历自然恢复。
+        var _dgName = (GAME.State.dungeonName ? GAME.State.dungeonName(p) : "");
+        if (_dgName) {
+            GAME.UI.log("身处" + _dgName + "深处，正与凶兽/禁制对峙，无法分心在外围游历！", "danger");
+            GAME.UI.updateUI();
+            return;
+        }
         GAME.Core.passTime(1);                 // 探看耗 1 月
         if (p.isDead) return;
 

@@ -117,6 +117,27 @@ GAME.Relic = {
         else GAME.UI.updateUI();
     },
 
+    // ---------- 探索进度（UI 卡与日志同读此口，避免各算一套） ----------
+    progress: function (p) {
+        p = p || GAME.State.p();
+        if (!p || !p.relic) return null;
+        var total = this.cfg().steps;
+        var done = Math.max(0, Math.min(total, total - (p.relic.stepsLeft || 0)));
+        return { total: total, done: done, left: total - done };
+    },
+
+    // ---------- 见好就收：强行脱离（不给通关奖励，已入囊的战利品保留；冷却已在入时挂上） ----------
+    flee: function () {
+        var p = GAME.State.p();
+        if (!p || !p.relic) return false;
+        var pr = this.progress(p);
+        p.relic = null;   // 唯一状态位清空 → State.inDungeon 现算为假，页签与 8 宫格随之解锁
+        GAME.UI.log("你按住心中贪念，循原路退出古修遗迹——此番深入 " + pr.done + " 步，所得已入囊；余下造化，留待后缘。", "system");
+        GAME.UI.autoSave();
+        GAME.UI.updateUI();
+        return true;
+    },
+
     // ---------- 走完 12 步，脱离结算 ----------
     exit: function () {
         var p = GAME.State.p();
