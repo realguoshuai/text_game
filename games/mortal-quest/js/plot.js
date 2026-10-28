@@ -88,10 +88,10 @@ GAME.Plot = {
     },
 
     // 还差几个月可收千年（已可收则 0）
-    monthsLeft: function (p, i) {
+    monthsLeft: function (p, i, target) {
         var y = this.yearsOf(p, i), rate = this.rate(p);
         if (rate <= 0) return 0;
-        var need = this.cfg().capYears;
+        var need = target || this.cfg().capYears;
         if (y >= need) return 0;
         return Math.ceil((need - y) / rate);
     },
@@ -111,7 +111,7 @@ GAME.Plot = {
             target: _target,
             mature: (_target === cfg.hundred) && y >= cfg.hundred && y < cfg.capYears,   // 仅下种苗、转千年前可收百年药
             ready:  y >= cfg.capYears,         // 千年满 → 可收千年药（移栽苗达此亦收千年）
-            left: this.monthsLeft(p, i),
+            left: this.monthsLeft(p, i, _target),
             hundredLeft: y < cfg.hundred ? this.monthsLeft(p, i) : 0
         };
     },
@@ -283,12 +283,16 @@ GAME.Plot = {
         }
         var isQian = s.ready;
         var item = isQian ? cfg.harvestThousand.id : cfg.harvestHundred.id;
-        var bonus = (GAME.Home && GAME.Home.yieldBonus) ? GAME.Home.yieldBonus() : 0;
-        var n = 1 + bonus;
+        // 单垄基础产出固定为 1 株；高阶灵田仅小幅提升「双生暴击」（额外 +1 株）概率，不再按阶数乘法膨胀
+        var bonus = 0;
+        if (GAME.Home && typeof GAME.Home.yieldBonus === "function") bonus = GAME.Home.yieldBonus() || 0;
+        var critChance = Math.max(0, Math.min(0.45, 0.05 * bonus));   // tier0=0% · tier2=10% · tier5=25%，上限 45%
+        var twin = Math.random() < critChance;
+        var n = 1 + (twin ? 1 : 0);
         GAME.State.addItem(item, n);
         p.plots[i] = null;
         GAME.UI.log("你小心起出第 " + (i + 1) + " 垄的药，得【" + GAME.DATA.ITEMS[item].name + "】×" + n +
-            (bonus ? "（灵田 +" + bonus + "）" : "") + "。", "loot");
+            (twin ? "（双生暴击 +1）" : "") + "。", "loot");
         GAME.UI.autoSave(); GAME.UI.updateUI();
         return true;
     },

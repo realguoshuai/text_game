@@ -99,7 +99,8 @@ GAME.Goals = {
             hint: function (p) {
                 return "尚余 " + (p.causal.months || 0) + " 个月，高阶修士循迹而来";
             },
-            where: "远遁 / 敛息"
+            where: "远遁 / 敛息",
+            whereTo: { kind: "tab", tab: "map" }   // 点按钮直达大地图（远遁·跨城转移以甩开尾随）
         },
         {
             id: "leak", urgent: true,

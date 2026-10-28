@@ -193,14 +193,27 @@ ok('千年满收成成功', G.Plot.harvest(0) === true);
 ok('得千年灵药 ×1（非百年）', G.State.countItem('herb_qiannian') === 1 && G.State.countItem('herb_bainian') === 0);
 ok('收完变空垄', p.plots[0] === null);
 
-// 灵田加成
+// 灵田加成：单垄基础产出固定为 1 株；高阶灵田仅小幅「双生暴击」（额外 +1）概率，不再按阶数乘法膨胀
+var _rnd = sandbox.Math.random, _yb = G.Home.yieldBonus;
+G.Home.yieldBonus = function () { return 2; };   // 锁死 tier2（yieldBonus 2）以确定性验证
 p = fresh({ bainian: 1 });
-setTier(0, 2);   // yieldBonus 2
+setTier(0, 2);
+G.Plot.plant(0);
+G.Plot.tick(300);
+sandbox.Math.random = function () { return 0.99; };   // 不触发双生暴击
+G.Plot.harvest(0);
+ok('灵田加成不再乘法膨胀（yieldBonus 2 仍只收 1 株）', G.State.countItem('herb_qiannian') === 1);
+ok('日志不再标灵田加成', !logs.some(x => /灵田 \+/.test(x)));
+// 双生暴击：强制触发时额外 +1 株（上限 +1，绝不回退到阶数乘法）
+sandbox.Math.random = function () { return 0.0; };
+p = fresh({ bainian: 1 });
+setTier(0, 2);
 G.Plot.plant(0);
 G.Plot.tick(300);
 G.Plot.harvest(0);
-ok('灵田 yieldBonus 2 → 千年灵药收 3 株', G.State.countItem('herb_qiannian') === 3);
-ok('日志标出灵田加成', logs.some(x => /灵田 \+2/.test(x)));
+sandbox.Math.random = _rnd; G.Home.yieldBonus = _yb;
+ok('双生暴击至多 +1 株（共 2 株上限）', G.State.countItem('herb_qiannian') === 2);
+ok('日志标出双生暴击', logs.some(x => /双生暴击 \+1/.test(x)));
 setTier(0, 0);
 
 /* ================= ⑥ 催熟（绿液） ================= */

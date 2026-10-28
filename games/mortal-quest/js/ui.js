@@ -841,10 +841,15 @@ GAME.UI = {
         box.style.display = "";
 
         var head = this.$("plot-head-text");
-        if (head) head.innerText = "药圃 " + st.growing + " / " + st.plots + " 垄在长" +
-            (st.ready > 0 ? " · " + st.ready + " 株千年可收"
-                : (st.mature > 0 ? " · " + st.mature + " 株百年可收"
-                    : (st.growingQian > 0 ? "（培育千年药中）" : "")));
+        if (head) {
+            var _suf = "";
+            var _parts = [];
+            if (st.ready > 0) _parts.push(st.ready + " 株育千年");
+            if (st.mature > 0) _parts.push(st.mature + " 株育百年");
+            if (_parts.length) _suf = " · " + _parts.join(" · ");
+            else if (st.growingQian > 0) _suf = "（培育千年药中）";
+            head.innerText = st.growing + " / " + st.plots + " 垄在长" + _suf;
+        }
 
         // 状态条右侧：灵田等阶 ＋ 手上存药。空垄时改成一句"点击打理药圃 ›"——
         // 光挂一个 0/3 的死数字，玩家既不知道点得动，也不知道该拿什么去种。
@@ -908,13 +913,13 @@ GAME.UI = {
             bSeed.className = "small-btn plot-btn";
             bSeed.innerText = "一键下种（灵药种子×" + seedN + "）";
             bSeed.disabled = seedN < 1;
-            this._why(bSeed, seedN < 1 ? "需【灵药种子】" : "");
+            bSeed.title = seedN < 1 ? "需【灵药种子】" : "";
             bSeed.onclick = function () { GAME.Plot.oneKeySeed(); };
             var bHarv = document.createElement("button");
             bHarv.className = "small-btn plot-btn";
-            bHarv.innerText = "一键采收" + (st.mature > 0 ? "（" + st.mature + " 株）" : "");
+            bHarv.innerText = "一键采收 (" + st.mature + " 株可收)";
             bHarv.disabled = st.mature < 1;
-            this._why(bHarv, st.mature < 1 ? "无满百年灵药可收" : "");
+            bHarv.title = st.mature < 1 ? "无满百年灵药可收" : "";
             bHarv.onclick = function () { GAME.Plot.oneKeyHarvest(); };
             batch.appendChild(bSeed);
             batch.appendChild(bHarv);
@@ -1225,9 +1230,10 @@ GAME.UI = {
             // 打坐耗时随境界递增（按钮文案动态）；重伤未愈时主按钮改为「静坐疗伤」
             var mm = realm.meditateMonths || 3;
             var _msub = this.$("meditate-sub");
-            if (_msub) _msub.innerText = p.wounded
+            var _lowHp = (p.maxHp > 0 && p.currentHp / p.maxHp < 0.2);
+            if (_msub) _msub.innerText = (p.wounded
                 ? "静坐疗伤（耗 " + mm + " 月 · 复原气血）"
-                : mm + " 月 · +1 修为";
+                : mm + " 月 · +1 修为") + (_lowHp ? "　⚠ 残血 " + p.currentHp + "/" + p.maxHp + "（宜先疗伤）" : "");
             else this.$("btn-meditate").innerText = p.wounded
                 ? "静坐疗伤 (" + mm + "月 · 复原气血)"
                 : "闭关打坐 (" + mm + "月 · +1修为)";
@@ -1319,9 +1325,8 @@ GAME.UI = {
             var _liq = function (b, need) {
                 if (!b) return;
                 b.disabled = lock || p.liquid < need;
-                this._why(b, lock ? lockWhyInline : (p.liquid < need
-                    ? "灵液不足：需 " + need + " 滴（现有 " + (p.liquid || 0) + "）" : ""));
-                b.title = lock ? lockTitle : "";
+                b.title = lock ? lockTitle : (p.liquid < need
+                    ? "灵液不足：需 " + need + " 滴（现有 " + (p.liquid || 0) + "）" : "");
             }.bind(this);
             _liq(this.$("btn-catalyze-wood"), 1);
             _liq(this.$("btn-catalyze-xuanbing"), 5);
@@ -1340,7 +1345,7 @@ GAME.UI = {
                 if (_pi.type === "pill" && _pi.use && _pi.use.exp) _pillN += GAME.State.countItem(_pid);
             }
             var _fuSub = this.$("fu-dan-sub");
-            if (_fuSub) _fuSub.innerText = "丹药 " + _pillN;
+            if (_fuSub) _fuSub.innerText = "丹药 " + _pillN + (_lowHp ? "　⚠ 残血（宜服丹疗伤）" : "");
 
             // —— 异常警示行：有异常才亮（煞气/阴毒/觊觎度/药香泄露） ——
             var aw = function (id, on) { var el = this.$(id); if (el) el.style.display = on ? "" : "none"; }.bind(this);

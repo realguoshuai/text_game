@@ -874,7 +874,7 @@ button .btn-why {
     .stats-grid { gap: 2px 8px; }
     .actions { gap: 6px; }
     #tabs { gap: 4px; }
-    #panel-area { padding: 8px; }
+    #panel-area { padding: 8px 8px 28px; }   /* 矮窗下也保底 28px 底部缓冲，第 3 个催熟按钮不被截断 */
 }
 
 /* ---------- 章节地图（Increment 2：章节为皮） ---------- */
