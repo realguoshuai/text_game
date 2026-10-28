@@ -568,6 +568,7 @@ GAME.UI = {
         var gText = (g.text && g.text !== "—" && g.text !== "-") ? g.text : "";
         var t = this.$("goal-text"); if (t) t.innerText = gText || "暂无特定目标，可四处游历或闭关破境";
         var h = this.$("goal-hint"); if (h) h.innerText = g.hint || "";
+        var gd = this.$("goal-guide"); if (gd) gd.innerText = g.guide || "";
         var w = this.$("goal-where");
         if (w) {
             w.innerHTML = "";

@@ -100,7 +100,8 @@ GAME.Goals = {
                 return "尚余 " + (p.causal.months || 0) + " 个月，高阶修士循迹而来";
             },
             where: "远遁 / 敛息",
-            whereTo: { kind: "tab", tab: "map" }   // 点按钮直达大地图（远遁·跨城转移以甩开尾随）
+            whereTo: { kind: "tab", tab: "map" },   // 点按钮直达大地图（远遁·跨城转移以甩开尾随）
+            guide: "化解指引：①点上方【前往】去大地图·远遁跨城转移，暂甩尾随；②入洞府静修涤煞，或开储物袋服化煞丹削减煞气，方为根治。"
         },
         {
             id: "leak", urgent: true,
@@ -549,7 +550,8 @@ GAME.Goals = {
             hint: d.hint ? (typeof d.hint === "function" ? d.hint(p) : d.hint) : "",
             where: typeof d.where === "function" ? (d.where(p) || "") : (d.where || ""),
             whereTo: d.whereTo || null,
-            goto: d.goto
+            goto: d.goto,
+            guide: d.guide ? (typeof d.guide === "function" ? d.guide(p) : d.guide) : ""
         };
     },
 

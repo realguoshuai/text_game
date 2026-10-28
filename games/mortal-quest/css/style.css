@@ -714,6 +714,7 @@ details.dropdown .dd-body .dd-item { margin: 2px 0; text-align: left; }
 .goal-main b { color: var(--text-strong); }
 .goal-banner.urgent .goal-main b { color: var(--warning); }
 .goal-hint { display: block; font-size: 12px; color: var(--text-mute); white-space: normal; overflow: visible; word-break: break-word; }
+.goal-guide { display: block; font-size: 11px; color: var(--text-faint); margin-top: 3px; line-height: 1.55; white-space: normal; word-break: break-word; }
 .goal-where { flex-shrink: 0; font-size: 12px; color: var(--text-faint); }
 .goal-parallel { flex: 1 1 100%; margin-top: 3px; padding-top: 3px; font-size: 11px; line-height: 1.5; color: var(--text-mute); border-top: 1px dashed rgba(140,110,70,.22); }
 .goal-parallel-label { color: var(--text-dim); margin-right: 2px; }
@@ -1434,6 +1435,7 @@ body::after {
 .goal-next-btn:hover { background: rgba(176,141,87,.32); }
 .goal-next-btn.goal-next-heal { border-color: #3d6b4a; color: #2f5a3c; background: rgba(61,107,74,.14); }
 .goal-where, .goal-next-why { color: #7b6550; }
+.goal-guide { color: #7b6550; }
 .goal-where-link { color: #8a5a1a; }
 
 /* 动作：石牌 + 六格 */
