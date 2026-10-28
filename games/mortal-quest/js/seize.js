@@ -234,8 +234,8 @@
             // 反夺其元神
             var c = cfg.counter;
             if (Math.random() < c.successP) {
-                var exp = (GAME.Time && GAME.Time.expOf) ? GAME.Time.expOf(p, c.expCycles) : c.expCycles;
-                p.currentExp += exp;
+                // 封顶：exp 取实收量，下面的「道行 +N」日志据此报数
+                var exp = GAME.Core.addExp((GAME.Time && GAME.Time.expOf) ? GAME.Time.expOf(p, c.expCycles) : c.expCycles);
                 p.spiritBonus = (p.spiritBonus || 0) + c.spiritBonus;
                 p.shaQi = (p.shaQi || 0) + c.winShaQi;
                 this.addLevel(p, -1);

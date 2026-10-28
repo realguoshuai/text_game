@@ -133,9 +133,10 @@ GAME.Alchemy = {
 
         if (base > 0) {
             if (gain > 0) {
-                p.currentExp += gain;
-                GAME.UI.log("你服下【" + item.name + "】（第 " + n + " 枚），药力化开——修为 +" + gain +
+                gain = GAME.Core.addExp(gain);   // 封顶：实收（本境圆满后药力不再虚涨）
+                if (gain > 0) GAME.UI.log("你服下【" + item.name + "】（第 " + n + " 枚），药力化开——修为 +" + gain +
                     (mul < 1 ? "（抗药性：药效仅余 " + Math.round(mul * 100) + "%）" : "") + "。", "success");
+                else GAME.UI.log("你服下【" + item.name + "】（第 " + n + " 枚）——本境修为已圆满，药力散入经络，再无寸进。", "system");
             } else {
                 GAME.UI.log("你服下【" + item.name + "】（第 " + n + " 枚）——体内经脉对该丹药已然麻木，毫无寸进。", "system");
             }

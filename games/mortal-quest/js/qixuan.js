@@ -113,8 +113,8 @@ GAME.Qixuan = {
         var p = GAME.State.p();
         var a2 = this.cfg().act2;
         if (idx === 0) {
-            p.currentExp += 30;
-            GAME.UI.log("你日夜运转大周天，春去夏来——《青木功》第一层愈发热络，修为 +30。", "success");
+            var _q = GAME.Core.addExp(30);
+            GAME.UI.log("你日夜运转大周天，春去夏来——《青木功》第一层愈发热络，" + (_q > 0 ? "修为 +" + _q : "修为已满") + "。", "success");
         } else if (idx === 2) {
             // 下山探亲：不涨修为不涨防，但心境与善念入账（趣味性选项）
             p.mind = (p.mind || 0) + 5;

@@ -266,8 +266,8 @@ GAME.Yuanying = {
                     }
                 }
             });
-            p.currentExp += site.exp;
-            GAME.UI.log("览古修遗泽，修为 +" + site.exp + "。", "success");
+            var _ye = GAME.Core.addExp(site.exp);
+            GAME.UI.log("览古修遗泽，" + (_ye > 0 ? "修为 +" + _ye : "修为已满") + "。", "success");
         } else if (res.id === "herb") {
             var qty = (site.id === "suixing") ? 2 : 1;
             GAME.State.addItem("herb_qiannian", qty);
@@ -280,9 +280,10 @@ GAME.Yuanying = {
             p.mind = Math.max(0, (p.mind || 0) - 5);
             GAME.UI.log("归途撞上一缕游离煞气，元神被撕去一小角。你闷哼一声收回肉身，识海刺痛许久。（心境 -5）", "danger");
         } else if (res.id === "art") {
-            p.currentExp += site.exp * 2;
+            var _ae = GAME.Core.addExp(site.exp * 2);   // 封顶走唯一加口
             p.mind = (p.mind || 0) + 5;
-            GAME.UI.log("你撞见一缕坐化前辈的残魂，他瞥你一眼，隔空点化三句真言——识海豁然开朗。（修为 +" + (site.exp * 2) + "，心境 +5）", "success");
+            GAME.UI.log("你撞见一缕坐化前辈的残魂，他瞥你一眼，隔空点化三句真言——识海豁然开朗。（" +
+                (_ae > 0 ? "修为 +" + _ae : "修为已满") + "，心境 +5）", "success");
         } else if (res.id === "trap") {
             p.mind = Math.max(0, (p.mind || 0) - 6);
             GAME.UI.log("元神误入一方杀机未消的古阵，被无形锋芒削去一缕神识。你急急抽身，识海刺痛。（心境 -6）", "danger");

@@ -924,8 +924,10 @@ GAME.Combat = {
 
         GAME.UI.log("【" + p.combat.name + "】轰然倒地！", "success");
         if (GAME.Moments) GAME.Moments.fire("first_kill", p.combat.name);
-        p.currentExp += expGain;
-        GAME.UI.log("斗法之余灵台清明，修为增加 " + expGain + " 点。", "success");
+        var _expReal = GAME.Core.addExp(expGain);   // 封顶：本境圆满后不再虚涨（卷轴也按实收报）
+        if (this._rec) this._rec.exp = _expReal;
+        if (_expReal > 0) GAME.UI.log("斗法之余灵台清明，修为增加 " + _expReal + " 点。", "success");
+        else GAME.UI.log("斗法之余灵台清明，只是本境修为已圆满，这点感悟无处安放。", "system");
 
         // 景阳城玄机世家主线 / 升仙大会擂台 / 血色禁地 / 狩猎 / 遗迹 / 劫杀：
         // 直接入袋，再交还对应模块续推剧情（不走"杀/放"抉择——这些由剧情验收）

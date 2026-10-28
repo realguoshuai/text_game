@@ -132,6 +132,12 @@ GAME.State = {
         // 秘境标志随取随算：p.inDungeon 只是 State.inDungeon() 的镜像，存档里不另存一份真值——
         // 两份状态必然漂移（血色禁地有五条退出路径，漏改一条就把人永久锁在秘境里）。
         this.player.inDungeon = this.inDungeon(this.player);
+        // 修为封顶自愈：老存档里可能留着超上限的修为（旧版各入口硬加，HUD 出现过「4756 / 3900」）。
+        // 新写入一律走 Core.addExp（唯一加口），这里只兜底把陈年溢出夹回本境所需。
+        var _rm = GAME.DATA && GAME.DATA.REALMS && GAME.DATA.REALMS[this.player.realmIndex];
+        if (_rm && _rm.needExp != null && (this.player.currentExp || 0) > _rm.needExp) {
+            this.player.currentExp = _rm.needExp;
+        }
         return this.player;
     },
 

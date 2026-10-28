@@ -49,9 +49,8 @@ GAME.Secret = {
                 p.mind = (p.mind || 0) + m;
                 txt = "一位云游老怪端坐石上，瞥你一眼：「心不定，道难成。」言罢化作清风——心境 +" + m + "。";
             } else {
-                var e = GAME.Core.rand(80, 200);
-                p.currentExp += e;
-                txt = "残阵中浮起一道前人功影，你驻足参悟，修为 +" + e + "。";
+                var e = GAME.Core.addExp(GAME.Core.rand(80, 200));
+                txt = "残阵中浮起一道前人功影，你驻足参悟，" + (e > 0 ? "修为 +" + e : "修为已满，只余一声长叹") + "。";
             }
         } else if (picked.type === "array") {
             var arr = [["mid_stone", GAME.Core.rand(2, 4)], ["shadan_suipian", 1], ["beast_soul", 1]];

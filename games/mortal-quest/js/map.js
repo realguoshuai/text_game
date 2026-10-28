@@ -132,11 +132,13 @@ GAME.Map = {
         if (res.id === "relic") {
             var eq = wd.relics[Math.floor(Math.random() * wd.relics.length)];
             GAME.State.addItem(eq, 1);
-            p.currentExp += 300;
-            GAME.UI.log("路旁岩隙嵌着一具古修遗蜕，指间法器犹自生辉。你取其随身之宝，并参悟其上残纹。（得【" + GAME.DATA.ITEMS[eq].name + "】，修为 +300）", "success");
+            var _r1 = GAME.Core.addExp(300);
+            GAME.UI.log("路旁岩隙嵌着一具古修遗蜕，指间法器犹自生辉。你取其随身之宝，并参悟其上残纹。（得【" + GAME.DATA.ITEMS[eq].name + "】" +
+                (_r1 > 0 ? "，修为 +" + _r1 : "，修为已满") + "）", "success");
         } else if (res.id === "art") {
-            p.currentExp += 500; p.mind = (p.mind || 0) + 5;
-            GAME.UI.log("半途遇一缕前辈残魂，隔空授你一段心法真意。（修为 +500，心境 +5）", "success");
+            var _r2 = GAME.Core.addExp(500); p.mind = (p.mind || 0) + 5;
+            GAME.UI.log("半途遇一缕前辈残魂，隔空授你一段心法真意。（" +
+                (_r2 > 0 ? "修为 +" + _r2 : "修为已满") + "，心境 +5）", "success");
         } else if (res.id === "herb") {
             GAME.State.addItem("herb_qiannian", 2);
             GAME.UI.log("崖壁石缝里，两株万年灵药正吞吐月华。你以玉匣小心收了。（【千年灵药】×2）", "loot");

@@ -519,11 +519,11 @@ GAME.Core = {
             // 伪灵根的残酷就在这儿——想靠黄龙丹堆到筑基，堆到后面等于白嗑；破局靠
             // 掌天瓶催熟高年份灵药炼高阶丹、或狩猎妖丹，不是靠同阶丹硬灌。
             var pot = this.pillPotency(id);
-            var gain = Math.max(1, Math.round(use.exp * pot.mult * (GAME.Reincarn ? GAME.Reincarn.pillMult(p) : 1)));
-            p.currentExp += gain;
+            var gain = this.addExp(Math.max(1, Math.round(use.exp * pot.mult * (GAME.Reincarn ? GAME.Reincarn.pillMult(p) : 1))));
             p.pillExpCount[id] = pot.taken + 1;
             var note = pot.mult < 1 ? "（连服渐抗，此颗药效 ×" + pot.mult.toFixed(2) + "）" : "";
-            GAME.UI.log("你服下【" + item.name + "】，滚滚药力在丹田化开，修为 +" + gain + note + "！", "success");
+            if (gain > 0) GAME.UI.log("你服下【" + item.name + "】，滚滚药力在丹田化开，修为 +" + gain + note + "！", "success");
+            else GAME.UI.log("你服下【" + item.name + "】，药力在丹田盘旋一周——本境修为已圆满，尽数散入经络，再无寸进。", "system");
         }
         if (use.ageBonus) {
             p.ageBonus += use.ageBonus;
@@ -665,12 +665,12 @@ GAME.Core = {
         if (GAME.State.countItem(id) < 1) return;
         p.herbEatCount = p.herbEatCount || 0;                       // 老存档无此字段，安全兜底
         var mult = Math.max(0.3, 1 - p.herbEatCount * 0.05);
-        var gain = Math.max(1, Math.round(item.use.eatExp * mult));
+        var gain = this.addExp(Math.max(1, Math.round(item.use.eatExp * mult)));
         GAME.State.removeItem(id, 1);
-        p.currentExp += gain;
         p.herbEatCount += 1;
         var note = mult < 1 ? "（连服生药，药力渐抗，效用 ×" + mult.toFixed(2) + "）" : "";
-        GAME.UI.log("你生嚼下一株【" + item.name + "】，草木清气直灌丹田——修为 +" + gain + note + "。", "success");
+        if (gain > 0) GAME.UI.log("你生嚼下一株【" + item.name + "】，草木清气直灌丹田——修为 +" + gain + note + "。", "success");
+        else GAME.UI.log("你生嚼下一株【" + item.name + "】，草木清气入体即散——本境修为已圆满，再补也是白费。", "system");
         this.passTime(item.use.eatMonths || 1);
     },
 
@@ -1024,6 +1024,26 @@ GAME.Core = {
         var gname = target ? ("「" + target.name + "」") : "";
         return "当前气血大损（" + cur + "/" + max + "），贸然冲击" + gname +
             "瓶颈极易因气血亏空而功亏一篑，建议先调息疗伤（回春散）再行突破！";
+    },
+
+    /* ---------- 修为唯一加口：封顶在本境所需（大圆满即止） ----------
+     * 旧版各处直接 `p.currentExp += n`：闭关到满会自动停（autoCult/苦修有闸），
+     * 但丹药、生药、斗法、历练掉落、奇遇仍是硬加 → HUD 出现「4756 / 3900」这种超上限的字，
+     * 而且突破失败扣三成后（4756→3330）仍高于 3900，可以立刻再冲，失败等于没代价。
+     * 现统一走这里：加满即止，返回值是**实际入账量**（被上限吞掉的部分不许在日志里谎报）。
+     * needExp 为 null 的境界（筑基后期转结丹天堑）不封顶——那里本就不靠修为推进。 */
+    addExp: function (n) {
+        var p = GAME.State.p();
+        if (!p) return 0;
+        n = Math.floor(n || 0);
+        var before = p.currentExp || 0;
+        if (n < 0) { p.currentExp = Math.max(0, before + n); return n; }
+        var realm = GAME.DATA.REALMS[p.realmIndex];
+        var cap = realm ? realm.needExp : null;
+        var after = before + n;
+        if (cap != null && after > cap) after = cap;
+        p.currentExp = after;
+        return Math.max(0, after - before);
     },
 
     // 心魔劫后由 chooseEventOption 调用：缓存已在 _btCtx，入口即走续破分支
@@ -1548,8 +1568,9 @@ GAME.Core = {
                 break;
             case "exp":
                 var exp = this.rand(o.amount[0], o.amount[1]);
-                p.currentExp += exp;
-                GAME.UI.log("修为 +" + exp + "。", "success");
+                var _expGot = this.addExp(exp);
+                if (_expGot > 0) GAME.UI.log("修为 +" + _expGot + "。", "success");
+                else GAME.UI.log("修为已至本境圆满，这一份感悟无处安放。", "system");
                 break;
             case "silver":
                 // 凡俗地界的收成：铜钱银两，不是灵石（镇民不认灵石）
@@ -1563,9 +1584,9 @@ GAME.Core = {
                 var _want = this.rand(o.amount[0], o.amount[1]);
                 var _real = Math.max(0, Math.min(_want, (p.maxHp || 0) - (p.currentHp || 0)));
                 if (_real <= 0) {
-                    var _conv = 15;
-                    p.currentExp += _conv;
-                    GAME.UI.log("气血本已充盈，这一份温养无处可去，尽数化入经脉——修为 +" + _conv + "。", "success");
+                    var _conv = this.addExp(15);
+                    if (_conv > 0) GAME.UI.log("气血本已充盈，这一份温养无处可去，尽数化入经脉——修为 +" + _conv + "。", "success");
+                    else GAME.UI.log("气血与修为俱已盈满，这一份温养终究无处可去。", "system");
                 } else {
                     p.currentHp += _real;
                     GAME.UI.log("气血回复 " + _real + " 点（现 " + p.currentHp + "/" + p.maxHp + "）。", "success");

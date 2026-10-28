@@ -252,7 +252,8 @@ GAME.Time = {
             delete p.wounded;
             GAME.UI.log("你静坐调息 " + t.months + " 个月，行功过气，淤塞的经脉尽数通畅——气血尽复，重伤已愈。", "success");
         } else {
-            p.currentExp += t.exp;
+            // 封顶：实收量（修为已满时闭关不再虚涨，日志也只报实收）
+            t.expGot = GAME.Core.addExp(t.exp);
             if (t.mind > 0) p.mind = (p.mind || 0) + t.mind;
         }
 
@@ -270,13 +271,15 @@ GAME.Time = {
         }
 
         // 修炼日志带折叠键（fold）：见闻录把连续打坐累加成一条，不刷屏（疗伤档不折叠）
-        var foldArg = opts.healOnly ? null : { fold: "meditate", months: t.months, exp: t.exp, mind: t.mind };
+        var gotExp = (t.expGot != null) ? t.expGot : t.exp;
+        var foldArg = opts.healOnly ? null : { fold: "meditate", months: t.months, exp: gotExp, mind: t.mind };
+        var _fullNote = (gotExp <= 0 && !opts.healOnly) ? "——本境修为已圆满，枯坐无益，该寻破境之机了" : "";
         if (t.cycles <= 1) {
-            GAME.UI.log("你闭门吐纳 " + t.months + " 个月，杂灵根吸纳的灵气微乎其微，修为 +" + t.exp +
-                (extra ? "（藏经阁 +" + extra + "）" : "") + "。", "info", foldArg);
+            GAME.UI.log("你闭门吐纳 " + t.months + " 个月，杂灵根吸纳的灵气微乎其微，修为 +" + gotExp +
+                (extra ? "（藏经阁 +" + extra + "）" : "") + _fullNote + "。", "info", foldArg);
         } else {
-            GAME.UI.log("你闭关苦修 " + t.months + " 个月，出关时蒲团上落了一层灰——修为 +" + t.exp +
-                (t.mind > 0 ? "，心境 +" + t.mind : "") + "。", "info", foldArg);
+            GAME.UI.log("你闭关苦修 " + t.months + " 个月，出关时蒲团上落了一层灰——修为 +" + gotExp +
+                (t.mind > 0 ? "，心境 +" + t.mind : "") + _fullNote + "。", "info", foldArg);
         }
         // 闭关期间挂屏蔽标记：passTime 内的夺舍/追杀检查据此不打断闭关
         p.seclusion = { id: t.id, shielded: !!t.shielded };
