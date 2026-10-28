@@ -173,7 +173,7 @@ GAME.Garden = {
             GAME.UI.log("【泄露值 " + p.leak + "/" + g.leakCaught + "】红灯警示：执法长老的神识将于下月掠过药园！" +
                 "速做打算——①催熟时焚【恶臭草】掩味；②把私药【暂存于玄傀体内】；两手空空硬抗，则必被查获罚没。", "danger");
         } else if (add > 0) {
-            GAME.UI.log("【泄露值 +" + add + "（现 " + p.leak + "/" + g.leakWarn + "）】药香隐隐外泄，暂无人察觉。达 " + g.leakWarn + " 时神识便会掠园——早备恶臭草为上。", "info");
+            GAME.UI.log("【泄露值 +" + add + "（现 " + p.leak + "/" + g.leakCaught + "）】药香隐隐外泄，暂无人察觉。达 " + g.leakWarn + " 时神识便会掠园——早备恶臭草为上。", "info");
         }
     },
 

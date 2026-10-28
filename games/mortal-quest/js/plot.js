@@ -305,6 +305,11 @@ GAME.Plot = {
             GAME.UI.log("第 " + (i + 1) + " 垄是自个儿下种的灵药，没有可退的百年苗。", "system");
             GAME.UI.updateUI(); return false;
         }
+        // 已注入绿液（年份 > 100）：锁死起出，防止误触拔苗吞掉已投入的绿液（#1 防绿液血本无归）
+        if (s.years > cfg.hundred) {
+            GAME.UI.log("第 " + (i + 1) + " 垄已长到 " + s.years + " 年、注入了绿液，此刻起出只会损失所有年份——静待满千年采收千年灵药。", "system");
+            GAME.UI.updateUI(); return false;
+        }
         GAME.State.addItem(cfg.transplantItem, 1);   // 退回一株百年灵药
         p.plots[i] = null;
         GAME.UI.log("你起出第 " + (i + 1) + " 垄的移栽苗，退回一株【" + GAME.DATA.ITEMS[cfg.transplantItem].name + "】。", "info");
@@ -354,16 +359,20 @@ GAME.Plot = {
         p = p || GAME.State.p();
         if (!p) return null;
         this._ensure(p);
-        var list = this.slots(p), growing = 0, mature = 0, ready = 0, nextLeft = null, i;
+        var list = this.slots(p), growing = 0, mature = 0, ready = 0, nextLeft = null, growingQian = 0, i;
+        var cap = this.cfg().capYears;
         for (i = 0; i < list.length; i++) {
             if (list[i].empty) continue;
             growing++;
             if (list[i].mature) mature++;
             if (list[i].ready) ready++;
             else if (nextLeft === null || list[i].left < nextLeft) nextLeft = list[i].left;
+            // 千年培育中（移栽苗 / 下种苗已转千年、未满千年）：计入「培育千年药中」
+            if (list[i].target === cap && !list[i].ready) growingQian++;
         }
         return {
             plots: this.plots(), growing: growing, mature: mature, ready: ready,
+            growingQian: growingQian,
             nextLeft: nextLeft, list: list,
             seed: GAME.State.countItem(this.cfg().seedItem)
         };

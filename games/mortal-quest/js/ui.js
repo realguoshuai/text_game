@@ -841,8 +841,10 @@ GAME.UI = {
         box.style.display = "";
 
         var head = this.$("plot-head-text");
-        if (head) head.innerText = st.growing + " / " + st.plots + " 垄在长" +
-            (st.ready > 0 ? " · " + st.ready + " 株千年可收" : (st.mature > 0 ? " · " + st.mature + " 株百年可收" : ""));
+        if (head) head.innerText = "药圃 " + st.growing + " / " + st.plots + " 垄在长" +
+            (st.ready > 0 ? " · " + st.ready + " 株千年可收"
+                : (st.mature > 0 ? " · " + st.mature + " 株百年可收"
+                    : (st.growingQian > 0 ? "（培育千年药中）" : "")));
 
         // 状态条右侧：灵田等阶 ＋ 手上存药。空垄时改成一句"点击打理药圃 ›"——
         // 光挂一个 0/3 的死数字，玩家既不知道点得动，也不知道该拿什么去种。
@@ -864,7 +866,7 @@ GAME.UI = {
             var t = "药圃 · " + st.growing + "/" + st.plots + " 垄在长";
             if (st.ready > 0) t += ' · <b class="bt-plus">' + st.ready + " 株千年可收</b>";
             else if (st.mature > 0) t += ' · <b class="bt-plus">' + st.mature + " 株百年可收</b>";
-            else if (st.nextLeft != null) t += " · 最近 " + GAME.Plot._fmtMonths(st.nextLeft) + "后成";
+            else if (st.nextLeft != null) t += " · 最近 " + GAME.Plot._fmtMonths(st.nextLeft) + (st.growingQian > 0 ? "后成（培育千年药中）" : "后成");
             sum.innerHTML = t;
         }
 
@@ -959,8 +961,8 @@ GAME.UI = {
                 } else if (s.ready) {
                     desc.innerText = s.years + " 年 · 已满千年";
                     var bH = document.createElement("button");
-                    bH.className = "small-btn plot-btn";
-                    bH.innerText = "收成·千年灵药";
+                    bH.className = "small-btn plot-btn plot-btn-ready";
+                    bH.innerText = "★ 采收千年灵药";
                     bH.onclick = function () { GAME.Plot.harvest(s.i); };
                     acts.appendChild(bH);
                 } else if (s.mature) {
@@ -987,7 +989,7 @@ GAME.UI = {
                     acts.appendChild(bA);
                     acts.appendChild(bD);
                 } else if (s.target === capYears) {
-                    // 千年培育中（移栽苗 / 下种苗已转千年）：催熟在左，移栽苗可起出在右
+                    // 千年培育中（移栽苗 / 下种苗已转千年）：催熟在左
                     desc.innerText = s.years + " 年 · 千年培育中";
                     var bA2 = document.createElement("button");
                     bA2.className = "small-btn plot-btn";
@@ -1005,12 +1007,23 @@ GAME.UI = {
                     acts.appendChild(bA2);
                     acts.appendChild(bD2);
                     if (s.isTransplant) {
-                        var bPull = document.createElement("button");
-                        bPull.className = "small-btn plot-btn plot-btn-weak";
-                        bPull.innerText = "起出幼苗（退回百年药）";
-                        bPull.title = "起出移栽苗，退回一株百年灵药";
-                        bPull.onclick = function () { GAME.Plot.pullOut(s.i); };
-                        acts.appendChild(bPull);
+                        if (s.years <= GAME.DATA.PLOT.hundred) {
+                            // 刚移栽、尚未注入绿液：可起出退回百年药（不损失）
+                            var bPull = document.createElement("button");
+                            bPull.className = "small-btn plot-btn plot-btn-weak";
+                            bPull.innerText = "起出百年苗";
+                            bPull.title = "起出移栽苗，退回一株百年灵药";
+                            bPull.onclick = function () { GAME.Plot.pullOut(s.i); };
+                            acts.appendChild(bPull);
+                        } else {
+                            // 已注入绿液（年份 > 100）：锁死置灰，防误触拔苗吞掉绿液
+                            var bLock = document.createElement("button");
+                            bLock.className = "small-btn plot-btn plot-btn-weak";
+                            bLock.innerText = "培育千年（差 " + (capYears - s.years) + " 年）";
+                            bLock.disabled = true;
+                            bLock.title = "已注入绿液，起出将损失所有年份——静待满千年再采收";
+                            acts.appendChild(bLock);
+                        }
                     }
                 } else {
                     // 幼苗（下种苗 <100 年）
@@ -1339,7 +1352,7 @@ GAME.UI = {
             var gsAlert = (GAME.Garden && GAME.Garden.status) ? GAME.Garden.status() : null;
             var leakV = gsAlert ? (gsAlert.leak || 0) : 0;
             aw("alert-wrap-leak", leakV > 0);
-            var leakCap = gsAlert ? (gsAlert.leakWarn || 80) : 80;
+            var leakCap = gsAlert ? (gsAlert.leakCaught || 100) : 100;
             if (leakV > 0) this.$("leak-text").innerText = leakV + "/" + leakCap;
             // 重伤未愈：战败后气血停在残血值。**没有额外的清除入口**——
             // 过时间自然回血（core.js 每月 +10），只要涨过战败那一刻的值就自解。

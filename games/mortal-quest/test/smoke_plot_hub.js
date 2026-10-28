@@ -210,12 +210,26 @@ function dumpText(node, acc) {
     (node.children || []).forEach(function (c) { dumpText(c, acc); });
     return acc;
 }
-// 移栽苗满 100 年：显示「催熟 +250年」「直催千年」「起出幼苗（退回百年药）」，不显示「收成·百年灵药」
+// 移栽苗满 100 年（刚移栽、未注入绿液）：显示「催熟 +250年」「直催千年」「起出百年苗」（可退回），不显示「收成·百年灵药」
 ok('移栽苗不显示「收成·百年灵药」', !dumpText(els['plot-list'], []).some(function (t) { return /收成·百年灵药/.test(t); }));
 ok('移栽苗显示「催熟 +250年」', dumpText(els['plot-list'], []).some(function (t) { return /催熟 \+250年/.test(t); }));
 ok('移栽苗显示「直催千年」', dumpText(els['plot-list'], []).some(function (t) { return /直催千年/.test(t); }));
-ok('移栽苗显示「起出幼苗（退回百年药）」', dumpText(els['plot-list'], []).some(function (t) { return /起出幼苗（退回百年药）/.test(t); }));
-// 移栽苗此刻收不动（不误拔），且 harvest 不产出百年灵药（#1 破除死循环）
+ok('移栽苗满100年显示「起出百年苗」可退回', dumpText(els['plot-list'], []).some(function (t) { return /起出百年苗/.test(t); }));
+// 刚移栽未注绿液：起出退回一株百年灵药（不损失）
+ok('移栽苗满100年起出退回百年药', (function () {
+    var n = G.State.countItem('herb_bainian');
+    var r = G.Plot.pullOut(0);
+    return r === true && G.State.countItem('herb_bainian') === n + 1 && G.State.p().plots[0] === null;
+})());
+// 重新移栽并注入绿液：年份 > 100 后锁定「培育千年（差 X 年）」防误拔（保护已投入绿液）
+G.State.addItem('herb_bainian', 1);
+G.Plot.plant(0);
+G.State.p().liquid = 10;
+G.Plot.catalyzeAdd(0);                 // 100 → 350 年
+U.updateUI();
+ok('注入绿液后显「培育千年（差 650 年）」', dumpText(els['plot-list'], []).some(function (t) { return /培育千年（差 650 年）/.test(t); }));
+ok('已注绿液后起出被锁（防吞绿液）', G.Plot.pullOut(0) === false);
+// 移栽苗此刻仍收不动、不误产百年药（#1 破除死循环）
 ok('移栽苗此刻收不动、不误产百年药', (function () {
     var n = G.State.countItem('herb_bainian');
     var r = G.Plot.harvest(0);

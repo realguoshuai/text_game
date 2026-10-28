@@ -318,7 +318,7 @@ h3 { margin: 0 0 8px 0; color: var(--text-dim); font-size: 14px; border-left: 3p
     background-color: var(--container-bg);
     border: 1px solid var(--panel-border);
     border-radius: 8px;
-    padding: 12px 10px 28px;   /* 上 12 / 下 28：确保首排按钮与底部灵液项完整露出，不被滚动容器截断 */
+    padding: 12px 10px 32px;   /* 上 12 / 下 32：确保首排按钮与底部灵液项完整露出，不被滚动容器截断 */
 }
 #panel-area > .panel {
     border: none;
@@ -1022,6 +1022,9 @@ button .btn-why {
 /* 每垄操作区：按钮横向排布、窄屏自动换行（#3：统一高度、右对齐主操作） */
 .plot-acts { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; align-items:center; }
 .plot-btn-weak { opacity:.72; }
+/* 千年药成熟：高亮主操作（与 .bt-ready 同源观感，但作用于药圃 .plot-acts 区） */
+.plot-btn-ready { border-color: var(--gold-bd); color: var(--gold-tx); background: rgba(176,141,87,.18); font-weight: 700; }
+.plot-btn-ready:hover:not(:disabled) { background: rgba(176,141,87,.30); border-color: var(--gold); }
 #plot-hint { line-height: 1.5; }
 
 /* ===== 坐化：一世账目（死亡不是结束，是这一世结束）===== */
@@ -1331,7 +1334,7 @@ body::after {
         var(--grain);
     border: 1px solid #b99a63;
     border-radius: 2px;
-    padding: 13px 15px 15px;
+    padding: 13px 15px 32px;
     box-shadow: inset 0 0 34px rgba(150,120,70,.24), inset 0 0 0 1px rgba(255,250,235,.34);
 }
 #panel-area > .panel { padding: 0; }
@@ -1739,7 +1742,7 @@ details.dropdown .dd-body .btn-why { color: #a2351f; }
     .actions > .act-tile, .actions > details#dd-catalyze { grid-column: span 1; }
     .actions > .act-hero-btn, .actions > details#dd-meditate > summary.act-hero-btn { font-size: 17px; letter-spacing: 4px; padding: 14px 4px; }
     .actions > button, .actions > details > summary { font-size: 14px; min-height: 54px; }
-    #panel-area { padding: 11px 11px 13px; }
+    #panel-area { padding: 11px 11px 32px; }
     .id-cell { padding: 2px 9px; font-size: 12.5px; }
     .id-cell:nth-of-type(4) .id-bar, .id-cell:nth-of-type(5) .id-bar { width: 40px; }
     .id-row .stats-more[open] > .stats-more-grid { width: min(430px, 92vw); }
