@@ -394,7 +394,7 @@ button:disabled {
 /* 右列封顶：禁用原因（.btn-why）会把按钮撑长，不封顶则左列被压成 0 宽（中文竖排） */
 .item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0;
     max-width: 58%; flex-wrap: wrap; justify-content: flex-end; }
-.item-right button { white-space: normal; }
+.item-right button { white-space: normal; padding: 6px 12px; flex-shrink: 0; line-height: 1.4; min-height: 0; overflow: visible; }
 .item-right .btn-why { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
 .empty-tip { color: var(--text-faint); font-size: 12px; text-align: center; padding: 8px; }
 
@@ -1246,7 +1246,7 @@ body::after {
     box-shadow: 0 0 0 3px #14170f, 0 0 0 4px rgba(176,141,87,.26), 0 10px 26px rgba(0,0,0,.5);
 }
 #plot-head {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     padding: 1px 3px 3px;
     font-size: 12px; letter-spacing: 2px; color: #a8916a;
 }
@@ -3548,8 +3548,11 @@ body.theme-light .log-trade { color: #6B4B12; }
 }
 #plot-head:hover b, #plot-head:focus-visible b { color: #f0dcae; }
 #plot-head:active { background-color: rgba(176,141,87,.20); }
+/* 状态摘要（左）：10 垄等长文案要能收缩/换行，否则把右侧实况挤出导致重叠 */
+#plot-head-text { min-width: 0; overflow-wrap: anywhere; }
 #plot-head-more {
     margin-left: auto;
+    flex-shrink: 0; text-align: right;
     font-size: 11px; letter-spacing: .3px; color: #8f7d5e;
     white-space: nowrap;
     transition: color .15s ease;
@@ -3647,10 +3650,10 @@ body.theme-light #map-actions .item-row.is-main button { box-shadow: 0 0 0 1px #
  *   ① 顶部补 6px 呼吸位（原 padding-top 只有 2px，首条几乎贴着上沿）；
  *   ② 滚起来时挂 .log-scrolled，上沿 10px 做一段渐隐——旧条目是"淡出画面"，
  *      而不是被硬切一刀；停在顶端（首条完整可见）时类名摘掉，首条原样清楚。 */
-#log-box { padding-top: 6px; }
+#log-box { padding-top: 10px; }
 #log-box.log-scrolled {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 6px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 6px);
 }
 
 

@@ -1237,16 +1237,19 @@ GAME.UI = {
                 if (n.reqSect && n.reqSect === p.sectId) sectNode = n;
             });
             var atSect = !!sectNode && p.location === sectNode.id;
+            // 苍南谷（tainan_gu）与本门同处苍南山：升仙大会与拜山入口皆在此，落在此地视同「回了宗门山头」，
+            // 门派按钮应可点开——旧版只认幽篁谷+青梧谷，从散修之地/云京归来先落苍南谷就被锁死（见顶部红字「需回驻地」）。
+            var atSectRange = atHome || atSect || p.location === "tainan_gu";
             var _sectBtn = this.$("btn-sect");
-            _sectBtn.disabled = lock || !(atHome || atSect) || !p.sectId;
+            _sectBtn.disabled = lock || !atSectRange || !p.sectId;
             this._why(_sectBtn, lock ? inlineWhy("btn-sect")
                 : !p.sectId ? "尚未拜入宗门"
-                : !(atHome || atSect) ? "须回青梧谷山门或幽篁谷" : "");
+                : !atSectRange ? "须回青梧谷山门、幽篁谷或苍南谷" : "");
             _sectBtn.title = lock ? lockTitle : "";
             // 「未开启」朱印角标：未拜入门派才盖；已拜入但不在驻地->「需回驻地」褐底
             _sectBtn.classList.remove("badge-locked", "badge-away");
             if (!p.sectId) _sectBtn.classList.add("badge-locked");
-            else if (!(atHome || atSect)) _sectBtn.classList.add("badge-away");
+            else if (!atSectRange) _sectBtn.classList.add("badge-away");
 
             var _ssub = this.$("sect-sub");
             if (_ssub) _ssub.innerText = p.sectId ? (p.innerSect ? "内门主峰（师叔） · 贡献 " : "杂役堂 · 贡献 ") + p.sectContrib : "";
