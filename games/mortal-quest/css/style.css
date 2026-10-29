@@ -222,7 +222,8 @@ h3 { margin: 0 0 8px 0; color: var(--text-dim); font-size: 14px; border-left: 3p
 .nav-g.nav-on {
     color: var(--gold);
     border-color: var(--gold);
-    background: linear-gradient(180deg, rgba(251,191,36,0.12), rgba(251,191,36,0.02));
+    /* 深色主题原用近透明金色叠深底，激活态看着像「纯黑」；改为深红褐实底+金边，古风高亮且不刺眼 */
+    background: linear-gradient(180deg, #6b4226, #43271a);
     box-shadow: inset 0 -2px 0 var(--gold);
 }
 .nav-g.nav-on em { color: var(--gold); opacity: .55; }
@@ -315,6 +316,8 @@ h3 { margin: 0 0 8px 0; color: var(--text-dim); font-size: 14px; border-left: 3p
     flex: 1;
     min-height: 0;
     overflow-y: auto;          /* 只有这里滚动 */
+    display: flex;             /* 让可见面板 flex:1 撑满，消除宗门面板下方灰色断层 */
+    flex-direction: column;
     background-color: var(--container-bg);
     border: 1px solid var(--panel-border);
     border-radius: 8px;
@@ -324,6 +327,10 @@ h3 { margin: 0 0 8px 0; color: var(--text-dim); font-size: 14px; border-left: 3p
     border: none;
     padding: 0;
     background: transparent;
+    flex: 1 1 auto;            /* 撑满 #panel-area，短面板也不留灰色断层 */
+    min-height: 0;
+    overflow-y: auto;          /* 内容超长时面板内部滚动，而非整片灰底露在外面 */
+    box-sizing: border-box;
 }
 
 /* ---------- 按钮 ---------- */
@@ -2339,7 +2346,7 @@ details.dropdown .dd-body .btn-why { color: var(--warning); }
        标题底下留一大片空洞，读起来像从半截开始。
        改成正常文档流，新条目接在末尾，由 JS 负责吸底。 */
     display: block;
-    padding: 2px 4px 6px;
+    padding: 10px 4px 6px;    /* 顶部 10px 呼吸位：首行不再被上沿削掉半截（深色主题此前仅 2px） */
     color: #CFC7BA;
     font-size: 12.5px;
     line-height: 1.75;

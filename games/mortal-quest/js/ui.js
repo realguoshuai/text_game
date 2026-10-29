@@ -1117,7 +1117,7 @@ GAME.UI = {
             sub.innerText = "\u2605 百年灵药可收 · 点击采收";
             if (btn) btn.classList.add("bt-ready");
         } else if (st.growing < st.plots) {
-            sub.innerText = st.growing + " / " + st.plots + " 垄在长（宜下种）";
+            sub.innerText = st.growing + " / " + st.plots + " 垄 · 灵田空置（宜下种）";
             if (btn) btn.classList.remove("bt-ready");
         } else {
             var nx = GAME.Plot._fmtMonths(st.nextLeft);
