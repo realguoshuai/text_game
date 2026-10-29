@@ -38,7 +38,11 @@ GAME.Relic = {
         if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
             GAME.Core.stopAutoCult("已入古修遗迹，石门落锁——洞府里的功课只能先搁下。");
         p.relic = { stepsLeft: cfg.steps, active: true };
-        GAME.State.setCd("relic", cfg.cooldownMonths);
+        // ⚠ 冷却「不在进入时」挂，而只在「脱离/走完」时挂（见 exit / flee）。
+        // 旧版在此 setCd，会导致「探索中（p.relic 为真→全场锁定）」与「休整中（cdLeft>0→节点显示【休整中】）」
+        // 两个状态同时为真——玩家既被判定身处秘境深处（修行/身家/宗门/历练全锁死），
+        // 节点又显示【休整中 · 尚需 4 月】，进退失据、像被永久困住。现在冷却只在真正离场后起算，
+        // 探索期间 cdLeft 恒为 0：状态互斥，互不打架（见 state.js 的 dungeonName 单一判据）。
         GAME.UI.log("你推开古修洞府的石门，尘封千载的灵机扑面而来——十二步探秘，生死未卜。", "danger");
         GAME.UI.updateUI();
     },
@@ -126,14 +130,35 @@ GAME.Relic = {
         return { total: total, done: done, left: total - done };
     },
 
-    // ---------- 见好就收：强行脱离（不给通关奖励，已入囊的战利品保留；冷却已在入时挂上） ----------
+    // ---------- 见好就收：强行脱离（不给通关奖励，已入囊的战利品保留；脱离即起算休整） ----------
     flee: function () {
         var p = GAME.State.p();
         if (!p || !p.relic) return false;
         var pr = this.progress(p);
         p.relic = null;   // 唯一状态位清空 → State.inDungeon 现算为假，页签与 8 宫格随之解锁
+        GAME.State.setCd("relic", this.cfg().cooldownMonths);   // 真正离场才起算休整（与 exit 同一把尺子）
         GAME.UI.log("你按住心中贪念，循原路退出古修遗迹——此番深入 " + pr.done + " 步，所得已入囊；余下造化，留待后缘。", "system");
         GAME.UI.autoSave();
+        GAME.UI.updateUI();
+        return true;
+    },
+
+    // ---------- 保底脱身：无论探索中还是异常卡死，都强行清掉遗迹状态 ----------
+    // 与 flee 的分工：flee 是「正常探索中」的优雅离场（保留战利品 + 起算休整）；
+    // forceReset 是兜底保险——即使出现状态异常（p.relic 残留但卡片未渲染、或残魂战路由悬空），
+    // 也能把遗迹相关标志位一并清掉，解除全场锁定，杜绝任何「进退失据」的二次卡死。
+    // 斗法之中不强行清（免得清了 p.relic 却仍在打架，由战斗里的遁走/胜负收口），先提示玩家了结战局。
+    forceReset: function () {
+        var p = GAME.State.p();
+        if (!p) return false;
+        if (p.combat) {
+            GAME.UI.log("古修残魂未散，斗法未了——须先分出胜负或施展遁术，方能脱离遗迹。", "danger");
+            return false;
+        }
+        if (p.relic) return this.flee();   // 正常探索中 → 走既有脱离（保留战利品 + 起算休整）
+        // 非探索态：清掉任何可能悬空的残魂战路由，确认状态清爽
+        if (p.combatRoute && p.combatRoute.type === "relic") p.combatRoute = null;
+        GAME.UI.log("你当前并未身处古修遗迹，状态已确认清爽。", "system");
         GAME.UI.updateUI();
         return true;
     },
@@ -142,6 +167,7 @@ GAME.Relic = {
     exit: function () {
         var p = GAME.State.p();
         p.relic = null;
+        GAME.State.setCd("relic", this.cfg().cooldownMonths);   // 真正离场才起算休整（与 flee 同一把尺子）
         var rw = this.cfg().clearReward;
         if (rw) {
             GAME.State.addItem(rw.id, rw.qty || 1);

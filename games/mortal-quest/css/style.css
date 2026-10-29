@@ -3821,6 +3821,11 @@ body.theme-light #recipe-list .recipe-effect .recipe-gain { color: #1F5F45; }
 .relic-card-warn { color: var(--warning); }
 .relic-card .combat-actions { grid-template-columns: 1fr 1fr; margin: 6px 0 4px; }
 
+/* 保底脱身键：常驻于遗迹卡底部，满宽高亮——遇异常卡死可一键强清遗迹状态，杜绝二次卡死 */
+.relic-escape { margin-top: 8px; }
+.relic-escape .combat-actions { grid-template-columns: 1fr; margin: 6px 0 2px; }
+.relic-escape-btn { width: 100%; letter-spacing: 1px; }
+
 /* 浅色主题：朱红描边压淡一档，纸底不刺眼（写在基样式之后，覆盖自然生效） */
 body.theme-light .relic-card {
     background: rgba(162, 53, 31, .05);

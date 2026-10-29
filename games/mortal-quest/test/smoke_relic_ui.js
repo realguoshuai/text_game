@@ -143,15 +143,20 @@ ok('见闻录写了「第 1 步」', hasLog(/第 1 步/));
 U.renderRelicCard();
 ok('卡片进度跟着走到「第 1 / 12 步」', /第 1 \/ 12 步/.test(dumpText(els['relic-card'], []).join(' ')));
 
-// ---------- ③ 见好就收：清状态、解锁、卡片收起 ----------
-section('③ 见好就收：清状态位 → 页签/8 宫格解锁');
+// ---------- ③ 见好就收：清状态、解锁；保底键常驻不收起 ----------
+section('③ 见好就收：清状态位 → 页签/8 宫格解锁；保底键常驻');
 logs.length = 0;
 const fled = bFlee.onclick();
 ok('flee 后 p.relic 为空', !P().relic);
 ok('State.inDungeon 现算为假（页签锁与宫格置灰随之解除）', G.State.inDungeon(P()) === false);
 ok('见闻录写「循原路退出古修遗迹」并报表步数', hasLog(/循原路退出古修遗迹.*深入 1 步/));
 U.renderRelicCard();
-ok('卡片收起（清空内容 + display:none）', dumpText(els['relic-card'], []).join('').length === 0 && els['relic-card'].style.display === 'none');
+ok('保底脱身键【强行脱身 / 返回现世】仍常驻可见（不再整体收起→避免二次卡死）', !!findById(els['relic-card'], 'btn-relic-escape'));
+ok('非探索态点保底键：清悬空路由、返回 true', (function(){
+    P().combatRoute = { type: 'relic' };
+    var r = G.Relic.forceReset();
+    return r === true && !P().relic && !(P().combatRoute && P().combatRoute.type === 'relic');
+})());
 
 // ---------- ④ 深处时「秘境游历」互斥 ----------
 section('④ 秘境游历：深处一律拦下（含时间不推进）');
@@ -206,8 +211,36 @@ U.renderRelicCard();
 const bFlee2 = findById(els['relic-card'], 'btn-relic-flee');
 ok('斗法中【见好就收】置灰', !!bFlee2 && bFlee2.disabled === true);
 ok('斗法中给的是「先分出胜负或施展遁术」', /先分出胜负或施展遁术/.test(bFlee2.title || ''));
+const bEsc2 = findById(els['relic-card'], 'btn-relic-escape');
+ok('斗法中保底键同样置灰（避免斗法中清掉 relic 却仍在打架）', !!bEsc2 && bEsc2.disabled === true);
 P().combat = null;
+U.renderRelicCard();
+const bEsc3 = findById(els['relic-card'], 'btn-relic-escape');
+ok('脱战后台底键恢复可点', !!bEsc3 && bEsc3.disabled === false);
 P().relic = null;
+
+// ---------- ⑨ 根因修复：探索中不再误判「休整中」，状态互斥 ----------
+section('⑨ 状态互斥：探索中 cdLeft==0（不误判休整）；离场后才起算休整');
+logs.length = 0;
+P().realmIndex = 13;
+P().relic = null;
+G.State.setCd('relic', 0);            // 清掉冷却，确保可进入
+P().relic = { stepsLeft: 12, active: true };
+ok('探索中 State.cdLeft("relic") === 0（不会误显示【休整中】）', G.State.cdLeft('relic') === 0);
+ok('探索中 dungeonName === "古修遗迹" 且 inDungeon 为真（全场锁定合理）',
+    G.State.dungeonName(P()) === '古修遗迹' && G.State.inDungeon(P()) === true);
+U.tab = 'secret';
+U.renderSecret();
+const list9 = dumpText(els['secret-list'], []).join(' ');
+ok('节点状态行显示「探索中」而非「休整中」', /探索中/.test(list9) && !/休整中/.test(list9));
+// 走完 12 步脱离 → 起算休整
+G.Relic.exit();
+ok('离场后 p.relic 为空', !P().relic);
+ok('离场后 State.cdLeft("relic") === 4（休整 4 月才起算）', G.State.cdLeft('relic') === 4);
+ok('离场后 inDungeon 为假（修行/身家/宗门/历练全解锁）', G.State.inDungeon(P()) === false);
+U.renderSecret();
+const list9b = dumpText(els['secret-list'], []).join(' ');
+ok('休整中节点显示「休整中」且不再显示「探索中」', /休整中/.test(list9b) && !/探索中/.test(list9b));
 
 // ---------- 汇总 ----------
 console.log('\n==== 结果：' + pass + ' 通过 / ' + fail + ' 失败 ====');
