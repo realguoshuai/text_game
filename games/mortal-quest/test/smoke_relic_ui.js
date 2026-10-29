@@ -118,40 +118,45 @@ const _log = U.log;
 U.log = function (msg, type) { logs.push({ msg: String(msg), type: type }); return _log.apply(U, arguments); };
 const hasLog = (re) => logs.some(l => re.test(l.msg));
 
-// ---------- ① 探索中必须有一张可点的紧急卡 ----------
-section('① 探索中：紧急卡（继续深入 / 见好就收）');
+// ---------- ① 探索中：整块切换为「多步探索面板」 ----------
+section('① 探索中：多步探索面板（顶栏进度 / 中部遭遇 / 底部双按钮）');
 P().realmIndex = 13;
 P().relic = { stepsLeft: 12, active: true };
 U.renderRelicCard();
 const cardText = dumpText(els['relic-card'], []).join(' ');
-ok('卡片有内容（不再是空白/仅一行提示）', cardText.length > 20);
-ok('标题写「古修遗迹 · 探索中（第 0 / 12 步）」', /古修遗迹 · 探索中（第 0 \/ 12 步）/.test(cardText));
-ok('说明写「已深入古修遗迹第 1 层」并报剩余步数', /已深入古修遗迹第 1 层/.test(cardText) && /尚余 12 步/.test(cardText));
+ok('面板有内容（不再是空白/仅一行提示）', cardText.length > 20);
+ok('顶栏写「古修遗迹 · 第 0 / 12 层」', /古修遗迹 · 第 0 \/ 12 层/.test(cardText));
+ok('中部默认遭遇写「已深入古修遗迹第 1 层」并报剩余步数', /已深入古修遗迹第 1 层/.test(cardText) && /尚余 12 步/.test(cardText));
 const bGo = findById(els['relic-card'], 'btn-relic-go');
 const bFlee = findById(els['relic-card'], 'btn-relic-flee');
 ok('有【继续深入秘境】按钮', !!bGo && /继续深入秘境/.test(bGo.innerText));
-ok('有【见好就收 · 强行脱离秘境】按钮', !!bFlee && /见好就收/.test(bFlee.innerText));
+ok('有【见好就收 · 退出】按钮', !!bFlee && /见好就收/.test(bFlee.innerText));
 ok('两个按钮都绑了 onclick', !!bGo.onclick && !!bFlee.onclick);
+const bEsc = findById(els['relic-card'], 'btn-relic-escape');
+ok('右上角保底【脱身】键存在', !!bEsc && /脱身/.test(bEsc.innerText));
 
-// ---------- ② 继续深入：走一步并刷新卡片 ----------
-section('② 继续深入：走一步、扣一步、刷新进度');
+// ---------- ② 继续深入：走一步并刷新面板 ----------
+section('② 继续深入：走一步、扣一步、刷新进度与遭遇');
 logs.length = 0;
 const before = P().relic.stepsLeft;
 bGo.onclick();
 ok('步数由 ' + before + ' 减到 ' + P().relic.stepsLeft, P().relic.stepsLeft === before - 1);
 ok('见闻录写了「第 1 步」', hasLog(/第 1 步/));
 U.renderRelicCard();
-ok('卡片进度跟着走到「第 1 / 12 步」', /第 1 \/ 12 步/.test(dumpText(els['relic-card'], []).join(' ')));
+ok('顶栏进度跟着走到「古修遗迹 · 第 1 / 12 层」', /古修遗迹 · 第 1 \/ 12 层/.test(dumpText(els['relic-card'], []).join(' ')));
+ok('中部遭遇更新为「第 1 步」描述', /第 1 步/.test(dumpText(els['relic-card'], []).join(' ')));
 
-// ---------- ③ 见好就收：清状态、解锁；保底键常驻不收起 ----------
-section('③ 见好就收：清状态位 → 页签/8 宫格解锁；保底键常驻');
+// ---------- ③ 见好就收：清状态、解锁；整块干净切回列表 ----------
+section('③ 见好就收：清状态位 → 页签/8 宫格解锁；面板整体收起、列表恢复');
 logs.length = 0;
 const fled = bFlee.onclick();
 ok('flee 后 p.relic 为空', !P().relic);
 ok('State.inDungeon 现算为假（页签锁与宫格置灰随之解除）', G.State.inDungeon(P()) === false);
 ok('见闻录写「循原路退出古修遗迹」并报表步数', hasLog(/循原路退出古修遗迹.*深入 1 步/));
 U.renderRelicCard();
-ok('保底脱身键【强行脱身 / 返回现世】仍常驻可见（不再整体收起→避免二次卡死）', !!findById(els['relic-card'], 'btn-relic-escape'));
+ok('脱离后 #relic-card 整体清空（不再残留红框/面板）', els['relic-card'].innerHTML === '');
+ok('脱离后 #secret-list-area 恢复可见（干净切回列表）', els['secret-list-area'] && els['secret-list-area'].style.display !== 'none');
+ok('脱离后 #secret-title 恢复可见', els['secret-title'] && els['secret-title'].style.display !== 'none');
 ok('非探索态点保底键：清悬空路由、返回 true', (function(){
     P().combatRoute = { type: 'relic' };
     var r = G.Relic.forceReset();
@@ -178,17 +183,28 @@ G.Secret.roam();
 ok('游历耗 1 月（时间推进）', P().totalMonths === t1 + 1);
 ok('产生了一条【秘境游历】见闻', hasLog(/【秘境游历】/));
 
-// ---------- ⑥ 秘境列表状态行 ----------
-section('⑥ 秘境列表：状态行指向上方紧急卡');
+// ---------- ⑥ 探索中列表整体让位 ----------
+section('⑥ 秘境列表：探索中整体让位给面板（列表清空，不再显示旧状态行）');
 P().relic = { stepsLeft: 12, active: true };
 U.tab = 'secret';
 U.renderSecret();
-const listText = dumpText(els['secret-list'], []).join(' ');
-ok('状态行写「探索中 · 第 0 / 12 步」', /探索中 · 第 0 \/ 12 步/.test(listText));
-ok('状态行指向「上方紧急面板继续或脱离」', /上方紧急面板继续或脱离/.test(listText));
+ok('探索中 renderSecret 直接清空 #secret-list（列表让位）', dumpText(els['secret-list'], []).join(' ').length === 0);
+U.renderRelicCard();
+ok('探索中 #secret-list-area 被隐藏', els['secret-list-area'] && els['secret-list-area'].style.display === 'none');
+ok('探索中 #secret-title 被隐藏（整块切为面板）', els['secret-title'] && els['secret-title'].style.display === 'none');
+ok('探索中面板顶栏写「古修遗迹 · 第 0 / 12 层」', /古修遗迹 · 第 0 \/ 12 层/.test(dumpText(els['relic-card'], []).join(' ')));
+// 脱离后干净切回列表
+G.Relic.flee();
+U.renderSecret();
+U.renderRelicCard();
+ok('脱离后 #secret-list-area 恢复可见', els['secret-list-area'].style.display !== 'none');
+ok('脱离后 #secret-title 恢复可见', els['secret-title'].style.display !== 'none');
+ok('脱离后 #relic-card 清空（面板不再残留）', els['relic-card'].innerHTML === '');
 
 // ---------- ⑦ 中栏置灰短句按语义分开 ----------
 section('⑦ 中栏短句：历练≠闭关、坊市≠闭关');
+P().relic = { stepsLeft: 8, active: true };   // 身处古修遗迹深处 → 中栏常规操作应被语义化锁起
+P().combat = null;
 U.updateUI();
 ok('打坐键 = 秘境之中，无从闭关', attr('btn-meditate') === '秘境之中，无从闭关');
 ok('历练键 = 秘境之中，无从历练', attr('btn-explore') === '秘境之中，无从历练');
@@ -230,9 +246,9 @@ ok('探索中 State.cdLeft("relic") === 0（不会误显示【休整中】）', 
 ok('探索中 dungeonName === "古修遗迹" 且 inDungeon 为真（全场锁定合理）',
     G.State.dungeonName(P()) === '古修遗迹' && G.State.inDungeon(P()) === true);
 U.tab = 'secret';
-U.renderSecret();
-const list9 = dumpText(els['secret-list'], []).join(' ');
-ok('节点状态行显示「探索中」而非「休整中」', /探索中/.test(list9) && !/休整中/.test(list9));
+U.renderRelicCard();
+const card9 = dumpText(els['relic-card'], []).join(' ');
+ok('探索中面板写「古修遗迹 · 第 0 / 12 层」且不含「休整中」', /古修遗迹 · 第 0 \/ 12 层/.test(card9) && !/休整中/.test(card9));
 // 走完 12 步脱离 → 起算休整
 G.Relic.exit();
 ok('离场后 p.relic 为空', !P().relic);

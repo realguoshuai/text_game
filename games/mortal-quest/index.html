@@ -403,17 +403,20 @@
 
                 <!-- 秘境舆图：筑基期可闯秘境集中视图（节点卡片地图） -->
                 <div class="panel" id="secret-panel">
-                    <h3>秘境舆图</h3>
-                    <!-- 古修遗迹·探宝：探索中常驻紧急互动卡（与 p.relic 同一份状态，由 UI.renderRelicCard 铺设） -->
+                    <h3 id="secret-title">秘境舆图</h3>
+                    <!-- 古修遗迹·探宝：探索中整块接管左栏，此区由 UI.renderRelicCard 铺设「多步探索面板」 -->
                     <div id="relic-card"></div>
-                    <div class="item-desc">筑基修士可闯的秘境尽列于此——有造化，也有杀机。点选秘境即可前往，莫要贸然轻入。</div>
-                    <div id="secret-list"></div>
-                    <h3 style="margin-top:12px;">秘境游历</h3>
-                    <div class="item-desc">不入秘境深处，只在外围游走探看——或有奇遇，亦或空手而返。每次探看耗 1 月。</div>
-                    <div class="combat-actions">
-                        <button id="btn-secret-roam" class="btn-gold">秘境游历（随机奇遇）</button>
+                    <!-- 常规秘境列表 + 游历：探索中由 renderRelicCard 整体隐藏，避免面板压列表造成错乱 -->
+                    <div id="secret-list-area">
+                        <div class="item-desc">筑基修士可闯的秘境尽列于此——有造化，也有杀机。点选秘境即可前往，莫要贸然轻入。</div>
+                        <div id="secret-list"></div>
+                        <h3 style="margin-top:12px;">秘境游历</h3>
+                        <div class="item-desc">不入秘境深处，只在外围游走探看——或有奇遇，亦或空手而返。每次探看耗 1 月。</div>
+                        <div class="combat-actions">
+                            <button id="btn-secret-roam" class="btn-gold">秘境游历（随机奇遇）</button>
+                        </div>
+                        <div id="secret-roam-text" class="event-text" style="margin-top:8px;"></div>
                     </div>
-                    <div id="secret-roam-text" class="event-text" style="margin-top:8px;"></div>
                 </div>
 
                 <!-- 云京皇宫·幽冥地宫：筑基期主线副本（分破四大血侍 → 决战越皇），探索中常驻为紧急面板 -->

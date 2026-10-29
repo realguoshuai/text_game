@@ -3307,6 +3307,7 @@ GAME.UI = {
         var box = this.$("secret-list");
         if (!box) return;
         box.innerHTML = "";
+        if (p.relic) return;   // 探索中：列表让位给「多步探索面板」（由 renderRelicCard 整块接管左栏）
         // 筑基期可闯秘境：节点卡片地图，点击前往复用现有副本逻辑
         var REALMS = [
             {
@@ -3402,91 +3403,95 @@ GAME.UI = {
         }
     },
 
-    // ---------- 古修遗迹·探宝：探索中常驻紧急卡（秘境视图正上方） ----------
-    // 旧版只有「（探索中——请从紧急面板继续）」一行字，而遗迹压根没有紧急面板 →
-    // 玩家进去就卡死：页签被锁、8 宫格按钮全灰、无处可点也退不出。此卡即那个缺失的出口。
-    // 现在更进一步：只要人还活着，#relic-card 永不全空——
-    // ① 探索中：进度卡 +【继续深入】+【见好就收·强行脱离】；
-    // ② 无论探索中还是异常卡死，底部恒定一枚高亮【强行脱身 / 返回现世】保底键（Relic.forceReset），
-    //    强清一切遗迹残留状态，杜绝「进退失据」的二次卡死。
+    // ---------- 古修遗迹·探宝：探索中整块切换为「多步探索面板」 ----------
+    // 旧版在列表上方硬塞一个红框 + 冗长说明，既破坏古风布局、又压住秘境列表。
+    // 现改为：p.relic 活跃时，整个左栏秘境视图让位给这枚古风铜金面板
+    //（顶栏进度 / 中部遭遇 / 底部双按钮），常规列表与游历区整体隐藏；
+    // 脱离后干净切回常规列表，绝不残留状态。保底【脱身】做成右上角精巧朱砂键，
+    // 遇异常卡死（p.relic 残留但面板未显）一键强清遗迹状态、返回现世。
     renderRelicCard: function () {
         var host = this.$("relic-card");
         if (!host) return;
         var p = GAME.State.p();
-        if (p.isDead) { host.innerHTML = ""; host.style.display = "none"; return; }
+        var listArea = this.$("secret-list-area");
+        var titleEl = this.$("secret-title");
         var pr = (GAME.Relic && GAME.Relic.progress) ? GAME.Relic.progress(p) : null;
-        host.innerHTML = "";
-        host.style.display = "";
 
-        // ---------- 探索中：进度 + 继续深入 + 见好就收 ----------
-        if (pr) {
-            var card = document.createElement("div");
-            card.className = "relic-card";
-
-            var title = document.createElement("div");
-            title.className = "relic-card-title";
-            title.innerText = "古修遗迹 · 探索中（第 " + pr.done + " / " + pr.total + " 步）";
-            card.appendChild(title);
-
-            var desc = document.createElement("div");
-            desc.className = "relic-card-desc";
-            desc.innerText = "已深入古修遗迹第 " + Math.min(pr.done + 1, pr.total) + " 层，身后石门已闭——" +
-                "前方或有灵物、宝箱，亦有机关与残魂。尚余 " + pr.left + " 步可行。";
-            card.appendChild(desc);
-
-            // 残血提醒：机关扣血不留情，硬闯容易当场暴毙
-            if (p.maxHp > 0 && p.currentHp / p.maxHp < 0.3) {
-                var hp = document.createElement("div");
-                hp.className = "relic-card-desc relic-card-warn";
-                hp.innerText = "⚠ 气血仅 " + p.currentHp + " / " + p.maxHp + "——再撞机关恐有性命之忧。";
-                card.appendChild(hp);
-            }
-
-            var bar = document.createElement("div");
-            bar.className = "combat-actions";
-            var bGo = document.createElement("button");
-            bGo.id = "btn-relic-go";
-            bGo.className = "btn-gold";
-            bGo.innerText = "【继续深入秘境】";
-            bGo.disabled = !!p.combat;
-            bGo.title = p.combat ? "斗法中——先分出胜负" : "";
-            bGo.onclick = function () { GAME.Relic.step(); };
-            var bFlee = document.createElement("button");
-            bFlee.id = "btn-relic-flee";
-            bFlee.className = "small-btn";
-            bFlee.innerText = "【见好就收 · 强行脱离秘境】";
-            bFlee.disabled = !!p.combat;   // 斗法中不许抽身（要脱身走战斗里的遁走），免得清掉 relic 却还在打架
-            bFlee.title = p.combat ? "斗法中——先分出胜负或施展遁术" : "保留已入囊的战利品，立刻退出遗迹";
-            bFlee.onclick = function () { GAME.Relic.flee(); };
-            bar.appendChild(bGo);
-            bar.appendChild(bFlee);
-            card.appendChild(bar);
-            host.appendChild(card);
+        // 死亡 / 非探索：收起面板、还原常规秘境列表（含标题与游历区），DOM 干净清爽
+        if (p.isDead || !pr) {
+            host.innerHTML = "";
+            host.style.display = "none";
+            if (listArea) listArea.style.display = "";
+            if (titleEl) titleEl.style.display = "";
+            return;
         }
 
-        // ---------- 保底脱身键：常驻（探索中即脱身；异常卡死时也能强清状态） ----------
-        // 不依附于 p.relic 是否存在——只要人还活着，这枚「紧急出口」永远亮着，
-        // 杜绝任何「状态残留却无处可点」的二次卡死。复用了 .relic-card 外观，新增 .relic-escape 仅做间距与按钮满宽。
-        var esc = document.createElement("div");
-        esc.className = "relic-card relic-escape";
-        var escDesc = document.createElement("div");
-        escDesc.className = "relic-card-desc";
-        escDesc.innerText = pr
-            ? "若遇异常卡死或想立刻离场，下方保底键随时可用——它比「见好就收」更兜底，强清所有遗迹残留状态。"
-            : "状态清爽：当前并未身处古修遗迹。此保底键常驻，遇任何遗迹卡死可一键脱身。";
-        esc.appendChild(escDesc);
-        var eBar = document.createElement("div");
-        eBar.className = "combat-actions";
+        // 探索中：整块接管左栏秘境视图
+        if (titleEl) titleEl.style.display = "none";
+        if (listArea) listArea.style.display = "none";
+        host.style.display = "";
+        host.innerHTML = "";
+
+        var panel = document.createElement("div");
+        panel.className = "relic-explore";
+
+        // 顶栏：进度标题（左）+ 精巧朱砂【脱身】保底键（右）
+        var head = document.createElement("div");
+        head.className = "relic-explore-head";
+        var ttl = document.createElement("span");
+        ttl.className = "relic-explore-title";
+        ttl.innerText = "古修遗迹 · 第 " + pr.done + " / " + pr.total + " 层";
+        head.appendChild(ttl);
         var bEsc = document.createElement("button");
         bEsc.id = "btn-relic-escape";
-        bEsc.className = "btn-danger relic-escape-btn";
-        bEsc.innerText = "【强行脱身 / 返回现世】";
-        bEsc.disabled = !!p.combat;   // 斗法中不让强清（避免清了 relic 却仍在打架）
+        bEsc.className = "relic-escape-mini";
+        bEsc.innerText = "脱身";
+        bEsc.disabled = !!p.combat;   // 斗法中不让强清（避免清了 relic 却仍在残魂战里）
         bEsc.title = p.combat ? "斗法未了，先分出胜负或施展遁术" : "强制清除古修遗迹探索状态，解除全场锁定，返回现世";
         bEsc.onclick = function () { if (GAME.Relic) GAME.Relic.forceReset(); };
-        eBar.appendChild(bEsc);
-        esc.appendChild(eBar);
-        host.appendChild(esc);
+        head.appendChild(bEsc);
+        panel.appendChild(head);
+
+        // 中部：当前遭遇描述
+        var body = document.createElement("div");
+        body.className = "relic-explore-body";
+        var enc = document.createElement("div");
+        enc.className = "relic-encounter";
+        enc.innerText = (p.relic && p.relic.encounter)
+            ? p.relic.encounter
+            : ("已深入古修遗迹第 " + Math.min(pr.done + 1, pr.total) + " 层，身后石门已闭。尚余 " + pr.left + " 步可行。");
+        body.appendChild(enc);
+        // 残血提醒：机关扣血不留情（小型 inline，非红框）
+        if (p.maxHp > 0 && p.currentHp / p.maxHp < 0.3) {
+            var hp = document.createElement("div");
+            hp.className = "relic-encounter relic-encounter-warn";
+            hp.innerText = "⚠ 气血仅 " + p.currentHp + " / " + p.maxHp + "——再撞机关恐有性命之忧。";
+            body.appendChild(hp);
+        }
+        panel.appendChild(body);
+
+        // 底部操作区：继续深入（左）+ 见好就收 · 退出（右）
+        var bar = document.createElement("div");
+        bar.className = "relic-explore-actions";
+        var bGo = document.createElement("button");
+        bGo.id = "btn-relic-go";
+        bGo.className = "btn-gold";
+        bGo.innerText = "【继续深入秘境】";
+        bGo.disabled = !!p.combat;
+        bGo.title = p.combat ? "斗法中——先分出胜负" : "";
+        bGo.onclick = function () { if (GAME.Relic) GAME.Relic.step(); };
+        var bFlee = document.createElement("button");
+        bFlee.id = "btn-relic-flee";
+        bFlee.className = "small-btn";
+        bFlee.innerText = "【见好就收 · 退出】";
+        bFlee.disabled = !!p.combat;   // 斗法中不许抽身（要脱身走战斗里的遁走），免得清掉 relic 却还在打架
+        bFlee.title = p.combat ? "斗法中——先分出胜负或施展遁术" : "保留已入囊的战利品，立刻退出遗迹";
+        bFlee.onclick = function () { if (GAME.Relic) GAME.Relic.flee(); };
+        bar.appendChild(bGo);
+        bar.appendChild(bFlee);
+        panel.appendChild(bar);
+
+        host.appendChild(panel);
     },
 
     renderQixuan: function () {

@@ -37,7 +37,10 @@ GAME.Relic = {
         }
         if (GAME.Core && GAME.Core.autoCultRunning && GAME.Core.autoCultRunning())
             GAME.Core.stopAutoCult("已入古修遗迹，石门落锁——洞府里的功课只能先搁下。");
-        p.relic = { stepsLeft: cfg.steps, active: true };
+        p.relic = {
+            stepsLeft: cfg.steps, active: true,
+            encounter: "石门初启，尘封千载的灵机扑面而来——十二步探秘，生死未卜。前路幽深，唯见石壁古刻指引去踪。"
+        };
         // ⚠ 冷却「不在进入时」挂，而只在「脱离/走完」时挂（见 exit / flee）。
         // 旧版在此 setCd，会导致「探索中（p.relic 为真→全场锁定）」与「休整中（cdLeft>0→节点显示【休整中】）」
         // 两个状态同时为真——玩家既被判定身处秘境深处（修行/身家/宗门/历练全锁死），
@@ -68,11 +71,13 @@ GAME.Relic = {
             var q = g.qty ? GAME.Core.rand(g.qty[0], g.qty[1]) : 1;
             GAME.State.addItem(g.id, q);
             GAME.UI.log("第 " + stepNo + " 步：你采得【" + GAME.DATA.ITEMS[g.id].name + "】×" + q + "！（已入囊）", "success");
+            p.relic.encounter = "第 " + stepNo + " 步：你于断壁残垣间采得【" + GAME.DATA.ITEMS[g.id].name + "】×" + q + "。灵物莹润生辉，已悄然纳入囊中。";
         } else if (picked.type === "chest") {
             var c = this._pick(cfg.chestTable);
             var q2 = c.qty ? GAME.Core.rand(c.qty[0], c.qty[1]) : 1;
             GAME.State.addItem(c.id, q2);
             GAME.UI.log("第 " + stepNo + " 步：你撬开一只古修宝箱，得【" + GAME.DATA.ITEMS[c.id].name + "】×" + q2 + "！", "loot");
+            p.relic.encounter = "第 " + stepNo + " 步：你撬开一只古修遗下的石匣，得【" + GAME.DATA.ITEMS[c.id].name + "】×" + q2 + "。宝光乍现，似有前人遗泽封存其中。";
         } else if (picked.type === "trap") {
             var t = cfg.trap;
             var d = GAME.Core.rand(t.hp[0], t.hp[1]);
@@ -83,8 +88,10 @@ GAME.Relic = {
             GAME.UI.log("第 " + stepNo + " 步：机关骤发！你受损 " + d + " 气血、被夺 " + lost + " 灵石。", "danger");
             GAME.Core.checkDeath();
             if (p.isDead) return;
+            p.relic.encounter = "第 " + stepNo + " 步：机关骤发！你损 " + d + " 气血、被夺 " + lost + " 灵石。石室轰鸣，尘烟未散，须稳住心神。";
         } else { // wraith：残魂战斗
             GAME.UI.log("第 " + stepNo + " 步：一缕古修残魂扑噬而来！", "danger");
+            p.relic.encounter = "第 " + stepNo + " 步：一缕古修残魂自骨堆中扑噬而来！杀机凛冽，须全力应对。";
             p.combatRoute = { type: "relic" };
             GAME.Combat.start(cfg.monsters[0]);
             return;   // 胜负后由 afterCombat 续推
@@ -109,6 +116,7 @@ GAME.Relic = {
         if (!p.relic) return;
         if (win) {
             GAME.UI.log("残魂散尽，遗迹深处似有宝光流转。", "success");
+            p.relic.encounter = "残魂散尽，遗迹深处似有宝光流转——前路仍幽，杀机未绝，不可掉以轻心。";
         } else {
             // 败北软着陆：重伤退出、战利品散失，不判当场身陨（由 combat.js defeat 调至此）
             GAME.UI.log("你重伤退出古修遗迹，此行所得多半散失于风沙。", "danger");
