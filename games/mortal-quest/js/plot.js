@@ -293,7 +293,7 @@ GAME.Plot = {
         GAME.State.addItem(item, n);
         p.plots[i] = null;
         GAME.UI.log("你小心起出第 " + (i + 1) + " 垄的药，得【" + GAME.DATA.ITEMS[item].name + "】×" + n +
-            (twin ? "（双生暴击 +1）" : "") + "。", "loot");
+            (twin ? "（双生暴击 +1）" : "") + "。", "loot", { merge: "harvest_" + item, qty: n });
         GAME.UI.autoSave(); GAME.UI.updateUI();
         return true;
     },

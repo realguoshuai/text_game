@@ -82,7 +82,7 @@ GAME.Sect = {
         }
         p.liquid -= m.steal.liquid;
         GAME.State.addItem(m.steal.gain.id, m.steal.gain.qty);
-        GAME.UI.log("你借承露瓶绿液催熟私藏药草，得【" + GAME.DATA.ITEMS[m.steal.gain.id].name + "】×" + m.steal.gain.qty + "。", "success");
+        GAME.UI.log("你借承露瓶绿液催熟私藏药草，得【" + GAME.DATA.ITEMS[m.steal.gain.id].name + "】×" + m.steal.gain.qty + "。", "success", { merge: "sect_green_" + m.steal.gain.id, qty: m.steal.gain.qty });
 
         if (Math.random() < m.steal.catchChance) {
             // 抽取惩罚

@@ -275,6 +275,30 @@ GAME.UI = {
             if (typeof box.scrollHeight === "number" && typeof box.clientHeight === "number") {
                 atBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 48;
             }
+            // 同类合并：短时间内连续触发的相同条目（绿液催熟 / 采集等），合并数量避免刷屏
+            if (fold && fold.merge) {
+                var _mk2 = fold.merge, _mq2 = fold.qty || 1, _mt2 = null;
+                var _kids2 = box.children;
+                for (var _mi2 = _kids2.length - 1, _mb2 = 0; _mi2 >= 0 && _mb2 < 6; _mi2--, _mb2++) {
+                    var _dm2 = (_kids2[_mi2].getAttribute && _kids2[_mi2].getAttribute("data-merge")) || null;
+                    if (_dm2 === _mk2 && _kids2[_mi2].classList && _kids2[_mi2].classList.contains("log-" + type)) { _mt2 = _kids2[_mi2]; break; }
+                    if (_dm2) break; // 别种合并条目：那是另一批连续操作的结尾，不跨批合并
+                }
+                if (_mt2) {
+                    _mt2._mergeQty = (_mt2._mergeQty || _mq2) + _mq2;
+                    var _mbody2 = _mt2.querySelector ? _mt2.querySelector(".log-msg") : null;
+                    if (_mbody2) _mbody2.innerText = _mbody2.innerText.replace(/×\s*\d+/, "×" + _mt2._mergeQty);
+                    var _mtime2 = _mt2.querySelector ? _mt2.querySelector(".log-time") : null;
+                    if (_mtime2) _mtime2.innerText = "[" + p.ageYears + "岁" + p.ageMonths + "月]";
+                    box.appendChild(_mt2);
+                    if (atBottom && typeof box.scrollHeight === "number") {
+                        var _selfM2 = this;
+                        requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; _selfM2._syncLogScroll(box); });
+                    }
+                    if (GAME.BattleUI) GAME.BattleUI.feed(message, type);
+                    return;
+                }
+            }
             // 折叠：向上找最近一条同键条目（允许中间插几条系统日志），累加耗时/产出后
             // 就地更新文本与时间戳，并把它挪回末尾——保持「最近的动作在最底部」
             if (key) {
@@ -339,6 +363,10 @@ GAME.UI = {
             if (key) {
                 entry.setAttribute("data-fold", key);
                 entry._foldAcc = { n: 1, months: fold.months || 0, exp: fold.exp || 0, mind: fold.mind || 0 };
+            }
+            if (fold && fold.merge) {
+                entry.setAttribute("data-merge", fold.merge);
+                entry._mergeQty = fold.qty || 1;
             }
             // 新条目接在末尾。原来是 column-reverse + insertBefore(firstChild)：
             // 好处是 CSS 原生吸底，坏处是条目不满一屏时整块贴到底，标题底下一大片空。
@@ -1089,11 +1117,11 @@ GAME.UI = {
             sub.innerText = "\u2605 百年灵药可收 · 点击采收";
             if (btn) btn.classList.add("bt-ready");
         } else if (st.growing < st.plots) {
-            sub.innerText = st.growing + " / " + st.plots + " 垄 · 灵田空置（宜下种）";
+            sub.innerText = st.growing + " / " + st.plots + " 垄在长（宜下种）";
             if (btn) btn.classList.remove("bt-ready");
         } else {
             var nx = GAME.Plot._fmtMonths(st.nextLeft);
-            sub.innerText = st.plots + " / " + st.plots + " 垄在长 · 最近 " + (nx || "\u2014") + "熟";
+            sub.innerText = st.growing + " / " + st.plots + " 垄在长 · 最近 " + (nx || "\u2014") + "熟";
             if (btn) btn.classList.remove("bt-ready");
         }
     },
@@ -1290,14 +1318,10 @@ GAME.UI = {
                 }
                 var _dn = this.$("dd-time-text");
                 if (_dn) {
-                    var _seg = ["寿元余 " + GAME.Time.remainShort(p)];
-                    if (p.marketNextRefresh != null) {
-                        var _mk = Math.max(0, p.marketNextRefresh - (p.totalMonths || 0));
-                        _seg.push(_mk > 0 ? "坊市 " + _mk + " 月后换货" : "坊市新到货");
-                    }
+                    var _seg = [];
                     var _ps = (GAME.Plot && GAME.Plot.status) ? GAME.Plot.status(p) : null;
                     if (_ps) _seg.push("药圃 " + _ps.growing + " 垄在长");
-                    _dn.innerText = _seg.join("　｜　");
+                    _dn.innerText = _seg.length ? _seg.join("　｜　") : "凝神静修，不急一朝一夕";
                 }
                 var _pv = this.$("dd-sec-preview");
                 if (_pv) {

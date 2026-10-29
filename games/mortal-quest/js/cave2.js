@@ -139,7 +139,7 @@ GAME.Cave2 = {
         }
         p.liquid -= 1;
         GAME.State.addItem("spirit_wood", 3);
-        GAME.UI.log("你滴一滴绿液于灵木幼苗根部——枝干拔节暴长，转瞬百年之材，得【百年灵木】×3。", "loot");
+        GAME.UI.log("你滴一滴绿液于灵木幼苗根部——枝干拔节暴长，转瞬百年之材，得【百年灵木】×3。", "loot", { merge: "herb_bainian", qty: 3 });
         GAME.UI.autoSave();
         GAME.UI.updateUI();
         return 3;

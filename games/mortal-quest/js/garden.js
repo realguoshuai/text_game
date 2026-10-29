@@ -122,7 +122,7 @@ GAME.Garden = {
         var n = 2 + extra;
         GAME.State.addItem("herb_ecao", n);
         GAME.UI.log("你在园角辟了半垄地，种下奇臭无比的恶臭草。一月之后，收获【恶臭草】×" + n +
-            (extra ? "（灵田 +" + extra + "）" : "") + "——臭得连蜂蝶都绕道，正好掩药香。", "success");
+            (extra ? "（灵田 +" + extra + "）" : "") + "——臭得连蜂蝶都绕道，正好掩药香。", "success", { merge: "garden_ecao", qty: n });
         GAME.Core.passTime(1);
     },
 
